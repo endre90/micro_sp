@@ -1,0 +1,7 @@
+[workspace]
+members = [
+    "micro_sp_smt",
+    "micro_sp_tools",
+    "micro_sp_runner",
+    "micro_sp_examples"
+]
