@@ -1,8 +1,13 @@
 use micro_sp_tools::*;
+use micro_sp_runner::*;
 use micro_sp_examples::robot::robot_1;
-use std::env;
+use std::sync::{Arc, Mutex};
+use tokio::sync::mpsc::channel;
+use r2r::*;
+use tokio::prelude::*;
 
-fn main() {
+#[tokio::main]
+async fn main() {
 
     let robot_model = robot_1();
     let domain = vec!("left", "right", "home");
@@ -19,6 +24,8 @@ fn main() {
     let problem = PlanningProblem::new("problem_1", &init, &goal, &robot_model, &Predicate::TRUE, &30);
     
     let result = incremental::incremental(&problem);
+
+    // let _m = runner(&problem);
 
     println!("\n");
     println!("============================================");

@@ -10,6 +10,9 @@ edition = "2018"
 micro_sp_tools = { path = "../micro_sp_tools" }
 micro_sp_runner = { path = "../micro_sp_runner" }
 plotlib = "0.5.1"
+tokio = { version = "0.2", features = ["full"] }
+tokio-util = { version = "0.3.1", features = ["codec"] }
+r2r = { git = "https://github.com/sequenceplanner/r2r" }
 
 [dev-dependencies]
 serial_test = "0.4.0"

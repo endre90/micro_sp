@@ -588,7 +588,10 @@ dependencies = [
  "micro_sp_runner",
  "micro_sp_tools",
  "plotlib",
+ "r2r",
  "serial_test",
+ "tokio",
+ "tokio-util",
 ]
 
 [[package]]

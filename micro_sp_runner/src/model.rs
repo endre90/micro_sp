@@ -1,7 +1,9 @@
+use std::time::{Instant};
+// use z3_sys::*;
 use micro_sp_tools::*;
-// use micro_sp_runner::*;
+// use super::*;
 
-pub fn robot_1() -> Vec<Transition> {
+pub fn model() -> PlanningProblem {
 
     let ref_pos = "ref_robot_1_pose";
     let act_pos = "act_robot_1_pose";
@@ -55,5 +57,18 @@ pub fn robot_1() -> Vec<Transition> {
         )
     }
 
-    move_to_transitions
+    let robot_model = move_to_transitions;
+    let domain = vec!("left", "right", "home");
+
+    let init = Predicate::AND(
+        vec!(
+            Predicate::EQRL(EnumVariable::new("act_robot_1_pose", "act_robot_1_pose", &domain, None, &ControlKind::None), String::from("left")),
+            Predicate::EQRL(EnumVariable::new("ref_robot_1_pose", "ref_robot_1_pose", &domain, None, &ControlKind::None), String::from("left"))
+        )
+    );
+
+    let goal = Predicate::EQRL(EnumVariable::new("act_robot_1_pose", "act_robot_1_pose", &domain, None, &ControlKind::None), String::from("right"));
+
+    let problem = PlanningProblem::new("problem_1", &init, &goal, &robot_model, &Predicate::TRUE, &30);
+    problem
 }
