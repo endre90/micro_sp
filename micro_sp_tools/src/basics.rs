@@ -7,7 +7,7 @@ pub struct Parameter {
 #[derive(Eq, Debug, PartialEq, Clone, PartialOrd, Ord)]
 pub enum ControlKind {
     Measured,
-    Control,
+    Command,
     Estimated,
     None
 }

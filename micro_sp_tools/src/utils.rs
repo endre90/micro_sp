@@ -80,6 +80,8 @@ impl GetProblemVars {
             s.extend(GetPredicateVars::new(&t.guard));
             s.extend(GetPredicateVars::new(&t.update));
         }
+        s.extend(GetPredicateVars::new(&prob.init));
+        s.extend(GetPredicateVars::new(&prob.goal));
         s.sort();
         s.dedup();
         s

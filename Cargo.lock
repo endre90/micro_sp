@@ -582,19 +582,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "micro_sp_examples"
-version = "0.1.0"
-dependencies = [
- "micro_sp_runner",
- "micro_sp_tools",
- "plotlib",
- "r2r",
- "serial_test",
- "tokio",
- "tokio-util",
-]
-
-[[package]]
 name = "micro_sp_runner"
 version = "0.1.0"
 dependencies = [
@@ -828,16 +815,6 @@ name = "pin-project-lite"
 version = "0.1.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "282adbf10f2698a7a77f8e983a74b2d18176c19a7fd32a45446139ae7b02b715"
-
-[[package]]
-name = "plotlib"
-version = "0.5.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9462104f987d8d0f6625f0c7764f1c8b890bd1dc8584d8293e031f25c5a0d242"
-dependencies = [
- "failure",
- "svg",
-]
 
 [[package]]
 name = "plotters"
@@ -1129,12 +1106,6 @@ name = "strsim"
 version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8ea5119cdb4c55b55d432abb513a0429384878c15dde60cc77b1c99de1a95a6a"
-
-[[package]]
-name = "svg"
-version = "0.7.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3685c82a045a6af0c488f0550b0f52b4c77d2a52b0ca8aba719f9d268fa96965"
 
 [[package]]
 name = "syn"
