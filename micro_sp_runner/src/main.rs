@@ -2,6 +2,8 @@ use tokio::prelude::*;
 use r2r::*;
 use tokio::sync::mpsc::channel;
 use micro_sp_tools::*;
+use lib::{Pair, Pairs};
+mod receiver;
 mod emmiter;
 mod model;
 
@@ -23,11 +25,19 @@ async fn main() -> io::Result<()> {
         let (mut tx, rx) = channel::<String>(10);
         ros_receivers.push((v.name.clone(), rx));
         let sub = move |x: r2r::std_msgs::msg::String| {
-            tx.try_send(x.data).unwrap();
+            tx.try_send(x.data).unwrap_or_default();
         };
         let _subref = node.subscribe(&format!("/{}", v.name), Box::new(sub))
             .expect("69900836-cc9c-4ea5-9f2f-1f585dae70b1: Creating subscribers failed.");
     }  
+
+    let mut measured_state = Pairs::new(&vec!());
+    for r in ros_receivers {
+        tokio::task::spawn(async{
+            let receiver = receiver::receiver(r.1);
+            let _res = tokio::try_join!(receiver);
+        });
+    }
 
     // generate subscribers for ControlKind::Command kind variables
     let mut ros_senders: Vec<(String, tokio::sync::mpsc::Sender<String>)> = vec!();

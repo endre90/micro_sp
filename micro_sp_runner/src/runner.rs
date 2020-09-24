@@ -1,77 +1,24 @@
-use std::time::{Instant};
-// use z3_sys::*;
+use tokio::prelude::*;
+use std::{thread, time};
+use r2r::*;
 use micro_sp_tools::*;
-// use super::*;
 
-pub fn runner(prob: &PlanningProblem) -> PlanningProblem {
+// pub async fn emmiter(publisher: Publisher<std_msgs::msg::String>,
+//     mut recv: tokio::sync::mpsc::Receiver<std::string::String>) -> io::Result<()> {
 
-    let ref_pos = "ref_robot_1_pose";
-    let act_pos = "act_robot_1_pose";
-    let ref_stat = "ref_robot_1_stat";
-    let mut move_to_transitions = vec!();
-    let ref_robot_pos_domain = vec!("left", "home", "right");
-    let act_robot_pos_domain = vec!("left", "home", "right", "unknown");
-    let ref_robot_stat_domain = vec!("idle", "active");
-    // let transition_state_domain = vec!("idle", "exec");
-    for rpd in &ref_robot_pos_domain {
-        move_to_transitions.push(
-            Transition::new(
-                &format!("start_move_to_{}", rpd),
-                &Predicate::AND(
-                    vec!(
-                        // Predicate::EQRL(EnumVariable::new(&format!("start_move_to_{}", rpd),, &format!("start_move_to_{}", rpd), &transition_state_domain, None, &ControlKind::None), String::from("executing")),
-                        Predicate::NOT(
-                            Box::new(Predicate::EQRL(EnumVariable::new(ref_pos, ref_pos, &ref_robot_pos_domain, None, &ControlKind::Command), String::from(rpd.to_owned()))
-                            )
-                        ),
-                        Predicate::NOT(
-                            Box::new(Predicate::EQRL(EnumVariable::new(act_pos, act_pos, &act_robot_pos_domain, None, &ControlKind::Measured), String::from(rpd.to_owned()))
-                            )
-                        )
-                    )
-                ),
-                &Predicate::AND(
-                    vec!(
-                        Predicate::EQRL(EnumVariable::new(ref_pos, ref_pos, &ref_robot_pos_domain, None, &ControlKind::Command), String::from(rpd.to_owned()))
-                    )
-                )
-            )
-        );
-        move_to_transitions.push(
-            Transition::new(
-                &format!("finish_move_to_{}", rpd),
-                &Predicate::AND(
-                    vec!(
-                        // Predicate::EQRL(EnumVariable::new(&format!("start_move_to_{}", rpd),, &format!("start_move_to_{}", rpd), &transition_state_domain, None, &ControlKind::None), String::from("executing")),
-                        Predicate::EQRL(EnumVariable::new(ref_pos, ref_pos, &ref_robot_pos_domain, None, &ControlKind::Command), String::from(rpd.to_owned())),
-                        Predicate::NOT(
-                            Box::new(Predicate::EQRL(EnumVariable::new(act_pos, act_pos, &act_robot_pos_domain, None, &ControlKind::Measured), String::from(rpd.to_owned()))
-                            )
-                        )
-                    )
-                ),
-                &Predicate::AND(
-                    vec!(
-                        Predicate::EQRL(EnumVariable::new(act_pos, act_pos, &act_robot_pos_domain, None, &ControlKind::Measured), String::from(rpd.to_owned()))
-                    )
-                )
-            )
-        )
+//     loop {
+//         thread::sleep(time::Duration::from_millis(100));
+//         let to_pub = recv.recv().await.unwrap();
+//         let to_send = std_msgs::msg::String { data: to_pub.to_owned()};
+//         publisher.publish(&to_send).unwrap();
+//     }
+// }
+
+
+pub async fn runner(prob: PlanningProblem,  recv: Vec<(String, tokio::sync::mpsc::Receiver<std::string::String>)>) -> io::Result<()> { // (String, tokio::sync::mpsc::Receiver<std::string::String>) {
+    loop{
+        for r in &recv {
+            // println!("{:?}", r.0)
+        }
     }
-
-    let robot_model = move_to_transitions;
-    let domain = vec!("left", "right", "home");
-
-    let init = Predicate::AND(
-        vec!(
-            Predicate::EQRL(EnumVariable::new("act_robot_1_pose", "act_robot_1_pose", &domain, None, &ControlKind::Measured), String::from("left")),
-            Predicate::EQRL(EnumVariable::new("ref_robot_1_stat", "ref_robot_1_stat", &ref_robot_stat_domain, None, &ControlKind::Command), String::from("idle")),
-            Predicate::EQRL(EnumVariable::new("ref_robot_1_pose", "ref_robot_1_pose", &domain, None, &ControlKind::Command), String::from("left"))
-        )
-    );
-
-    let goal = Predicate::EQRL(EnumVariable::new("act_robot_1_pose", "act_robot_1_pose", &domain, None, &ControlKind::Measured), String::from("right"));
-
-    let problem = PlanningProblem::new("problem_1", &init, &goal, &robot_model, &Predicate::TRUE, &30);
-    problem
 }

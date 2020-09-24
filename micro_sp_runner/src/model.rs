@@ -64,13 +64,14 @@ pub fn model() -> PlanningProblem {
 
     let init = Predicate::AND(
         vec!(
-            Predicate::EQRL(EnumVariable::new("act_robot_1_pose", "act_robot_1_pose", &domain, None, &ControlKind::Measured), String::from("left")),
+            Predicate::EQRL(EnumVariable::new("act_robot_1_pose", "act_robot_1_pose", &act_robot_pos_domain, None, &ControlKind::Measured), String::from("left")),
+            Predicate::EQRL(EnumVariable::new("act_robot_2_pose", "act_robot_2_pose", &act_robot_pos_domain, None, &ControlKind::Measured), String::from("left")),
             Predicate::EQRL(EnumVariable::new("ref_robot_1_stat", "ref_robot_1_stat", &ref_robot_stat_domain, None, &ControlKind::Command), String::from("idle")),
-            Predicate::EQRL(EnumVariable::new("ref_robot_1_pose", "ref_robot_1_pose", &domain, None, &ControlKind::Command), String::from("left"))
+            Predicate::EQRL(EnumVariable::new("ref_robot_1_pose", "ref_robot_1_pose", &ref_robot_pos_domain, None, &ControlKind::Command), String::from("left"))
         )
     );
 
-    let goal = Predicate::EQRL(EnumVariable::new("act_robot_1_pose", "act_robot_1_pose", &domain, None, &ControlKind::Measured), String::from("right"));
+    let goal = Predicate::EQRL(EnumVariable::new("act_robot_1_pose", "act_robot_1_pose", &act_robot_pos_domain, None, &ControlKind::Measured), String::from("right"));
 
     let problem = PlanningProblem::new("problem_1", &init, &goal, &robot_model, &Predicate::TRUE, &30);
     problem

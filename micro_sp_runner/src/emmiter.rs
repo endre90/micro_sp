@@ -1,5 +1,3 @@
-use std::sync::Mutex;
-use std::sync::Arc;
 use tokio::prelude::*;
 use std::{thread, time};
 use r2r::*;
