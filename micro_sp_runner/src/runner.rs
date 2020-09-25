@@ -10,7 +10,9 @@ use std::io;
 use micro_sp_tools::*;
 use super::*;
 
-pub async fn runner(prob: PlanningProblem, ros_receivers: Vec<(String, KeyValuePair, tokio::sync::mpsc::Receiver<String>)>) -> io::Result<()> {
+pub async fn runner(prob: PlanningProblem, 
+                    ros_receivers: Vec<(String, KeyValuePair, tokio::sync::mpsc::Receiver<String>)>,
+                    ros_senders: Vec<(String, tokio::sync::mpsc::Sender<String>)>) -> io::Result<()> {
     
     let vars = GetProblemVars::new(&prob);
     let msr_vars: Vec<EnumVariable> = vars.iter().filter(|x| x.kind == ControlKind::Measured).map(|x| x.clone()).collect();
@@ -37,6 +39,15 @@ pub async fn runner(prob: PlanningProblem, ros_receivers: Vec<(String, KeyValueP
         for t in &measured_list {
             println!("{:?}", *t.lock().unwrap());
         }
+
+        for v in &cmd_vars {
+            for s in &ros_senders {
+                if v.name == s.0 {
+                    s.1.clone().try_send(s.0.to_string()).unwrap_or_default();
+                }
+            }
+        }
+
         delay_for(Duration::from_millis(10)).await;
     }
 }

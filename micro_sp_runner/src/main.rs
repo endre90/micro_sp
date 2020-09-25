@@ -38,11 +38,6 @@ async fn main() -> io::Result<()> {
             .expect("69900836-cc9c-4ea5-9f2f-1f585dae70b1: Creating subscribers failed.");
     }  
 
-    tokio::task::spawn(async{
-        let recv = runner::runner(problem, ros_receivers);
-        let _res = tokio::try_join!(recv);
-    });
-
     // generate publishers for ControlKind::Command kind variables
     let mut ros_senders: Vec<(String, tokio::sync::mpsc::Sender<String>)> = vec!();
     for v in cmd_vars.clone() {
@@ -56,19 +51,18 @@ async fn main() -> io::Result<()> {
         });
     }
 
+    tokio::task::spawn(async{
+        let recv = runner::runner(problem, ros_receivers, ros_senders);
+        let _res = tokio::try_join!(recv);
+    });
+
     loop {
 
         // for t in &measured_list {
         //     println!("{:?}", *t.lock().unwrap());
         // }
 
-        for v in &cmd_vars {
-            for s in &ros_senders {
-                if v.name == s.0 {
-                    s.1.clone().try_send(s.0.to_string()).unwrap_or_default();
-                }
-            }
-        }
+        
         node.spin_once(std::time::Duration::from_millis(10));
     }
 }
