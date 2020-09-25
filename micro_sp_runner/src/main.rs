@@ -1,16 +1,14 @@
-use tokio::prelude::*;
 use r2r::*;
 use std::sync::Mutex;
 use std::sync::Arc;
 use tokio::sync::mpsc::channel;
 use micro_sp_tools::*;
 use lib::{KeyValuePair, State};
-use futures::*;
 use std::io;
+mod runner;
 mod receiver;
 mod emmiter;
 mod model;
-
 
 #[tokio::main]
 async fn main() -> io::Result<()> {
@@ -24,9 +22,9 @@ async fn main() -> io::Result<()> {
     let msr_vars: Vec<EnumVariable> = vars.iter().filter(|x| x.kind == ControlKind::Measured).map(|x| x.clone()).collect();
     let cmd_vars: Vec<EnumVariable> = vars.iter().filter(|x| x.kind == ControlKind::Command).map(|x| x.clone()).collect();
 
-    let mut measured_values = msr_vars.iter().map(|x| KeyValuePair::new(x.name.as_str(), "dummy_value")).collect();
-    let mut measured_state = State::new(&measured_values);
-    println!("{:?}", measured_state);
+    // let measured_values = msr_vars.iter().map(|x| KeyValuePair::new(x.name.as_str(), "dummy_value")).collect();
+    // let measured_state = State::new(&measured_values);
+    // println!("{:?}", measured_state);
 
     // generate subscribers for ControlKind::Measured kind variables
     let mut ros_receivers: Vec<(String, KeyValuePair, tokio::sync::mpsc::Receiver<String>)> = vec!();
@@ -40,18 +38,10 @@ async fn main() -> io::Result<()> {
             .expect("69900836-cc9c-4ea5-9f2f-1f585dae70b1: Creating subscribers failed.");
     }  
 
-    let mut test_list = vec!();
-    for r in ros_receivers {
-        let kvp = measured_values.iter().find(|x| x.key == r.1.key).unwrap();
-        let amkvp = Arc::new(Mutex::new(*kvp));
-        let amkvp1 = amkvp.clone();
-        let amkvp2 = amkvp.clone();
-        tokio::task::spawn(async{
-            let receiver = receiver::receiver(r.0, amkvp2, r.2);
-            let _res = tokio::try_join!(receiver);
-        });
-        test_list.push(amkvp1);
-    }
+    tokio::task::spawn(async{
+        let recv = runner::runner(problem, ros_receivers);
+        let _res = tokio::try_join!(recv);
+    });
 
     // generate publishers for ControlKind::Command kind variables
     let mut ros_senders: Vec<(String, tokio::sync::mpsc::Sender<String>)> = vec!();
@@ -68,10 +58,10 @@ async fn main() -> io::Result<()> {
 
     loop {
 
-        for t in &test_list {
-            println!("{:?}", *t.lock().unwrap());
-        }
-        
+        // for t in &measured_list {
+        //     println!("{:?}", *t.lock().unwrap());
+        // }
+
         for v in &cmd_vars {
             for s in &ros_senders {
                 if v.name == s.0 {

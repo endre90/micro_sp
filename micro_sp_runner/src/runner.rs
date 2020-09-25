@@ -1,24 +1,42 @@
 use tokio::prelude::*;
 use std::{thread, time};
+use std::sync::Mutex;
+use std::sync::Arc;
+use lib::{KeyValuePair, State};
 use r2r::*;
+use tokio::time::delay_for;
+use std::time::Duration;
+use std::io;
 use micro_sp_tools::*;
+use super::*;
 
-// pub async fn emmiter(publisher: Publisher<std_msgs::msg::String>,
-//     mut recv: tokio::sync::mpsc::Receiver<std::string::String>) -> io::Result<()> {
+pub async fn runner(prob: PlanningProblem, ros_receivers: Vec<(String, KeyValuePair, tokio::sync::mpsc::Receiver<String>)>) -> io::Result<()> {
+    
+    let vars = GetProblemVars::new(&prob);
+    let msr_vars: Vec<EnumVariable> = vars.iter().filter(|x| x.kind == ControlKind::Measured).map(|x| x.clone()).collect();
+    let cmd_vars: Vec<EnumVariable> = vars.iter().filter(|x| x.kind == ControlKind::Command).map(|x| x.clone()).collect();
 
-//     loop {
-//         thread::sleep(time::Duration::from_millis(100));
-//         let to_pub = recv.recv().await.unwrap();
-//         let to_send = std_msgs::msg::String { data: to_pub.to_owned()};
-//         publisher.publish(&to_send).unwrap();
-//     }
-// }
+    let measured_values = msr_vars.iter().map(|x| KeyValuePair::new(x.name.as_str(), "dummy_value")).collect();
+    let measured_state = State::new(&measured_values);
 
+    let mut measured_list = vec!();
+    for r in ros_receivers {
+        let kvp = measured_values.iter().find(|x| x.key == r.1.key).unwrap();
+        let amkvp = Arc::new(Mutex::new(*kvp));
+        let amkvp1 = amkvp.clone();
+        let amkvp2 = amkvp.clone();
+        tokio::task::spawn(async{
+            let receiver = receiver::receiver(r.0, amkvp2, r.2);
+            let _res = tokio::try_join!(receiver);
+        });
+        measured_list.push(amkvp1);
+    }
 
-pub async fn runner(prob: PlanningProblem,  recv: Vec<(String, tokio::sync::mpsc::Receiver<std::string::String>)>) -> io::Result<()> { // (String, tokio::sync::mpsc::Receiver<std::string::String>) {
-    loop{
-        for r in &recv {
-            // println!("{:?}", r.0)
+    loop {
+
+        for t in &measured_list {
+            println!("{:?}", *t.lock().unwrap());
         }
+        delay_for(Duration::from_millis(10)).await;
     }
 }
