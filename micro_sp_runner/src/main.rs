@@ -18,7 +18,7 @@ async fn main() -> io::Result<()> {
         .expect("Error 8fddc8c1-7cce-4cd7-97e0-c16438ac3a28: Creating ros node failed.");
 
     let problem = model::model();
-    let vars = GetProblemVars::new(&problem);
+    let vars = get_problem_vars(&problem);
     let msr_vars: Vec<EnumVariable> = vars.iter().filter(|x| x.kind == ControlKind::Measured).map(|x| x.clone()).collect();
     let cmd_vars: Vec<EnumVariable> = vars.iter().filter(|x| x.kind == ControlKind::Command).map(|x| x.clone()).collect();
 
@@ -26,7 +26,7 @@ async fn main() -> io::Result<()> {
     // let measured_state = State::new(&measured_values);
     // println!("{:?}", measured_state);
 
-    // generate subscribers for ControlKind::Measured kind variables
+    // generate subscribers for ControlKind::Measured kind variables (maybe all? testing needed)
     let mut ros_receivers: Vec<(String, KeyValuePair, tokio::sync::mpsc::Receiver<String>)> = vec!();
     for v in &msr_vars {
         let (mut tx, rx) = channel::<String>(10);

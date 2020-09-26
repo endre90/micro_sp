@@ -31,7 +31,7 @@ pub struct EnumVariable {
 
 #[derive(Eq, Debug, PartialEq, Clone, PartialOrd, Ord)]
 pub struct State {
-    pub state: Vec<KeyValuePair>
+    pub pairs: Vec<KeyValuePair>
 }
 
 impl KeyValuePair {
@@ -63,7 +63,7 @@ impl KeyValuePair {
 impl State {
     pub fn new(pairs: &Vec<KeyValuePair>) -> State {
         State {
-            state: pairs.iter().map(|x| x.to_owned()).collect()
+            pairs: pairs.iter().map(|x| x.to_owned()).collect()
         }
     }
 }
@@ -125,9 +125,9 @@ impl Default for EnumVariable {
 #[test]
 fn test_new_enum_variable(){
     let param = Parameter::new("param1", &false);
-    assert_eq!("EnumVariable { name: \"z\", type: \"letters\", domain: [\"a\", \"b\", \"c\", \"d\"], param: Parameter { name: \"TRUE\", value: true }, kind: None }", 
+    assert_eq!("EnumVariable { name: KeyValuePair { key: \"z\", value: \"dummy_value\" }, type: \"letters\", domain: [\"a\", \"b\", \"c\", \"d\"], param: Parameter { name: \"TRUE\", value: true }, kind: None }", 
         &format!("{:?}", EnumVariable::new("z", "letters", &vec!("a", "b", "c", "d"), None, &ControlKind::None)));
-    assert_eq!("EnumVariable { name: \"z\", type: \"letters\", domain: [\"a\", \"b\", \"c\", \"d\"], param: Parameter { name: \"param1\", value: false }, kind: None }", 
+    assert_eq!("EnumVariable { name: KeyValuePair { key: \"z\", value: \"dummy_value\" }, type: \"letters\", domain: [\"a\", \"b\", \"c\", \"d\"], param: Parameter { name: \"param1\", value: false }, kind: None }", 
         &format!("{:?}", EnumVariable::new("z", "letters", &vec!("a", "b", "c", "d"), Some(&param), &ControlKind::None)));
 
 }

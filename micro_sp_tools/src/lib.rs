@@ -8,4 +8,4 @@ pub mod incremental;
 pub use crate::incremental::{Transition, PlanningProblem, incremental, PlanningFrame, PlanningResult};
 
 pub mod utils;
-pub use crate::utils::{GetPredicateVars, GetProblemVars, IterOps};
+pub use crate::utils::{get_predicate_vars, get_problem_vars, result_to_states, IterOps};

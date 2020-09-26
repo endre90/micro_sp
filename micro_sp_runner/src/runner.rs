@@ -13,12 +13,12 @@ pub async fn runner(prob: PlanningProblem,
                     ros_receivers: Vec<(String, KeyValuePair, tokio::sync::mpsc::Receiver<String>)>,
                     ros_senders: Vec<(String, tokio::sync::mpsc::Sender<String>)>) -> io::Result<()> {
     
-    let vars = GetProblemVars::new(&prob);
+    let vars = get_problem_vars(&prob);
     let msr_vars: Vec<EnumVariable> = vars.iter().filter(|x| x.kind == ControlKind::Measured).map(|x| x.clone()).collect();
     let cmd_vars: Vec<EnumVariable> = vars.iter().filter(|x| x.kind == ControlKind::Command).map(|x| x.clone()).collect();
 
-    let measured_values = msr_vars.iter().map(|x| KeyValuePair::new(x.name.key.as_str(), "dummy_value")).collect();
-    let measured_state = State::new(&measured_values);
+    let measured_values: Vec<KeyValuePair> = msr_vars.iter().map(|x| KeyValuePair::dummy(x.name.key.as_str())).collect();
+    // let measured_state = State::new(&measured_values);
 
     let mut measured_list = vec!();
     for r in ros_receivers {
@@ -33,11 +33,20 @@ pub async fn runner(prob: PlanningProblem,
         measured_list.push(amkvp1);
     }
 
-    loop {
+    let result = incremental(&prob);
+    println!("{:?}", result);
+    let table = result_to_states(&result);
+    println!("{:?}", table);
 
+    loop {
+        let mut measured_state = vec!();
         for t in &measured_list {
+            measured_state.push(*t.lock().unwrap());
             println!("{:?}", *t.lock().unwrap());
         }
+        let msrd_state = State::new(&measured_state);
+        // compare complete or partial states?
+        // have to handle estimated state also somehow??
 
         for v in &cmd_vars {
             for s in &ros_senders {

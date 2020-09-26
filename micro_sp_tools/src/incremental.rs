@@ -72,7 +72,7 @@ impl PlanningProblem {
 
 impl <'ctx> KeepVariableValues<'ctx> {
     pub fn new(ctx: &'ctx ContextZ3, vars: &Vec<EnumVariable>, trans: &Transition, step: &u32) -> Z3_ast {
-        let changed = GetPredicateVars::new(&trans.update);
+        let changed = get_predicate_vars(&trans.update);
         let unchanged = IterOps::difference(vars, &changed);
         let mut assert_vec = vec!();
         for u in unchanged {
@@ -92,7 +92,7 @@ pub fn incremental(prob: &PlanningProblem) -> PlanningResult {
     let ctx = ContextZ3::new(&cfg);
     let slv = SolverZ3::new(&ctx);
 
-    let problem_vars = GetProblemVars::new(&prob);
+    let problem_vars = get_problem_vars(&prob);
 
     SlvAssertZ3::new(&ctx, &slv, PredicateToAstZ3::new(&ctx, &prob.init, "state", &0));
 
