@@ -1,5 +1,5 @@
 pub mod basics;
-pub use crate::basics::{Parameter, ControlKind, EnumVariable};
+pub use crate::basics::{Parameter, ControlKind, EnumVariable, KeyValuePair, State};
 
 pub mod predicates;
 pub use crate::predicates::{Predicate, PredicateToAstZ3};

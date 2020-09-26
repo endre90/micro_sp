@@ -2,7 +2,6 @@ use tokio::prelude::*;
 use std::{thread, time};
 use std::sync::Mutex;
 use std::sync::Arc;
-use lib::{KeyValuePair, State};
 use r2r::*;
 use tokio::time::delay_for;
 use std::time::Duration;
@@ -18,7 +17,7 @@ pub async fn runner(prob: PlanningProblem,
     let msr_vars: Vec<EnumVariable> = vars.iter().filter(|x| x.kind == ControlKind::Measured).map(|x| x.clone()).collect();
     let cmd_vars: Vec<EnumVariable> = vars.iter().filter(|x| x.kind == ControlKind::Command).map(|x| x.clone()).collect();
 
-    let measured_values = msr_vars.iter().map(|x| KeyValuePair::new(x.name.as_str(), "dummy_value")).collect();
+    let measured_values = msr_vars.iter().map(|x| KeyValuePair::new(x.name.key.as_str(), "dummy_value")).collect();
     let measured_state = State::new(&measured_values);
 
     let mut measured_list = vec!();
@@ -42,7 +41,7 @@ pub async fn runner(prob: PlanningProblem,
 
         for v in &cmd_vars {
             for s in &ros_senders {
-                if v.name == s.0 {
+                if v.name.key.to_string() == s.0 {
                     s.1.clone().try_send(s.0.to_string()).unwrap_or_default();
                 }
             }

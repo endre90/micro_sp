@@ -1,7 +1,7 @@
 use std::sync::Mutex;
 use std::sync::Arc;
 use tokio::prelude::*;
-use super::{KeyValuePair};
+use micro_sp_tools::*;
 
 pub async fn receiver(name: String, kvp: Arc<Mutex<KeyValuePair>>, mut recv: tokio::sync::mpsc::Receiver<std::string::String>) -> io::Result<()> {
     loop {

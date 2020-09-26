@@ -1,6 +1,7 @@
 use z3_sys::*;
 use z3_v2::*;
 use super::*;
+use arrayvec::ArrayString;
 
 #[derive(Debug, PartialEq, Clone, PartialOrd, Eq, Ord)]
 pub enum Predicate {
@@ -29,14 +30,15 @@ impl <'ctx> PredicateToAstZ3<'ctx> {
             Predicate::AND(p) => ANDZ3::new(&ctx, p.iter().map(|x| PredicateToAstZ3::new(&ctx, x, r#type, step)).collect()),
             Predicate::OR(p) => ORZ3::new(&ctx, p.iter().map(|x| PredicateToAstZ3::new(&ctx, x, r#type, step)).collect()),
             Predicate::EQRL(x, y) => {
-                match x.domain.contains(&y) {
+                let y = &ArrayString::<[_; 32]>::from(y).unwrap_or_default();
+                match x.domain.contains(y) {
                     true => {
                         let sort = EnumSortZ3::new(&ctx, &x.r#type, x.domain.iter().map(|x| x.as_str()).collect());
                         let elems = &sort.enum_asts;
-                        let index = x.domain.iter().position(|r| *r == y.to_string()).unwrap();
-                        EQZ3::new(&ctx, EnumVarZ3::new(&ctx, sort.r, format!("{}_s{}", x.name.to_string(), step).as_str()), elems[index])      
+                        let index = x.domain.iter().position(|r| r == y).unwrap();
+                        EQZ3::new(&ctx, EnumVarZ3::new(&ctx, sort.r, format!("{}_s{}", x.name.key.to_string(), step).as_str()), elems[index])      
                     },
-                    false => panic!("Error 6f789b86-7f6c-4426-ab0f-6b5b72dd2c55: Value '{}' not in the domain of variable '{}'.", y, x.name)
+                    false => panic!("Error 6f789b86-7f6c-4426-ab0f-6b5b72dd2c55: Value '{}' not in the domain of variable '{}'.", y, x.name.key)
                 }
             },
             Predicate::EQRR(x, y) => {
@@ -46,15 +48,15 @@ impl <'ctx> PredicateToAstZ3<'ctx> {
                             "guard" | "state" | "specs" => {
                                 let sort_1 = EnumSortZ3::new(&ctx, &x.r#type, x.domain.iter().map(|x| x.as_str()).collect());
                                 let sort_2 = EnumSortZ3::new(&ctx, &y.r#type, y.domain.iter().map(|y| y.as_str()).collect());
-                                let v_1 = EnumVarZ3::new(&ctx, sort_1.r, format!("{}_s{}", x.name.to_string(), step).as_str());
-                                let v_2 = EnumVarZ3::new(&ctx, sort_2.r, format!("{}_s{}", y.name.to_string(), step).as_str());
+                                let v_1 = EnumVarZ3::new(&ctx, sort_1.r, format!("{}_s{}", x.name.key.to_string(), step).as_str());
+                                let v_2 = EnumVarZ3::new(&ctx, sort_2.r, format!("{}_s{}", y.name.key.to_string(), step).as_str());
                                 EQZ3::new(&ctx, v_1, v_2)
                             },
                             "update" => {
                                 let sort_1 = EnumSortZ3::new(&ctx, &x.r#type, x.domain.iter().map(|x| x.as_str()).collect());
                                 let sort_2 = EnumSortZ3::new(&ctx, &y.r#type, y.domain.iter().map(|y| y.as_str()).collect());
-                                let v_1 = EnumVarZ3::new(&ctx, sort_1.r, format!("{}_s{}", x.name.to_string(), step).as_str());
-                                let v_2 = EnumVarZ3::new(&ctx, sort_2.r, format!("{}_s{}", y.name.to_string(), step - 1).as_str());
+                                let v_1 = EnumVarZ3::new(&ctx, sort_1.r, format!("{}_s{}", x.name.key.to_string(), step).as_str());
+                                let v_2 = EnumVarZ3::new(&ctx, sort_2.r, format!("{}_s{}", y.name.key.to_string(), step - 1).as_str());
                                 EQZ3::new(&ctx, v_1, v_2)
                             },
                             _ => panic!("Error 53b0fd14-1ddd-4bf0-8dc7-d372d6ad8c99: Predicate type '{}' is not allowed.", r#type)

@@ -688,6 +688,7 @@ dependencies = [
 name = "micro_sp_tools"
 version = "0.1.0"
 dependencies = [
+ "arrayvec",
  "criterion",
  "crossbeam",
  "env_logger 0.6.2",

@@ -3,7 +3,7 @@ use std::sync::Mutex;
 use std::sync::Arc;
 use tokio::sync::mpsc::channel;
 use micro_sp_tools::*;
-use lib::{KeyValuePair, State};
+// use lib::{KeyValuePair, State};
 use std::io;
 mod runner;
 mod receiver;
@@ -30,21 +30,21 @@ async fn main() -> io::Result<()> {
     let mut ros_receivers: Vec<(String, KeyValuePair, tokio::sync::mpsc::Receiver<String>)> = vec!();
     for v in &msr_vars {
         let (mut tx, rx) = channel::<String>(10);
-        ros_receivers.push((v.name.clone(), KeyValuePair::new(&v.name, "dummy_value"), rx));
+        ros_receivers.push((v.name.key.to_string(), KeyValuePair::dummy(&v.name.key), rx));
         let sub = move |x: r2r::std_msgs::msg::String| {
             tx.try_send(x.data).unwrap_or_default();
         };
-        let _subref = node.subscribe(&format!("/{}", v.name), Box::new(sub))
+        let _subref = node.subscribe(&format!("/{}", v.name.key), Box::new(sub))
             .expect("69900836-cc9c-4ea5-9f2f-1f585dae70b1: Creating subscribers failed.");
     }  
 
     // generate publishers for ControlKind::Command kind variables
     let mut ros_senders: Vec<(String, tokio::sync::mpsc::Sender<String>)> = vec!();
     for v in cmd_vars.clone() {
-        let publisher = node.create_publisher::<std_msgs::msg::String>(&format!("/{}", v.name))
+        let publisher = node.create_publisher::<std_msgs::msg::String>(&format!("/{}", v.name.key))
             .expect("Error f93c6d99-5725-467a-8a96-e49f72b3485f: Creating publishers failed.");
         let (tx, rx) = channel::<String>(10);
-        ros_senders.push((v.name, tx));
+        ros_senders.push((v.name.key.to_string(), tx));
         tokio::task::spawn(async{
             let writer = emmiter::emmiter(publisher, rx);
             let _res = tokio::try_join!(writer);
@@ -56,13 +56,7 @@ async fn main() -> io::Result<()> {
         let _res = tokio::try_join!(recv);
     });
 
-    loop {
-
-        // for t in &measured_list {
-        //     println!("{:?}", *t.lock().unwrap());
-        // }
-
-        
+    loop {       
         node.spin_once(std::time::Duration::from_millis(10));
     }
 }

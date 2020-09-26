@@ -77,8 +77,8 @@ impl <'ctx> KeepVariableValues<'ctx> {
         let mut assert_vec = vec!();
         for u in unchanged {
             let sort = EnumSortZ3::new(&ctx, &u.r#type, u.domain.iter().map(|x| x.as_str()).collect());
-            let v_1 = EnumVarZ3::new(&ctx, sort.r, format!("{}_s{}", u.name.to_string(), step).as_str());
-            let v_2 = EnumVarZ3::new(&ctx, sort.r, format!("{}_s{}", u.name.to_string(), step - 1).as_str());
+            let v_1 = EnumVarZ3::new(&ctx, sort.r, format!("{}_s{}", u.name.key.to_string(), step).as_str());
+            let v_2 = EnumVarZ3::new(&ctx, sort.r, format!("{}_s{}", u.name.key.to_string(), step - 1).as_str());
             assert_vec.push(EQZ3::new(&ctx, v_1, v_2));
         }
 
