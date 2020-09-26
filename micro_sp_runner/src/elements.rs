@@ -1,4 +1,3 @@
-use serde::{Deserialize, Serialize};
 use arrayvec::ArrayString;
 
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]

@@ -685,22 +685,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "micro_sp_smt"
-version = "0.1.0"
-dependencies = [
- "criterion",
- "crossbeam",
- "env_logger 0.6.2",
- "itertools 0.8.2",
- "lazy_static",
- "log",
- "serde",
- "serde_json",
- "serial_test",
- "z3-sys",
-]
-
-[[package]]
 name = "micro_sp_tools"
 version = "0.1.0"
 dependencies = [
@@ -710,11 +694,11 @@ dependencies = [
  "itertools 0.8.2",
  "lazy_static",
  "log",
- "micro_sp_smt",
  "serde",
  "serde_json",
  "serial_test",
  "z3-sys",
+ "z3_v2",
 ]
 
 [[package]]
@@ -1524,3 +1508,18 @@ dependencies = [
 name = "z3-sys"
 version = "0.5.0"
 source = "git+https://github.com/endre90/z3_sys_v2#69ccc65e19eee1eac6f95b164e956fa9cb8e974c"
+
+[[package]]
+name = "z3_v2"
+version = "0.1.0"
+source = "git+https://github.com/endre90/z3_v2#f8bf1417513451cf1bd25046fcfa89346f58573b"
+dependencies = [
+ "crossbeam",
+ "env_logger 0.6.2",
+ "itertools 0.8.2",
+ "lazy_static",
+ "log",
+ "serde",
+ "serde_json",
+ "z3-sys",
+]

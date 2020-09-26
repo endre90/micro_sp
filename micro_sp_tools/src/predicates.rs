@@ -1,5 +1,5 @@
 use z3_sys::*;
-use micro_sp_smt::*;
+use z3_v2::*;
 use super::*;
 
 #[derive(Debug, PartialEq, Clone, PartialOrd, Eq, Ord)]
