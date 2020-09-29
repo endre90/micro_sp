@@ -1,12 +1,13 @@
 use tokio::prelude::*;
-use std::{thread, time};
+use tokio::time::delay_for;
+use std::time::Duration;
 use r2r::*;
 
-pub async fn emmiter(publisher: Publisher<std_msgs::msg::String>,
+pub async fn publisher(publisher: Publisher<std_msgs::msg::String>,
     mut recv: tokio::sync::mpsc::Receiver<std::string::String>) -> io::Result<()> {
 
     loop {
-        thread::sleep(time::Duration::from_millis(100));
+        delay_for(Duration::from_millis(100)).await;
         let to_pub = recv.recv().await.unwrap();
         let to_send = std_msgs::msg::String { data: to_pub.to_owned()};
         publisher.publish(&to_send).unwrap();

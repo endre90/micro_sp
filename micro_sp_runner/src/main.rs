@@ -1,14 +1,12 @@
-use r2r::*;
-use std::sync::Mutex;
-use std::sync::Arc;
 use tokio::sync::mpsc::channel;
 use micro_sp_tools::*;
-// use lib::{KeyValuePair, State};
 use std::io;
 mod runner;
 mod receiver;
-mod emmiter;
+mod sender;
+mod publisher;
 mod model;
+use r2r::*;
 
 #[tokio::main]
 async fn main() -> io::Result<()> {
@@ -22,15 +20,11 @@ async fn main() -> io::Result<()> {
     let msr_vars: Vec<EnumVariable> = vars.iter().filter(|x| x.kind == ControlKind::Measured).map(|x| x.clone()).collect();
     let cmd_vars: Vec<EnumVariable> = vars.iter().filter(|x| x.kind == ControlKind::Command).map(|x| x.clone()).collect();
 
-    // let measured_values = msr_vars.iter().map(|x| KeyValuePair::new(x.name.as_str(), "dummy_value")).collect();
-    // let measured_state = State::new(&measured_values);
-    // println!("{:?}", measured_state);
-
     // generate subscribers for ControlKind::Measured kind variables (maybe all? testing needed)
-    let mut ros_receivers: Vec<(String, KeyValuePair, tokio::sync::mpsc::Receiver<String>)> = vec!();
+    let mut ros_receivers: Vec<(KeyValuePair, tokio::sync::mpsc::Receiver<String>)> = vec!();
     for v in &msr_vars {
         let (mut tx, rx) = channel::<String>(10);
-        ros_receivers.push((v.name.key.to_string(), KeyValuePair::dummy(&v.name.key), rx));
+        ros_receivers.push((KeyValuePair::dummy(&v.name.key), rx));
         let sub = move |x: r2r::std_msgs::msg::String| {
             tx.try_send(x.data).unwrap_or_default();
         };
@@ -39,14 +33,14 @@ async fn main() -> io::Result<()> {
     }  
 
     // generate publishers for ControlKind::Command kind variables
-    let mut ros_senders: Vec<(String, tokio::sync::mpsc::Sender<String>)> = vec!();
+    let mut ros_senders: Vec<(KeyValuePair, tokio::sync::mpsc::Sender<String>)> = vec!();
     for v in cmd_vars.clone() {
         let publisher = node.create_publisher::<std_msgs::msg::String>(&format!("/{}", v.name.key))
             .expect("Error f93c6d99-5725-467a-8a96-e49f72b3485f: Creating publishers failed.");
         let (tx, rx) = channel::<String>(10);
-        ros_senders.push((v.name.key.to_string(), tx));
+        ros_senders.push((KeyValuePair::dummy(&v.name.key), tx));
         tokio::task::spawn(async{
-            let writer = emmiter::emmiter(publisher, rx);
+            let writer = publisher::publisher(publisher, rx);
             let _res = tokio::try_join!(writer);
         });
     }

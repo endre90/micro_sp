@@ -3,9 +3,10 @@ use std::sync::Arc;
 use tokio::prelude::*;
 use micro_sp_tools::*;
 
-pub async fn receiver(name: String, kvp: Arc<Mutex<KeyValuePair>>, mut recv: tokio::sync::mpsc::Receiver<std::string::String>) -> io::Result<()> {
+pub async fn receiver(kvp: Arc<Mutex<KeyValuePair>>, mut recv: tokio::sync::mpsc::Receiver<std::string::String>) -> io::Result<()> {
+    let key_value_pair = *kvp.lock().unwrap();
     loop {
         let data = recv.recv().await.unwrap();
-        *kvp.lock().unwrap() = KeyValuePair::new(name.as_str(), &data.to_string());
+        *kvp.lock().unwrap() = KeyValuePair::new(&key_value_pair.key.to_string(), &data.to_string());
     }  
 }
