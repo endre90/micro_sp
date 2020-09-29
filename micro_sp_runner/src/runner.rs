@@ -3,11 +3,19 @@ use std::{thread, time};
 use std::sync::Mutex;
 use std::sync::Arc;
 use r2r::*;
-use tokio::time::delay_for;
-use std::time::Duration;
+use tokio::time::{Duration, Instant, delay_for};
 use std::io;
 use micro_sp_tools::*;
 use arrayvec::ArrayString;
+
+// #[tokio::main]
+// async fn main() {
+//     let now = Instant::now();
+//     delay_for(Duration::new(1, 0)).await;
+//     let new_now = Instant::now();
+//     println!("{:?}", new_now.checked_duration_since(now));
+//     println!("{:?}", now.checked_duration_since(new_now)); // None
+// }
 
 use super::*;
 
@@ -17,10 +25,12 @@ pub async fn runner(prob: PlanningProblem,
 
     let mut measured_list = vec!();
     for r in ros_receivers {
-        let amkvp = Arc::new(Mutex::new(r.0));
+        let amkvp = Arc::new(Mutex::new((r.0, Instant::now())));
         let amkvp1 = amkvp.clone();
         let amkvp2 = amkvp.clone();
         tokio::task::spawn(async{
+            let now = Instant::now();
+            println!("{:?}", now);
             let receiver = receiver::receiver(amkvp2, r.1);
             let _res = tokio::try_join!(receiver);
         });
@@ -46,7 +56,8 @@ pub async fn runner(prob: PlanningProblem,
 
     loop {
 
-        let measured_state = State::new(&measured_list.iter().map(|x| *x.lock().unwrap()).collect());
+        // let measured_state = State::new(&measured_list.iter().map(|x| *x.lock().unwrap()).collect());
+        let measured_state = &measured_list.iter().map(|x| *x.lock().unwrap()).collect::<Vec<(KeyValuePair, Instant)>>();
 
         // for t in &table {
         //     if t.0.pairs.contains(measured_state.pa) {
