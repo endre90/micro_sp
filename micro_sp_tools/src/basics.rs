@@ -1,4 +1,5 @@
 use arrayvec::ArrayString;
+use serde::{Serialize, Deserialize};
 
 #[derive(Copy, Debug, PartialEq, Clone, PartialOrd, Eq, Ord)]
 pub struct Parameter {
@@ -6,7 +7,13 @@ pub struct Parameter {
     pub value: bool
 }
 
-#[derive(Copy, Eq, Debug, PartialEq, Clone, PartialOrd, Ord)]
+#[derive(Debug, PartialEq, Clone, PartialOrd, Eq, Ord, Serialize, Deserialize)]
+pub struct TestParameter {
+    pub name: String,
+    pub value: bool
+}
+
+#[derive(Copy, Eq, Debug, PartialEq, Clone, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum ControlKind {
     Measured,
     Command,
@@ -26,6 +33,16 @@ pub struct EnumVariable {
     pub r#type: ArrayString::<[u8; 32]>,
     pub domain: Vec<ArrayString::<[u8; 32]>>,
     pub param: Parameter,
+    pub kind: ControlKind
+}
+
+#[derive(Eq, Debug, PartialEq, Clone, PartialOrd, Ord, Serialize, Deserialize)]
+pub struct TestVariable {
+    pub name: String,
+    pub value: String,
+    pub r#type: String,
+    pub domain: Vec<String>,
+    pub param: TestParameter,
     pub kind: ControlKind
 }
 
@@ -105,6 +122,25 @@ impl EnumVariable{
 
             r#type: ArrayString::<[_; 32]>::from(r#type).unwrap(),
             domain: domain.iter().map(|x| ArrayString::<[_; 32]>::from(x).unwrap()).collect::<Vec<ArrayString::<[u8; 32]>>>(),
+            kind: kind.to_owned()
+        }
+    }
+}
+
+impl TestVariable{
+    pub fn new(name: &str, value: &str, r#type: &str, domain: &Vec<&str>, param: Option<&TestParameter>, kind: &ControlKind) -> TestVariable {
+        TestVariable { 
+            param: match param {
+                Some(x) => x.to_owned(),
+                None => TestParameter {name: "TRUE".to_string(), value: true}
+            },
+            name: match name == "EMPTY" {
+                true => panic!("Error 69e2abf9-498b-4d5c-88c7-30ea70ed27fb: EnumVariable name 'EMPTY' is reserved."),
+                false => name.to_owned()
+            },
+            value: value.to_owned(),
+            r#type: r#type.to_owned(),
+            domain: domain.iter().map(|x| x.to_string()).collect::<Vec<String>>(),
             kind: kind.to_owned()
         }
     }
