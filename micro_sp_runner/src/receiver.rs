@@ -17,7 +17,7 @@ pub async fn receiver(kvp: Arc<Mutex<(KeyValuePair, Instant)>>, mut recv: tokio:
     let arc = *kvp.lock().unwrap();
     let key_value_pair = arc.0;
     loop {
-        let data = recv.recv().await.unwrap();
+        let data = recv.recv().await.unwrap(); 
         *kvp.lock().unwrap() = (KeyValuePair::new(&key_value_pair.key.to_string(), &data.to_string()), Instant::now());
     }  
 }
