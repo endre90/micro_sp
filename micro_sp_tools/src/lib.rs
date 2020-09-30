@@ -1,11 +1,13 @@
 pub mod basics;
-pub use crate::basics::{Parameter, ControlKind, EnumVariable, KeyValuePair, State, TestVariable, TestParameter};
+pub use crate::basics::{ControlKind, EnumVariable, EnumVariableValue, Parameter, State};
 
 pub mod predicates;
 pub use crate::predicates::{Predicate, PredicateToAstZ3};
 
 pub mod incremental;
-pub use crate::incremental::{Transition, PlanningProblem, incremental, PlanningFrame, PlanningResult};
+pub use crate::incremental::{
+    incremental, PlanningFrame, PlanningProblem, PlanningResult, Transition,
+};
 
 pub mod utils;
-pub use crate::utils::{get_predicate_vars, get_problem_vars, result_to_states, IterOps};
+pub use crate::utils::{get_predicate_vars, get_problem_vars, IterOps};

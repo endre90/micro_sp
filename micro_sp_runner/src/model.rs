@@ -1,78 +1,51 @@
-use std::time::{Instant};
-// use z3_sys::*;
 use micro_sp_tools::*;
-// use super::*;
 
 pub fn model() -> PlanningProblem {
-
-    let ref_pos = "ref_robot_1_pose";
-    let act_pos = "act_robot_1_pose";
-    let ref_stat = "ref_robot_1_stat";
-    let mut move_to_transitions = vec!();
-    let ref_robot_pos_domain = vec!("left", "home", "right");
-    let act_robot_pos_domain = vec!("left", "home", "right", "unknown");
-    let ref_robot_stat_domain = vec!("idle", "active");
-    // let transition_state_domain = vec!("idle", "exec");
-    for rpd in &ref_robot_pos_domain {
-        move_to_transitions.push(
-            Transition::new(
-                &format!("start_move_to_{}", rpd),
-                &Predicate::AND(
-                    vec!(
-                        // Predicate::EQRL(EnumVariable::new(&format!("start_move_to_{}", rpd),, &format!("start_move_to_{}", rpd), &transition_state_domain, None, &ControlKind::None), String::from("executing")),
-                        Predicate::NOT(
-                            Box::new(Predicate::EQRL(EnumVariable::new(ref_pos, ref_pos, &ref_robot_pos_domain, None, &ControlKind::Command), String::from(rpd.to_owned()))
-                            )
-                        ),
-                        Predicate::NOT(
-                            Box::new(Predicate::EQRL(EnumVariable::new(act_pos, act_pos, &act_robot_pos_domain, None, &ControlKind::Measured), String::from(rpd.to_owned()))
-                            )
-                        )
-                    )
-                ),
-                &Predicate::AND(
-                    vec!(
-                        Predicate::EQRL(EnumVariable::new(ref_pos, ref_pos, &ref_robot_pos_domain, None, &ControlKind::Command), String::from(rpd.to_owned()))
-                    )
-                )
-            )
-        );
-        move_to_transitions.push(
-            Transition::new(
-                &format!("finish_move_to_{}", rpd),
-                &Predicate::AND(
-                    vec!(
-                        // Predicate::EQRL(EnumVariable::new(&format!("start_move_to_{}", rpd),, &format!("start_move_to_{}", rpd), &transition_state_domain, None, &ControlKind::None), String::from("executing")),
-                        Predicate::EQRL(EnumVariable::new(ref_pos, ref_pos, &ref_robot_pos_domain, None, &ControlKind::Command), String::from(rpd.to_owned())),
-                        Predicate::NOT(
-                            Box::new(Predicate::EQRL(EnumVariable::new(act_pos, act_pos, &act_robot_pos_domain, None, &ControlKind::Measured), String::from(rpd.to_owned()))
-                            )
-                        )
-                    )
-                ),
-                &Predicate::AND(
-                    vec!(
-                        Predicate::EQRL(EnumVariable::new(act_pos, act_pos, &act_robot_pos_domain, None, &ControlKind::Measured), String::from(rpd.to_owned()))
-                    )
-                )
-            )
-        )
-    }
-
-    let robot_model = move_to_transitions;
-    let domain = vec!("left", "right", "home");
-
-    let init = Predicate::AND(
-        vec!(
-            Predicate::EQRL(EnumVariable::new("act_robot_1_pose", "act_robot_1_pose", &act_robot_pos_domain, None, &ControlKind::Measured), String::from("left")),
-            Predicate::EQRL(EnumVariable::new("act_robot_2_pose", "act_robot_2_pose", &act_robot_pos_domain, None, &ControlKind::Measured), String::from("left")),
-            Predicate::EQRL(EnumVariable::new("ref_robot_1_stat", "ref_robot_1_stat", &ref_robot_stat_domain, None, &ControlKind::Command), String::from("idle")),
-            Predicate::EQRL(EnumVariable::new("ref_robot_1_pose", "ref_robot_1_pose", &ref_robot_pos_domain, None, &ControlKind::Command), String::from("left"))
-        )
+    let act_pos = EnumVariable::new(
+        "act_pos",
+        "act_pos",
+        &vec!["left", "right"],
+        None,
+        Some(&ControlKind::Measured),
     );
-
-    let goal = Predicate::EQRL(EnumVariable::new("act_robot_1_pose", "act_robot_1_pose", &act_robot_pos_domain, None, &ControlKind::Measured), String::from("right"));
-
-    let problem = PlanningProblem::new("problem_1", &init, &goal, &robot_model, &Predicate::TRUE, &30);
+    let ref_pos = EnumVariable::new(
+        "ref_pos",
+        "ref_pos",
+        &vec!["left", "right"],
+        None,
+        Some(&ControlKind::Command),
+    );
+    let act_left = Predicate::EQRL(act_pos.clone(), "left".to_string());
+    let act_right = Predicate::EQRL(act_pos.clone(), "right".to_string());
+    let ref_left = Predicate::EQRL(ref_pos.clone(), "left".to_string());
+    let ref_right = Predicate::EQRL(ref_pos.clone(), "right".to_string());
+    let t1 = Transition::new(
+        "start_move_left",
+        &Predicate::AND(vec![act_right.clone(), ref_right.clone()]),
+        &ref_left,
+    );
+    let t2 = Transition::new(
+        "start_move_right",
+        &Predicate::AND(vec![act_left.clone(), ref_left.clone()]),
+        &ref_right,
+    );
+    let t3 = Transition::new(
+        "finish_move_left",
+        &Predicate::AND(vec![act_right.clone(), ref_left.clone()]),
+        &act_left,
+    );
+    let t4 = Transition::new(
+        "finish_move_right",
+        &Predicate::AND(vec![act_left.clone(), ref_right.clone()]),
+        &act_right,
+    );
+    let problem = PlanningProblem::new(
+        "prob1",
+        &Predicate::AND(vec![act_left, ref_left]),
+        &act_right,
+        &vec![t1, t2, t3, t4],
+        &Predicate::TRUE,
+        &12,
+    );
     problem
 }
