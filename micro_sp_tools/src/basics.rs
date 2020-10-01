@@ -36,6 +36,27 @@ pub struct State {
     pub estimated: Vec<EnumVariableValue>,
 }
 
+impl State {
+    pub fn new() -> State {
+        State {
+            measured: vec![],
+            command: vec![],
+            estimated: vec![],
+        }
+    }
+    pub fn from_lists(
+        measured: &Vec<EnumVariableValue>,
+        command: &Vec<EnumVariableValue>,
+        estimated: &Vec<EnumVariableValue>,
+    ) -> State {
+        State {
+            measured: measured.to_owned(),
+            command: command.to_owned(),
+            estimated: estimated.to_owned(),
+        }
+    }
+}
+
 impl Parameter {
     pub fn new(name: &str, value: &bool) -> Parameter {
         Parameter {
