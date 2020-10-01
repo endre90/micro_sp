@@ -77,20 +77,67 @@ pub fn get_problem_vars(prob: &PlanningProblem) -> Vec<EnumVariable> {
     s
 }
 
-// pub fn result_to_states(result: &PlanningResult) -> Vec<(State, State)> {
-//     let mut table = vec![];
-//     for r in &result.trace {
-//         let mut source_kvps = vec![];
-//         let mut sink_kvps = vec![];
-//         for s in &r.source {
-//             let sep: Vec<&str> = s.split(" -> ").collect();
-//             source_kvps.push(KeyValuePair::new(sep[0], sep[1]));
-//         }
-//         for s in &r.sink {
-//             let sep: Vec<&str> = s.split(" -> ").collect();
-//             sink_kvps.push(KeyValuePair::new(sep[0], sep[1]));
-//         }
-//         table.push((State::new(&source_kvps), State::new(&sink_kvps)));
-//     }
-//     table
-// }
+pub fn to_state(vars: &Vec<EnumVariable>, vals: &Vec<&str>) -> State {
+    State {
+        measured: vars
+            .iter()
+            .filter(|c| c.kind == ControlKind::Measured)
+            .map(|x| {
+                EnumVariableValue::new(
+                    &x,
+                    vals.iter()
+                        .filter(|y| y.split(" -> ").collect::<Vec<&str>>()[0] == x.name)
+                        .map(|z| z.split(" -> ").collect::<Vec<&str>>()[1])
+                        .collect::<Vec<&str>>()[0],
+                )
+            })
+            .collect(),
+        command: vars
+            .iter()
+            .filter(|c| c.kind == ControlKind::Command)
+            .map(|x| {
+                EnumVariableValue::new(
+                    &x,
+                    vals.iter()
+                        .filter(|y| y.split(" -> ").collect::<Vec<&str>>()[0] == x.name)
+                        .map(|z| z.split(" -> ").collect::<Vec<&str>>()[1])
+                        .collect::<Vec<&str>>()[0],
+                )
+            })
+            .collect(),
+        estimated: vars
+            .iter()
+            .filter(|c| c.kind == ControlKind::Estimated)
+            .map(|x| {
+                EnumVariableValue::new(
+                    &x,
+                    vals.iter()
+                        .filter(|y| y.split(" -> ").collect::<Vec<&str>>()[0] == x.name)
+                        .map(|z| z.split(" -> ").collect::<Vec<&str>>()[1])
+                        .collect::<Vec<&str>>()[0],
+                )
+            })
+            .collect(),
+    }
+}
+
+pub fn result_to_states(
+    prob: &PlanningProblem,
+    res: &PlanningResultStrings,
+) -> PlanningResultStates {
+    let vars = get_problem_vars(&prob);
+    PlanningResultStates {
+        plan_found: res.plan_found,
+        plan_length: res.plan_length,
+        trace: res
+            .trace
+            .iter()
+            .map(|x| PlanningFrameStates {
+                source: to_state(&vars, &x.source.iter().map(|x| x.as_str()).collect()),
+                trans: x.trans.clone(),
+                sink: to_state(&vars, &x.sink.iter().map(|x| x.as_str()).collect()),
+            })
+            .collect(),
+        time_to_solve: res.time_to_solve,
+    }
+}

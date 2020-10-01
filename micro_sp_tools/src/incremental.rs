@@ -26,24 +26,39 @@ pub struct KeepVariableValues<'ctx> {
 }
 
 #[derive(PartialEq, Eq, Clone, Debug, PartialOrd, Ord)]
-pub struct PlanningFrame {
+pub struct PlanningFrameStrings {
     pub source: Vec<String>,
     pub sink: Vec<String>,
     pub trans: String,
+}
+
+#[derive(PartialEq, Eq, Clone, Debug, PartialOrd, Ord)]
+pub struct PlanningFrameStates {
+    pub source: State,
+    pub sink: State,
+    pub trans: String,
+}
+
+#[derive(PartialEq, Eq, Clone, Debug, PartialOrd, Ord)]
+pub struct PlanningResultStates {
+    pub plan_found: bool,
+    pub plan_length: u32,
+    pub trace: Vec<PlanningFrameStates>,
+    pub time_to_solve: std::time::Duration,
 }
 
 pub struct GetPlanningResultZ3<'ctx> {
     pub ctx: &'ctx ContextZ3,
     pub model: Z3_model,
     pub nr_steps: u32,
-    pub frames: PlanningResult,
+    pub frames: PlanningResultStates,
 }
 
 #[derive(PartialEq, Eq, Clone, Debug, PartialOrd, Ord)]
-pub struct PlanningResult {
+pub struct PlanningResultStrings {
     pub plan_found: bool,
     pub plan_length: u32,
-    pub trace: Vec<PlanningFrame>,
+    pub trace: Vec<PlanningFrameStrings>,
     // pub raw_trace: Vec<PlanningFrame>,
     pub time_to_solve: std::time::Duration,
 }
@@ -111,7 +126,7 @@ impl<'ctx> KeepVariableValues<'ctx> {
     }
 }
 
-pub fn incremental(prob: &PlanningProblem) -> PlanningResult {
+pub fn incremental(prob: &PlanningProblem) -> PlanningResultStrings {
     let cfg = ConfigZ3::new();
     let ctx = ContextZ3::new(&cfg);
     let slv = SolverZ3::new(&ctx);
@@ -205,9 +220,9 @@ pub fn incremental(prob: &PlanningProblem) -> PlanningResult {
     }
 }
 
-impl PlanningFrame {
-    pub fn new(source: &Vec<&str>, sink: &Vec<&str>, trans: &str) -> PlanningFrame {
-        PlanningFrame {
+impl PlanningFrameStrings {
+    pub fn new(source: &Vec<&str>, sink: &Vec<&str>, trans: &str) -> PlanningFrameStrings {
+        PlanningFrameStrings {
             source: source.iter().map(|x| x.to_string()).collect(),
             sink: sink.iter().map(|x| x.to_string()).collect(),
             trans: trans.to_string(),
@@ -222,7 +237,7 @@ impl<'ctx> GetPlanningResultZ3<'ctx> {
         nr_steps: u32,
         planning_time: std::time::Duration,
         plan_found: bool,
-    ) -> PlanningResult {
+    ) -> PlanningResultStrings {
         let model_str = ModelToStringZ3::new(&ctx, model);
         let mut model_vec = vec![];
 
@@ -237,11 +252,11 @@ impl<'ctx> GetPlanningResultZ3<'ctx> {
 
         // println!("{:#?}", model_vec);
 
-        let mut trace: Vec<PlanningFrame> = vec![];
+        let mut trace: Vec<PlanningFrameStrings> = vec![];
         // let mut raw_trace: Vec<PlanningFrame> = vec!();
         for i in 0..nr_steps {
-            let mut frame: PlanningFrame = PlanningFrame::new(&vec![], &vec![], "");
-            let mut raw_frame: PlanningFrame = PlanningFrame::new(&vec![], &vec![], "");
+            let mut frame: PlanningFrameStrings = PlanningFrameStrings::new(&vec![], &vec![], "");
+            let mut raw_frame: PlanningFrameStrings = PlanningFrameStrings::new(&vec![], &vec![], "");
             for j in &model_vec {
                 let sep: Vec<&str> = j.split(" -> ").collect();
                 if sep[0].ends_with(&format!("_s{}", i)) {
@@ -278,7 +293,7 @@ impl<'ctx> GetPlanningResultZ3<'ctx> {
         let mut prev = vec![];
 
         'breakable: loop {
-            let mut frame: PlanningFrame = PlanningFrame::new(&vec![], &vec![], "");
+            let mut frame: PlanningFrameStrings = PlanningFrameStrings::new(&vec![], &vec![], "");
 
             match new.next() {
                 Some(x) => {
@@ -296,7 +311,7 @@ impl<'ctx> GetPlanningResultZ3<'ctx> {
             new_trace.drain(0..1);
         }
 
-        PlanningResult {
+        PlanningResultStrings {
             plan_found: plan_found,
             plan_length: nr_steps - 1,
             trace: new_trace,

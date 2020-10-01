@@ -32,7 +32,7 @@ pub struct EnumVariableValue {
 #[derive(Debug, PartialEq, Clone, PartialOrd, Eq, Ord, Serialize, Deserialize)]
 pub struct State {
     pub measured: Vec<EnumVariableValue>,
-    pub control: Vec<EnumVariableValue>,
+    pub command: Vec<EnumVariableValue>,
     pub estimated: Vec<EnumVariableValue>,
 }
 

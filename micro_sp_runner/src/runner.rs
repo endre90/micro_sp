@@ -8,14 +8,14 @@ pub async fn runner(
     ros_receivers: Vec<(String, tokio::sync::mpsc::Receiver<String>)>,
     ros_senders: Vec<(String, tokio::sync::mpsc::Sender<String>)>,
 ) -> io::Result<()> {
+
     let mut measured_list = vec![];
     for r in ros_receivers {
         let past_time = Instant::now().checked_sub(Duration::new(6, 0));
         let amkvp = Arc::new(Mutex::new((r.0.clone(), past_time.unwrap())));
         let amkvp1 = amkvp.clone();
-        let amkvp2 = amkvp.clone();
         tokio::task::spawn(async {
-            let receiver = receiver::receiver(amkvp2, r.1);
+            let receiver = receiver::receiver(amkvp, r.1);
             let _res = tokio::try_join!(receiver);
         });
         measured_list.push(amkvp1);
@@ -25,9 +25,8 @@ pub async fn runner(
     for r in ros_senders {
         let amkvp = Arc::new(Mutex::new(r.0.clone()));
         let amkvp1 = amkvp.clone();
-        let amkvp2 = amkvp.clone();
         tokio::task::spawn(async {
-            let sender = sender::sender(amkvp2, r.1);
+            let sender = sender::sender(amkvp, r.1);
             let _res = tokio::try_join!(sender);
         });
         command_list.push(amkvp1);
@@ -55,8 +54,8 @@ pub async fn runner(
     println!("============================================");
 
     // println!("{:?}", result);
-    // let mut table = result_to_states(&result);
-    // println!("{:?}", table);
+    let table = result_to_states(&prob, &result);
+    println!("{:#?}", table);
 
     loop {
         let measured_state_string = &measured_list
@@ -72,7 +71,7 @@ pub async fn runner(
         let looping_now = Instant::now();
 
         for m in measured_state {
-            println!("{:?}", looping_now.duration_since(m.1));
+            println!("message lifetime: {:?}", looping_now.duration_since(m.1));
             println!("{:?}", m);
         }
 
