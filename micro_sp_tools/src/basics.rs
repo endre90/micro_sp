@@ -48,7 +48,6 @@ impl Parameter {
 impl EnumVariable {
     pub fn new(
         name: &str,
-        r#type: &str,
         domain: &Vec<&str>,
         param: Option<&Parameter>,
         kind: Option<&ControlKind>,
@@ -61,7 +60,7 @@ impl EnumVariable {
                 ), // why?
                 false => name.to_owned(),
             },
-            r#type: r#type.to_owned(),
+            r#type: name.to_owned(),
             domain: domain
                 .iter()
                 .map(|x| x.to_string())
@@ -89,6 +88,6 @@ impl EnumVariableValue {
 
 #[test]
 fn test_new_enum_variable() {
-    let var1 = EnumVariable::new("var1", "type1", &vec!["a", "b", "c"], None, None);
+    let var1 = EnumVariable::new("var1", &vec!["a", "b", "c"], None, None);
     println!("{:?}", var1);
 }

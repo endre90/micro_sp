@@ -30,8 +30,6 @@ async fn main() -> io::Result<()> {
         .map(|x| EnumVariableValue::new(x, "dummy_value"))
         .collect();
 
-    println!("{:?}", vars);
-
     // generate subscribers for ControlKind::Measured kind variables (maybe all? testing needed)
     let mut ros_receivers: Vec<(String, tokio::sync::mpsc::Receiver<String>)> = vec![];
     for v in &msr_var_vals {

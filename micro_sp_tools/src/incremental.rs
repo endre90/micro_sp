@@ -307,8 +307,8 @@ impl<'ctx> GetPlanningResultZ3<'ctx> {
 
 #[test]
 fn test_incremental_1() {
-    let act_pos = EnumVariable::new("act_pos", "act_pos", &vec!["left", "right"], None, None);
-    let ref_pos = EnumVariable::new("ref_pos", "ref_pos", &vec!["left", "right"], None, None);
+    let act_pos = EnumVariable::new("act_pos", &vec!["left", "right"], None, None);
+    let ref_pos = EnumVariable::new("ref_pos", &vec!["left", "right"], None, None);
     let act_left = Predicate::EQRL(act_pos.clone(), "left".to_string());
     let act_right = Predicate::EQRL(act_pos.clone(), "right".to_string());
     let ref_left = Predicate::EQRL(ref_pos.clone(), "left".to_string());

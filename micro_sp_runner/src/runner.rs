@@ -33,7 +33,27 @@ pub async fn runner(
         command_list.push(amkvp1);
     }
 
-    let _result = incremental(&prob);
+    let result = incremental(&prob);
+
+    println!("\n");
+    println!("============================================");
+    println!("              PLANNING RESULT               ");
+    println!("============================================");
+    println!("plan_found: {:?}", result.plan_found);
+    println!("plan_lenght: {:?}", result.plan_length);
+    println!("time_to_solve: {:?}", result.time_to_solve);
+    println!("============================================");
+    for t in 0..result.trace.len(){
+        
+        println!("frame: {:?}", t);
+        println!("source: {:?}", result.trace[t].source);
+        println!("trans: {:?}", result.trace[t].trans);
+        println!("sink: {:?}", result.trace[t].sink);
+        println!("============================================");
+    }
+    println!("               END OF RESULT                ");
+    println!("============================================");
+
     // println!("{:?}", result);
     // let mut table = result_to_states(&result);
     // println!("{:?}", table);
