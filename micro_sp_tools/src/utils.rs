@@ -53,7 +53,7 @@ pub fn get_predicate_vars(pred: &Predicate) -> Vec<EnumVariable> {
         Predicate::AND(x) => s.extend(x.iter().flat_map(|p| get_predicate_vars(p))),
         Predicate::OR(x) => s.extend(x.iter().flat_map(|p| get_predicate_vars(p))),
         Predicate::NOT(x) => s.extend(get_predicate_vars(x)),
-        Predicate::EQRL(x, _) => s.push(x.clone())
+        Predicate::EQRL(x, _) => s.push(x.clone()),
     }
     s.sort();
     s.dedup();
@@ -73,7 +73,7 @@ pub fn get_problem_vars(prob: &PlanningProblem) -> Vec<EnumVariable> {
     s
 }
 
-pub fn to_state(vars: &Vec<EnumVariable>, vals: &Vec<&str>) -> State {
+pub fn frame_to_state(vars: &Vec<EnumVariable>, vals: &Vec<&str>) -> State {
     State {
         measured: vars
             .iter()
@@ -117,7 +117,7 @@ pub fn to_state(vars: &Vec<EnumVariable>, vals: &Vec<&str>) -> State {
     }
 }
 
-pub fn result_to_states(
+pub fn result_to_table(
     prob: &PlanningProblem,
     res: &PlanningResultStrings,
 ) -> PlanningResultStates {
@@ -129,11 +129,31 @@ pub fn result_to_states(
             .trace
             .iter()
             .map(|x| PlanningFrameStates {
-                source: to_state(&vars, &x.source.iter().map(|x| x.as_str()).collect()),
+                source: frame_to_state(&vars, &x.source.iter().map(|x| x.as_str()).collect()),
                 trans: x.trans.clone(),
-                sink: to_state(&vars, &x.sink.iter().map(|x| x.as_str()).collect()),
+                sink: frame_to_state(&vars, &x.sink.iter().map(|x| x.as_str()).collect()),
             })
             .collect(),
         time_to_solve: res.time_to_solve,
     }
+}
+
+pub fn pprint_result(result: &PlanningResultStrings) -> () {
+    println!("\n");
+    println!("============================================");
+    println!("              PLANNING RESULT               ");
+    println!("============================================");
+    println!("plan_found: {:?}", result.plan_found);
+    println!("plan_lenght: {:?}", result.plan_length);
+    println!("time_to_solve: {:?}", result.time_to_solve);
+    println!("============================================");
+    for t in 0..result.trace.len() {
+        println!("frame: {:?}", t);
+        println!("source: {:?}", result.trace[t].source);
+        println!("trans: {:?}", result.trace[t].trans);
+        println!("sink: {:?}", result.trace[t].sink);
+        println!("============================================");
+    }
+    println!("               END OF RESULT                ");
+    println!("============================================");
 }

@@ -6,9 +6,11 @@ pub use crate::predicates::{Predicate, PredicateToAstZ3};
 
 pub mod incremental;
 pub use crate::incremental::{
-    incremental, PlanningFrameStates, PlanningFrameStrings, PlanningResultStates, PlanningProblem,
+    incremental, PlanningFrameStates, PlanningFrameStrings, PlanningProblem, PlanningResultStates,
     PlanningResultStrings, Transition,
 };
 
 pub mod utils;
-pub use crate::utils::{get_predicate_vars, get_problem_vars, IterOps, to_state, result_to_states};
+pub use crate::utils::{
+    frame_to_state, get_predicate_vars, get_problem_vars, pprint_result, result_to_table, IterOps,
+};

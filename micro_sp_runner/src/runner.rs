@@ -9,61 +9,33 @@ pub async fn runner(
     ros_senders: Vec<(String, tokio::sync::mpsc::Sender<String>)>,
 ) -> io::Result<()> {
 
-    let mut measured_list = vec![];
-    for r in ros_receivers {
-        let past_time = Instant::now().checked_sub(Duration::new(6, 0));
-        let amkvp = Arc::new(Mutex::new((r.0.clone(), past_time.unwrap())));
-        let amkvp1 = amkvp.clone();
-        tokio::task::spawn(async {
-            let receiver = receiver::receiver(amkvp, r.1);
-            let _res = tokio::try_join!(receiver);
-        });
-        measured_list.push(amkvp1);
-    }
-
-    let mut command_list = vec![];
-    for r in ros_senders {
-        let amkvp = Arc::new(Mutex::new(r.0.clone()));
-        let amkvp1 = amkvp.clone();
-        tokio::task::spawn(async {
-            let sender = sender::sender(amkvp, r.1);
-            let _res = tokio::try_join!(sender);
-        });
-        command_list.push(amkvp1);
-    }
-
+    let measured_list = state::make_measured(ros_receivers);
+    let command_list = state::make_command(ros_senders);
+    
     let result = incremental(&prob);
+    pprint_result(&result);  
 
-    println!("\n");
-    println!("============================================");
-    println!("              PLANNING RESULT               ");
-    println!("============================================");
-    println!("plan_found: {:?}", result.plan_found);
-    println!("plan_lenght: {:?}", result.plan_length);
-    println!("time_to_solve: {:?}", result.time_to_solve);
-    println!("============================================");
-    for t in 0..result.trace.len(){
-        
-        println!("frame: {:?}", t);
-        println!("source: {:?}", result.trace[t].source);
-        println!("trans: {:?}", result.trace[t].trans);
-        println!("sink: {:?}", result.trace[t].sink);
-        println!("============================================");
-    }
-    println!("               END OF RESULT                ");
-    println!("============================================");
-
-    // println!("{:?}", result);
-    let table = result_to_states(&prob, &result);
+    let table = result_to_table(&prob, &result);
     println!("{:#?}", table);
 
     loop {
-        let measured_state_string = &measured_list
+
+        let measured_state_strings = &measured_list
             .iter()
             .map(|x| x.lock().unwrap().clone())
             .collect::<Vec<(String, Instant)>>();
 
-        let measured_state = &measured_state_string
+        let measured_state = &measured_state_strings
+            .iter()
+            .map(|x| (serde_json::from_str(&x.0).unwrap(), x.1))
+            .collect::<Vec<(EnumVariableValue, Instant)>>();
+
+        let command_state_strings = &command_list
+            .iter()
+            .map(|x| x.lock().unwrap().clone())
+            .collect::<Vec<(String, Instant)>>();
+
+        let command_state = &command_state_strings
             .iter()
             .map(|x| (serde_json::from_str(&x.0).unwrap(), x.1))
             .collect::<Vec<(EnumVariableValue, Instant)>>();
@@ -74,6 +46,13 @@ pub async fn runner(
             println!("message lifetime: {:?}", looping_now.duration_since(m.1));
             println!("{:?}", m);
         }
+        println!("-------------------------");
+
+        for c in command_state {
+            println!("message lifetime: {:?}", looping_now.duration_since(c.1));
+            println!("{:?}", c);
+        }
+        println!("-------------------------");
 
         delay_for(Duration::from_millis(10)).await;
     }
