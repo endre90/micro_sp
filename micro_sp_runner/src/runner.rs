@@ -4,7 +4,7 @@ use std::sync::{Arc, Mutex};
 use tokio::time::{delay_for, Duration};
 
 pub async fn runner(
-    prob: PlanningProblem,
+    mut prob: PlanningProblem,
     ros_receivers: Vec<(String, tokio::sync::mpsc::Receiver<String>)>,
     ros_senders: Vec<(String, tokio::sync::mpsc::Sender<String>)>,
 ) -> io::Result<()> {
@@ -20,12 +20,16 @@ pub async fn runner(
     pprint_result(&result);  
 
     let table = result_to_table(&prob, &result);
-    println!("{:#?}", table);
+    // println!("{:#?}", table);
 
     loop {
 
-        let s = arc_clone.lock().unwrap().clone();
-        println!("{:?} :: {:?}", serde_json::from_str::<State>(&s.0).unwrap(), s.1);
+        let arc = arc_clone.lock().unwrap().clone();
+        let state = serde_json::from_str::<State>(&arc.0).unwrap();
+        let sink = get_sink(&table, &state);
+
+        println!("{:?} :: {:?}", sink, arc.1);
+
         delay_for(Duration::from_millis(100)).await;
     }
 }

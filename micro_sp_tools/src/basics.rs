@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use super::*;
 
 #[derive(Debug, PartialEq, Clone, PartialOrd, Eq, Ord, Serialize, Deserialize)]
 pub struct Parameter {
@@ -8,9 +9,9 @@ pub struct Parameter {
 
 #[derive(Debug, PartialEq, Clone, PartialOrd, Eq, Ord, Serialize, Deserialize)]
 pub enum ControlKind {
-    Measured,
-    Command,
-    Estimated,
+    Measured,   // input
+    Command,    // output
+    Estimated,  // internal
     None,
 }
 
@@ -36,6 +37,14 @@ pub struct State {
     pub estimated: Vec<EnumVariableValue>,
 }
 
+#[derive(Debug, PartialEq, Clone, PartialOrd, Eq, Ord)]
+pub struct Transition {
+    pub name: String,
+    pub guard: Predicate,
+    pub update: Predicate,
+    pub kind: ControlKind
+}
+
 impl State {
     pub fn new() -> State {
         State {
@@ -53,6 +62,24 @@ impl State {
             measured: measured.to_owned(),
             command: command.to_owned(),
             estimated: estimated.to_owned(),
+        }
+    }
+}
+
+impl Transition {
+    pub fn new(name: &str, guard: &Predicate, update: &Predicate) -> Transition {
+        Transition {
+            name: name.to_string(),
+            guard: guard.to_owned(),
+            update: update.to_owned(),
+            kind: { // get kind from the kind of the updated variable
+                let diff = get_predicate_vars(&guard).intersect(get_predicate_vars(&update));
+                match diff.len() {
+                    0 => panic!("no update"),
+                    1 => diff[0].kind.to_owned(),
+                    _ => panic!("multiple actions in one step not implemented")
+                }
+            }
         }
     }
 }

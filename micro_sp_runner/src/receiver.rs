@@ -11,7 +11,7 @@ pub async fn receiver(
     let s = kvp.lock().unwrap().0.clone();
     let des: EnumVariableValue = serde_json::from_str(&s).unwrap();
     loop {
-        let data = recv.recv().await.unwrap();
+        let data = recv.recv().await.unwrap_or_default();
         *kvp.lock().unwrap() = (
             serde_json::to_string(&EnumVariableValue::new(&des.var, &data)).unwrap(),
             Instant::now(),

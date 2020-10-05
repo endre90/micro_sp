@@ -138,6 +138,17 @@ pub fn result_to_table(
     }
 }
 
+pub fn get_sink(table: &PlanningResultStates, source: &State) -> State {
+    match table
+        .trace
+        .iter()
+        .find(|x| x.source.measured == source.measured)
+    {
+        Some(x) => x.sink.to_owned(),
+        None => State::new(),
+    }
+}
+
 pub fn pprint_result(result: &PlanningResultStrings) -> () {
     println!("\n");
     println!("============================================");

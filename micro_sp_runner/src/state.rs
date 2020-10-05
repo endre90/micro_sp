@@ -56,7 +56,7 @@ pub async fn state(
 
         let measured_freshness = &measured_list
             .iter()
-            .map(|x| looping_now.duration_since(x.lock().unwrap().1))
+            .map(|x| looping_now.saturating_duration_since(x.lock().unwrap().1))
             .collect::<Vec<Duration>>();
 
         let command_vec = &command_list

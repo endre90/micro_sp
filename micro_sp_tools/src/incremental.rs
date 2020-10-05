@@ -4,13 +4,6 @@ use z3_sys::*;
 use z3_v2::*;
 
 #[derive(Debug, PartialEq, Clone, PartialOrd, Eq, Ord)]
-pub struct Transition {
-    pub name: String,
-    pub guard: Predicate,
-    pub update: Predicate,
-}
-
-#[derive(Debug, PartialEq, Clone, PartialOrd, Eq, Ord)]
 pub struct PlanningProblem {
     pub name: String,
     pub init: Predicate,
@@ -61,16 +54,6 @@ pub struct PlanningResultStrings {
     pub trace: Vec<PlanningFrameStrings>,
     // pub raw_trace: Vec<PlanningFrame>,
     pub time_to_solve: std::time::Duration,
-}
-
-impl Transition {
-    pub fn new(name: &str, guard: &Predicate, update: &Predicate) -> Transition {
-        Transition {
-            name: name.to_string(),
-            guard: guard.to_owned(),
-            update: update.to_owned(),
-        }
-    }
 }
 
 impl PlanningProblem {
@@ -322,31 +305,33 @@ impl<'ctx> GetPlanningResultZ3<'ctx> {
 
 #[test]
 fn test_incremental_1() {
+
     let act_pos = EnumVariable::new("act_pos", &vec!["left", "right"], None, None);
     let ref_pos = EnumVariable::new("ref_pos", &vec!["left", "right"], None, None);
     let act_left = Predicate::EQRL(act_pos.clone(), "left".to_string());
     let act_right = Predicate::EQRL(act_pos.clone(), "right".to_string());
     let ref_left = Predicate::EQRL(ref_pos.clone(), "left".to_string());
     let ref_right = Predicate::EQRL(ref_pos.clone(), "right".to_string());
+
     let t1 = Transition::new(
         "start_move_left",
         &Predicate::AND(vec![act_right.clone(), ref_right.clone()]),
-        &ref_left,
+        &ref_left
     );
     let t2 = Transition::new(
         "start_move_right",
         &Predicate::AND(vec![act_left.clone(), ref_left.clone()]),
-        &ref_right,
+        &ref_right
     );
     let t3 = Transition::new(
         "finish_move_left",
         &Predicate::AND(vec![act_right.clone(), ref_left.clone()]),
-        &act_left,
+        &act_left
     );
     let t4 = Transition::new(
         "finish_move_right",
         &Predicate::AND(vec![act_left.clone(), ref_right.clone()]),
-        &act_right,
+        &act_right
     );
     let problem = PlanningProblem::new(
         "prob1",

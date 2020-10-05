@@ -95,5 +95,6 @@ pub fn model() -> PlanningProblem {
         &Predicate::TRUE,
         &12,
     );
+    
     problem
 }
