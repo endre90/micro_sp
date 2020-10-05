@@ -31,7 +31,9 @@ pub fn model() -> PlanningProblem {
     );
 
     let act_left = Predicate::EQRL(act_pos.clone(), "left".to_string());
+    let not_act_left = Predicate::NOT(Box::new(act_left.clone()));
     let act_right = Predicate::EQRL(act_pos.clone(), "right".to_string());
+    let not_act_right = Predicate::NOT(Box::new(act_right.clone()));
     let ref_left = Predicate::EQRL(ref_pos.clone(), "left".to_string());
     let ref_right = Predicate::EQRL(ref_pos.clone(), "right".to_string());
     let activate = Predicate::EQRL(ref_stat.clone(), "active".to_string());
@@ -41,25 +43,25 @@ pub fn model() -> PlanningProblem {
 
     let t1 = Transition::new(
         "start_move_left",
-        &Predicate::AND(vec![act_right.clone(), ref_right.clone()]),
+        &Predicate::AND(vec![not_act_left.clone(), ref_right.clone()]),
         &ref_left,
     );
 
     let t2 = Transition::new(
         "start_move_right",
-        &Predicate::AND(vec![act_left.clone(), ref_left.clone()]),
+        &Predicate::AND(vec![not_act_right.clone(), ref_left.clone()]),
         &ref_right,
     );
 
     let t3 = Transition::new(
         "finish_move_left",
-        &Predicate::AND(vec![act_right.clone(), ref_left.clone()]),
+        &Predicate::AND(vec![not_act_left.clone(), ref_left.clone()]),
         &act_left,
     );
 
     let t4 = Transition::new(
         "finish_move_right",
-        &Predicate::AND(vec![act_left.clone(), ref_right.clone()]),
+        &Predicate::AND(vec![not_act_right.clone(), ref_right.clone()]),
         &act_right,
     );
 

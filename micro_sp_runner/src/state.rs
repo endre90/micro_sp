@@ -42,9 +42,18 @@ pub async fn state(
     arc: Arc<Mutex<(String, bool)>>,
     ros_receivers: Vec<(String, tokio::sync::mpsc::Receiver<String>)>,
     ros_senders: Vec<(String, tokio::sync::mpsc::Sender<String>)>,
+    state_publisher: (String, tokio::sync::mpsc::Sender<String>)
 ) -> io::Result<()> {
     let measured_list = state::make_measured(ros_receivers);
     let command_list = state::make_command(ros_senders);
+
+    // let arc_clone = arc.lock().unwrap().clone();
+    // let past_time = Instant::now().checked_sub(Duration::new(6, 0));
+    // let amkvp = Arc::new(Mutex::new((arc_clone.0.clone(), past_time.unwrap())));
+    // tokio::task::spawn(async {
+    //     let sender = sender::sender(amkvp, state_publisher.1);
+    //     let _res = tokio::try_join!(sender);
+    // });
 
     loop {
         let looping_now = Instant::now();

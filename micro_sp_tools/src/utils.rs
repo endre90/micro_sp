@@ -149,6 +149,81 @@ pub fn get_sink(table: &PlanningResultStates, source: &State) -> State {
     }
 }
 
+pub fn state_to_predicate(state: &State, kind: &ControlKind) -> Predicate {
+    match kind {
+        ControlKind::Measured => Predicate::AND(
+            state
+                .measured
+                .iter()
+                .map(|x| {
+                    Predicate::EQRL(
+                        EnumVariable::new(
+                            &x.var.name,
+                            &x.var.domain.iter().map(|x| x.as_str()).collect(),
+                            Some(&x.var.param),
+                            Some(&x.var.kind),
+                        ),
+                        x.val.to_owned(),
+                    )
+                })
+                .collect::<Vec<Predicate>>(),
+        ),
+        ControlKind::Estimated => Predicate::AND(
+            state
+                .estimated
+                .iter()
+                .map(|x| {
+                    Predicate::EQRL(
+                        EnumVariable::new(
+                            &x.var.name,
+                            &x.var.domain.iter().map(|x| x.as_str()).collect(),
+                            Some(&x.var.param),
+                            Some(&x.var.kind),
+                        ),
+                        x.val.to_owned(),
+                    )
+                })
+                .collect::<Vec<Predicate>>(),
+        ),
+        ControlKind::Command => Predicate::AND(
+            state
+                .command
+                .iter()
+                .map(|x| {
+                    Predicate::EQRL(
+                        EnumVariable::new(
+                            &x.var.name,
+                            &x.var.domain.iter().map(|x| x.as_str()).collect(),
+                            Some(&x.var.param),
+                            Some(&x.var.kind),
+                        ),
+                        x.val.to_owned(),
+                    )
+                })
+                .collect::<Vec<Predicate>>(),
+        ),
+        ControlKind::None => Predicate::AND(
+            vec!(
+                state_to_predicate(&state, &ControlKind::Measured),
+                state_to_predicate(&state, &ControlKind::Estimated),
+                state_to_predicate(&state, &ControlKind::Command)
+            )
+        )
+    }
+}
+
+pub fn refresh_problem(prob: &PlanningProblem, current: &State) -> PlanningProblem {
+    PlanningProblem {
+        name: prob.name.to_owned(),
+        init: state_to_predicate(&current, &ControlKind::Measured),
+        goal: prob.goal.to_owned(),
+        trans: prob.trans.to_owned(),
+        ltl_specs: prob.ltl_specs.to_owned(),
+        max_steps: prob.max_steps
+
+    }
+}
+
 pub fn pprint_result(result: &PlanningResultStrings) -> () {
     println!("\n");
     println!("============================================");

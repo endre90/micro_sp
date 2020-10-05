@@ -21,3 +21,16 @@ pub async fn sender(
         send.try_send(des.val.to_string()).unwrap_or_default();
     }
 }
+
+// pub async fn state_sender(
+//     kvp: Arc<Mutex<String>>,
+//     mut send: tokio::sync::mpsc::Sender<std::string::String>,
+// ) -> io::Result<()> {
+//     let s = kvp.lock().unwrap().clone();
+//     let des: State = serde_json::from_str(&s).unwrap();
+//     loop {
+//         delay_for(Duration::from_millis(100)).await;
+//         *kvp.lock().unwrap() = serde_json::to_string(&State::from_lists(&des.measured, &des.command, &des.estimated)).unwrap();
+//         send.try_send(des.val.to_string()).unwrap_or_default();
+//     }
+// }

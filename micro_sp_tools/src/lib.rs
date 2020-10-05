@@ -14,6 +14,6 @@ pub use crate::incremental::{
 
 pub mod utils;
 pub use crate::utils::{
-    frame_to_state, get_predicate_vars, get_problem_vars, get_sink, pprint_result, result_to_table,
-    IterOps,
+    frame_to_state, get_predicate_vars, get_problem_vars, get_sink, pprint_result, refresh_problem,
+    result_to_table, state_to_predicate, IterOps,
 };
