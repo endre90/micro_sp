@@ -4,28 +4,28 @@ pub fn model() -> PlanningProblem {
 
     let act_pos = EnumVariable::new(
         "act_pos",
-        &vec!["left", "right", "unknown"],
+        &vec!["left", "right", "unknown", "dummy_value"],
         None,
         Some(&ControlKind::Measured),
     );
 
     let ref_pos = EnumVariable::new(
         "ref_pos",
-        &vec!["left", "right"],
+        &vec!["left", "right", "dummy_value"],
         None,
         Some(&ControlKind::Command),
     );
 
     let act_stat = EnumVariable::new(
         "act_stat",
-        &vec!["idle", "active", "unknown"],
+        &vec!["idle", "active", "unknown", "dummy_value"],
         None,
         Some(&ControlKind::Measured),
     );
 
     let ref_stat = EnumVariable::new(
         "ref_stat",
-        &vec!["idle", "active"],
+        &vec!["idle", "active", "dummy_value"],
         None,
         Some(&ControlKind::Command),
     );

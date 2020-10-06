@@ -27,8 +27,8 @@ pub struct PlanningFrameStrings {
 
 #[derive(PartialEq, Eq, Clone, Debug, PartialOrd, Ord)]
 pub struct PlanningFrameStates {
-    pub source: State,
-    pub sink: State,
+    pub source: CompleteState,
+    pub sink: CompleteState,
     pub trans: String,
 }
 

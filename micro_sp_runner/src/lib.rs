@@ -4,5 +4,8 @@ pub use crate::receiver::receiver;
 pub mod sender;
 pub use crate::sender::sender;
 
-pub mod state;
-pub use crate::state::{make_measured, make_command, state};
+pub mod mstate;
+pub use crate::mstate::{mstate};
+
+pub mod cstate;
+pub use crate::cstate::{cstate};

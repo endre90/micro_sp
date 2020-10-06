@@ -1,12 +1,14 @@
 use micro_sp_tools::*;
 use std::io;
 use tokio::sync::mpsc::channel;
+use tokio::time::Duration;
 mod model;
 mod publisher;
 mod receiver;
 mod runner;
 mod sender;
-mod state;
+mod mstate;
+mod cstate;
 use r2r::*;
 
 #[tokio::main]
@@ -22,13 +24,13 @@ async fn main() -> io::Result<()> {
     let msr_var_vals: Vec<EnumVariableValue> = vars
         .iter()
         .filter(|x| x.kind == ControlKind::Measured)
-        .map(|x| EnumVariableValue::new(x, "dummy_value"))
+        .map(|x| EnumVariableValue::timed(x, "dummy_value", Duration::new(6, 0)))
         .collect();
 
     let cmd_var_vals: Vec<EnumVariableValue> = vars
         .iter()
         .filter(|x| x.kind == ControlKind::Command)
-        .map(|x| EnumVariableValue::new(x, "dummy_value"))
+        .map(|x| EnumVariableValue::timed(x, "dummy_value", Duration::new(6, 0)))
         .collect();
 
     // generate subscribers for ControlKind::Measured kind variables (maybe all? testing needed)
@@ -58,19 +60,19 @@ async fn main() -> io::Result<()> {
         });
     }
 
-    // make a publisher for the global state
-    let state_publisher = node
-        .create_publisher::<std_msgs::msg::String>("/state")
-        .expect("Error f93c6d99-5725-467a-8a96-e49f72b3485f: Creating state publisher failed.");
-    let (tx, rx) = channel::<String>(10);
-    let state_publisher_data = (serde_json::to_string(&State::new()).unwrap(), tx);
-    tokio::task::spawn(async {
-        let writer = publisher::publisher(state_publisher, rx);
-        let _res = tokio::try_join!(writer);
-    });
+    // // make a publisher for the global state
+    // let state_publisher = node
+    //     .create_publisher::<std_msgs::msg::String>("/state")
+    //     .expect("Error f93c6d99-5725-467a-8a96-e49f72b3485f: Creating state publisher failed.");
+    // let (tx, rx) = channel::<String>(10);
+    // let state_publisher_data = (serde_json::to_string(&State::new()).unwrap(), tx);
+    // tokio::task::spawn(async {
+    //     let writer = publisher::publisher(state_publisher, rx);
+    //     let _res = tokio::try_join!(writer);
+    // });
 
     tokio::task::spawn(async {
-        let recv = runner::runner(problem, ros_receivers, ros_senders, state_publisher_data);
+        let recv = runner::runner(problem, ros_receivers, ros_senders);
         let _res = tokio::try_join!(recv);
     });
 

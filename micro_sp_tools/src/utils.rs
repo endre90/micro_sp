@@ -73,9 +73,9 @@ pub fn get_problem_vars(prob: &PlanningProblem) -> Vec<EnumVariable> {
     s
 }
 
-pub fn frame_to_state(vars: &Vec<EnumVariable>, vals: &Vec<&str>) -> State {
+pub fn frame_to_measured_state(vars: &Vec<EnumVariable>, vals: &Vec<&str>) -> State {
     State {
-        measured: vars
+        vec: vars
             .iter()
             .filter(|c| c.kind == ControlKind::Measured)
             .map(|x| {
@@ -88,7 +88,13 @@ pub fn frame_to_state(vars: &Vec<EnumVariable>, vals: &Vec<&str>) -> State {
                 )
             })
             .collect(),
-        command: vars
+        kind: ControlKind::Measured,
+    }
+}
+
+pub fn frame_to_command_state(vars: &Vec<EnumVariable>, vals: &Vec<&str>) -> State {
+    State {
+        vec: vars
             .iter()
             .filter(|c| c.kind == ControlKind::Command)
             .map(|x| {
@@ -101,7 +107,13 @@ pub fn frame_to_state(vars: &Vec<EnumVariable>, vals: &Vec<&str>) -> State {
                 )
             })
             .collect(),
-        estimated: vars
+        kind: ControlKind::Command,
+    }
+}
+
+pub fn frame_to_estimated_state(vars: &Vec<EnumVariable>, vals: &Vec<&str>) -> State {
+    State {
+        vec: vars
             .iter()
             .filter(|c| c.kind == ControlKind::Estimated)
             .map(|x| {
@@ -114,6 +126,15 @@ pub fn frame_to_state(vars: &Vec<EnumVariable>, vals: &Vec<&str>) -> State {
                 )
             })
             .collect(),
+        kind: ControlKind::Estimated,
+    }
+}
+
+pub fn frame_to_complete_state(vars: &Vec<EnumVariable>, vals: &Vec<&str>) -> CompleteState {
+    CompleteState {
+        measured: frame_to_measured_state(&vars, &vals),
+        command: frame_to_command_state(&vars, &vals),
+        estimated: frame_to_estimated_state(&vars, &vals),
     }
 }
 
@@ -129,31 +150,35 @@ pub fn result_to_table(
             .trace
             .iter()
             .map(|x| PlanningFrameStates {
-                source: frame_to_state(&vars, &x.source.iter().map(|x| x.as_str()).collect()),
+                source: frame_to_complete_state(
+                    &vars,
+                    &x.source.iter().map(|x| x.as_str()).collect(),
+                ),
                 trans: x.trans.clone(),
-                sink: frame_to_state(&vars, &x.sink.iter().map(|x| x.as_str()).collect()),
+                sink: frame_to_complete_state(&vars, &x.sink.iter().map(|x| x.as_str()).collect()),
             })
             .collect(),
         time_to_solve: res.time_to_solve,
     }
 }
 
-pub fn get_sink(table: &PlanningResultStates, source: &State) -> State {
-    match table
-        .trace
-        .iter()
-        .find(|x| x.source.measured == source.measured)
-    {
-        Some(x) => x.sink.to_owned(),
-        None => State::new(),
+pub fn get_sink(table: &PlanningResultStates, source: &State) -> CompleteState {
+    // let untimed_source: Vec<(String, String)> = source.vec.iter().map(|x| (x.var.name, x.val)).collect();
+    // let untimed_table = table.trace.iter().map(|x| PlanningFrameStates { source:  } x.source.measured.)
+    match source.kind == ControlKind::Measured {
+        true => match table.trace.iter().find(|x| x.source.measured.vec == source.vec.clone()) {
+            Some(x) => x.sink.to_owned(),
+            None => CompleteState::new(),
+        },
+        false => panic!("asdf"),
     }
 }
 
-pub fn state_to_predicate(state: &State, kind: &ControlKind) -> Predicate {
-    match kind {
+pub fn measured_state_to_predicate(state: &State) -> Predicate {
+    match state.kind {
         ControlKind::Measured => Predicate::AND(
             state
-                .measured
+                .vec
                 .iter()
                 .map(|x| {
                     Predicate::EQRL(
@@ -168,59 +193,20 @@ pub fn state_to_predicate(state: &State, kind: &ControlKind) -> Predicate {
                 })
                 .collect::<Vec<Predicate>>(),
         ),
-        ControlKind::Estimated => Predicate::AND(
-            state
-                .estimated
-                .iter()
-                .map(|x| {
-                    Predicate::EQRL(
-                        EnumVariable::new(
-                            &x.var.name,
-                            &x.var.domain.iter().map(|x| x.as_str()).collect(),
-                            Some(&x.var.param),
-                            Some(&x.var.kind),
-                        ),
-                        x.val.to_owned(),
-                    )
-                })
-                .collect::<Vec<Predicate>>(),
-        ),
-        ControlKind::Command => Predicate::AND(
-            state
-                .command
-                .iter()
-                .map(|x| {
-                    Predicate::EQRL(
-                        EnumVariable::new(
-                            &x.var.name,
-                            &x.var.domain.iter().map(|x| x.as_str()).collect(),
-                            Some(&x.var.param),
-                            Some(&x.var.kind),
-                        ),
-                        x.val.to_owned(),
-                    )
-                })
-                .collect::<Vec<Predicate>>(),
-        ),
-        ControlKind::None => Predicate::AND(
-            vec!(
-                state_to_predicate(&state, &ControlKind::Measured),
-                state_to_predicate(&state, &ControlKind::Estimated),
-                state_to_predicate(&state, &ControlKind::Command)
-            )
-        )
+        ControlKind::Command => panic!("not measured type"),
+        ControlKind::Estimated => panic!("not measured type"),
+        ControlKind::None => panic!("not measured type")
     }
 }
 
 pub fn refresh_problem(prob: &PlanningProblem, current: &State) -> PlanningProblem {
     PlanningProblem {
         name: prob.name.to_owned(),
-        init: state_to_predicate(&current, &ControlKind::Measured),
+        init: measured_state_to_predicate(&current),
         goal: prob.goal.to_owned(),
         trans: prob.trans.to_owned(),
         ltl_specs: prob.ltl_specs.to_owned(),
-        max_steps: prob.max_steps
-
+        max_steps: prob.max_steps,
     }
 }
 
