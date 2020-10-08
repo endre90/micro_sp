@@ -10,7 +10,6 @@ pub async fn publisher(
     loop {
         delay_for(Duration::from_millis(100)).await;
         let to_pub = recv.recv().await.unwrap();
-        println!("PUBLISHER {:?}", to_pub);
         let to_send = std_msgs::msg::String {
             data: to_pub.to_owned(),
         };
