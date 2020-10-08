@@ -23,7 +23,7 @@ pub async fn cstate(
     loop {
         let looping_now = Instant::now();
         let sink: State = serde_json::from_str(&arc.lock().unwrap()).unwrap();
-        let command_vec = &command_list
+        let _command_vec = &command_list
             .iter()
             .map(|x| {
                 

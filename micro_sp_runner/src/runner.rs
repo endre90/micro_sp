@@ -4,7 +4,7 @@ use std::sync::{Arc, Mutex};
 use tokio::time::{Instant, interval, Duration};
 
 pub async fn runner(
-    mut prob: PlanningProblem,
+    prob: PlanningProblem,
     ros_receivers: Vec<(String, tokio::sync::mpsc::Receiver<String>)>,
     ros_senders: Vec<(String, tokio::sync::mpsc::Sender<String>)>,
     // state_publisher: (String, tokio::sync::mpsc::Sender<String>),
@@ -47,8 +47,6 @@ pub async fn runner(
             false => false
         };
 
-        let looping_now = Instant::now();
-
         if fresh {
             if sink == State::new(&ControlKind::Command) {
                 let fresh_prob = refresh_problem(&prob, &current_measured_state);
@@ -64,13 +62,6 @@ pub async fn runner(
         }
 
         *command_arc_clone.lock().unwrap() = serde_json::to_string(&sink).unwrap();
-        
-
-        // println!("asdfjpoij");
-        // println!("MEASURED {:?}", current_measured_state);
-        // println!("COMMAND {:?}", command_vec);
-        // println!("TABLE {:?}", table);     
-        println!("FRESH {:?}", fresh);
 
         let mut interval = interval(Duration::from_millis(100));
         interval.tick().await;
