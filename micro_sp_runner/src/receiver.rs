@@ -19,7 +19,7 @@ pub async fn receiver(
         };
         let data = recv.recv().await.unwrap_or_default();
         *kvp.lock().unwrap() = (
-            serde_json::to_string(&EnumVariableValue::timed(&des.var, &data, duration)).unwrap(), //, looping_now.saturating_duration_since(s.1))).unwrap(),
+            serde_json::to_string(&EnumVariableValue::timed(&des.var, &data, duration)).unwrap(),
             Instant::now(),
         );
     }

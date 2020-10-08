@@ -11,19 +11,14 @@ pub async fn runner(
 ) -> io::Result<()> {
     
     let measured_arc = Arc::new(Mutex::new(serde_json::to_string(&State::new(&ControlKind::Measured)).unwrap()));
-    let measured_arc_clone = measured_arc.clone();
-    tokio::task::spawn(async {
-        let measured_state = mstate::mstate(measured_arc, ros_receivers);
-        let _res = tokio::try_join!(measured_state);
-    });
-
     let command_arc = Arc::new(Mutex::new(serde_json::to_string(&State::new(&ControlKind::Command)).unwrap()));
+    let measured_arc_clone = measured_arc.clone();
     let command_arc_clone = command_arc.clone();
     tokio::task::spawn(async {
-        let command_state = cstate::cstate(command_arc, ros_senders);
-        let _res = tokio::try_join!(command_state);
+        let state = state::state(measured_arc, command_arc, ros_receivers, ros_senders);
+        let _res = tokio::try_join!(state);
     });
-
+    
     let mut i: u32 = 1;
     // let mut fresh = false;
     let mut sink = State::new(&ControlKind::Command);
