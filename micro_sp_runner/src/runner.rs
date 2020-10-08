@@ -17,16 +17,27 @@ pub async fn runner(
         let _res = tokio::try_join!(measured_state);
     });
 
-    let command_state = cstate::cstate(ros_senders);
+    // let command_state = cstate::cstate(ros_senders);
     // let command_arc = Arc::new(Mutex::new(serde_json::to_string(&State::new(&ControlKind::Command)).unwrap()));
     // let command_arc_clone = command_arc.clone();
+    let mut command_list = vec![];
+    for r in ros_senders {
+        let past_time = Instant::now().checked_sub(Duration::new(6, 0));
+        let amkvp = Arc::new(Mutex::new((r.0.clone(), past_time.unwrap())));
+        let amkvp1 = amkvp.clone();
+        tokio::task::spawn(async {
+            let sender = sender::sender(amkvp, r.1);
+            let _res = tokio::try_join!(sender);
+        });
+        command_list.push(amkvp1);
+    }
     // tokio::task::spawn(async {
-    //     let command_state = cstate::cstate(command_arc, ros_senders);
+    //     let command_state = cstate::cstate(ros_senders);
     //     let _res = tokio::try_join!(command_state);
     // });
 
     let mut i: u32 = 1;
-    let mut fresh = false;
+    // let mut fresh = false;
     let mut sink = State::new(&ControlKind::Command);
     let mut table = PlanningResultStates {
         plan_found: false,
@@ -38,32 +49,17 @@ pub async fn runner(
     loop {
 
         let measured_arc_clone_clone = measured_arc_clone.lock().unwrap().clone();
-        let current_measured_state = serde_json::from_str(&measured_arc_clone_clone).unwrap();
+        let current_measured_state: State = serde_json::from_str(&measured_arc_clone_clone).unwrap();
+
+        let fresh = match current_measured_state.vec.len() > 0 {
+            true => current_measured_state
+                .vec
+                .iter()
+                .all(|x| x.lifetime < Duration::from_millis(5000)),
+            false => false
+        };
 
         let looping_now = Instant::now();
-        let command_vec = &command_state
-            .iter()
-            .map(|x| {
-                let des: EnumVariableValue = serde_json::from_str(&x.lock().unwrap().0).unwrap();
-                let dummy = EnumVariableValue::new(&des.var, &des.val);
-                let update = sink.vec.iter().find(|x| x.var == des.var).unwrap_or(&dummy);
-                EnumVariableValue::timed(
-                    &des.var,
-                    &update.val,
-                    looping_now.saturating_duration_since(x.lock().unwrap().1),
-                )
-            })
-            .collect::<Vec<EnumVariableValue>>();
-
-        // *arc.lock().unwrap() = serde_json::to_string(&command_vec).unwrap();
-        // delay_for(Duration::from_millis(10)).await;
-
-        // println!("SINK {:?} :: {:?}", sink, fresh);
-
-        // println!("asdfjpoij");
-        println!("MEASURED {:?}", current_measured_state);
-        println!("COMMAND {:?}", command_vec);
-        println!("TABLE {:?}", table);
 
         if fresh {
             if sink == State::new(&ControlKind::Command) {
@@ -75,14 +71,33 @@ pub async fn runner(
                 table = result_to_table(&prob, &result);
             }
             sink = get_sink(&table, &current_measured_state).command;
-            // *arc_clone.lock().unwrap() = (serde_json::to_string(&sink).unwrap(), arc.1)
+        } else {
+            sink = State::new(&ControlKind::Command);
         }
 
-        println!("SINK {:?} :: {:?}", sink, fresh);
-        fresh = current_measured_state
-            .vec
+        let command_vec = &command_list
             .iter()
-            .all(|x| x.lifetime < Duration::new(5, 0));
+            .map(|x| {
+                let des: EnumVariableValue = serde_json::from_str(&x.lock().unwrap().0).unwrap();
+                let dummy = EnumVariableValue::new(&des.var, &des.val);
+                let update = sink.vec.iter().find(|x| x.var == des.var).unwrap_or(&dummy);
+                println!("UPDATE {:?}", update);
+                *x.lock().unwrap() = (serde_json::to_string(&update).unwrap(), Instant::now());
+                EnumVariableValue::timed(
+                    &des.var,
+                    &update.val,
+                    looping_now.saturating_duration_since(x.lock().unwrap().1),
+                )
+            })
+            .collect::<Vec<EnumVariableValue>>();
+
+        // *arc.lock().unwrap() = serde_json::to_string(&command_vec).unwrap();
+
+        // println!("asdfjpoij");
+        // println!("MEASURED {:?}", current_measured_state);
+        // println!("COMMAND {:?}", command_vec);
+        // println!("TABLE {:?}", table);     
+        println!("FRESH {:?}", fresh);
 
         let mut interval = interval(Duration::from_millis(100));
         interval.tick().await;
