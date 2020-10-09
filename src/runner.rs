@@ -1,7 +1,7 @@
 use super::*;
 use std::io;
 use std::sync::{Arc, Mutex};
-use tokio::time::{Instant, interval, Duration};
+use tokio::time::{interval, Duration};
 
 pub async fn runner(
     prob: PlanningProblem,

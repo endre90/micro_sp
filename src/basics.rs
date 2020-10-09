@@ -16,7 +16,6 @@ pub enum ControlKind {
     None,
 }
 
-
 #[derive(Debug, PartialEq, Clone, PartialOrd, Eq, Ord, Serialize, Deserialize)]
 pub struct EnumVariable {
     pub name: String,

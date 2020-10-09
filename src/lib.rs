@@ -2,10 +2,10 @@
 extern crate derivative;
 
 pub mod basics;
-pub use crate::basics::*;
+pub use basics::*;
 
 pub mod predicates;
-pub use crate::predicates::*;
+pub use predicates::*;
 
 pub mod incremental;
 pub use crate::incremental::*;

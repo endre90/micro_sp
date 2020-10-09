@@ -1,4 +1,4 @@
-use micro_sp_tools::*;
+use super::*;
 
 pub fn model() -> PlanningProblem {
 
