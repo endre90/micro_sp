@@ -9,13 +9,40 @@ pub struct PlanningProblem {
     pub init: Predicate,
     pub goal: Predicate,
     pub trans: Vec<Transition>,
-    pub ltl_specs: Predicate,
     pub max_steps: u32,
 }
 
-#[derive(Clone)]
-pub struct KeepVariableValues<'ctx> {
-    pub ctx: &'ctx ContextZ3,
+#[derive(PartialEq, Eq, Clone, Debug, PartialOrd, Ord)]
+pub struct PlanningFrame {
+    pub source: CompleteState,
+    pub sink: CompleteState,
+    pub trans: String,
+}
+
+#[derive(PartialEq, Eq, Clone, Debug, PartialOrd, Ord)]
+pub struct PlanningResult {
+    pub plan_found: bool,
+    pub plan_length: u32,
+    pub trace: Vec<PlanningFrame>,
+    pub time_to_solve: std::time::Duration,
+}
+
+impl PlanningProblem {
+    pub fn new(
+        name: &str,
+        init: &Predicate,
+        goal: &Predicate,
+        trans: &Vec<Transition>,
+        max_steps: &u32,
+    ) -> PlanningProblem {
+        PlanningProblem {
+            name: name.to_string(),
+            init: init.to_owned(),
+            goal: goal.to_owned(),
+            trans: trans.to_owned(),
+            max_steps: max_steps.to_owned(),
+        }
+    }
 }
 
 #[derive(PartialEq, Eq, Clone, Debug, PartialOrd, Ord)]
@@ -56,57 +83,41 @@ pub struct PlanningResultStrings {
     pub time_to_solve: std::time::Duration,
 }
 
-impl PlanningProblem {
-    pub fn new(
-        name: &str,
-        init: &Predicate,
-        goal: &Predicate,
-        trans: &Vec<Transition>,
-        ltl_specs: &Predicate,
-        max_steps: &u32,
-    ) -> PlanningProblem {
-        PlanningProblem {
-            name: name.to_string(),
-            init: init.to_owned(),
-            goal: goal.to_owned(),
-            trans: trans.to_owned(),
-            ltl_specs: ltl_specs.to_owned(),
-            max_steps: max_steps.to_owned(),
-        }
-    }
-}
+pub fn keep_variable_values(
+    ctx: &ContextZ3,
+    vars: &Vec<EnumVariable>,
+    trans: &Transition,
+    step: &u32,
+) -> Z3_ast {
+    let changed = get_predicate_vars(&trans.update);
+    let unchanged = IterOps::difference(vars, &changed);
 
-impl<'ctx> KeepVariableValues<'ctx> {
-    pub fn new(
-        ctx: &'ctx ContextZ3,
-        vars: &Vec<EnumVariable>,
-        trans: &Transition,
-        step: &u32,
-    ) -> Z3_ast {
-        let changed = get_predicate_vars(&trans.update);
-        let unchanged = IterOps::difference(vars, &changed);
-        let mut assert_vec = vec![];
-        for u in unchanged {
-            let sort = EnumSortZ3::new(
-                &ctx,
-                &u.r#type,
-                u.domain.iter().map(|x| x.as_str()).collect(),
-            );
-            let v_1 = EnumVarZ3::new(
-                &ctx,
-                sort.r,
-                format!("{}_s{}", u.name.to_string(), step).as_str(),
-            );
-            let v_2 = EnumVarZ3::new(
-                &ctx,
-                sort.r,
-                format!("{}_s{}", u.name.to_string(), step - 1).as_str(),
-            );
-            assert_vec.push(EQZ3::new(&ctx, v_1, v_2));
-        }
-
-        ANDZ3::new(&ctx, assert_vec)
-    }
+    ANDZ3::new(
+        &ctx,
+        unchanged
+            .iter()
+            .map(|x| {
+                let sort = EnumSortZ3::new(
+                    &ctx,
+                    &x.r#type,
+                    x.domain.iter().map(|x| x.as_str()).collect(),
+                );
+                EQZ3::new(
+                    &ctx,
+                    EnumVarZ3::new(
+                        &ctx,
+                        sort.r,
+                        format!("{}_s{}", x.name.to_string(), step).as_str(),
+                    ),
+                    EnumVarZ3::new(
+                        &ctx,
+                        sort.r,
+                        format!("{}_s{}", x.name.to_string(), step - 1).as_str(),
+                    ),
+                )
+            })
+            .collect(),
+    )
 }
 
 pub fn incremental(prob: &PlanningProblem) -> PlanningResultStrings {
@@ -114,94 +125,169 @@ pub fn incremental(prob: &PlanningProblem) -> PlanningResultStrings {
     let ctx = ContextZ3::new(&cfg);
     let slv = SolverZ3::new(&ctx);
 
-    let problem_vars = get_problem_vars(&prob);
-
-    SlvAssertZ3::new(
-        &ctx,
-        &slv,
-        predicate_to_ast(&ctx, &prob.init, &0),
-    );
+    SlvAssertZ3::new(&ctx, &slv, predicate_to_ast(&ctx, &prob.init, &0));
 
     SlvPushZ3::new(&ctx, &slv); // create backtracking point
-    SlvAssertZ3::new(
-        &ctx,
-        &slv,
-        predicate_to_ast(&ctx, &prob.ltl_specs, &0),
-    );
-    SlvAssertZ3::new(
-        &ctx,
-        &slv,
-        predicate_to_ast(&ctx, &prob.goal, &0),
-    );
+    SlvAssertZ3::new(&ctx, &slv, predicate_to_ast(&ctx, &prob.goal, &0));
 
     let now = Instant::now();
     let mut plan_found: bool = false;
-
     let mut step: u32 = 0;
 
     while step < prob.max_steps + 1 {
         step = step + 1;
-        if SlvCheckZ3::new(&ctx, &slv) != 1 {
-            SlvPopZ3::new(&ctx, &slv, 1);
-
-            let mut all_trans = vec![];
-            for t in &prob.trans {
-                let name = format!("{}_t{}", &t.name, step);
-                let guard = predicate_to_ast(&ctx, &t.guard, &(step - 1));
-                let update = predicate_to_ast(&ctx, &t.update, &(step));
-                let keeps = KeepVariableValues::new(&ctx, &problem_vars, &t, &step);
-
-                all_trans.push(ANDZ3::new(
+        match SlvCheckZ3::new(&ctx, &slv) == 1 {
+            false => {
+                SlvPopZ3::new(&ctx, &slv, 1);
+                SlvAssertZ3::new(
                     &ctx,
-                    vec![
-                        EQZ3::new(
-                            &ctx,
-                            BoolVarZ3::new(&ctx, &BoolSortZ3::new(&ctx), name.as_str()),
-                            BoolZ3::new(&ctx, true),
-                        ),
-                        guard,
-                        update,
-                        keeps,
-                    ],
-                ));
-            }
+                    &slv,
+                    ORZ3::new(
+                        &ctx,
+                        prob.trans
+                            .iter()
+                            .map(|x| {
+                                ANDZ3::new(
+                                    &ctx,
+                                    vec![
+                                        EQZ3::new(
+                                            &ctx,
+                                            BoolVarZ3::new(
+                                                &ctx,
+                                                &BoolSortZ3::new(&ctx),
+                                                format!("{}_t{}", &x.name, step).as_str(),
+                                            ),
+                                            BoolZ3::new(&ctx, true),
+                                        ),
+                                        predicate_to_ast(&ctx, &x.guard, &(step - 1)),
+                                        predicate_to_ast(&ctx, &x.update, &(step)),
+                                        keep_variable_values(
+                                            &ctx,
+                                            &get_problem_vars(&prob),
+                                            &x,
+                                            &step,
+                                        ),
+                                    ],
+                                )
+                            })
+                            .collect(),
+                    ),
+                );
 
-            SlvAssertZ3::new(&ctx, &slv, ORZ3::new(&ctx, all_trans));
-            SlvPushZ3::new(&ctx, &slv);
-            SlvAssertZ3::new(
-                &ctx,
-                &slv,
-                predicate_to_ast(&ctx, &prob.ltl_specs, &step),
-            );
-            SlvAssertZ3::new(
-                &ctx,
-                &slv,
-                predicate_to_ast(&ctx, &prob.goal, &step),
-            );
-        } else {
-            plan_found = true;
-            break;
+                SlvPushZ3::new(&ctx, &slv);
+                SlvAssertZ3::new(&ctx, &slv, predicate_to_ast(&ctx, &prob.goal, &step));
+            }
+            true => {
+                plan_found = true;
+                break;
+            }
         }
     }
 
     let planning_time = now.elapsed();
 
-    // let asserts = SlvGetAssertsZ3::new(&ctx, &slv);
-    // let asrtvec = Z3AstVectorToVectorAstZ3::new(&ctx, asserts);
-    // for asrt in asrtvec {
-    //     println!("{}", AstToStringZ3::new(&ctx, asrt));
-    // }
-    // let cnf = GetCnfVectorZ3::new(&ctx, asrtvec);
-    if plan_found == true {
-        let model = SlvGetModelZ3::new(&ctx, &slv);
-        let result = GetPlanningResultZ3::new(&ctx, model, step, planning_time, plan_found);
-        result
-    } else {
-        let model = FreshModelZ3::new(&ctx);
-        let result = GetPlanningResultZ3::new(&ctx, model, step, planning_time, plan_found);
-        result
+    match plan_found {
+        true => GetPlanningResultZ3::new(
+            &ctx,
+            SlvGetModelZ3::new(&ctx, &slv),
+            step,
+            planning_time,
+            plan_found,
+        ),
+        false => GetPlanningResultZ3::new(
+            &ctx,
+            FreshModelZ3::new(&ctx),
+            step,
+            planning_time,
+            plan_found,
+        ),
     }
 }
+
+// rewrite this one day... merge string to state from utils with this
+// pub fn get_planning_result(ctx: &ContextZ3, model: Z3_model, nr_steps: u32, planning_time: std::time::Duration, plan_found: bool) -> PlanningResult {
+//     let model_str = ModelToStringZ3::new(&ctx, model);
+//         let mut model_vec = vec![];
+
+//         let num = ModelGetNumConstsZ3::new(&ctx, model);
+//         let mut lines = model_str.lines();
+//         let mut i: u32 = 0;
+
+//         while i < num {
+//             model_vec.push(lines.next().unwrap_or(""));
+//             i = i + 1;
+//         }
+
+//         // println!("{:#?}", model_vec);
+
+//         let mut trace: Vec<PlanningFrameStrings> = vec![];
+//         // let mut raw_trace: Vec<PlanningFrame> = vec!();
+//         for i in 0..nr_steps {
+//             let mut frame: PlanningFrameStrings = PlanningFrameStrings::new(&vec![], &vec![], "");
+//             let mut raw_frame: PlanningFrameStrings =
+//                 PlanningFrameStrings::new(&vec![], &vec![], "");
+//             for j in &model_vec {
+//                 let sep: Vec<&str> = j.split(" -> ").collect();
+//                 if sep[0].ends_with(&format!("_s{}", i)) {
+//                     // raw_frame.state.push(j.to_string());
+//                     let trimmed_state = sep[0].trim_end_matches(&format!("_s{}", i));
+//                     match sep[1] {
+//                         "false" => {
+//                             frame.sink.push(sep[0].to_string());
+//                             // raw_frame.state.push(j.to_string());
+//                         }
+//                         "true" => {
+//                             frame.sink.push(sep[0].to_string());
+//                             // raw_frame.state.push(j.to_string());
+//                         }
+//                         _ => {
+//                             frame.sink.push(format!("{} -> {}", trimmed_state, sep[1]));
+//                             // raw_frame.state.push(j.to_string());
+//                         }
+//                     }
+//                 } else if sep[0].ends_with(&format!("_t{}", i)) && sep[1] == "true" {
+//                     let trimmed_trans = sep[0].trim_end_matches(&format!("_t{}", i));
+//                     frame.trans = trimmed_trans.to_string();
+//                     raw_frame.trans = sep[0].to_string();
+//                 }
+//             }
+//             if model_vec.len() != 0 {
+//                 trace.push(frame);
+//                 // raw_trace.push(raw_frame);
+//             }
+//         }
+
+//         let mut new_trace = vec![];
+//         let mut new = trace.iter();
+//         let mut prev = vec![];
+
+//         'breakable: loop {
+//             let mut frame: PlanningFrameStrings = PlanningFrameStrings::new(&vec![], &vec![], "");
+
+//             match new.next() {
+//                 Some(x) => {
+//                     frame.source = prev.clone();
+//                     frame.sink = x.sink.clone();
+//                     prev = x.sink.clone();
+//                     frame.trans = x.trans.clone();
+//                 }
+//                 None => break 'breakable,
+//             }
+
+//             new_trace.push(frame);
+//         }
+//         if new_trace.len() >= 1 {
+//             new_trace.drain(0..1);
+//         }
+
+//         PlanningResult {
+//             plan_found: plan_found,
+//             plan_length: nr_steps - 1,
+//             trace: new_trace,
+//             time_to_solve: planning_time,
+//         }
+
+// }
 
 impl PlanningFrameStrings {
     pub fn new(source: &Vec<&str>, sink: &Vec<&str>, trans: &str) -> PlanningFrameStrings {
@@ -239,7 +325,8 @@ impl<'ctx> GetPlanningResultZ3<'ctx> {
         // let mut raw_trace: Vec<PlanningFrame> = vec!();
         for i in 0..nr_steps {
             let mut frame: PlanningFrameStrings = PlanningFrameStrings::new(&vec![], &vec![], "");
-            let mut raw_frame: PlanningFrameStrings = PlanningFrameStrings::new(&vec![], &vec![], "");
+            let mut raw_frame: PlanningFrameStrings =
+                PlanningFrameStrings::new(&vec![], &vec![], "");
             for j in &model_vec {
                 let sep: Vec<&str> = j.split(" -> ").collect();
                 if sep[0].ends_with(&format!("_s{}", i)) {

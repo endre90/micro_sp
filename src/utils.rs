@@ -210,7 +210,6 @@ pub fn refresh_problem(prob: &PlanningProblem, current: &State) -> PlanningProbl
         init: measured_state_to_predicate(&current),
         goal: prob.goal.to_owned(),
         trans: prob.trans.to_owned(),
-        ltl_specs: prob.ltl_specs.to_owned(),
         max_steps: prob.max_steps,
     }
 }

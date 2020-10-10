@@ -49,7 +49,6 @@ fn test_and_predicate() {
     );
 }
 
-
 #[test]
 fn test_or_predicate() {
     let x = EnumVariable::new("x", &vec!["a", "b", "c", "d"], None, &Kind::Estimated);

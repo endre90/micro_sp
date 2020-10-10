@@ -1,7 +1,7 @@
 use super::*;
 use std::io;
 use std::sync::{Arc, Mutex};
-use tokio::time::{delay_for, Duration, Instant};
+use tokio::time::{interval, delay_for, Duration, Instant};
 
 pub async fn state(
     measured_arc: Arc<Mutex<String>>,
@@ -69,6 +69,8 @@ pub async fn state(
             })
             .collect::<Vec<EnumValue>>();
 
-        delay_for(Duration::from_millis(10)).await;
+        let mut interval = interval(Duration::from_millis(10));
+        interval.tick().await;
+        interval.tick().await;
     }
 }

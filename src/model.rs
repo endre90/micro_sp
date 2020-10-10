@@ -94,7 +94,6 @@ pub fn model() -> PlanningProblem {
         &Predicate::AND(vec![act_left.clone(), ref_left, deactivated, deactivate]),
         &Predicate::AND(vec![activated, act_right]),
         &vec![t1, t2, t3, t4, t5, t6, t7, t8],
-        &Predicate::TRUE,
         &12,
     );
     
