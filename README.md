@@ -8,5 +8,7 @@ TODO:
 5.  when to call the planner
 6.  multiple goals
 7.  eliminate need for dummy in var domain
-8.  dockerize
-9.  maybe some quality of life for modeling
+8.  flow graph
+9.  dockerize
+10. maybe some quality of life for modeling
+11. explore all paths and generate graph
