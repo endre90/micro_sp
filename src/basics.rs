@@ -7,7 +7,7 @@ use std::time::Duration;
 #[derive(Debug, PartialEq, Clone, PartialOrd, Eq, Ord, Serialize, Deserialize)]
 pub struct Parameter {
     pub name: String,
-    pub value: bool
+    pub value: bool,
 }
 
 impl Parameter {
@@ -34,7 +34,7 @@ impl Parameter {
 pub enum Kind {
     Measured,
     Command,
-    Estimated
+    Estimated,
 }
 
 /// An enumeration kind variable with a name (ex. banana), type (ex. fruit),
@@ -46,7 +46,7 @@ pub struct EnumVariable {
     pub r#type: String,
     pub domain: Vec<String>,
     pub param: Parameter,
-    pub kind: Kind
+    pub kind: Kind,
 }
 
 impl EnumVariable {
@@ -68,7 +68,7 @@ impl EnumVariable {
                 Some(x) => x.to_owned(),
                 None => Parameter::none(),
             },
-            kind: kind.to_owned()
+            kind: kind.to_owned(),
         }
     }
 }
@@ -81,7 +81,7 @@ pub struct EnumValue {
     pub var: EnumVariable,
     pub val: String,
     #[derivative(PartialEq = "ignore")]
-    pub lifetime: Duration
+    pub lifetime: Duration,
 }
 
 impl EnumValue {
@@ -96,7 +96,7 @@ impl EnumValue {
             lifetime: match lifetime {
                 Some(x) => x.to_owned(),
                 None => Duration::new(6, 0),
-            }
+            },
         }
     }
 }
@@ -105,7 +105,7 @@ impl EnumValue {
 #[derive(Debug, PartialEq, Clone, PartialOrd, Eq, Ord, Serialize, Deserialize)]
 pub struct State {
     pub vec: Vec<EnumValue>,
-    pub kind: Kind
+    pub kind: Kind,
 }
 
 impl State {
@@ -120,8 +120,8 @@ impl State {
                 true => State {
                     vec: vec.to_owned(),
                     kind: kind.to_owned(),
-                }
-            }
+                },
+            },
         }
     }
 }
@@ -131,7 +131,7 @@ impl State {
 pub struct CompleteState {
     pub measured: State,
     pub command: State,
-    pub estimated: State
+    pub estimated: State,
 }
 
 impl CompleteState {
@@ -157,7 +157,7 @@ impl CompleteState {
             estimated: match estimated.kind == Kind::Estimated {
                 true => estimated.to_owned(),
                 false => panic!("kind must match when constructing state"),
-            }
+            },
         }
     }
     /// Collect a complete state from a vector of values.
@@ -183,7 +183,7 @@ impl CompleteState {
                     .map(|x| x.to_owned())
                     .collect(),
                 &Kind::Estimated,
-            )
+            ),
         }
     }
 }
@@ -196,7 +196,7 @@ pub struct Transition {
     pub name: String,
     pub guard: Predicate,
     pub update: Predicate,
-    pub kind: Kind
+    pub kind: Kind,
 }
 
 impl Transition {
@@ -207,26 +207,13 @@ impl Transition {
             name: name.to_string(),
             guard: guard.to_owned(),
             update: update.to_owned(),
-            kind: {               
+            kind: {
                 match diff.len() {
                     0 => panic!("no update?"),
                     1 => diff[0].kind.to_owned(),
-                    _ => panic!("multiple updates not implemented.")
+                    _ => panic!("multiple updates not implemented."),
                 }
-            }
+            },
         }
     }
 }
-
-// #[test]
-
-// fn new_transition() {
-//     assert_eq!(
-//         Transition::new("t1", &Predicate::TRUE, &Predicate::TRUE),
-//         Transition {
-//             name: String::from("t1"),
-//             guard: Predicate::TRUE,
-//             update: Predicate::TRUE
-//         }
-//     )
-// }
