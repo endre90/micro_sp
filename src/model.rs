@@ -6,40 +6,40 @@ pub fn model() -> PlanningProblem {
         "act_pos",
         &vec!["left", "right", "unknown", "dummy_value"],
         None,
-        Some(&ControlKind::Measured),
+        &Kind::Measured
     );
 
     let ref_pos = EnumVariable::new(
         "ref_pos",
         &vec!["left", "right", "dummy_value"],
         None,
-        Some(&ControlKind::Command),
+        &Kind::Command
     );
 
     let act_stat = EnumVariable::new(
         "act_stat",
         &vec!["idle", "active", "unknown", "dummy_value"],
         None,
-        Some(&ControlKind::Measured),
+        &Kind::Measured
     );
 
     let ref_stat = EnumVariable::new(
         "ref_stat",
         &vec!["idle", "active", "dummy_value"],
         None,
-        Some(&ControlKind::Command),
+        &Kind::Command
     );
 
-    let act_left = Predicate::EQRL(act_pos.clone(), "left".to_string());
+    let act_left = Predicate::EQ(EnumValue::new(&act_pos, "left", None));
     let not_act_left = Predicate::NOT(Box::new(act_left.clone()));
-    let act_right = Predicate::EQRL(act_pos.clone(), "right".to_string());
+    let act_right = Predicate::EQ(EnumValue::new(&act_pos, "right", None));
     let not_act_right = Predicate::NOT(Box::new(act_right.clone()));
-    let ref_left = Predicate::EQRL(ref_pos.clone(), "left".to_string());
-    let ref_right = Predicate::EQRL(ref_pos.clone(), "right".to_string());
-    let activate = Predicate::EQRL(ref_stat.clone(), "active".to_string());
-    let activated = Predicate::EQRL(act_stat.clone(), "active".to_string());
-    let deactivate = Predicate::EQRL(ref_stat.clone(), "idle".to_string());
-    let deactivated = Predicate::EQRL(act_stat.clone(), "idle".to_string());
+    let ref_left = Predicate::EQ(EnumValue::new(&ref_pos, "left", None));
+    let ref_right = Predicate::EQ(EnumValue::new(&ref_pos, "right", None));
+    let activate = Predicate::EQ(EnumValue::new(&ref_stat, "active", None));
+    let activated = Predicate::EQ(EnumValue::new(&act_stat, "active", None));
+    let deactivate = Predicate::EQ(EnumValue::new(&ref_stat, "idle", None));
+    let deactivated = Predicate::EQ(EnumValue::new(&act_stat, "idle", None));
 
     let t1 = Transition::new(
         "start_move_left",

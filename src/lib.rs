@@ -8,7 +8,7 @@ pub mod predicates;
 pub use predicates::*;
 
 pub mod incremental;
-pub use crate::incremental::*;
+pub use incremental::*;
 
 pub mod utils;
-pub use crate::utils::*;
+pub use utils::*;

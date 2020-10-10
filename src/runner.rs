@@ -10,8 +10,8 @@ pub async fn runner(
     // state_publisher: (String, tokio::sync::mpsc::Sender<String>),
 ) -> io::Result<()> {
     
-    let measured_arc = Arc::new(Mutex::new(serde_json::to_string(&State::new(&ControlKind::Measured)).unwrap()));
-    let command_arc = Arc::new(Mutex::new(serde_json::to_string(&State::new(&ControlKind::Command)).unwrap()));
+    let measured_arc = Arc::new(Mutex::new(serde_json::to_string(&State::new(&vec!(), &Kind::Measured)).unwrap()));
+    let command_arc = Arc::new(Mutex::new(serde_json::to_string(&State::new(&vec!(), &Kind::Command)).unwrap()));
     let measured_arc_clone = measured_arc.clone();
     let command_arc_clone = command_arc.clone();
     tokio::task::spawn(async {
@@ -21,7 +21,7 @@ pub async fn runner(
     
     let mut i: u32 = 1;
     // let mut fresh = false;
-    let mut sink = State::new(&ControlKind::Command);
+    let mut sink = State::new(&vec!(), &Kind::Command);
     let mut table = PlanningResultStates {
         plan_found: false,
         plan_length: 0,
@@ -43,7 +43,7 @@ pub async fn runner(
         };
 
         if fresh {
-            if sink == State::new(&ControlKind::Command) {
+            if sink == State::new(&vec!(), &Kind::Command) {
                 let fresh_prob = refresh_problem(&prob, &current_measured_state);
                 let result = incremental(&fresh_prob);
                 println!("planner called {:?} times", i);
@@ -53,7 +53,7 @@ pub async fn runner(
             }
             sink = get_sink(&table, &current_measured_state).command;
         } else {
-            sink = State::new(&ControlKind::Command);
+            sink = State::new(&vec!(), &Kind::Command);
         }
 
         *command_arc_clone.lock().unwrap() = serde_json::to_string(&sink).unwrap();

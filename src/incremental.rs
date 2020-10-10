@@ -119,19 +119,19 @@ pub fn incremental(prob: &PlanningProblem) -> PlanningResultStrings {
     SlvAssertZ3::new(
         &ctx,
         &slv,
-        PredicateToAstZ3::new(&ctx, &prob.init, "state", &0),
+        predicate_to_ast(&ctx, &prob.init, "state", &0),
     );
 
     SlvPushZ3::new(&ctx, &slv); // create backtracking point
     SlvAssertZ3::new(
         &ctx,
         &slv,
-        PredicateToAstZ3::new(&ctx, &prob.ltl_specs, "specs", &0),
+        predicate_to_ast(&ctx, &prob.ltl_specs, "specs", &0),
     );
     SlvAssertZ3::new(
         &ctx,
         &slv,
-        PredicateToAstZ3::new(&ctx, &prob.goal, "specs", &0),
+        predicate_to_ast(&ctx, &prob.goal, "specs", &0),
     );
 
     let now = Instant::now();
@@ -147,8 +147,8 @@ pub fn incremental(prob: &PlanningProblem) -> PlanningResultStrings {
             let mut all_trans = vec![];
             for t in &prob.trans {
                 let name = format!("{}_t{}", &t.name, step);
-                let guard = PredicateToAstZ3::new(&ctx, &t.guard, "guard", &(step - 1));
-                let update = PredicateToAstZ3::new(&ctx, &t.update, "update", &(step));
+                let guard = predicate_to_ast(&ctx, &t.guard, "guard", &(step - 1));
+                let update = predicate_to_ast(&ctx, &t.update, "update", &(step));
                 let keeps = KeepVariableValues::new(&ctx, &problem_vars, &t, &step);
 
                 all_trans.push(ANDZ3::new(
@@ -171,12 +171,12 @@ pub fn incremental(prob: &PlanningProblem) -> PlanningResultStrings {
             SlvAssertZ3::new(
                 &ctx,
                 &slv,
-                PredicateToAstZ3::new(&ctx, &prob.ltl_specs, "specs", &step),
+                predicate_to_ast(&ctx, &prob.ltl_specs, "specs", &step),
             );
             SlvAssertZ3::new(
                 &ctx,
                 &slv,
-                PredicateToAstZ3::new(&ctx, &prob.goal, "specs", &step),
+                predicate_to_ast(&ctx, &prob.goal, "specs", &step),
             );
         } else {
             plan_found = true;
@@ -303,44 +303,44 @@ impl<'ctx> GetPlanningResultZ3<'ctx> {
     }
 }
 
-#[test]
-fn test_incremental_1() {
+// #[test]
+// fn test_incremental_1() {
 
-    let act_pos = EnumVariable::new("act_pos", &vec!["left", "right"], None, None);
-    let ref_pos = EnumVariable::new("ref_pos", &vec!["left", "right"], None, None);
-    let act_left = Predicate::EQRL(act_pos.clone(), "left".to_string());
-    let act_right = Predicate::EQRL(act_pos.clone(), "right".to_string());
-    let ref_left = Predicate::EQRL(ref_pos.clone(), "left".to_string());
-    let ref_right = Predicate::EQRL(ref_pos.clone(), "right".to_string());
+//     let act_pos = EnumVariable::new("act_pos", &vec!["left", "right"], None, &Kind::Measured);
+//     let ref_pos = EnumVariable::new("ref_pos", &vec!["left", "right"], None, &Kind::Command);
+//     let act_left = Predicate::EQRL(act_pos.clone(), "left".to_string());
+//     let act_right = Predicate::EQRL(act_pos.clone(), "right".to_string());
+//     let ref_left = Predicate::EQRL(ref_pos.clone(), "left".to_string());
+//     let ref_right = Predicate::EQRL(ref_pos.clone(), "right".to_string());
 
-    let t1 = Transition::new(
-        "start_move_left",
-        &Predicate::AND(vec![act_right.clone(), ref_right.clone()]),
-        &ref_left
-    );
-    let t2 = Transition::new(
-        "start_move_right",
-        &Predicate::AND(vec![act_left.clone(), ref_left.clone()]),
-        &ref_right
-    );
-    let t3 = Transition::new(
-        "finish_move_left",
-        &Predicate::AND(vec![act_right.clone(), ref_left.clone()]),
-        &act_left
-    );
-    let t4 = Transition::new(
-        "finish_move_right",
-        &Predicate::AND(vec![act_left.clone(), ref_right.clone()]),
-        &act_right
-    );
-    let problem = PlanningProblem::new(
-        "prob1",
-        &Predicate::AND(vec![act_left, ref_left]),
-        &act_right,
-        &vec![t1, t2, t3, t4],
-        &Predicate::TRUE,
-        &12,
-    );
-    let result = incremental(&problem);
-    println!("{:?}", result);
-}
+//     let t1 = Transition::new(
+//         "start_move_left",
+//         &Predicate::AND(vec![act_right.clone(), ref_right.clone()]),
+//         &ref_left
+//     );
+//     let t2 = Transition::new(
+//         "start_move_right",
+//         &Predicate::AND(vec![act_left.clone(), ref_left.clone()]),
+//         &ref_right
+//     );
+//     let t3 = Transition::new(
+//         "finish_move_left",
+//         &Predicate::AND(vec![act_right.clone(), ref_left.clone()]),
+//         &act_left
+//     );
+//     let t4 = Transition::new(
+//         "finish_move_right",
+//         &Predicate::AND(vec![act_left.clone(), ref_right.clone()]),
+//         &act_right
+//     );
+//     let problem = PlanningProblem::new(
+//         "prob1",
+//         &Predicate::AND(vec![act_left, ref_left]),
+//         &act_right,
+//         &vec![t1, t2, t3, t4],
+//         &Predicate::TRUE,
+//         &12,
+//     );
+//     let result = incremental(&problem);
+//     println!("{:?}", result);
+// }

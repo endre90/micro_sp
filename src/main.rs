@@ -21,19 +21,19 @@ async fn main() -> io::Result<()> {
     let problem = model::model();
     let vars = get_problem_vars(&problem);
 
-    let msr_var_vals: Vec<EnumVariableValue> = vars
+    let msr_var_vals: Vec<EnumValue> = vars
         .iter()
-        .filter(|x| x.kind == ControlKind::Measured)
-        .map(|x| EnumVariableValue::timed(x, "dummy_value", Duration::new(6, 0)))
+        .filter(|x| x.kind == Kind::Measured)
+        .map(|x| EnumValue::new(x, "dummy_value", None))
         .collect();
 
-    let cmd_var_vals: Vec<EnumVariableValue> = vars
+    let cmd_var_vals: Vec<EnumValue> = vars
         .iter()
-        .filter(|x| x.kind == ControlKind::Command)
-        .map(|x| EnumVariableValue::timed(x, "dummy_value", Duration::new(6, 0)))
+        .filter(|x| x.kind == Kind::Command)
+        .map(|x| EnumValue::new(x, "dummy_value", None))
         .collect();
 
-    // generate subscribers for ControlKind::Measured kind variables (maybe all? testing needed)
+    // generate subscribers for Kind::Measured kind variables (maybe all? testing needed)
     let mut ros_receivers: Vec<(String, tokio::sync::mpsc::Receiver<String>)> = vec![];
     for v in &msr_var_vals {
         let (mut tx, rx) = channel::<String>(10);
@@ -46,7 +46,7 @@ async fn main() -> io::Result<()> {
             .expect("69900836-cc9c-4ea5-9f2f-1f585dae70b1: Creating subscribers failed.");
     }
 
-    // generate publishers for ControlKind::Command kind variables
+    // generate publishers for Kind::Command kind variables
     let mut ros_senders: Vec<(String, tokio::sync::mpsc::Sender<String>)> = vec![];
     for v in cmd_var_vals.clone() {
         let publisher = node

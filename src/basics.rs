@@ -2,145 +2,63 @@ use super::*;
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
 
+/// Variables with the same parameter belong to the same group during compositional planning.
+/// As such, they will be included in the model together after the next refinement.
 #[derive(Debug, PartialEq, Clone, PartialOrd, Eq, Ord, Serialize, Deserialize)]
 pub struct Parameter {
     pub name: String,
-    pub value: bool,
-}
-
-#[derive(Debug, PartialEq, Clone, PartialOrd, Eq, Ord, Serialize, Deserialize)]
-pub enum ControlKind {
-    Measured,  // input
-    Command,   // output
-    Estimated, // internal
-    None,
-}
-
-#[derive(Debug, PartialEq, Clone, PartialOrd, Eq, Ord, Serialize, Deserialize)]
-pub struct EnumVariable {
-    pub name: String,
-    pub r#type: String,
-    pub domain: Vec<String>,
-    pub param: Parameter,
-    pub kind: ControlKind,
-}
-
-#[derive(Derivative, Debug, Clone, PartialOrd, Eq, Ord, Serialize, Deserialize)]
-#[derivative(PartialEq)]
-pub struct EnumVariableValue {
-    pub var: EnumVariable,
-    pub val: String,
-    #[derivative(PartialEq="ignore")]
-    pub lifetime: Duration,
-}
-
-#[derive(Debug, PartialEq, Clone, PartialOrd, Eq, Ord, Serialize, Deserialize)]
-pub struct State {
-    pub vec: Vec<EnumVariableValue>,
-    pub kind: ControlKind,
-}
-
-#[derive(Debug, PartialEq, Clone, PartialOrd, Eq, Ord, Serialize, Deserialize)]
-pub struct CompleteState {
-    pub measured: State,
-    pub command: State,
-    pub estimated: State,
-}
-
-#[derive(Debug, PartialEq, Clone, PartialOrd, Eq, Ord)]
-pub struct Transition {
-    pub name: String,
-    pub guard: Predicate,
-    pub update: Predicate,
-    pub kind: ControlKind,
-}
-
-impl State {
-    pub fn new(kind: &ControlKind) -> State {
-        State {
-            vec: vec![],
-            kind: kind.to_owned(),
-        }
-    }
-    pub fn from(vec: &Vec<EnumVariableValue>, kind: &ControlKind) -> State {
-        State {
-            vec: vec.to_owned(),
-            kind: kind.to_owned(),
-        }
-    }
-}
-
-impl CompleteState {
-    pub fn new() -> CompleteState {
-        CompleteState {
-            measured: State::new(&ControlKind::Measured),
-            command: State::new(&ControlKind::Command),
-            estimated: State::new(&ControlKind::Estimated),
-        }
-    }
-    pub fn from(measured: &State, command: &State, estimated: &State) -> CompleteState {
-        CompleteState {
-            measured: match measured.kind == ControlKind::Measured {
-                true => measured.to_owned(),
-                false => panic!("kind must match when constructing state"),
-            },
-            command: match measured.kind == ControlKind::Command {
-                true => command.to_owned(),
-                false => panic!("kind must match when constructing state"),
-            },
-            estimated: match measured.kind == ControlKind::Estimated {
-                true => estimated.to_owned(),
-                false => panic!("kind must match when constructing state"),
-            },
-        }
-    }
-}
-
-// revise transition (not sure about the panics and stuff)
-impl Transition {
-    pub fn new(name: &str, guard: &Predicate, update: &Predicate) -> Transition {
-        Transition {
-            name: name.to_string(),
-            guard: guard.to_owned(),
-            update: update.to_owned(),
-            kind: {
-                // get kind from the kind of the updated variable
-                let diff = get_predicate_vars(&guard).intersect(get_predicate_vars(&update));
-                match diff.len() {
-                    0 => panic!("no update"),
-                    1 => diff[0].kind.to_owned(),
-                    _ => panic!("multiple actions in one step not implemented"),
-                }
-            },
-        }
-    }
+    pub value: bool
 }
 
 impl Parameter {
+    /// Make a new paremeter that will enable or disable variables during compositional planning.
     pub fn new(name: &str, value: &bool) -> Parameter {
         Parameter {
             name: name.to_owned(),
             value: *value,
         }
     }
+    /// Make a dummy parameter that will include variables in every step during compositional
+    /// planning, or for incremental planning where no parameter is needed.
+    pub fn none() -> Parameter {
+        Parameter {
+            name: "NONE".to_owned(),
+            value: true,
+        }
+    }
 }
 
-// revise enum variable (don't like the EMPTY and TRUE stuff)
+/// Variables, transitions and states can be of Measured (input), Command (output) and
+/// Estimated (internal) kind.
+#[derive(Debug, PartialEq, Clone, PartialOrd, Eq, Ord, Serialize, Deserialize)]
+pub enum Kind {
+    Measured,
+    Command,
+    Estimated
+}
+
+/// An enumeration kind variable with a name (ex. banana), type (ex. fruit),
+/// domain (ex. [green, ripe, spoiled]), activation parameter for refinement during
+/// compositional planning (ex. food == false) and control kind (ex. estimated).
+#[derive(Debug, PartialEq, Clone, PartialOrd, Eq, Ord, Serialize, Deserialize)]
+pub struct EnumVariable {
+    pub name: String,
+    pub r#type: String,
+    pub domain: Vec<String>,
+    pub param: Parameter,
+    pub kind: Kind
+}
+
 impl EnumVariable {
+    /// Make a new enumeration kind variable.
     pub fn new(
         name: &str,
         domain: &Vec<&str>,
         param: Option<&Parameter>,
-        kind: Option<&ControlKind>,
+        kind: &Kind,
     ) -> EnumVariable {
         EnumVariable {
-            name: match name == "EMPTY" {
-                true => panic!(
-                    "Error 69e2abf9-498b-4d5c-88c7-30ea70ed27fb: 
-                EnumVariable name 'EMPTY' is reserved."
-                ), // why?
-                false => name.to_owned(),
-            },
+            name: name.to_owned(),
             r#type: name.to_owned(),
             domain: domain
                 .iter()
@@ -148,37 +66,167 @@ impl EnumVariable {
                 .collect::<Vec<String>>(),
             param: match param {
                 Some(x) => x.to_owned(),
-                None => Parameter::new("TRUE", &true),
+                None => Parameter::none(),
             },
-            kind: match kind {
+            kind: kind.to_owned()
+        }
+    }
+}
+
+/// A value assigned to the enumeration kind variable from its domain with a tracked
+/// lifetime since its last updated.
+#[derive(Derivative, Debug, Clone, PartialOrd, Eq, Ord, Serialize, Deserialize)]
+#[derivative(PartialEq)]
+pub struct EnumValue {
+    pub var: EnumVariable,
+    pub val: String,
+    #[derivative(PartialEq = "ignore")]
+    pub lifetime: Duration
+}
+
+impl EnumValue {
+    /// Assign a value to a varible from its domain.
+    pub fn new(var: &EnumVariable, val: &str, lifetime: Option<&Duration>) -> EnumValue {
+        EnumValue {
+            var: var.to_owned(),
+            val: match var.domain.contains(&val.to_owned()) {
+                true => val.to_owned(),
+                false => panic!("value not in the domain of the variable"),
+            },
+            lifetime: match lifetime {
                 Some(x) => x.to_owned(),
-                None => ControlKind::None,
+                None => Duration::new(6, 0),
+            }
+        }
+    }
+}
+
+// A collection of variables of the same control kind.
+#[derive(Debug, PartialEq, Clone, PartialOrd, Eq, Ord, Serialize, Deserialize)]
+pub struct State {
+    pub vec: Vec<EnumValue>,
+    pub kind: Kind
+}
+
+impl State {
+    pub fn new(vec: &Vec<EnumValue>, kind: &Kind) -> State {
+        match vec.len() > 0 {
+            false => State {
+                vec: vec![],
+                kind: kind.to_owned(),
             },
+            true => match vec.iter().all(|x| x.var.kind == *kind) {
+                false => panic!("can't make a state of other than variable kind"),
+                true => State {
+                    vec: vec.to_owned(),
+                    kind: kind.to_owned(),
+                }
+            }
         }
     }
 }
 
-impl EnumVariableValue {
-    // for output from planner
-    pub fn new(var: &EnumVariable, val: &str) -> EnumVariableValue {
-        EnumVariableValue {
-            var: var.to_owned(),
-            val: val.to_owned(),
-            lifetime: Duration::new(6, 0),
+/// A struct containing the measured, command and estimated state. (Temporary?)
+#[derive(Debug, PartialEq, Clone, PartialOrd, Eq, Ord, Serialize, Deserialize)]
+pub struct CompleteState {
+    pub measured: State,
+    pub command: State,
+    pub estimated: State
+}
+
+impl CompleteState {
+    /// Create a new empty complete state. (Temporary?)
+    pub fn empty() -> CompleteState {
+        CompleteState {
+            measured: State::new(&vec![], &Kind::Measured),
+            command: State::new(&vec![], &Kind::Command),
+            estimated: State::new(&vec![], &Kind::Estimated),
         }
     }
-    // for input
-    pub fn timed(var: &EnumVariable, val: &str, lifetime: Duration) -> EnumVariableValue {
-        EnumVariableValue {
-            var: var.to_owned(),
-            val: val.to_owned(),
-            lifetime: lifetime.to_owned(),
+    /// Collect a complete state from measured, command and estimated state. States can also be empty.
+    pub fn from_states(measured: &State, command: &State, estimated: &State) -> CompleteState {
+        CompleteState {
+            measured: match measured.kind == Kind::Measured {
+                true => measured.to_owned(),
+                false => panic!("kind must match when constructing state"),
+            },
+            command: match command.kind == Kind::Command {
+                true => command.to_owned(),
+                false => panic!("kind must match when constructing state"),
+            },
+            estimated: match estimated.kind == Kind::Estimated {
+                true => estimated.to_owned(),
+                false => panic!("kind must match when constructing state"),
+            }
+        }
+    }
+    /// Collect a complete state from a vector of values.
+    pub fn from_vec(vec: &Vec<EnumValue>) -> CompleteState {
+        CompleteState {
+            measured: State::new(
+                &vec.iter()
+                    .filter(|x| x.var.kind == Kind::Measured)
+                    .map(|x| x.to_owned())
+                    .collect(),
+                &Kind::Measured,
+            ),
+            command: State::new(
+                &vec.iter()
+                    .filter(|x| x.var.kind == Kind::Command)
+                    .map(|x| x.to_owned())
+                    .collect(),
+                &Kind::Command,
+            ),
+            estimated: State::new(
+                &vec.iter()
+                    .filter(|x| x.var.kind == Kind::Estimated)
+                    .map(|x| x.to_owned())
+                    .collect(),
+                &Kind::Estimated,
+            )
         }
     }
 }
 
-#[test]
-fn test_new_enum_variable() {
-    let var1 = EnumVariable::new("var1", &vec!["a", "b", "c"], None, None);
-    println!("{:?}", var1);
+/// A transition that updates the state according to the guard and update predicates.
+/// The transition has a kind since it is assumed that transitions are changing one
+/// variable at a time.
+#[derive(Debug, PartialEq, Clone, PartialOrd, Eq, Ord)]
+pub struct Transition {
+    pub name: String,
+    pub guard: Predicate,
+    pub update: Predicate,
+    pub kind: Kind
 }
+
+impl Transition {
+    /// Make a new named transition from guard and update predicates.
+    pub fn new(name: &str, guard: &Predicate, update: &Predicate) -> Transition {
+        let diff = get_predicate_vars(&guard).intersect(get_predicate_vars(&update));
+        Transition {
+            name: name.to_string(),
+            guard: guard.to_owned(),
+            update: update.to_owned(),
+            kind: {               
+                match diff.len() {
+                    0 => panic!("no update?"),
+                    1 => diff[0].kind.to_owned(),
+                    _ => panic!("multiple updates not implemented.")
+                }
+            }
+        }
+    }
+}
+
+// #[test]
+
+// fn new_transition() {
+//     assert_eq!(
+//         Transition::new("t1", &Predicate::TRUE, &Predicate::TRUE),
+//         Transition {
+//             name: String::from("t1"),
+//             guard: Predicate::TRUE,
+//             update: Predicate::TRUE
+//         }
+//     )
+// }

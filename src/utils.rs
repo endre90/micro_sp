@@ -53,7 +53,7 @@ pub fn get_predicate_vars(pred: &Predicate) -> Vec<EnumVariable> {
         Predicate::AND(x) => s.extend(x.iter().flat_map(|p| get_predicate_vars(p))),
         Predicate::OR(x) => s.extend(x.iter().flat_map(|p| get_predicate_vars(p))),
         Predicate::NOT(x) => s.extend(get_predicate_vars(x)),
-        Predicate::EQRL(x, _) => s.push(x.clone()),
+        Predicate::EQ(x) => s.push(x.var.clone()),
     }
     s.sort();
     s.dedup();
@@ -77,18 +77,19 @@ pub fn frame_to_measured_state(vars: &Vec<EnumVariable>, vals: &Vec<&str>) -> St
     State {
         vec: vars
             .iter()
-            .filter(|c| c.kind == ControlKind::Measured)
+            .filter(|c| c.kind == Kind::Measured)
             .map(|x| {
-                EnumVariableValue::new(
+                EnumValue::new(
                     &x,
                     vals.iter()
                         .filter(|y| y.split(" -> ").collect::<Vec<&str>>()[0] == x.name)
                         .map(|z| z.split(" -> ").collect::<Vec<&str>>()[1])
                         .collect::<Vec<&str>>()[0],
+                        None
                 )
             })
             .collect(),
-        kind: ControlKind::Measured,
+        kind: Kind::Measured,
     }
 }
 
@@ -96,18 +97,19 @@ pub fn frame_to_command_state(vars: &Vec<EnumVariable>, vals: &Vec<&str>) -> Sta
     State {
         vec: vars
             .iter()
-            .filter(|c| c.kind == ControlKind::Command)
+            .filter(|c| c.kind == Kind::Command)
             .map(|x| {
-                EnumVariableValue::new(
+                EnumValue::new(
                     &x,
                     vals.iter()
                         .filter(|y| y.split(" -> ").collect::<Vec<&str>>()[0] == x.name)
                         .map(|z| z.split(" -> ").collect::<Vec<&str>>()[1])
                         .collect::<Vec<&str>>()[0],
+                        None
                 )
             })
             .collect(),
-        kind: ControlKind::Command,
+        kind: Kind::Command,
     }
 }
 
@@ -115,18 +117,19 @@ pub fn frame_to_estimated_state(vars: &Vec<EnumVariable>, vals: &Vec<&str>) -> S
     State {
         vec: vars
             .iter()
-            .filter(|c| c.kind == ControlKind::Estimated)
+            .filter(|c| c.kind == Kind::Estimated)
             .map(|x| {
-                EnumVariableValue::new(
+                EnumValue::new(
                     &x,
                     vals.iter()
                         .filter(|y| y.split(" -> ").collect::<Vec<&str>>()[0] == x.name)
                         .map(|z| z.split(" -> ").collect::<Vec<&str>>()[1])
                         .collect::<Vec<&str>>()[0],
+                        None
                 )
             })
             .collect(),
-        kind: ControlKind::Estimated,
+        kind: Kind::Estimated,
     }
 }
 
@@ -165,10 +168,10 @@ pub fn result_to_table(
 pub fn get_sink(table: &PlanningResultStates, source: &State) -> CompleteState {
     // let untimed_source: Vec<(String, String)> = source.vec.iter().map(|x| (x.var.name, x.val)).collect();
     // let untimed_table = table.trace.iter().map(|x| PlanningFrameStates { source:  } x.source.measured.)
-    match source.kind == ControlKind::Measured {
+    match source.kind == Kind::Measured {
         true => match table.trace.iter().find(|x| x.source.measured.vec == source.vec.clone()) {
             Some(x) => x.sink.to_owned(),
-            None => CompleteState::new(),
+            None => CompleteState::empty()
         },
         false => panic!("asdf"),
     }
@@ -176,26 +179,28 @@ pub fn get_sink(table: &PlanningResultStates, source: &State) -> CompleteState {
 
 pub fn measured_state_to_predicate(state: &State) -> Predicate {
     match state.kind {
-        ControlKind::Measured => Predicate::AND(
+        Kind::Measured => Predicate::AND(
             state
                 .vec
                 .iter()
                 .map(|x| {
-                    Predicate::EQRL(
-                        EnumVariable::new(
-                            &x.var.name,
-                            &x.var.domain.iter().map(|x| x.as_str()).collect(),
-                            Some(&x.var.param),
-                            Some(&x.var.kind),
-                        ),
-                        x.val.to_owned(),
+                    Predicate::EQ(
+                        EnumValue::new(
+                            &EnumVariable::new(
+                                &x.var.name,
+                                &x.var.domain.iter().map(|x| x.as_str()).collect(),
+                                Some(&x.var.param),
+                                &x.var.kind,
+                            ),
+                            &x.val,
+                            Some(&x.lifetime)
+                        )
                     )
                 })
                 .collect::<Vec<Predicate>>(),
         ),
-        ControlKind::Command => panic!("not measured type"),
-        ControlKind::Estimated => panic!("not measured type"),
-        ControlKind::None => panic!("not measured type")
+        Kind::Command => panic!("not measured type"),
+        Kind::Estimated => panic!("not measured type")
     }
 }
 

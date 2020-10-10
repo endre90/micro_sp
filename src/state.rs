@@ -39,15 +39,15 @@ pub async fn state(
         let measured_vec = &measured_list
             .iter()
             .map(|x| {
-                let des: EnumVariableValue = serde_json::from_str(&x.lock().unwrap().0).unwrap();
+                let des: EnumValue = serde_json::from_str(&x.lock().unwrap().0).unwrap();
                 let duration = match looping_now.checked_duration_since(x.lock().unwrap().1) {
                     Some(x) => x,
                     None => Duration::new(6, 0),
                 };
-                EnumVariableValue::timed(&des.var, &des.val, duration)
+                EnumValue::new(&des.var, &des.val, Some(&duration))
             })
-            .collect::<Vec<EnumVariableValue>>();
-        let measured_state = State::from(&measured_vec, &ControlKind::Measured);
+            .collect::<Vec<EnumValue>>();
+        let measured_state = State::new(&measured_vec, &Kind::Measured);
 
         *measured_arc.lock().unwrap() = serde_json::to_string(&measured_state).unwrap();
         delay_for(Duration::from_millis(10)).await;
@@ -56,18 +56,18 @@ pub async fn state(
         let _command_vec = &command_list
             .iter()
             .map(|x| {
-                let des: EnumVariableValue = serde_json::from_str(&x.lock().unwrap().0).unwrap();
-                let dummy = EnumVariableValue::new(&des.var, &des.val);
-                let update: &EnumVariableValue =
+                let des: EnumValue = serde_json::from_str(&x.lock().unwrap().0).unwrap();
+                let dummy = EnumValue::new(&des.var, &des.val, None);
+                let update: &EnumValue =
                     sink.vec.iter().find(|x| x.var == des.var).unwrap_or(&dummy);
                 *x.lock().unwrap() = (serde_json::to_string(&update).unwrap(), Instant::now());
-                EnumVariableValue::timed(
+                EnumValue::new(
                     &des.var,
                     &update.val,
-                    looping_now.saturating_duration_since(x.lock().unwrap().1),
+                    Some(&looping_now.saturating_duration_since(x.lock().unwrap().1))
                 )
             })
-            .collect::<Vec<EnumVariableValue>>();
+            .collect::<Vec<EnumValue>>();
 
         delay_for(Duration::from_millis(10)).await;
     }
