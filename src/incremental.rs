@@ -45,44 +45,6 @@ impl PlanningProblem {
     }
 }
 
-#[derive(PartialEq, Eq, Clone, Debug, PartialOrd, Ord)]
-pub struct PlanningFrameStrings {
-    pub source: Vec<String>,
-    pub sink: Vec<String>,
-    pub trans: String,
-}
-
-#[derive(PartialEq, Eq, Clone, Debug, PartialOrd, Ord)]
-pub struct PlanningFrameStates {
-    pub source: CompleteState,
-    pub sink: CompleteState,
-    pub trans: String,
-}
-
-#[derive(PartialEq, Eq, Clone, Debug, PartialOrd, Ord)]
-pub struct PlanningResultStates {
-    pub plan_found: bool,
-    pub plan_length: u32,
-    pub trace: Vec<PlanningFrameStates>,
-    pub time_to_solve: std::time::Duration,
-}
-
-pub struct GetPlanningResultZ3<'ctx> {
-    pub ctx: &'ctx ContextZ3,
-    pub model: Z3_model,
-    pub nr_steps: u32,
-    pub frames: PlanningResultStates,
-}
-
-#[derive(PartialEq, Eq, Clone, Debug, PartialOrd, Ord)]
-pub struct PlanningResultStrings {
-    pub plan_found: bool,
-    pub plan_length: u32,
-    pub trace: Vec<PlanningFrameStrings>,
-    // pub raw_trace: Vec<PlanningFrame>,
-    pub time_to_solve: std::time::Duration,
-}
-
 pub fn keep_variable_values(
     ctx: &ContextZ3,
     vars: &Vec<EnumVariable>,
@@ -120,7 +82,7 @@ pub fn keep_variable_values(
     )
 }
 
-pub fn incremental(prob: &PlanningProblem) -> PlanningResultStrings {
+pub fn incremental(prob: &PlanningProblem) -> PlanningResult {
     let cfg = ConfigZ3::new();
     let ctx = ContextZ3::new(&cfg);
     let slv = SolverZ3::new(&ctx);
@@ -187,15 +149,17 @@ pub fn incremental(prob: &PlanningProblem) -> PlanningResultStrings {
     let planning_time = now.elapsed();
 
     match plan_found {
-        true => GetPlanningResultZ3::new(
+        true => get_planning_result(
             &ctx,
+            &prob,
             SlvGetModelZ3::new(&ctx, &slv),
             step,
             planning_time,
             plan_found,
         ),
-        false => GetPlanningResultZ3::new(
+        false => get_planning_result(
             &ctx,
+            &prob,
             FreshModelZ3::new(&ctx),
             step,
             planning_time,
@@ -203,231 +167,3 @@ pub fn incremental(prob: &PlanningProblem) -> PlanningResultStrings {
         ),
     }
 }
-
-// rewrite this one day... merge string to state from utils with this
-// pub fn get_planning_result(ctx: &ContextZ3, model: Z3_model, nr_steps: u32, planning_time: std::time::Duration, plan_found: bool) -> PlanningResult {
-//     let model_str = ModelToStringZ3::new(&ctx, model);
-//         let mut model_vec = vec![];
-
-//         let num = ModelGetNumConstsZ3::new(&ctx, model);
-//         let mut lines = model_str.lines();
-//         let mut i: u32 = 0;
-
-//         while i < num {
-//             model_vec.push(lines.next().unwrap_or(""));
-//             i = i + 1;
-//         }
-
-//         // println!("{:#?}", model_vec);
-
-//         let mut trace: Vec<PlanningFrameStrings> = vec![];
-//         // let mut raw_trace: Vec<PlanningFrame> = vec!();
-//         for i in 0..nr_steps {
-//             let mut frame: PlanningFrameStrings = PlanningFrameStrings::new(&vec![], &vec![], "");
-//             let mut raw_frame: PlanningFrameStrings =
-//                 PlanningFrameStrings::new(&vec![], &vec![], "");
-//             for j in &model_vec {
-//                 let sep: Vec<&str> = j.split(" -> ").collect();
-//                 if sep[0].ends_with(&format!("_s{}", i)) {
-//                     // raw_frame.state.push(j.to_string());
-//                     let trimmed_state = sep[0].trim_end_matches(&format!("_s{}", i));
-//                     match sep[1] {
-//                         "false" => {
-//                             frame.sink.push(sep[0].to_string());
-//                             // raw_frame.state.push(j.to_string());
-//                         }
-//                         "true" => {
-//                             frame.sink.push(sep[0].to_string());
-//                             // raw_frame.state.push(j.to_string());
-//                         }
-//                         _ => {
-//                             frame.sink.push(format!("{} -> {}", trimmed_state, sep[1]));
-//                             // raw_frame.state.push(j.to_string());
-//                         }
-//                     }
-//                 } else if sep[0].ends_with(&format!("_t{}", i)) && sep[1] == "true" {
-//                     let trimmed_trans = sep[0].trim_end_matches(&format!("_t{}", i));
-//                     frame.trans = trimmed_trans.to_string();
-//                     raw_frame.trans = sep[0].to_string();
-//                 }
-//             }
-//             if model_vec.len() != 0 {
-//                 trace.push(frame);
-//                 // raw_trace.push(raw_frame);
-//             }
-//         }
-
-//         let mut new_trace = vec![];
-//         let mut new = trace.iter();
-//         let mut prev = vec![];
-
-//         'breakable: loop {
-//             let mut frame: PlanningFrameStrings = PlanningFrameStrings::new(&vec![], &vec![], "");
-
-//             match new.next() {
-//                 Some(x) => {
-//                     frame.source = prev.clone();
-//                     frame.sink = x.sink.clone();
-//                     prev = x.sink.clone();
-//                     frame.trans = x.trans.clone();
-//                 }
-//                 None => break 'breakable,
-//             }
-
-//             new_trace.push(frame);
-//         }
-//         if new_trace.len() >= 1 {
-//             new_trace.drain(0..1);
-//         }
-
-//         PlanningResult {
-//             plan_found: plan_found,
-//             plan_length: nr_steps - 1,
-//             trace: new_trace,
-//             time_to_solve: planning_time,
-//         }
-
-// }
-
-impl PlanningFrameStrings {
-    pub fn new(source: &Vec<&str>, sink: &Vec<&str>, trans: &str) -> PlanningFrameStrings {
-        PlanningFrameStrings {
-            source: source.iter().map(|x| x.to_string()).collect(),
-            sink: sink.iter().map(|x| x.to_string()).collect(),
-            trans: trans.to_string(),
-        }
-    }
-}
-
-impl<'ctx> GetPlanningResultZ3<'ctx> {
-    pub fn new(
-        ctx: &'ctx ContextZ3,
-        model: Z3_model,
-        nr_steps: u32,
-        planning_time: std::time::Duration,
-        plan_found: bool,
-    ) -> PlanningResultStrings {
-        let model_str = ModelToStringZ3::new(&ctx, model);
-        let mut model_vec = vec![];
-
-        let num = ModelGetNumConstsZ3::new(&ctx, model);
-        let mut lines = model_str.lines();
-        let mut i: u32 = 0;
-
-        while i < num {
-            model_vec.push(lines.next().unwrap_or(""));
-            i = i + 1;
-        }
-
-        // println!("{:#?}", model_vec);
-
-        let mut trace: Vec<PlanningFrameStrings> = vec![];
-        // let mut raw_trace: Vec<PlanningFrame> = vec!();
-        for i in 0..nr_steps {
-            let mut frame: PlanningFrameStrings = PlanningFrameStrings::new(&vec![], &vec![], "");
-            let mut raw_frame: PlanningFrameStrings =
-                PlanningFrameStrings::new(&vec![], &vec![], "");
-            for j in &model_vec {
-                let sep: Vec<&str> = j.split(" -> ").collect();
-                if sep[0].ends_with(&format!("_s{}", i)) {
-                    // raw_frame.state.push(j.to_string());
-                    let trimmed_state = sep[0].trim_end_matches(&format!("_s{}", i));
-                    match sep[1] {
-                        "false" => {
-                            frame.sink.push(sep[0].to_string());
-                            // raw_frame.state.push(j.to_string());
-                        }
-                        "true" => {
-                            frame.sink.push(sep[0].to_string());
-                            // raw_frame.state.push(j.to_string());
-                        }
-                        _ => {
-                            frame.sink.push(format!("{} -> {}", trimmed_state, sep[1]));
-                            // raw_frame.state.push(j.to_string());
-                        }
-                    }
-                } else if sep[0].ends_with(&format!("_t{}", i)) && sep[1] == "true" {
-                    let trimmed_trans = sep[0].trim_end_matches(&format!("_t{}", i));
-                    frame.trans = trimmed_trans.to_string();
-                    raw_frame.trans = sep[0].to_string();
-                }
-            }
-            if model_vec.len() != 0 {
-                trace.push(frame);
-                // raw_trace.push(raw_frame);
-            }
-        }
-
-        let mut new_trace = vec![];
-        let mut new = trace.iter();
-        let mut prev = vec![];
-
-        'breakable: loop {
-            let mut frame: PlanningFrameStrings = PlanningFrameStrings::new(&vec![], &vec![], "");
-
-            match new.next() {
-                Some(x) => {
-                    frame.source = prev.clone();
-                    frame.sink = x.sink.clone();
-                    prev = x.sink.clone();
-                    frame.trans = x.trans.clone();
-                }
-                None => break 'breakable,
-            }
-
-            new_trace.push(frame);
-        }
-        if new_trace.len() >= 1 {
-            new_trace.drain(0..1);
-        }
-
-        PlanningResultStrings {
-            plan_found: plan_found,
-            plan_length: nr_steps - 1,
-            trace: new_trace,
-            time_to_solve: planning_time,
-        }
-    }
-}
-
-// #[test]
-// fn test_incremental_1() {
-
-//     let act_pos = EnumVariable::new("act_pos", &vec!["left", "right"], None, &Kind::Measured);
-//     let ref_pos = EnumVariable::new("ref_pos", &vec!["left", "right"], None, &Kind::Command);
-//     let act_left = Predicate::EQRL(act_pos.clone(), "left".to_string());
-//     let act_right = Predicate::EQRL(act_pos.clone(), "right".to_string());
-//     let ref_left = Predicate::EQRL(ref_pos.clone(), "left".to_string());
-//     let ref_right = Predicate::EQRL(ref_pos.clone(), "right".to_string());
-
-//     let t1 = Transition::new(
-//         "start_move_left",
-//         &Predicate::AND(vec![act_right.clone(), ref_right.clone()]),
-//         &ref_left
-//     );
-//     let t2 = Transition::new(
-//         "start_move_right",
-//         &Predicate::AND(vec![act_left.clone(), ref_left.clone()]),
-//         &ref_right
-//     );
-//     let t3 = Transition::new(
-//         "finish_move_left",
-//         &Predicate::AND(vec![act_right.clone(), ref_left.clone()]),
-//         &act_left
-//     );
-//     let t4 = Transition::new(
-//         "finish_move_right",
-//         &Predicate::AND(vec![act_left.clone(), ref_right.clone()]),
-//         &act_right
-//     );
-//     let problem = PlanningProblem::new(
-//         "prob1",
-//         &Predicate::AND(vec![act_left, ref_left]),
-//         &act_right,
-//         &vec![t1, t2, t3, t4],
-//         &Predicate::TRUE,
-//         &12,
-//     );
-//     let result = incremental(&problem);
-//     println!("{:?}", result);
-// }

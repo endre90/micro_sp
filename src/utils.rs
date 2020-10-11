@@ -1,4 +1,7 @@
 use super::*;
+use z3_v2::*;
+use z3_sys::*;
+use itertools::sorted;
 
 pub trait IterOps<T, I>: IntoIterator<Item = T>
 where
@@ -73,110 +76,114 @@ pub fn get_problem_vars(prob: &PlanningProblem) -> Vec<EnumVariable> {
     s
 }
 
-pub fn frame_to_measured_state(vars: &Vec<EnumVariable>, vals: &Vec<&str>) -> State {
-    State {
-        vec: vars
-            .iter()
-            .filter(|c| c.kind == Kind::Measured)
-            .map(|x| {
-                EnumValue::new(
-                    &x,
-                    vals.iter()
-                        .filter(|y| y.split(" -> ").collect::<Vec<&str>>()[0] == x.name)
-                        .map(|z| z.split(" -> ").collect::<Vec<&str>>()[1])
-                        .collect::<Vec<&str>>()[0],
-                        None
-                )
-            })
-            .collect(),
-        kind: Kind::Measured,
-    }
-}
-
-pub fn frame_to_command_state(vars: &Vec<EnumVariable>, vals: &Vec<&str>) -> State {
-    State {
-        vec: vars
-            .iter()
-            .filter(|c| c.kind == Kind::Command)
-            .map(|x| {
-                EnumValue::new(
-                    &x,
-                    vals.iter()
-                        .filter(|y| y.split(" -> ").collect::<Vec<&str>>()[0] == x.name)
-                        .map(|z| z.split(" -> ").collect::<Vec<&str>>()[1])
-                        .collect::<Vec<&str>>()[0],
-                        None
-                )
-            })
-            .collect(),
-        kind: Kind::Command,
-    }
-}
-
-pub fn frame_to_estimated_state(vars: &Vec<EnumVariable>, vals: &Vec<&str>) -> State {
-    State {
-        vec: vars
-            .iter()
-            .filter(|c| c.kind == Kind::Estimated)
-            .map(|x| {
-                EnumValue::new(
-                    &x,
-                    vals.iter()
-                        .filter(|y| y.split(" -> ").collect::<Vec<&str>>()[0] == x.name)
-                        .map(|z| z.split(" -> ").collect::<Vec<&str>>()[1])
-                        .collect::<Vec<&str>>()[0],
-                        None
-                )
-            })
-            .collect(),
-        kind: Kind::Estimated,
-    }
-}
-
-pub fn frame_to_complete_state(vars: &Vec<EnumVariable>, vals: &Vec<&str>) -> CompleteState {
-    CompleteState {
-        measured: frame_to_measured_state(&vars, &vals),
-        command: frame_to_command_state(&vars, &vals),
-        estimated: frame_to_estimated_state(&vars, &vals),
-    }
-}
-
-pub fn result_to_table(
+pub fn get_planning_result(
+    ctx: &ContextZ3,
     prob: &PlanningProblem,
-    res: &PlanningResultStrings,
-) -> PlanningResultStates {
+    model: Z3_model,
+    nr_steps: u32,
+    planning_time: std::time::Duration,
+    plan_found: bool,
+) -> PlanningResult {
+    let model_str = ModelToStringZ3::new(&ctx, model);
+    let model_vec: Vec<Vec<&str>> = model_str
+        .lines()
+        .map(|l| l.split(" -> ").collect())
+        .collect();
     let vars = get_problem_vars(&prob);
-    PlanningResultStates {
-        plan_found: res.plan_found,
-        plan_length: res.plan_length,
-        trace: res
-            .trace
+
+    let mut trace: Vec<PlanningFrame> = vec![];
+    for i in 0..nr_steps - 1 {
+        let enum_vals_source: Vec<EnumValue> = model_vec
             .iter()
-            .map(|x| PlanningFrameStates {
-                source: frame_to_complete_state(
-                    &vars,
-                    &x.source.iter().map(|x| x.as_str()).collect(),
-                ),
-                trans: x.trans.clone(),
-                sink: frame_to_complete_state(&vars, &x.sink.iter().map(|x| x.as_str()).collect()),
-            })
-            .collect(),
-        time_to_solve: res.time_to_solve,
+            .filter(|x| x[0].ends_with(&format!("_s{}", i)))
+            .map(|x| (x[0].trim_end_matches(&format!("_s{}", i)), x[1], i))
+            .map(|x| (vars.iter().find(|y| y.name == x.0).unwrap(), x.1))
+            .map(|x| EnumValue::new(&x.0, x.1, None))
+            .collect();
+
+        let enum_vals_sink: Vec<EnumValue> = model_vec
+            .iter()
+            .filter(|x| x[0].ends_with(&format!("_s{}", i + 1)))
+            .map(|x| (x[0].trim_end_matches(&format!("_s{}", i + 1)), x[1], i + 1))
+            .map(|x| (vars.iter().find(|y| y.name == x.0).unwrap(), x.1))
+            .map(|x| EnumValue::new(&x.0, x.1, None))
+            .collect();
+
+        let measured_source: Vec<EnumValue> = enum_vals_source
+            .iter()
+            .filter(|x| x.var.kind == Kind::Measured)
+            .map(|y| y.clone())
+            .collect::<Vec<EnumValue>>();
+        let command_source: Vec<EnumValue> = enum_vals_source
+            .iter()
+            .filter(|x| x.var.kind == Kind::Command)
+            .map(|y| y.clone())
+            .collect();
+        let estimated_source: Vec<EnumValue> = enum_vals_source
+            .iter()
+            .filter(|x| x.var.kind == Kind::Estimated)
+            .map(|y| y.clone())
+            .collect();
+
+        let measured_sink: Vec<EnumValue> = enum_vals_sink
+            .iter()
+            .filter(|x| x.var.kind == Kind::Measured)
+            .map(|y| y.clone())
+            .collect();
+        let command_sink: Vec<EnumValue> = enum_vals_sink
+            .iter()
+            .filter(|x| x.var.kind == Kind::Command)
+            .map(|y| y.clone())
+            .collect();
+        let estimated_sink: Vec<EnumValue> = enum_vals_sink
+            .iter()
+            .filter(|x| x.var.kind == Kind::Estimated)
+            .map(|y| y.clone())
+            .collect();
+
+        let trans = model_vec
+            .iter()
+            .filter(|x| x[0].ends_with(&format!("_t{}", i + 1)))
+            .map(|x| (x[0].trim_end_matches(&format!("_t{}", i + 1)), x[1], i + 1))
+            .find(|x| x.1 == "true")
+            .map(|z| z.0)
+            .unwrap_or_default();
+
+        trace.push(PlanningFrame {
+            source: CompleteState::from_states(
+                &State::new(&measured_source, &Kind::Measured),
+                &State::new(&command_source, &Kind::Command),
+                &State::new(&estimated_source, &Kind::Estimated),
+            ),
+            trans: String::from(trans),
+            sink: CompleteState::from_states(
+                &State::new(&measured_sink, &Kind::Measured),
+                &State::new(&command_sink, &Kind::Command),
+                &State::new(&estimated_sink, &Kind::Estimated),
+            ),
+        });
+    }
+    PlanningResult {
+        plan_found: plan_found,
+        plan_length: nr_steps - 1,
+        trace: trace,
+        time_to_solve: planning_time,
     }
 }
 
-pub fn get_sink(table: &PlanningResultStates, source: &State) -> CompleteState {
-    // let untimed_source: Vec<(String, String)> = source.vec.iter().map(|x| (x.var.name, x.val)).collect();
-    // let untimed_table = table.trace.iter().map(|x| PlanningFrameStates { source:  } x.source.measured.)
-    match source.kind == Kind::Measured {
-        true => match table.trace.iter().find(|x| x.source.measured.vec == source.vec.clone()) {
-            Some(x) => x.sink.to_owned(),
-            None => CompleteState::empty()
-        },
-        false => panic!("asdf"),
-    }
-}
+// pub fn get_sink(table: &PlanningResultStates, source: &State) -> CompleteState {
+//     // let untimed_source: Vec<(String, String)> = source.vec.iter().map(|x| (x.var.name, x.val)).collect();
+//     // let untimed_table = table.trace.iter().map(|x| PlanningFrameStates { source:  } x.source.measured.)
+//     match source.kind == Kind::Measured {
+//         true => match table.trace.iter().find(|x| x.source.measured.vec == source.vec.clone()) {
+//             Some(x) => x.sink.to_owned(),
+//             None => CompleteState::empty()
+//         },
+//         false => panic!("asdf"),
+//     }
+// }
 
+// revisit this...
 pub fn measured_state_to_predicate(state: &State) -> Predicate {
     match state.kind {
         Kind::Measured => Predicate::AND(
@@ -184,23 +191,21 @@ pub fn measured_state_to_predicate(state: &State) -> Predicate {
                 .vec
                 .iter()
                 .map(|x| {
-                    Predicate::EQ(
-                        EnumValue::new(
-                            &EnumVariable::new(
-                                &x.var.name,
-                                &x.var.domain.iter().map(|x| x.as_str()).collect(),
-                                Some(&x.var.param),
-                                &x.var.kind,
-                            ),
-                            &x.val,
-                            Some(&x.lifetime)
-                        )
-                    )
+                    Predicate::EQ(EnumValue::new(
+                        &EnumVariable::new(
+                            &x.var.name,
+                            &x.var.domain.iter().map(|x| x.as_str()).collect(),
+                            Some(&x.var.param),
+                            &x.var.kind,
+                        ),
+                        &x.val,
+                        Some(&x.lifetime),
+                    ))
                 })
                 .collect::<Vec<Predicate>>(),
         ),
         Kind::Command => panic!("not measured type"),
-        Kind::Estimated => panic!("not measured type")
+        Kind::Estimated => panic!("not measured type"),
     }
 }
 
@@ -214,22 +219,93 @@ pub fn refresh_problem(prob: &PlanningProblem, current: &State) -> PlanningProbl
     }
 }
 
-pub fn pprint_result(result: &PlanningResultStrings) -> () {
-    println!("\n");
-    println!("============================================");
-    println!("              PLANNING RESULT               ");
-    println!("============================================");
+pub fn pprint_result(result: &PlanningResult) -> () {
+    println!("======================================================");
+    println!("                   PLANNING RESULT                    ");
+    println!("======================================================");
     println!("plan_found: {:?}", result.plan_found);
     println!("plan_lenght: {:?}", result.plan_length);
     println!("time_to_solve: {:?}", result.time_to_solve);
-    println!("============================================");
+    println!("======================================================");
     for t in 0..result.trace.len() {
         println!("frame: {:?}", t);
-        println!("source: {:?}", result.trace[t].source);
         println!("trans: {:?}", result.trace[t].trans);
-        println!("sink: {:?}", result.trace[t].sink);
-        println!("============================================");
+        println!("------------------------------------------------------");
+        println!(
+            "       | measured: {:?}",
+            sorted(
+                result.trace[t]
+                    .source
+                    .measured
+                    .vec
+                    .iter()
+                    .map(|x| format!("{} -> {}", x.var.name, x.val))
+            )
+            .collect::<Vec<String>>()
+        );
+        println!(
+            "source | command: {:?}",
+            sorted(
+                result.trace[t]
+                    .source
+                    .command
+                    .vec
+                    .iter()
+                    .map(|x| format!("{} -> {}", x.var.name, x.val))
+            )
+            .collect::<Vec<String>>()
+        );
+        println!(
+            "       | estimated: {:?}",
+            sorted(
+                result.trace[t]
+                    .source
+                    .estimated
+                    .vec
+                    .iter()
+                    .map(|x| format!("{} -> {}", x.var.name, x.val))
+            )
+            .collect::<Vec<String>>()
+        );
+        println!("------------------------------------------------------");
+        println!(
+            "       | measured: {:?}",
+            sorted(
+                result.trace[t]
+                    .sink
+                    .measured
+                    .vec
+                    .iter()
+                    .map(|x| format!("{} -> {}", x.var.name, x.val))
+            )
+            .collect::<Vec<String>>()
+        );
+        println!(
+            " sink  | command: {:?}",
+            sorted(
+                result.trace[t]
+                    .sink
+                    .command
+                    .vec
+                    .iter()
+                    .map(|x| format!("{} -> {}", x.var.name, x.val))
+            )
+            .collect::<Vec<String>>()
+        );
+        println!(
+            "       | estimated: {:?}",
+            sorted(
+                result.trace[t]
+                    .sink
+                    .estimated
+                    .vec
+                    .iter()
+                    .map(|x| format!("{} -> {}", x.var.name, x.val))
+            )
+            .collect::<Vec<String>>()
+        );
+        println!("======================================================");
     }
-    println!("               END OF RESULT                ");
-    println!("============================================");
+    println!("                    END OF RESULT                     ");
+    println!("======================================================");
 }
