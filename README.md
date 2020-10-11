@@ -19,7 +19,8 @@ TODO:
 16. [ ] make model launch choice argument
 17. [ ] multiple goals
 18. [ ] eliminate need for dummy in var domain
-19. [ ] flow graph to readme
-20. [ ] dockerize
-21. [ ] maybe some quality of life for modeling
-22. [ ] explore all paths and generate graph
+19. [x] check for measured in domain
+20. [ ] flow graph to readme
+21. [ ] dockerize
+22. [ ] maybe some quality of life for modeling
+23. [ ] explore all paths and generate graph

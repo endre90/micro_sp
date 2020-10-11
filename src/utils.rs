@@ -1,5 +1,6 @@
 use super::*;
 use itertools::sorted;
+use std::time::Duration;
 use z3_sys::*;
 use z3_v2::*;
 
@@ -214,6 +215,40 @@ pub fn refresh_problem(prob: &PlanningProblem, current: &State) -> PlanningProbl
         trans: prob.trans.to_owned(),
         max_steps: prob.max_steps,
     }
+}
+
+pub fn values_in_domains(current: &State) -> bool {
+    current.vec.iter().any(|x| x.var.domain.contains(&x.val))
+}
+
+#[test]
+fn test_values_in_domains() {
+    let s = State::new(
+        &vec![
+            EnumValue::new(
+                &EnumVariable::new(
+                    "banana",
+                    &vec!["green", "ripe", "spoiled"],
+                    None,
+                    &Kind::Measured,
+                ),
+                "green",
+                Some(&Duration::from_millis(3000)),
+            ),
+            EnumValue::new(
+                &EnumVariable::new(
+                    "peach",
+                    &vec!["green", "ripe", "spoiled"],
+                    None,
+                    &Kind::Measured,
+                ),
+                "grfeen",
+                Some(&Duration::from_millis(3000)),
+            ),
+        ],
+        &Kind::Measured,
+    );
+    assert_eq!(values_in_domains(&s), true);
 }
 
 pub fn pprint_result(result: &PlanningResult) -> () {

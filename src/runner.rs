@@ -44,8 +44,7 @@ pub async fn runner(
 
         if fresh {
             if sink == State::new(&vec!(), &Kind::Command) {
-                let fresh_prob = refresh_problem(&prob, &current_measured_state);
-                result = incremental(&fresh_prob);
+                result = incremental(&refresh_problem(&prob, &current_measured_state));
                 pprint_result(&result);
             }
             sink = get_sink(&result, &current_measured_state).command;
