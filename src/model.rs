@@ -43,37 +43,37 @@ pub fn model() -> PlanningProblem {
 
     let t1 = Transition::new(
         "start_move_left",
-        &Predicate::AND(vec![not_act_left.clone(), ref_right.clone()]),
+        &Predicate::AND(vec![not_act_left.clone(), ref_right.clone(), activated.clone()]),
         &ref_left,
     );
 
     let t2 = Transition::new(
         "start_move_right",
-        &Predicate::AND(vec![not_act_right.clone(), ref_left.clone()]),
+        &Predicate::AND(vec![not_act_right.clone(), ref_left.clone(), activated.clone()]),
         &ref_right,
     );
 
     let t3 = Transition::new(
         "finish_move_left",
-        &Predicate::AND(vec![not_act_left.clone(), ref_left.clone()]),
+        &Predicate::AND(vec![not_act_left.clone(), ref_left.clone(), activated.clone()]),
         &act_left,
     );
 
     let t4 = Transition::new(
         "finish_move_right",
-        &Predicate::AND(vec![not_act_right.clone(), ref_right.clone()]),
+        &Predicate::AND(vec![not_act_right.clone(), ref_right.clone(), activated.clone()]),
         &act_right,
     );
 
     let t5 = Transition::new(
         "start_activate",
-        &Predicate::AND(vec![deactivated.clone(), deactivate.clone()]),
+        &Predicate::AND(vec![deactivated.clone()]),
         &activate,
     );
 
     let t6 = Transition::new(
         "finish_activate",
-        &Predicate::AND(vec![deactivated.clone(), activate.clone()]),
+        &Predicate::AND(vec![activate.clone()]),
         &activated,
     );
 

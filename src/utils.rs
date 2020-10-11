@@ -1,7 +1,7 @@
 use super::*;
-use z3_v2::*;
-use z3_sys::*;
 use itertools::sorted;
+use z3_sys::*;
+use z3_v2::*;
 
 pub trait IterOps<T, I>: IntoIterator<Item = T>
 where
@@ -173,44 +173,43 @@ pub fn get_planning_result(
 
 pub fn get_sink(result: &PlanningResult, source: &State) -> CompleteState {
     match source.kind == Kind::Measured {
-        true => match result.trace.iter().find(|x| x.source.measured.vec == source.vec.clone()) {
+        true => match result
+            .trace
+            .iter()
+            .find(|x| x.source.measured.vec == source.vec.clone())
+        {
             Some(x) => x.sink.to_owned(),
-            None => CompleteState::empty()
+            None => CompleteState::empty(),
         },
         false => panic!("asdf"),
     }
 }
 
-// revisit this...
-pub fn measured_state_to_predicate(state: &State) -> Predicate {
-    match state.kind {
-        Kind::Measured => Predicate::AND(
-            state
-                .vec
-                .iter()
-                .map(|x| {
-                    Predicate::EQ(EnumValue::new(
-                        &EnumVariable::new(
-                            &x.var.name,
-                            &x.var.domain.iter().map(|x| x.as_str()).collect(),
-                            Some(&x.var.param),
-                            &x.var.kind,
-                        ),
-                        &x.val,
-                        Some(&x.lifetime),
-                    ))
-                })
-                .collect::<Vec<Predicate>>(),
-        ),
-        Kind::Command => panic!("not measured type"),
-        Kind::Estimated => panic!("not measured type"),
-    }
+pub fn state_to_predicate(state: &State) -> Predicate {
+    Predicate::AND(
+        state
+            .vec
+            .iter()
+            .map(|x| {
+                Predicate::EQ(EnumValue::new(
+                    &EnumVariable::new(
+                        &x.var.name,
+                        &x.var.domain.iter().map(|x| x.as_str()).collect(),
+                        Some(&x.var.param),
+                        &x.var.kind,
+                    ),
+                    &x.val,
+                    Some(&x.lifetime),
+                ))
+            })
+            .collect::<Vec<Predicate>>(),
+    )
 }
 
 pub fn refresh_problem(prob: &PlanningProblem, current: &State) -> PlanningProblem {
     PlanningProblem {
         name: prob.name.to_owned(),
-        init: measured_state_to_predicate(&current),
+        init: state_to_predicate(&current),
         goal: prob.goal.to_owned(),
         trans: prob.trans.to_owned(),
         max_steps: prob.max_steps,

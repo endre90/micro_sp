@@ -202,18 +202,15 @@ pub struct Transition {
 impl Transition {
     /// Make a new named transition from guard and update predicates.
     pub fn new(name: &str, guard: &Predicate, update: &Predicate) -> Transition {
-        let diff = get_predicate_vars(&guard).intersect(get_predicate_vars(&update));
+        let updates = get_predicate_vars(&update);
         Transition {
             name: name.to_string(),
             guard: guard.to_owned(),
             update: update.to_owned(),
-            kind: {
-                match diff.len() {
-                    0 => panic!("no update?"),
-                    1 => diff[0].kind.to_owned(),
-                    _ => panic!("multiple updates not implemented."),
-                }
-            },
+            kind: match updates.len() > 0 {
+                true => updates[0].kind.to_owned(),
+                false => panic!("no update?")
+            }
         }
     }
 }
