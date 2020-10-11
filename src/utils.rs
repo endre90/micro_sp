@@ -171,17 +171,15 @@ pub fn get_planning_result(
     }
 }
 
-// pub fn get_sink(table: &PlanningResultStates, source: &State) -> CompleteState {
-//     // let untimed_source: Vec<(String, String)> = source.vec.iter().map(|x| (x.var.name, x.val)).collect();
-//     // let untimed_table = table.trace.iter().map(|x| PlanningFrameStates { source:  } x.source.measured.)
-//     match source.kind == Kind::Measured {
-//         true => match table.trace.iter().find(|x| x.source.measured.vec == source.vec.clone()) {
-//             Some(x) => x.sink.to_owned(),
-//             None => CompleteState::empty()
-//         },
-//         false => panic!("asdf"),
-//     }
-// }
+pub fn get_sink(result: &PlanningResult, source: &State) -> CompleteState {
+    match source.kind == Kind::Measured {
+        true => match result.trace.iter().find(|x| x.source.measured.vec == source.vec.clone()) {
+            Some(x) => x.sink.to_owned(),
+            None => CompleteState::empty()
+        },
+        false => panic!("asdf"),
+    }
+}
 
 // revisit this...
 pub fn measured_state_to_predicate(state: &State) -> Predicate {
