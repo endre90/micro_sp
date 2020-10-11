@@ -61,9 +61,9 @@ impl EnumVariable {
             name: name.to_owned(),
             r#type: name.to_owned(),
             domain: domain
-                .iter()
-                .map(|x| x.to_string())
-                .collect::<Vec<String>>(),
+                    .iter()
+                    .map(|x| x.to_string())
+                    .collect::<Vec<String>>(),
             param: match param {
                 Some(x) => x.to_owned(),
                 None => Parameter::none(),
@@ -91,7 +91,7 @@ impl EnumValue {
             var: var.to_owned(),
             val: match var.domain.contains(&val.to_owned()) {
                 true => val.to_owned(),
-                false => panic!("value not in the domain of the variable"),
+                false => panic!("value {:?} not in the domain of the variable", val),
             },
             lifetime: match lifetime {
                 Some(x) => x.to_owned(),
@@ -209,8 +209,8 @@ impl Transition {
             update: update.to_owned(),
             kind: match updates.len() > 0 {
                 true => updates[0].kind.to_owned(),
-                false => panic!("no update?")
-            }
+                false => panic!("no update?"),
+            },
         }
     }
 }

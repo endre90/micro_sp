@@ -13,14 +13,15 @@ TODO:
 10. [ ] nondeterminism
 11. [ ] compositional algorithm
 12. [ ] when to call the planner
-13. [ ] should refresh state handle command? 
-14. [ ] handle estimated
-15. [ ] move model to models
-16. [ ] make model launch choice argument
-17. [ ] multiple goals
-18. [ ] eliminate need for dummy in var domain
-19. [x] check for measured in domain
-20. [ ] flow graph to readme
-21. [ ] dockerize
-22. [ ] maybe some quality of life for modeling
-23. [ ] explore all paths and generate graph
+13. [ ] should refresh state handle command?
+14. [ ] don't replan after every state change
+15. [ ] handle estimated
+16. [ ] move model to models
+17. [ ] make model launch choice argument
+18. [ ] multiple goals
+19. [ ] dummy in var domain default or eliminate
+20. [x] check for measured in domain
+21. [ ] flow graph to readme
+22. [ ] dockerize
+23. [ ] maybe some quality of life for modeling
+24. [ ] explore all paths and generate graph
