@@ -5,7 +5,7 @@ use tokio::time::{interval, delay_for, Duration, Instant};
 
 pub async fn state(
     measured_arc: Arc<Mutex<String>>,
-    command_arc: Arc<Mutex<String>>,
+    command_arc: Arc<Mutex<(String, bool)>>,
     ros_receivers: Vec<(String, tokio::sync::mpsc::Receiver<String>)>,
     ros_senders: Vec<(String, tokio::sync::mpsc::Sender<String>)>,
 ) -> io::Result<()> {
@@ -52,15 +52,21 @@ pub async fn state(
         *measured_arc.lock().unwrap() = serde_json::to_string(&measured_state).unwrap();
         delay_for(Duration::from_millis(10)).await;
 
-        let sink: State = serde_json::from_str(&command_arc.lock().unwrap()).unwrap();
+        let sink: State = serde_json::from_str(&command_arc.lock().unwrap().0).unwrap();
+        let fresh: bool = command_arc.lock().unwrap().1;
+
         let _command_vec = &command_list
             .iter()
             .map(|x| {
                 let des: EnumValue = serde_json::from_str(&x.lock().unwrap().0).unwrap();
-                let dummy = EnumValue::new(&des.var, &des.val, None);
+                let dummy = EnumValue::new(&des.var, "dummy_value", None);
                 let update: &EnumValue =
                     sink.vec.iter().find(|x| x.var == des.var).unwrap_or(&dummy);
-                *x.lock().unwrap() = (serde_json::to_string(&update).unwrap(), Instant::now());
+                match fresh {
+                    true => *x.lock().unwrap() = (serde_json::to_string(&update).unwrap(), Instant::now()),
+                    false => *x.lock().unwrap() = (serde_json::to_string(&dummy).unwrap(), Instant::now())
+                }
+                
                 EnumValue::new(
                     &des.var,
                     &update.val,

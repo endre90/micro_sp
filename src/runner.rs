@@ -11,7 +11,7 @@ pub async fn runner(
 ) -> io::Result<()> {
     
     let measured_arc = Arc::new(Mutex::new(serde_json::to_string(&State::new(&vec!(), &Kind::Measured)).unwrap()));
-    let command_arc = Arc::new(Mutex::new(serde_json::to_string(&State::new(&vec!(), &Kind::Command)).unwrap()));
+    let command_arc = Arc::new(Mutex::new((serde_json::to_string(&State::new(&vec!(), &Kind::Command)).unwrap(), false)));
     let measured_arc_clone = measured_arc.clone();
     let command_arc_clone = command_arc.clone();
     tokio::task::spawn(async {
@@ -46,8 +46,6 @@ pub async fn runner(
             if sink == State::new(&vec!(), &Kind::Command) {
                 let fresh_prob = refresh_problem(&prob, &current_measured_state);
                 result = incremental(&fresh_prob);
-                println!("planner called {:?} times", i);
-                i = i + 1;
                 pprint_result(&result);
             }
             sink = get_sink(&result, &current_measured_state).command;
@@ -55,7 +53,9 @@ pub async fn runner(
             sink = State::new(&vec!(), &Kind::Command);
         }
 
-        *command_arc_clone.lock().unwrap() = serde_json::to_string(&sink).unwrap();
+        println!("{:?} :: {:?}", sink, fresh);
+
+        *command_arc_clone.lock().unwrap() = (serde_json::to_string(&sink).unwrap(), fresh);
 
         let mut interval = interval(Duration::from_millis(100));
         interval.tick().await;
