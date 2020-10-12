@@ -19,3 +19,15 @@ pub async fn sender(
         send.try_send(des.val.to_string()).unwrap_or_default();
     }
 }
+
+/// Send out the complete state as a json string.
+pub async fn complete_state_sender(
+    kvp: Arc<Mutex<(String, Instant)>>,
+    mut send: tokio::sync::mpsc::Sender<std::string::String>,
+) -> io::Result<()> {
+    loop {
+        let s = kvp.lock().unwrap().0.clone();
+        delay_for(Duration::from_millis(100)).await;
+        send.try_send(s).unwrap_or_default();
+    }
+}

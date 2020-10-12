@@ -62,19 +62,19 @@ async fn main() -> io::Result<()> {
         });
     }
 
-    // // make a publisher for the global state
-    // let state_publisher = node
-    //     .create_publisher::<std_msgs::msg::String>("/state")
-    //     .expect("Error f93c6d99-5725-467a-8a96-e49f72b3485f: Creating state publisher failed.");
-    // let (tx, rx) = channel::<String>(10);
-    // let state_publisher_data = (serde_json::to_string(&State::new())?, tx);
-    // tokio::task::spawn(async {
-    //     let writer = publisher::publisher(state_publisher, rx);
-    //     let _res = tokio::try_join!(writer);
-    // });
+    // make a publisher for the global state
+    let state_publisher = node
+        .create_publisher::<std_msgs::msg::String>("/state")
+        .expect("Error f93c6d99-5725-467a-8a96-e49f72b3485f: Creating state publisher failed.");
+    let (tx, rx) = channel::<String>(10);
+    let state_sender = (serde_json::to_string(&CompleteState::empty())?, tx);
+    tokio::task::spawn(async {
+        let writer = publisher::publisher(state_publisher, rx);
+        let _res = tokio::try_join!(writer);
+    });
 
     tokio::task::spawn(async {
-        let recv = runner::runner(problem, ros_receivers, ros_senders);
+        let recv = runner::runner(problem, ros_receivers, ros_senders, state_sender);
         let _res = tokio::try_join!(recv);
     });
 

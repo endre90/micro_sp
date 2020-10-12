@@ -9,7 +9,7 @@ pub async fn runner(
     prob: PlanningProblem,
     ros_receivers: Vec<(String, tokio::sync::mpsc::Receiver<String>)>,
     ros_senders: Vec<(String, tokio::sync::mpsc::Sender<String>)>,
-    // state_publisher: (String, tokio::sync::mpsc::Sender<String>),
+    state_sender: (String, tokio::sync::mpsc::Sender<String>),
 ) -> io::Result<()> {
     
     let measured_arc = Arc::new(Mutex::new(serde_json::to_string(&State::new(&vec!(), &Kind::Measured)).unwrap()));
@@ -17,7 +17,7 @@ pub async fn runner(
     let measured_arc_clone = measured_arc.clone();
     let command_arc_clone = command_arc.clone();
     tokio::task::spawn(async {
-        let state = state::state(measured_arc, command_arc, ros_receivers, ros_senders);
+        let state = state::state(measured_arc, command_arc, ros_receivers, ros_senders, state_sender);
         let _res = tokio::try_join!(state);
     });
     

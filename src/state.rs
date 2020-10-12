@@ -1,9 +1,9 @@
 use super::*;
 use std::io;
 use std::sync::{Arc, Mutex};
-use tokio::time::{interval, delay_for, Duration, Instant};
+use tokio::time::{delay_for, interval, Duration, Instant};
 
-/// Collects the measured values to a current measured state and 
+/// Collects the measured values to a current measured state and
 /// decomposes the current command state to be sent to corresponding
 /// publishers.
 pub async fn state(
@@ -11,6 +11,7 @@ pub async fn state(
     command_arc: Arc<Mutex<(String, bool)>>,
     ros_receivers: Vec<(String, tokio::sync::mpsc::Receiver<String>)>,
     ros_senders: Vec<(String, tokio::sync::mpsc::Sender<String>)>,
+    state_sender: (String, tokio::sync::mpsc::Sender<String>),
 ) -> io::Result<()> {
     let mut measured_list = vec![];
     for r in ros_receivers {
@@ -36,6 +37,16 @@ pub async fn state(
         command_list.push(amkvp1);
     }
 
+    let state_amkvp = Arc::new(Mutex::new((
+        serde_json::to_string(&CompleteState::empty())?,
+        Instant::now(),
+    )));
+    let state_amkvp_clone = state_amkvp.clone();
+    tokio::task::spawn(async {
+        let sender = sender::complete_state_sender(state_amkvp, state_sender.1);
+        let _res = tokio::try_join!(sender);
+    });
+
     loop {
         let looping_now = Instant::now();
 
@@ -58,6 +69,15 @@ pub async fn state(
         let sink: State = serde_json::from_str(&command_arc.lock().unwrap().0)?;
         let fresh: bool = command_arc.lock().unwrap().1;
 
+        *state_amkvp_clone.lock().unwrap() = (
+            serde_json::to_string(&CompleteState::from_states(
+                &measured_state,
+                &sink,
+                &State::new(&vec![], &Kind::Estimated),
+            ))?,
+            Instant::now(),
+        );
+
         let _command_vec = &command_list
             .iter()
             .map(|x| {
@@ -66,14 +86,19 @@ pub async fn state(
                 let update: &EnumValue =
                     sink.vec.iter().find(|x| x.var == des.var).unwrap_or(&dummy);
                 match fresh {
-                    true => *x.lock().unwrap() = (serde_json::to_string(&update).unwrap(), Instant::now()),
-                    false => *x.lock().unwrap() = (serde_json::to_string(&dummy).unwrap(), Instant::now())
+                    true => {
+                        *x.lock().unwrap() =
+                            (serde_json::to_string(&update).unwrap(), Instant::now())
+                    }
+                    false => {
+                        *x.lock().unwrap() =
+                            (serde_json::to_string(&dummy).unwrap(), Instant::now())
+                    }
                 }
-                
                 EnumValue::new(
                     &des.var,
                     &update.val,
-                    Some(&looping_now.saturating_duration_since(x.lock().unwrap().1))
+                    Some(&looping_now.saturating_duration_since(x.lock().unwrap().1)),
                 )
             })
             .collect::<Vec<EnumValue>>();

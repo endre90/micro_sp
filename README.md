@@ -3,7 +3,7 @@
 ## TODO
 ### high prioriry 
 1.  [x] unwraps error handling, probably not done
-2.  [ ] publish complete state
+2.  [x] publish complete state
 3.  [ ] testing
 4.  [x] documentation
 5.  [ ] proper readme
