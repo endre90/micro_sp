@@ -11,10 +11,10 @@ pub async fn publisher(
 ) -> io::Result<()> {
     loop {
         delay_for(Duration::from_millis(100)).await;
-        let to_pub = recv.recv().await.unwrap();
+        let to_pub = recv.recv().await.unwrap_or_default();
         let to_send = std_msgs::msg::String {
             data: to_pub.to_owned(),
         };
-        publisher.publish(&to_send).unwrap();
+        publisher.publish(&to_send).unwrap_or_default();
     }
 }

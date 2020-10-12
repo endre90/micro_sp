@@ -51,12 +51,11 @@ pub async fn state(
             })
             .collect::<Vec<EnumValue>>();
         let measured_state = State::new(&measured_vec, &Kind::Measured);
-        println!("HERE: {:?}", measured_state);
 
-        *measured_arc.lock().unwrap() = serde_json::to_string(&measured_state).unwrap();
+        *measured_arc.lock().unwrap() = serde_json::to_string(&measured_state)?;
         delay_for(Duration::from_millis(10)).await;
 
-        let sink: State = serde_json::from_str(&command_arc.lock().unwrap().0).unwrap();
+        let sink: State = serde_json::from_str(&command_arc.lock().unwrap().0)?;
         let fresh: bool = command_arc.lock().unwrap().1;
 
         let _command_vec = &command_list

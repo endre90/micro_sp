@@ -39,7 +39,7 @@ async fn main() -> io::Result<()> {
     let mut ros_receivers: Vec<(String, tokio::sync::mpsc::Receiver<String>)> = vec![];
     for v in &msr_var_vals {
         let (mut tx, rx) = channel::<String>(10);
-        ros_receivers.push((serde_json::to_string(&v).unwrap(), rx));
+        ros_receivers.push((serde_json::to_string(&v)?, rx));
         let sub = move |x: r2r::std_msgs::msg::String| {
             tx.try_send(x.data).unwrap_or_default();
         };
@@ -55,7 +55,7 @@ async fn main() -> io::Result<()> {
             .create_publisher::<std_msgs::msg::String>(&format!("/{}", v.var.name))
             .expect("Error f93c6d99-5725-467a-8a96-e49f72b3485f: Creating publishers failed.");
         let (tx, rx) = channel::<String>(10);
-        ros_senders.push((serde_json::to_string(&v).unwrap(), tx));
+        ros_senders.push((serde_json::to_string(&v)?, tx));
         tokio::task::spawn(async {
             let writer = publisher::publisher(publisher, rx);
             let _res = tokio::try_join!(writer);
@@ -67,7 +67,7 @@ async fn main() -> io::Result<()> {
     //     .create_publisher::<std_msgs::msg::String>("/state")
     //     .expect("Error f93c6d99-5725-467a-8a96-e49f72b3485f: Creating state publisher failed.");
     // let (tx, rx) = channel::<String>(10);
-    // let state_publisher_data = (serde_json::to_string(&State::new()).unwrap(), tx);
+    // let state_publisher_data = (serde_json::to_string(&State::new())?, tx);
     // tokio::task::spawn(async {
     //     let writer = publisher::publisher(state_publisher, rx);
     //     let _res = tokio::try_join!(writer);

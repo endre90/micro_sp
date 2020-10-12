@@ -14,7 +14,7 @@ pub async fn sender(
 ) -> io::Result<()> {
     loop {
         let s = kvp.lock().unwrap().0.clone();
-        let des: EnumValue = serde_json::from_str(&s).unwrap();
+        let des: EnumValue = serde_json::from_str(&s)?;
         delay_for(Duration::from_millis(100)).await;
         send.try_send(des.val.to_string()).unwrap_or_default();
     }

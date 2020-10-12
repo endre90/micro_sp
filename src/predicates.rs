@@ -24,7 +24,7 @@ pub fn predicate_to_ast(ctx: &ContextZ3, pred: &Predicate, step: &u32) -> Z3_ast
         Predicate::EQ(x) => {
             let sort = EnumSortZ3::new(&ctx, &x.var.r#type, x.var.domain.iter().map(|x| x.as_str()).collect());
             let elems = &sort.enum_asts;
-            let index = x.var.domain.iter().position(|r| r == &x.val).unwrap();
+            let index = x.var.domain.iter().position(|r| r == &x.val).unwrap_or_default();
             EQZ3::new(&ctx, EnumVarZ3::new(&ctx, sort.r, format!("{}_s{}", x.var.name.to_string(), step).as_str()), elems[index])
         }
     }

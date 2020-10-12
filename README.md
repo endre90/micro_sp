@@ -2,24 +2,25 @@
 
 ## TODO
 ### high prioriry 
-1.  [ ] unwraps error handling
-2.  [ ] testing
-3.  [x] documentation
-4.  [ ] proper readme
-5.  [x] proper get planning result
-6.  [ ] benchmarks to models
-7.  [ ] improve runner 
-8.  [ ] fix command lifetime
-9.  [x] match published data to sink when fresh timeouts
-10. [ ] compositional algorithm
-11. [ ] when to call the planner
-12. [ ] should refresh state handle command?
-13. [ ] don't replan after every state change
-14. [ ] handle estimated
-15. [ ] move model to models
-16. [ ] make model launch choice argument
-17. [x] check for measured in domain
-18. [ ] flow graph to readme
+1.  [x] unwraps error handling, probably not done
+2.  [ ] publish complete state
+3.  [ ] testing
+4.  [x] documentation
+5.  [ ] proper readme
+6.  [x] proper get planning result
+7.  [ ] benchmarks to models
+8.  [ ] improve runner 
+9.  [ ] fix command lifetime
+10. [x] match published data to sink when fresh timeouts
+11. [ ] compositional algorithm
+12. [ ] when to call the planner
+13. [ ] should refresh state handle command?
+14. [ ] don't replan after every state change
+15. [ ] handle estimated
+16. [ ] move model to models
+17. [ ] make model launch choice argument
+18. [x] check for measured in domain
+19. [ ] flow graph to readme
 
 ### low priority
 1. [ ] nondeterminism
