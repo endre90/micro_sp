@@ -9,6 +9,10 @@ mod receiver;
 mod sender;
 use r2r::*;
 
+/// A 'micro_sp' ROS2 node is made here. Based on the provided model,
+/// subscribers are generated for measured kind variables and publishers
+/// for command kind variables. These subs and pubs run asynchronously in
+/// their green threads. 
 #[tokio::main]
 async fn main() -> io::Result<()> {
     let ros_ctx = Context::create()

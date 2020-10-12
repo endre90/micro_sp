@@ -1,27 +1,30 @@
 # micro_sp
 
-TODO: 
+## TODO
+### high prioriry 
 1.  [ ] unwraps error handling
 2.  [ ] testing
-3.  [ ] documentation
+3.  [x] documentation
 4.  [ ] proper readme
 5.  [x] proper get planning result
-6.  [ ] improve runner 
-7.  [ ] fix command lifetime
-8.  [x] match published data to sink when fresh timeouts
-9.  [ ] replan after freshness timeout
-10. [ ] nondeterminism
-11. [ ] compositional algorithm
-12. [ ] when to call the planner
-13. [ ] should refresh state handle command?
-14. [ ] don't replan after every state change
-15. [ ] handle estimated
-16. [ ] move model to models
-17. [ ] make model launch choice argument
-18. [ ] multiple goals
-19. [ ] dummy in var domain default or eliminate
-20. [x] check for measured in domain
-21. [ ] flow graph to readme
-22. [ ] dockerize
-23. [ ] maybe some quality of life for modeling
-24. [ ] explore all paths and generate graph
+6.  [ ] benchmarks to models
+7.  [ ] improve runner 
+8.  [ ] fix command lifetime
+9.  [x] match published data to sink when fresh timeouts
+10. [ ] compositional algorithm
+11. [ ] when to call the planner
+12. [ ] should refresh state handle command?
+13. [ ] don't replan after every state change
+14. [ ] handle estimated
+15. [ ] move model to models
+16. [ ] make model launch choice argument
+17. [x] check for measured in domain
+18. [ ] flow graph to readme
+
+### low priority
+1. [ ] nondeterminism
+2. [ ] multiple goals
+3. [ ] dummy in var domain default or eliminate
+4. [ ] dockerize
+5. [ ] maybe some quality of life for modeling
+6. [ ] explore all paths and generate graph

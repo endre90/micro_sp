@@ -101,7 +101,7 @@ impl EnumValue {
     }
 }
 
-// A collection of variables of the same control kind.
+/// A collection of variables of the same control kind.
 #[derive(Debug, PartialEq, Clone, PartialOrd, Eq, Ord, Serialize, Deserialize)]
 pub struct State {
     pub vec: Vec<EnumValue>,

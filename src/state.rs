@@ -3,6 +3,9 @@ use std::io;
 use std::sync::{Arc, Mutex};
 use tokio::time::{interval, delay_for, Duration, Instant};
 
+/// Collects the measured values to a current measured state and 
+/// decomposes the current command state to be sent to corresponding
+/// publishers.
 pub async fn state(
     measured_arc: Arc<Mutex<String>>,
     command_arc: Arc<Mutex<(String, bool)>>,
@@ -48,6 +51,7 @@ pub async fn state(
             })
             .collect::<Vec<EnumValue>>();
         let measured_state = State::new(&measured_vec, &Kind::Measured);
+        println!("HERE: {:?}", measured_state);
 
         *measured_arc.lock().unwrap() = serde_json::to_string(&measured_state).unwrap();
         delay_for(Duration::from_millis(10)).await;
@@ -75,7 +79,7 @@ pub async fn state(
             })
             .collect::<Vec<EnumValue>>();
 
-        let mut interval = interval(Duration::from_millis(10));
+        let mut interval = interval(Duration::from_millis(100));
         interval.tick().await;
         interval.tick().await;
     }

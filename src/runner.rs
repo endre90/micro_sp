@@ -3,6 +3,8 @@ use std::io;
 use std::sync::{Arc, Mutex};
 use tokio::time::{interval, Duration};
 
+/// The runner gets the current measured state, calls the planner when
+/// needed and sets the corresponding sink state from the plan as command.
 pub async fn runner(
     prob: PlanningProblem,
     ros_receivers: Vec<(String, tokio::sync::mpsc::Receiver<String>)>,

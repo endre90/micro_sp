@@ -67,13 +67,13 @@ pub fn model() -> PlanningProblem {
 
     let t5 = Transition::new(
         "start_activate",
-        &Predicate::AND(vec![deactivated.clone()]),
+        &Predicate::AND(vec![deactivated.clone(), deactivate.clone()]),
         &activate,
     );
 
     let t6 = Transition::new(
         "finish_activate",
-        &Predicate::AND(vec![activate.clone()]),
+        &Predicate::AND(vec![deactivated.clone(), activate.clone()]),
         &activated,
     );
 

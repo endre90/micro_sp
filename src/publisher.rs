@@ -3,6 +3,8 @@ use std::time::Duration;
 use tokio::prelude::*;
 use tokio::time::delay_for;
 
+/// Per command kind variable, a publisher is spawned that pushes the current 
+/// value of that variable to a ROS2 topic. 
 pub async fn publisher(
     publisher: Publisher<std_msgs::msg::String>,
     mut recv: tokio::sync::mpsc::Receiver<std::string::String>,

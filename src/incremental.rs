@@ -3,6 +3,7 @@ use std::time::Instant;
 use z3_sys::*;
 use z3_v2::*;
 
+/// A planning problem that is given to the incremental solver.
 #[derive(Debug, PartialEq, Clone, PartialOrd, Eq, Ord)]
 pub struct PlanningProblem {
     pub name: String,
@@ -12,6 +13,7 @@ pub struct PlanningProblem {
     pub max_steps: u32,
 }
 
+/// A frame holds states about what happens in a step.
 #[derive(PartialEq, Eq, Clone, Debug, PartialOrd, Ord)]
 pub struct PlanningFrame {
     pub source: CompleteState,
@@ -19,6 +21,7 @@ pub struct PlanningFrame {
     pub trans: String,
 }
 
+/// A result is generated when the planner finds a satisfiable model.
 #[derive(PartialEq, Eq, Clone, Debug, PartialOrd, Ord)]
 pub struct PlanningResult {
     pub plan_found: bool,
@@ -28,6 +31,7 @@ pub struct PlanningResult {
 }
 
 impl PlanningProblem {
+    /// Make a new planning problem from defined componenets.
     pub fn new(
         name: &str,
         init: &Predicate,
@@ -45,6 +49,8 @@ impl PlanningProblem {
     }
 }
 
+/// When some varibels are updated in a transition, the other variables
+/// from the problem should keep their values from the previous step.
 pub fn keep_variable_values(
     ctx: &ContextZ3,
     vars: &Vec<EnumVariable>,
@@ -82,6 +88,9 @@ pub fn keep_variable_values(
     )
 }
 
+/// The incremental algorithm that calls z3 to find a plan.
+/// 
+/// Based on Gocht and Balyo's algorithm from 2017.
 pub fn incremental(prob: &PlanningProblem) -> PlanningResult {
     let cfg = ConfigZ3::new();
     let ctx = ContextZ3::new(&cfg);

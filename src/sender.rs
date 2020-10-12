@@ -6,6 +6,8 @@ use tokio::time::Instant;
 use std::io;
 use super::*;
 
+/// Per command kind variable, a sender is spawned that updates the
+/// value of the variable.
 pub async fn sender(
     kvp: Arc<Mutex<(String, Instant)>>,
     mut send: tokio::sync::mpsc::Sender<std::string::String>,

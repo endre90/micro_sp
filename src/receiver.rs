@@ -5,6 +5,8 @@ use std::sync::Mutex;
 use tokio::time::Duration;
 use tokio::time::Instant;
 
+/// Per measured kind variable, a receiver is spawned that handles 
+/// live incomming data from its corresponding ROS2 topic.
 pub async fn receiver(
     kvp: Arc<Mutex<(String, Instant)>>,
     mut recv: tokio::sync::mpsc::Receiver<std::string::String>,

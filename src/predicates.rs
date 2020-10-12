@@ -2,6 +2,7 @@ use super::*;
 use z3_sys::*;
 use z3_v2::*;
 
+/// Only the most basic connectives to form predicates.
 #[derive(Debug, PartialEq, Clone, PartialOrd, Eq, Ord)]
 pub enum Predicate {
     TRUE,
@@ -12,6 +13,7 @@ pub enum Predicate {
     EQ(EnumValue)
 }
 
+/// Transforms a Predicate to an object that z3 can handle.
 pub fn predicate_to_ast(ctx: &ContextZ3, pred: &Predicate, step: &u32) -> Z3_ast {
     match pred {
         Predicate::TRUE => BoolZ3::new(&ctx, true),

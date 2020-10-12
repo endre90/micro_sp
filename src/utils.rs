@@ -18,6 +18,7 @@ where
     I: IntoIterator<Item = T>,
     T: PartialEq,
 {
+    /// Gets the intersection of two vectors.
     fn intersect(self, other: I) -> Vec<T> {
         let mut common = Vec::new();
         let mut v_other: Vec<_> = other.into_iter().collect();
@@ -32,6 +33,7 @@ where
         common
     }
 
+    /// Gets the diff of two vectors.
     fn difference(self, other: I) -> Vec<T> {
         let mut diff = Vec::new();
         let mut v_other: Vec<_> = other.into_iter().collect();
@@ -49,6 +51,7 @@ where
     }
 }
 
+/// Given a predicate, return a vector of variables that play a role in it.
 pub fn get_predicate_vars(pred: &Predicate) -> Vec<EnumVariable> {
     let mut s = Vec::new();
     match pred {
@@ -64,6 +67,7 @@ pub fn get_predicate_vars(pred: &Predicate) -> Vec<EnumVariable> {
     s
 }
 
+/// Given a planning problem, return a vector of all variables defined for that problem.
 pub fn get_problem_vars(prob: &PlanningProblem) -> Vec<EnumVariable> {
     let mut s = Vec::new();
     for t in &prob.trans {
@@ -77,6 +81,7 @@ pub fn get_problem_vars(prob: &PlanningProblem) -> Vec<EnumVariable> {
     s
 }
 
+/// After the incremental algorithm has found a model it is unrolled into a plan.
 pub fn get_planning_result(
     ctx: &ContextZ3,
     prob: &PlanningProblem,
@@ -172,6 +177,7 @@ pub fn get_planning_result(
     }
 }
 
+/// For a given source state in a plan, return a corresponding sink state.
 pub fn get_sink(result: &PlanningResult, source: &State) -> CompleteState {
     match source.kind == Kind::Measured {
         true => match result
@@ -186,6 +192,7 @@ pub fn get_sink(result: &PlanningResult, source: &State) -> CompleteState {
     }
 }
 
+/// Generate a predicate from a given state as a conjunction of values.
 pub fn state_to_predicate(state: &State) -> Predicate {
     Predicate::AND(
         state
@@ -207,6 +214,7 @@ pub fn state_to_predicate(state: &State) -> Predicate {
     )
 }
 
+/// When called, generate a new planning problem where the initial state is the current measured state.
 pub fn refresh_problem(prob: &PlanningProblem, current: &State) -> PlanningProblem {
     PlanningProblem {
         name: prob.name.to_owned(),
@@ -217,40 +225,7 @@ pub fn refresh_problem(prob: &PlanningProblem, current: &State) -> PlanningProbl
     }
 }
 
-pub fn values_in_domains(current: &State) -> bool {
-    current.vec.iter().any(|x| x.var.domain.contains(&x.val))
-}
-
-#[test]
-fn test_values_in_domains() {
-    let s = State::new(
-        &vec![
-            EnumValue::new(
-                &EnumVariable::new(
-                    "banana",
-                    &vec!["green", "ripe", "spoiled"],
-                    None,
-                    &Kind::Measured,
-                ),
-                "green",
-                Some(&Duration::from_millis(3000)),
-            ),
-            EnumValue::new(
-                &EnumVariable::new(
-                    "peach",
-                    &vec!["green", "ripe", "spoiled"],
-                    None,
-                    &Kind::Measured,
-                ),
-                "grfeen",
-                Some(&Duration::from_millis(3000)),
-            ),
-        ],
-        &Kind::Measured,
-    );
-    assert_eq!(values_in_domains(&s), true);
-}
-
+/// Pretty print a planning result.
 pub fn pprint_result(result: &PlanningResult) -> () {
     println!("======================================================");
     println!("                   PLANNING RESULT                    ");
