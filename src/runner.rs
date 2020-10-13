@@ -21,8 +21,6 @@ pub async fn runner(
         let _res = tokio::try_join!(state);
     });
     
-    let mut i: u32 = 1;
-    // let mut fresh = false;
     let mut sink = State::new(&vec!(), &Kind::Command);
     let mut result = PlanningResult {
         plan_found: false,
@@ -54,7 +52,7 @@ pub async fn runner(
             sink = State::new(&vec!(), &Kind::Command);
         }
 
-        println!("{:?} :: {:?}", sink, fresh);
+        println!("SINK {:?} :: {:?}", sink, fresh);
 
         *command_arc_clone.lock().unwrap() = (serde_json::to_string(&sink).unwrap(), fresh);
 

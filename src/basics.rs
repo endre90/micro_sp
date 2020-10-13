@@ -60,7 +60,14 @@ impl EnumVariable {
         EnumVariable {
             name: name.to_owned(),
             r#type: name.to_owned(),
-            domain: domain
+            domain: 
+            // {
+            //     let mut domain2 = domain.clone();
+            //     domain2.push("dummy");
+            //     let domain3 = domain2.iter().map(|x| { println!("{}", x); x.to_string()}).collect();
+            //     domain3
+            // },
+            domain
                     .iter()
                     .map(|x| x.to_string())
                     .collect::<Vec<String>>(),
