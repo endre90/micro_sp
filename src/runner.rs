@@ -53,7 +53,7 @@ pub async fn runner(
 
         if fresh {
             if sink == State::new(&vec![], &Kind::Command) {
-                result = incremental(&refresh_problem(&prob, &current_measured_state));
+                result = incremental(&refresh_problem_raar(&prob, &current_measured_state));
                 pprint_result(&result);
             }
             sink = get_sink(&result, &current_measured_state).command;

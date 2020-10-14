@@ -1,7 +1,7 @@
 use lib::*;
 
 #[test]
-pub fn test_incremental_1() {
+pub fn test_raar_incremental_1() {
 
     let stat_domain = vec!["idle", "active", "unknown", "dummy_value"];
     let pos_domain = vec!["left", "right", "unknown", "dummy_value"];
@@ -142,7 +142,7 @@ pub fn test_incremental_1() {
         &Predicate::AND(vec![act_active.clone(), act_right.clone(), ref_active.clone(), ref_right.clone()]),
         &vec![t1, t2, t3, t4, t5, t6, t7, t8],
         &12,
-        &Cat::Raar
+        &Paradigm::Raar
     );
 
     let result = incremental(&problem);

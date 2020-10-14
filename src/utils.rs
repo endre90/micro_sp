@@ -65,7 +65,7 @@ pub fn get_predicate_vars(pred: &Predicate) -> Vec<EnumVariable> {
         Predicate::EQRR(x, y) => {
             s.push(x.clone());
             s.push(y.clone());
-        },
+        }
     }
     s.sort();
     s.dedup();
@@ -184,47 +184,24 @@ pub fn get_planning_result(
         false => PlanningResult {
             plan_found: plan_found,
             plan_length: 0,
-            trace: vec!(),
+            trace: vec![],
             time_to_solve: planning_time,
         },
     }
-    
 }
 
 /// For a given source state in a plan, return a corresponding sink state.
 pub fn get_sink(result: &PlanningResult, source: &State) -> CompleteState {
     match source.kind == Kind::Measured {
-        true => match result
-            .trace
-            .iter()
-            .find(|x| sorted(x.source.measured.vec.clone()).collect::<Vec<EnumValue>>() == source.vec.clone())
-        {
+        true => match result.trace.iter().find(|x| {
+            sorted(x.source.measured.vec.clone()).collect::<Vec<EnumValue>>() == source.vec.clone()
+        }) {
             Some(x) => x.sink.to_owned(),
             None => CompleteState::empty(),
         },
         false => panic!("asdf"),
     }
 }
-
-// /// For a given source state in a plan, return a corresponding sink state.
-// pub fn get_sink(result: &PlanningResult, source: &CompleteState) -> CompleteState {
-//     let candidates: Vec<PlanningFrame> = result
-//         .trace
-//         .iter()
-//         .filter(|x| {
-//             println!("source {:?} \n frame {:?}", source, x);
-//             x.source.measured.vec == source.measured.vec.clone()
-//                 && x.source.command.vec == source.command.vec.clone()
-//                 && x.source.estimated.vec == source.estimated.vec.clone()
-//         })
-//         .map(|x| x.to_owned())
-//         .collect();
-//     match candidates.len() {
-//         0 => panic!("no sink"),
-//         1 => candidates[0].sink.clone(),
-//         _ => panic!("nondeterminism?"),
-//     }
-// }
 
 /// Generate a predicate from a given state as a conjunction of values.
 pub fn state_to_predicate(state: &State) -> Predicate {
@@ -249,6 +226,23 @@ pub fn state_to_predicate(state: &State) -> Predicate {
     )
 }
 
+/// Refence variables should take actual values when problem is refreshed (this could solve the raar/invar debate)
+pub fn measured_to_command(state: &State, prob: &PlanningProblem) -> State {
+    let cmd_vars: Vec<EnumVariable> = get_problem_vars(&prob)
+        .iter()
+        .filter(|x| x.kind == Kind::Command)
+        .map(|x| x.to_owned())
+        .collect();
+    let mut mapped = vec![];
+    for mv in &state.vec {
+        let _q = cmd_vars
+            .iter()
+            .filter(|x| x.r#type == mv.var.r#type)
+            .map(|y| mapped.push(EnumValue::new(&y, &mv.val, None)));
+    }
+    State::new(&mapped, &Kind::Command)
+}
+
 /// Generate a predicate from a complete state as a conjunction of values.
 pub fn complete_state_to_predicate(state: &CompleteState) -> Predicate {
     Predicate::AND(vec![
@@ -266,7 +260,23 @@ pub fn refresh_problem(prob: &PlanningProblem, current: &State) -> PlanningProbl
         goal: prob.goal.to_owned(),
         trans: prob.trans.to_owned(),
         max_steps: prob.max_steps,
-        cat: prob.cat.to_owned()
+        cat: prob.cat.to_owned(),
+    }
+}
+
+/// When called, generate a new planning problem where the initial state is the current measured state.
+/// When Cat::Raar, the reference variables should take values from their actual counterparts when problem is refreshing (actually, maybe always, not only when Cat::Raar?).
+pub fn refresh_problem_raar(prob: &PlanningProblem, current: &State) -> PlanningProblem {
+    PlanningProblem {
+        name: prob.name.to_owned(),
+        init: Predicate::AND(vec![
+            state_to_predicate(&current),
+            state_to_predicate(&measured_to_command(&current, &prob)),
+        ]),
+        goal: prob.goal.to_owned(),
+        trans: prob.trans.to_owned(),
+        max_steps: prob.max_steps,
+        cat: prob.cat.to_owned(),
     }
 }
 
