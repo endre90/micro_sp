@@ -28,6 +28,13 @@ impl Parameter {
     }
 }
 
+/// Control Architecture Type, experimantal...
+#[derive(Debug, PartialEq, Clone, PartialOrd, Eq, Ord, Serialize, Deserialize)]
+pub enum Cat {
+    Raar,
+    Invar
+}
+
 /// Variables, transitions and states can be of Measured (input), Command (output) and
 /// Estimated (internal) kind.
 #[derive(Debug, PartialEq, Clone, PartialOrd, Eq, Ord, Serialize, Deserialize)]
@@ -54,12 +61,13 @@ impl EnumVariable {
     pub fn new(
         name: &str,
         domain: &Vec<&str>,
+        r#type: &str,
         param: Option<&Parameter>,
         kind: &Kind,
     ) -> EnumVariable {
         EnumVariable {
             name: name.to_owned(),
-            r#type: name.to_owned(),
+            r#type: r#type.to_owned(),
             domain: 
             // {
             //     let mut domain2 = domain.clone();

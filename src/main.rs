@@ -20,7 +20,7 @@ async fn main() -> io::Result<()> {
     let mut node = Node::create(ros_ctx, "micro_sp", "")
         .expect("Error 8fddc8c1-7cce-4cd7-97e0-c16438ac3a28: Creating ros node failed.");
 
-    let problem = model::model();
+    let problem = model::raar_model();
     let vars = get_problem_vars(&problem);
 
     let msr_var_vals: Vec<EnumValue> = vars

@@ -11,6 +11,7 @@ pub struct PlanningProblem {
     pub goal: Predicate,
     pub trans: Vec<Transition>,
     pub max_steps: u32,
+    pub cat: Cat
 }
 
 /// A frame holds states about what happens in a step.
@@ -38,6 +39,7 @@ impl PlanningProblem {
         goal: &Predicate,
         trans: &Vec<Transition>,
         max_steps: &u32,
+        cat: &Cat
     ) -> PlanningProblem {
         PlanningProblem {
             name: name.to_string(),
@@ -45,6 +47,7 @@ impl PlanningProblem {
             goal: goal.to_owned(),
             trans: trans.to_owned(),
             max_steps: max_steps.to_owned(),
+            cat: cat.to_owned()
         }
     }
 }

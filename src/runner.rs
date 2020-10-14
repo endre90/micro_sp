@@ -11,17 +11,27 @@ pub async fn runner(
     ros_senders: Vec<(String, tokio::sync::mpsc::Sender<String>)>,
     state_sender: (String, tokio::sync::mpsc::Sender<String>),
 ) -> io::Result<()> {
-    
-    let measured_arc = Arc::new(Mutex::new(serde_json::to_string(&State::new(&vec!(), &Kind::Measured)).unwrap()));
-    let command_arc = Arc::new(Mutex::new((serde_json::to_string(&State::new(&vec!(), &Kind::Command)).unwrap(), false)));
+    let measured_arc = Arc::new(Mutex::new(
+        serde_json::to_string(&State::new(&vec![], &Kind::Measured)).unwrap(),
+    ));
+    let command_arc = Arc::new(Mutex::new((
+        serde_json::to_string(&State::new(&vec![], &Kind::Command)).unwrap(),
+        false,
+    )));
     let measured_arc_clone = measured_arc.clone();
     let command_arc_clone = command_arc.clone();
     tokio::task::spawn(async {
-        let state = state::state(measured_arc, command_arc, ros_receivers, ros_senders, state_sender);
+        let state = state::state(
+            measured_arc,
+            command_arc,
+            ros_receivers,
+            ros_senders,
+            state_sender,
+        );
         let _res = tokio::try_join!(state);
     });
-    
-    let mut sink = State::new(&vec!(), &Kind::Command);
+
+    let mut sink = State::new(&vec![], &Kind::Command);
     let mut result = PlanningResult {
         plan_found: false,
         plan_length: 0,
@@ -30,7 +40,6 @@ pub async fn runner(
     };
 
     loop {
-
         let measured_arc_clone_clone = measured_arc_clone.lock().unwrap().clone();
         let current_measured_state: State = serde_json::from_str(&measured_arc_clone_clone).unwrap();
 
@@ -39,17 +48,17 @@ pub async fn runner(
                 .vec
                 .iter()
                 .all(|x| x.lifetime < Duration::from_millis(5000)),
-            false => false
+            false => false,
         };
 
         if fresh {
-            if sink == State::new(&vec!(), &Kind::Command) {
+            if sink == State::new(&vec![], &Kind::Command) {
                 result = incremental(&refresh_problem(&prob, &current_measured_state));
                 pprint_result(&result);
             }
             sink = get_sink(&result, &current_measured_state).command;
         } else {
-            sink = State::new(&vec!(), &Kind::Command);
+            sink = State::new(&vec![], &Kind::Command);
         }
 
         println!("SINK {:?} :: {:?}", sink, fresh);

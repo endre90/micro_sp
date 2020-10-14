@@ -62,6 +62,7 @@ pub async fn state(
             })
             .collect::<Vec<EnumValue>>();
         let measured_state = State::new(&measured_vec, &Kind::Measured);
+        // let measured_state = CompleteState::from_vec(&measured_vec);
 
         *measured_arc.lock().unwrap() = serde_json::to_string(&measured_state)?;
         delay_for(Duration::from_millis(10)).await;
@@ -71,6 +72,9 @@ pub async fn state(
 
         *state_amkvp_clone.lock().unwrap() = (
             serde_json::to_string(&CompleteState::from_states(
+                // &measured_state.measured,
+                // &sink,
+                // &measured_state.estimated,
                 &measured_state,
                 &sink,
                 &State::new(&vec![], &Kind::Estimated),

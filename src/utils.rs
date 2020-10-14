@@ -61,6 +61,11 @@ pub fn get_predicate_vars(pred: &Predicate) -> Vec<EnumVariable> {
         Predicate::OR(x) => s.extend(x.iter().flat_map(|p| get_predicate_vars(p))),
         Predicate::NOT(x) => s.extend(get_predicate_vars(x)),
         Predicate::EQ(x) => s.push(x.var.clone()),
+        Predicate::HOLD(x) => s.push(x.clone()),
+        Predicate::EQRR(x, y) => {
+            s.push(x.clone());
+            s.push(y.clone());
+        },
     }
     s.sort();
     s.dedup();
@@ -169,12 +174,21 @@ pub fn get_planning_result(
             ),
         });
     }
-    PlanningResult {
-        plan_found: plan_found,
-        plan_length: nr_steps - 1,
-        trace: trace,
-        time_to_solve: planning_time,
+    match plan_found {
+        true => PlanningResult {
+            plan_found: plan_found,
+            plan_length: nr_steps - 1,
+            trace: trace,
+            time_to_solve: planning_time,
+        },
+        false => PlanningResult {
+            plan_found: plan_found,
+            plan_length: 0,
+            trace: vec!(),
+            time_to_solve: planning_time,
+        },
     }
+    
 }
 
 /// For a given source state in a plan, return a corresponding sink state.
@@ -183,7 +197,7 @@ pub fn get_sink(result: &PlanningResult, source: &State) -> CompleteState {
         true => match result
             .trace
             .iter()
-            .find(|x| x.source.measured.vec == source.vec.clone())
+            .find(|x| sorted(x.source.measured.vec.clone()).collect::<Vec<EnumValue>>() == source.vec.clone())
         {
             Some(x) => x.sink.to_owned(),
             None => CompleteState::empty(),
@@ -191,6 +205,26 @@ pub fn get_sink(result: &PlanningResult, source: &State) -> CompleteState {
         false => panic!("asdf"),
     }
 }
+
+// /// For a given source state in a plan, return a corresponding sink state.
+// pub fn get_sink(result: &PlanningResult, source: &CompleteState) -> CompleteState {
+//     let candidates: Vec<PlanningFrame> = result
+//         .trace
+//         .iter()
+//         .filter(|x| {
+//             println!("source {:?} \n frame {:?}", source, x);
+//             x.source.measured.vec == source.measured.vec.clone()
+//                 && x.source.command.vec == source.command.vec.clone()
+//                 && x.source.estimated.vec == source.estimated.vec.clone()
+//         })
+//         .map(|x| x.to_owned())
+//         .collect();
+//     match candidates.len() {
+//         0 => panic!("no sink"),
+//         1 => candidates[0].sink.clone(),
+//         _ => panic!("nondeterminism?"),
+//     }
+// }
 
 /// Generate a predicate from a given state as a conjunction of values.
 pub fn state_to_predicate(state: &State) -> Predicate {
@@ -203,6 +237,7 @@ pub fn state_to_predicate(state: &State) -> Predicate {
                     &EnumVariable::new(
                         &x.var.name,
                         &x.var.domain.iter().map(|x| x.as_str()).collect(),
+                        &x.var.r#type,
                         Some(&x.var.param),
                         &x.var.kind,
                     ),
@@ -214,6 +249,15 @@ pub fn state_to_predicate(state: &State) -> Predicate {
     )
 }
 
+/// Generate a predicate from a complete state as a conjunction of values.
+pub fn complete_state_to_predicate(state: &CompleteState) -> Predicate {
+    Predicate::AND(vec![
+        state_to_predicate(&state.measured),
+        state_to_predicate(&state.command),
+        state_to_predicate(&state.estimated),
+    ])
+}
+
 /// When called, generate a new planning problem where the initial state is the current measured state.
 pub fn refresh_problem(prob: &PlanningProblem, current: &State) -> PlanningProblem {
     PlanningProblem {
@@ -222,6 +266,7 @@ pub fn refresh_problem(prob: &PlanningProblem, current: &State) -> PlanningProbl
         goal: prob.goal.to_owned(),
         trans: prob.trans.to_owned(),
         max_steps: prob.max_steps,
+        cat: prob.cat.to_owned()
     }
 }
 
