@@ -28,9 +28,9 @@ impl Parameter {
     }
 }
 
-/// Control Architecture Type, experimantal...
+/// Control and Modelling paradigm. More about this later, might end up with only one.
 #[derive(Debug, PartialEq, Clone, PartialOrd, Eq, Ord, Serialize, Deserialize)]
-pub enum Cat {
+pub enum Paradigm {
     Raar,
     Invar
 }

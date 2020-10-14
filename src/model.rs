@@ -232,10 +232,6 @@ pub fn raar_model() -> PlanningProblem {
     let act_ref_active = Predicate::EQ(EnumValue::new(&act_ref_stat, "active", None));
     let not_act_ref_active = Predicate::NOT(Box::new(act_ref_active.clone()));
 
-    let hold_stat = Predicate::HOLD(ref_stat.clone());
-    let hold_pos = Predicate::HOLD(ref_pos.clone());
-    // include stuff like hold pos and hold stat automatically
-
     let t1 = Transition::new(
         "start_activate",
         &Predicate::AND(vec![not_act_active.clone(), not_act_ref_active.clone()]),
@@ -290,7 +286,7 @@ pub fn raar_model() -> PlanningProblem {
         &Predicate::AND(vec![act_active.clone(), ref_active.clone(), act_right.clone(), ref_right.clone()]),
         &vec![t1, t2, t3, t4, t5, t6, t7, t8],
         &12,
-        &Cat::Raar
+        &Paradigm::Raar
     );
     
     problem

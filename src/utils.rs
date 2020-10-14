@@ -260,7 +260,7 @@ pub fn refresh_problem(prob: &PlanningProblem, current: &State) -> PlanningProbl
         goal: prob.goal.to_owned(),
         trans: prob.trans.to_owned(),
         max_steps: prob.max_steps,
-        cat: prob.cat.to_owned(),
+        paradigm: prob.paradigm.to_owned(),
     }
 }
 
@@ -276,7 +276,7 @@ pub fn refresh_problem_raar(prob: &PlanningProblem, current: &State) -> Planning
         goal: prob.goal.to_owned(),
         trans: prob.trans.to_owned(),
         max_steps: prob.max_steps,
-        cat: prob.cat.to_owned(),
+        paradigm: prob.paradigm.to_owned(),
     }
 }
 
