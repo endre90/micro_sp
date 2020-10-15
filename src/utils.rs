@@ -102,6 +102,12 @@ pub fn get_planning_result(
         .collect();
     let vars = get_problem_vars(&prob);
 
+    println!("MODEL:");
+    for m in &model_vec {
+        println!("{:?}", m);
+    }
+    
+
     let mut trace: Vec<PlanningFrame> = vec![];
     for i in 0..nr_steps - 1 {
         let enum_vals_source: Vec<EnumValue> = model_vec
@@ -226,7 +232,7 @@ pub fn state_to_predicate(state: &State) -> Predicate {
     )
 }
 
-/// Refence variables should take actual values when problem is refreshed (this could solve the raar/invar debate)
+/// Refence variables should take actual values when problem is refreshed
 pub fn measured_to_command(state: &State, prob: &PlanningProblem) -> State {
     let cmd_vars: Vec<EnumVariable> = get_problem_vars(&prob)
         .iter()
@@ -253,30 +259,29 @@ pub fn complete_state_to_predicate(state: &CompleteState) -> Predicate {
 }
 
 /// When called, generate a new planning problem where the initial state is the current measured state.
+/// When Paradigm::Raar, the reference variables should take values from their actual counterparts when
+/// problem is refreshing (actually, maybe always, not only when Paradigm::Raar?. test).
 pub fn refresh_problem(prob: &PlanningProblem, current: &State) -> PlanningProblem {
-    PlanningProblem {
-        name: prob.name.to_owned(),
-        init: state_to_predicate(&current),
-        goal: prob.goal.to_owned(),
-        trans: prob.trans.to_owned(),
-        max_steps: prob.max_steps,
-        paradigm: prob.paradigm.to_owned(),
-    }
-}
-
-/// When called, generate a new planning problem where the initial state is the current measured state.
-/// When Cat::Raar, the reference variables should take values from their actual counterparts when problem is refreshing (actually, maybe always, not only when Cat::Raar?).
-pub fn refresh_problem_raar(prob: &PlanningProblem, current: &State) -> PlanningProblem {
-    PlanningProblem {
-        name: prob.name.to_owned(),
-        init: Predicate::AND(vec![
-            state_to_predicate(&current),
-            state_to_predicate(&measured_to_command(&current, &prob)),
-        ]),
-        goal: prob.goal.to_owned(),
-        trans: prob.trans.to_owned(),
-        max_steps: prob.max_steps,
-        paradigm: prob.paradigm.to_owned(),
+    match prob.paradigm {
+        Paradigm::Raar => PlanningProblem {
+            name: prob.name.to_owned(),
+            init: Predicate::AND(vec![
+                state_to_predicate(&current),
+                state_to_predicate(&measured_to_command(&current, &prob)),
+            ]),
+            goal: prob.goal.to_owned(),
+            trans: prob.trans.to_owned(),
+            max_steps: prob.max_steps,
+            paradigm: prob.paradigm.to_owned(),
+        },
+        Paradigm::Invar => PlanningProblem {
+            name: prob.name.to_owned(),
+            init: state_to_predicate(&current),
+            goal: prob.goal.to_owned(),
+            trans: prob.trans.to_owned(),
+            max_steps: prob.max_steps,
+            paradigm: prob.paradigm.to_owned(),
+        },
     }
 }
 
