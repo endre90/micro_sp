@@ -109,12 +109,16 @@ pub fn handle_args(args: &Vec<String>) -> Args {
         _ => panic!("too many arguments"),
     }
 
-    let problem = match problem_name.as_str() {
-        "initial" => models::initial::raar_model(),
-        "blocks_4_a" => models::blocksworld::instances::instance4::instance_4_a(),
-        "blocks_4_b" => models::blocksworld::instances::instance4::instance_4_b(),
-        _ => panic!("unknown model"),
-    };
+    // yeah, parser exists now only for blocksworld...
+    let problem = blocksworld::parser::parser(problem_name.as_str());
+    // let problem = match problem_name.as_str() {
+    //     "initial" => models::initial::raar_model(),
+    //     "blocks_4_a" => models::blocksworld::instances::instance4::instance_4_a(),
+    //     "blocks_4_b" => models::blocksworld::instances::instance4::instance_4_b(),
+    //     "blocks_4_c" => models::blocksworld::instances::instance4::instance_4_c(),
+    //     "blocks_5_a" => models::blocksworld::instances::instance5::instance_5_a(),
+    //     _ => panic!("unknown model"),
+    // };
 
     Args {
         plan_only: plan_only,

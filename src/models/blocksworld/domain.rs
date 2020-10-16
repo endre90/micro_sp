@@ -366,7 +366,7 @@ pub fn blocksworld_model(blocks: &Vec<&str>) -> (Vec<Transition>, Predicate) {
     // 2. [x] if holding any block, the gripper can't be empty
     // 3. [x] at most one block can be held
     // 4. [x] a block can't simultaneously be on several different blocks
-    // 5. [ ] if block is on table, it is not on a block
+    // 5. [x] if block is on table, it is not on a block
     let mut invariants = vec![];
     let mut holding = vec![];
     for b1 in blocks {

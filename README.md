@@ -34,10 +34,12 @@
 30. [ ] flow graph to readme
 
 ### low priority
-1. [ ] nondeterminism
-2. [ ] multiple goals
-3. [ ] dummy in var domain default or eliminate
-4. [ ] dockerize
-5. [ ] maybe some quality of life for modeling
-6. [ ] generate both raar and invar paradigms from a hl model?
-7. [ ] explore all paths and generate graph
+1. [ ] improve Qol
+2. [ ] nondeterminism
+3. [ ] multiple goals
+4. [ ] dummy in var domain default or eliminate
+5. [ ] dockerize
+6. [ ] maybe some quality of life for modeling
+7. [ ] generate both raar and invar paradigms from a hl model?
+8. [ ] explore all paths and generate graph
+9. [ ] maybe move models and instances to separate crate
