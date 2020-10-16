@@ -10,6 +10,7 @@ pub struct PlanningProblem {
     pub init: Predicate,
     pub goal: Predicate,
     pub trans: Vec<Transition>,
+    pub invar: Predicate,
     pub max_steps: u32,
     pub paradigm: Paradigm
 }
@@ -38,6 +39,7 @@ impl PlanningProblem {
         init: &Predicate,
         goal: &Predicate,
         trans: &Vec<Transition>,
+        invar: &Predicate,
         max_steps: &u32,
         paradigm: &Paradigm
     ) -> PlanningProblem {
@@ -46,6 +48,7 @@ impl PlanningProblem {
             init: init.to_owned(),
             goal: goal.to_owned(),
             trans: trans.to_owned(),
+            invar: invar.to_owned(),
             max_steps: max_steps.to_owned(),
             paradigm: paradigm.to_owned()
         }
@@ -100,9 +103,11 @@ pub fn incremental(prob: &PlanningProblem) -> PlanningResult {
     let slv = SolverZ3::new(&ctx);
 
     SlvAssertZ3::new(&ctx, &slv, predicate_to_ast(&ctx, &prob.init, &0));
+    SlvAssertZ3::new(&ctx, &slv, predicate_to_ast(&ctx, &prob.invar, &0));
 
     SlvPushZ3::new(&ctx, &slv); // create backtracking point
     SlvAssertZ3::new(&ctx, &slv, predicate_to_ast(&ctx, &prob.goal, &0));
+    
 
     let now = Instant::now();
     let mut plan_found: bool = false;
@@ -148,8 +153,17 @@ pub fn incremental(prob: &PlanningProblem) -> PlanningResult {
                     ),
                 );
 
+                SlvAssertZ3::new(&ctx, &slv, predicate_to_ast(&ctx, &prob.invar, &step));
                 SlvPushZ3::new(&ctx, &slv);
                 SlvAssertZ3::new(&ctx, &slv, predicate_to_ast(&ctx, &prob.goal, &step));
+                
+
+                // let asserts = SlvGetAssertsZ3::new(&ctx, &slv);
+                // let asrtvec = Z3AstVectorToVectorAstZ3::new(&ctx, asserts);
+                // for asrt in asrtvec {
+                //     println!("{}", AstToStringZ3::new(&ctx, asrt));
+                // }
+
             }
             true => {
                 plan_found = true;
@@ -159,6 +173,8 @@ pub fn incremental(prob: &PlanningProblem) -> PlanningResult {
     }
 
     let planning_time = now.elapsed();
+
+  
 
     match plan_found {
         true => get_planning_result(

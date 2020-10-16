@@ -11,6 +11,7 @@ pub enum Predicate {
     AND(Vec<Predicate>),
     OR(Vec<Predicate>),
     EQ(EnumValue),
+    PBEQ(Vec<Predicate>, i32), // exactly n true predicates in a step
     HOLD(EnumVariable), // hold value in next step
     EQRR(EnumVariable, EnumVariable), // eq in current step
     // EQPS(EnumVariable, EnumVariable)  // 
@@ -30,6 +31,7 @@ pub fn predicate_to_ast(ctx: &ContextZ3, pred: &Predicate, step: &u32) -> Z3_ast
             let index = x.var.domain.iter().position(|r| r == &x.val).unwrap_or_default();
             EQZ3::new(&ctx, EnumVarZ3::new(&ctx, sort.r, format!("{}_s{}", x.var.name.to_string(), step).as_str()), elems[index])
         },
+        Predicate::PBEQ(x, k) => PBEQZ3::new(&ctx, x.iter().map(|z| predicate_to_ast(&ctx, z, step)).collect(), *k),
         Predicate::HOLD(x) => {
             let sort = EnumSortZ3::new(&ctx, &x.r#type, x.domain.iter().map(|x| x.as_str()).collect());
             let v_1 = EnumVarZ3::new(&ctx, sort.r, format!("{}_s{}", x.name.to_string(), step).as_str());

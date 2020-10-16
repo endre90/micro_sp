@@ -51,6 +51,37 @@ where
     }
 }
 
+pub struct Args {
+    pub plan_only: bool,
+    pub problem: String
+}
+
+/// Handle arguments
+pub fn handle_args(args: &Vec<String>) -> Args {
+    let mut mut_args = args.to_owned();
+    mut_args.drain(0..1);
+    match mut_args.len() {
+        0 => panic!("problem argument not provided"),
+        1 => Args {
+            plan_only: false,
+            problem: mut_args.drain(0..1).collect::<Vec<String>>()[0].parse::<String>().unwrap_or_default()
+        },
+        2 => {
+            let plan_only_arg = mut_args.drain(0..1).collect::<Vec<String>>()[0].parse::<String>().unwrap_or_default();
+            let plan_only: bool = match plan_only_arg.as_str() {
+                "" => false,
+                "plan-only" => true,
+                _ => false
+            };
+            Args {
+                plan_only: plan_only,
+                problem: mut_args.drain(0..1).collect::<Vec<String>>()[0].parse::<String>().unwrap_or_default()
+            }
+        }
+        _ => panic!("too many arguments"),
+    }
+}
+
 /// Given a predicate, return a vector of variables that play a role in it.
 pub fn get_predicate_vars(pred: &Predicate) -> Vec<EnumVariable> {
     let mut s = Vec::new();
@@ -62,6 +93,7 @@ pub fn get_predicate_vars(pred: &Predicate) -> Vec<EnumVariable> {
         Predicate::NOT(x) => s.extend(get_predicate_vars(x)),
         Predicate::EQ(x) => s.push(x.var.clone()),
         Predicate::HOLD(x) => s.push(x.clone()),
+        Predicate::PBEQ(x, _) => s.extend(x.iter().flat_map(|p| get_predicate_vars(p))),
         Predicate::EQRR(x, y) => {
             s.push(x.clone());
             s.push(y.clone());
@@ -271,6 +303,7 @@ pub fn refresh_problem(prob: &PlanningProblem, current: &State) -> PlanningProbl
             ]),
             goal: prob.goal.to_owned(),
             trans: prob.trans.to_owned(),
+            invar: prob.invar.to_owned(),
             max_steps: prob.max_steps,
             paradigm: prob.paradigm.to_owned(),
         },
@@ -279,6 +312,7 @@ pub fn refresh_problem(prob: &PlanningProblem, current: &State) -> PlanningProbl
             init: state_to_predicate(&current),
             goal: prob.goal.to_owned(),
             trans: prob.trans.to_owned(),
+            invar: prob.invar.to_owned(),
             max_steps: prob.max_steps,
             paradigm: prob.paradigm.to_owned(),
         },
@@ -372,6 +406,24 @@ pub fn pprint_result(result: &PlanningResult) -> () {
             .collect::<Vec<String>>()
         );
         println!("======================================================");
+    }
+    println!("                    END OF RESULT                     ");
+    println!("======================================================");
+}
+
+/// Pretty print a planning result.
+pub fn pprint_result_trans_only(result: &PlanningResult) -> () {
+    println!("======================================================");
+    println!("                   PLANNING RESULT                    ");
+    println!("======================================================");
+    println!("plan_found: {:?}", result.plan_found);
+    println!("plan_lenght: {:?}", result.plan_length);
+    println!("time_to_solve: {:?}", result.time_to_solve);
+    println!("======================================================");
+    for t in 0..result.trace.len() {
+        println!("frame: {:?}", t);
+        println!("trans: {:?}", result.trace[t].trans);
+        println!("------------------------------------------------------");
     }
     println!("                    END OF RESULT                     ");
     println!("======================================================");

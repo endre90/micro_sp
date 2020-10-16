@@ -139,6 +139,7 @@ pub fn test_raar_incremental_1() {
             ref_right.clone(),
         ]),
         &vec![t1, t2, t3, t4, t5, t6, t7, t8],
+        &Predicate::TRUE,
         &12,
         &Paradigm::Raar,
     );
@@ -148,11 +149,471 @@ pub fn test_raar_incremental_1() {
 
 #[test]
 pub fn blocks_model_test() {
-    let domain = vec!["true", "false"];
+    let tf_domain = vec!["true", "false"];
+    let on_domain = vec!["GRIPPER", "TABLE", "A", "B"]; //, "C", "D", "E", "F", "G", "H", "I", "J"];
+    let holding_domain = vec!["EMPTY", "A", "B"]; //, "C", "D", "E", "F", "G", "H", "I", "J"];
+    let holding = "holding";
+    let position = "position";
     let boolean = "boolean";
-    let hand = EnumVariable::new("hand", &domain, boolean, None, &Kind::Command);
-    let hand_empty = Predicate::EQ(EnumValue::new(&hand, "true", None));
-    let hand_full = Predicate::EQ(EnumValue::new(&hand, "false", None));
+
+    let blocks = vec!["A", "B"]; //, "C", "D", "E", "F", "G", "H", "I", "J"];
+    let mut pick_up_transitions = vec![];
+    let mut put_down_transitions = vec![];
+    let mut stack_transitions = vec![];
+    let mut unstack_transitions = vec![];
+
+    for block in &blocks {
+        pick_up_transitions.push(Transition::new(
+            &format!("pick_up_{}", block),
+            &Predicate::AND(vec![
+                Predicate::EQ(EnumValue::new(
+                    &EnumVariable::new(
+                        &format!("clear_{}", block),
+                        &tf_domain,
+                        boolean,
+                        None,
+                        &Kind::Command,
+                    ),
+                    "true",
+                    None,
+                )),
+                Predicate::EQ(EnumValue::new(
+                    &EnumVariable::new(
+                        &format!("{}_on", block),
+                        &on_domain,
+                        position,
+                        None,
+                        &Kind::Command,
+                    ),
+                    "TABLE",
+                    None,
+                )),
+                Predicate::EQ(EnumValue::new(
+                    &EnumVariable::new(
+                        &format!("holding"),
+                        &holding_domain,
+                        holding,
+                        None,
+                        &Kind::Command,
+                    ),
+                    "EMPTY",
+                    None,
+                )),
+            ]),
+            &Predicate::AND(vec![
+                Predicate::NOT(Box::new(Predicate::EQ(EnumValue::new(
+                    &EnumVariable::new(
+                        &format!("{}_on", block),
+                        &on_domain,
+                        position,
+                        None,
+                        &Kind::Command,
+                    ),
+                    "TABLE",
+                    None,
+                )))),
+                Predicate::NOT(Box::new(Predicate::EQ(EnumValue::new(
+                    &EnumVariable::new(
+                        &format!("clear_{}", block),
+                        &tf_domain,
+                        boolean,
+                        None,
+                        &Kind::Command,
+                    ),
+                    "false",
+                    None,
+                )))),
+                Predicate::EQ(EnumValue::new(
+                    &EnumVariable::new(
+                        &format!("holding"),
+                        &holding_domain,
+                        holding,
+                        None,
+                        &Kind::Command,
+                    ),
+                    block,
+                    None,
+                )),
+            ]),
+        ))
+    }
+
+    for block in &blocks {
+        if block != &"TABLE" {
+            put_down_transitions.push(Transition::new(
+                &format!("put_down_{}", block),
+                &Predicate::EQ(EnumValue::new(
+                    &EnumVariable::new(
+                        &format!("holding"),
+                        &holding_domain,
+                        holding,
+                        None,
+                        &Kind::Command,
+                    ),
+                    block,
+                    None,
+                )),
+                &Predicate::AND(vec![
+                    Predicate::EQ(EnumValue::new(
+                        &EnumVariable::new(
+                            &format!("holding"),
+                            &holding_domain,
+                            holding,
+                            None,
+                            &Kind::Command,
+                        ),
+                        "EMPTY",
+                        None,
+                    )),
+                    Predicate::EQ(EnumValue::new(
+                        &EnumVariable::new(
+                            &format!("clear_{}", block),
+                            &tf_domain,
+                            boolean,
+                            None,
+                            &Kind::Command,
+                        ),
+                        "true",
+                        None,
+                    )),
+                    Predicate::EQ(EnumValue::new(
+                        &EnumVariable::new(
+                            &format!("{}_on", block),
+                            &on_domain,
+                            position,
+                            None,
+                            &Kind::Command,
+                        ),
+                        "TABLE",
+                        None,
+                    )),
+                ]),
+            ))
+        }
+    }
+
+    for b1 in &blocks {
+        for b2 in &blocks {
+            if b1 != b2 {
+                stack_transitions.push(Transition::new(
+                    &format!("stack_{}_on_{}", b1, b2),
+                    &Predicate::AND(vec![
+                        Predicate::EQ(EnumValue::new(
+                            &EnumVariable::new(
+                                &format!("clear_{}", b2),
+                                &tf_domain,
+                                boolean,
+                                None,
+                                &Kind::Command,
+                            ),
+                            "true",
+                            None,
+                        )),
+                        Predicate::EQ(EnumValue::new(
+                            &EnumVariable::new(
+                                &format!("holding"),
+                                &holding_domain,
+                                holding,
+                                None,
+                                &Kind::Command,
+                            ),
+                            b1,
+                            None,
+                        )),
+                    ]),
+                    &Predicate::AND(vec![
+                        Predicate::EQ(EnumValue::new(
+                            &EnumVariable::new(
+                                &format!("holding"),
+                                &holding_domain,
+                                holding,
+                                None,
+                                &Kind::Command,
+                            ),
+                            "EMPTY",
+                            None,
+                        )),
+                        Predicate::EQ(EnumValue::new(
+                            &EnumVariable::new(
+                                &format!("clear_{}", b2),
+                                &tf_domain,
+                                boolean,
+                                None,
+                                &Kind::Command,
+                            ),
+                            "false",
+                            None,
+                        )),
+                        Predicate::EQ(EnumValue::new(
+                            &EnumVariable::new(
+                                &format!("clear_{}", b1),
+                                &tf_domain,
+                                boolean,
+                                None,
+                                &Kind::Command,
+                            ),
+                            "true",
+                            None,
+                        )),
+                        Predicate::EQ(EnumValue::new(
+                            &EnumVariable::new(
+                                &format!("{}_on", b1),
+                                &on_domain,
+                                position,
+                                None,
+                                &Kind::Command,
+                            ),
+                            b2,
+                            None,
+                        )),
+                    ]),
+                ))
+            }
+        }
+    }
+
+    for b1 in &blocks {
+        for b2 in &blocks {
+            if b1 != b2 {
+                unstack_transitions.push(Transition::new(
+                    &format!("unstack_{}_from_{}", b1, b2),
+                    &Predicate::AND(vec![
+                        Predicate::EQ(EnumValue::new(
+                            &EnumVariable::new(
+                                &format!("holding"),
+                                &holding_domain,
+                                holding,
+                                None,
+                                &Kind::Command,
+                            ),
+                            "EMPTY",
+                            None,
+                        )),
+                        Predicate::EQ(EnumValue::new(
+                            &EnumVariable::new(
+                                &format!("{}_on", b1),
+                                &on_domain,
+                                position,
+                                None,
+                                &Kind::Command,
+                            ),
+                            b2,
+                            None,
+                        )),
+                        Predicate::EQ(EnumValue::new(
+                            &EnumVariable::new(
+                                &format!("clear_{}", b1),
+                                &tf_domain,
+                                boolean,
+                                None,
+                                &Kind::Command,
+                            ),
+                            "true",
+                            None,
+                        )),
+                    ]),
+                    &Predicate::AND(vec![
+                        Predicate::EQ(EnumValue::new(
+                            &EnumVariable::new(
+                                &format!("clear_{}", b2),
+                                &tf_domain,
+                                boolean,
+                                None,
+                                &Kind::Command,
+                            ),
+                            "true",
+                            None,
+                        )),
+                        Predicate::EQ(EnumValue::new(
+                            &EnumVariable::new(
+                                &format!("holding"),
+                                &holding_domain,
+                                holding,
+                                None,
+                                &Kind::Command,
+                            ),
+                            b1,
+                            None,
+                        )),
+                        Predicate::NOT(Box::new(Predicate::EQ(EnumValue::new(
+                            &EnumVariable::new(
+                                &format!("{}_on", b1),
+                                &on_domain,
+                                position,
+                                None,
+                                &Kind::Command,
+                            ),
+                            b2,
+                            None,
+                        )))),
+                    ]),
+                ))
+            }
+        }
+    }
+
+    let mut clear_predicates = vec![];
+    for x in vec!["B"] {
+        clear_predicates.push(Predicate::EQ(EnumValue::new(
+            &EnumVariable::new(
+                &format!("clear_{}", x),
+                &tf_domain,
+                boolean,
+                None,
+                &Kind::Command,
+            ),
+            "true",
+            None,
+        )))
+    }
+
+    let mut ontable_predicates = vec![];
+    for x in vec!["A"] {
+        ontable_predicates.push(Predicate::EQ(EnumValue::new(
+            &EnumVariable::new(
+                &format!("{}_on", x),
+                &on_domain,
+                position,
+                None,
+                &Kind::Command,
+            ),
+            "TABLE",
+            None,
+        )))
+    }
+
+    let mut on_predicates = vec![];
+    for (b1, b2) in vec![
+        ("A", "B")
+        // ("C", "E"),
+        // ("E", "J"),
+        // ("J", "B"),
+        // ("B", "G"),
+        // ("G", "H"),
+        // ("H", "A"),
+        // ("A", "D"),
+        // ("D", "I"),
+    ] {
+        on_predicates.push(Predicate::EQ(EnumValue::new(
+            &EnumVariable::new(
+                &format!("{}_on", b2),
+                &on_domain,
+                position,
+                None,
+                &Kind::Command,
+            ),
+            b1,
+            None,
+        )))
+    }
+
+    let initial = Predicate::AND(vec![
+        Predicate::AND(clear_predicates),
+        Predicate::AND(ontable_predicates),
+        Predicate::AND(on_predicates),
+        Predicate::EQ(EnumValue::new(
+            &EnumVariable::new(
+                &format!("holding"),
+                &holding_domain,
+                holding,
+                None,
+                &Kind::Command,
+            ),
+            "EMPTY",
+            None,
+        )),
+    ]);
+
+    let mut goal_on_predicates = vec![];
+    for (b1, b2) in vec![
+        // ("D", "C"),
+        // ("C", "F"),
+        // ("F", "J"),
+        // ("J", "E"),
+        // ("E", "H"),
+        // ("H", "B"),
+        // ("B", "A"),
+        // ("A", "G"),
+        // ("G", "I"),
+        ("B", "A"),
+    ] {
+        goal_on_predicates.push(Predicate::EQ(EnumValue::new(
+            &EnumVariable::new(
+                &format!("{}_on", b2),
+                &on_domain,
+                position,
+                None,
+                &Kind::Command,
+            ),
+            b1,
+            None,
+        )))
+    }
+
+    let mut transitions = vec![];
+    for t in vec![
+        pick_up_transitions,
+        put_down_transitions,
+        stack_transitions,
+        unstack_transitions,
+    ] {
+        transitions.extend(t)
+    }
+
+    let mut invariants = vec![];
+    for b1 in &blocks {
+        for b2 in &blocks {
+            if b1 != b2 {
+                invariants.push(Predicate::NOT(Box::new(Predicate::AND(vec![
+                    Predicate::EQ(EnumValue::new(
+                        &EnumVariable::new(
+                            &format!("{}_on", b1),
+                            &on_domain,
+                            position,
+                            None,
+                            &Kind::Command,
+                        ),
+                        b2,
+                        None,
+                    )),
+                    Predicate::EQ(EnumValue::new(
+                        &EnumVariable::new(
+                            &format!("{}_on", b2),
+                            &on_domain,
+                            position,
+                            None,
+                            &Kind::Command,
+                        ),
+                        b1,
+                        None,
+                    )),
+                ]))))
+            }
+        }
+    }
+
+    // for b in &blocks {
+    //     invariants.push(Predicate::AND(vec![]))
+    // }
+
+    let goal = Predicate::AND(goal_on_predicates);
+    let problem = PlanningProblem::new(
+        "blocks_world",
+        &initial,
+        &goal,
+        &transitions,
+        &Predicate::AND(invariants),
+        &50,
+        &Paradigm::Raar,
+    );
+
+    let result = incremental(&problem);
+    pprint_result(&result)
+}
+
+#[test]
+pub fn blocks_model_test_2() {
+    let domain = vec!["true", "false"];
 
     let blocks = vec!["A", "B", "C", "D", "E", "F", "G", "H", "I", "J"];
     let mut pick_up_transitions = vec![];
@@ -164,12 +625,11 @@ pub fn blocks_model_test() {
         pick_up_transitions.push(Transition::new(
             &format!("pick_up_{}", block),
             &Predicate::AND(vec![
-                hand_empty.clone(),
                 Predicate::EQ(EnumValue::new(
                     &EnumVariable::new(
                         &format!("clear_{}", block),
                         &domain,
-                        boolean,
+                        "boolean",
                         None,
                         &Kind::Command,
                     ),
@@ -180,7 +640,18 @@ pub fn blocks_model_test() {
                     &EnumVariable::new(
                         &format!("ontable_{}", block),
                         &domain,
-                        boolean,
+                        "boolean",
+                        None,
+                        &Kind::Command,
+                    ),
+                    "true",
+                    None,
+                )),
+                Predicate::EQ(EnumValue::new(
+                    &EnumVariable::new(
+                        &format!("hand_empty"),
+                        &domain,
+                        "boolean",
                         None,
                         &Kind::Command,
                     ),
@@ -189,12 +660,11 @@ pub fn blocks_model_test() {
                 )),
             ]),
             &Predicate::AND(vec![
-                hand_full.clone(),
                 Predicate::EQ(EnumValue::new(
                     &EnumVariable::new(
-                        &format!("clear_{}", block),
+                        &format!("ontable_{}", block),
                         &domain,
-                        boolean,
+                        "boolean",
                         None,
                         &Kind::Command,
                     ),
@@ -203,9 +673,9 @@ pub fn blocks_model_test() {
                 )),
                 Predicate::EQ(EnumValue::new(
                     &EnumVariable::new(
-                        &format!("ontable_{}", block),
+                        &format!("clear_{}", block),
                         &domain,
-                        boolean,
+                        "boolean",
                         None,
                         &Kind::Command,
                     ),
@@ -216,11 +686,22 @@ pub fn blocks_model_test() {
                     &EnumVariable::new(
                         &format!("holding_{}", block),
                         &domain,
-                        boolean,
+                        "boolean",
                         None,
                         &Kind::Command,
                     ),
                     "true",
+                    None,
+                )),
+                Predicate::EQ(EnumValue::new(
+                    &EnumVariable::new(
+                        &format!("hand_empty"),
+                        &domain,
+                        "boolean",
+                        None,
+                        &Kind::Command,
+                    ),
+                    "false",
                     None,
                 )),
             ]),
@@ -234,7 +715,7 @@ pub fn blocks_model_test() {
                 &EnumVariable::new(
                     &format!("holding_{}", block),
                     &domain,
-                    boolean,
+                    "boolean",
                     None,
                     &Kind::Command,
                 ),
@@ -242,12 +723,22 @@ pub fn blocks_model_test() {
                 None,
             )),
             &Predicate::AND(vec![
-                hand_empty.clone(),
+                Predicate::EQ(EnumValue::new(
+                    &EnumVariable::new(
+                        &format!("holding_{}", block),
+                        &domain,
+                        "boolean",
+                        None,
+                        &Kind::Command,
+                    ),
+                    "false",
+                    None,
+                )),
                 Predicate::EQ(EnumValue::new(
                     &EnumVariable::new(
                         &format!("clear_{}", block),
                         &domain,
-                        boolean,
+                        "boolean",
                         None,
                         &Kind::Command,
                     ),
@@ -258,7 +749,7 @@ pub fn blocks_model_test() {
                     &EnumVariable::new(
                         &format!("ontable_{}", block),
                         &domain,
-                        boolean,
+                        "boolean",
                         None,
                         &Kind::Command,
                     ),
@@ -267,13 +758,13 @@ pub fn blocks_model_test() {
                 )),
                 Predicate::EQ(EnumValue::new(
                     &EnumVariable::new(
-                        &format!("holding_{}", block),
+                        &format!("hand_empty"),
                         &domain,
-                        boolean,
+                        "boolean",
                         None,
                         &Kind::Command,
                     ),
-                    "false",
+                    "true",
                     None,
                 )),
             ]),
@@ -290,7 +781,7 @@ pub fn blocks_model_test() {
                             &EnumVariable::new(
                                 &format!("clear_{}", b2),
                                 &domain,
-                                boolean,
+                                "boolean",
                                 None,
                                 &Kind::Command,
                             ),
@@ -301,7 +792,7 @@ pub fn blocks_model_test() {
                             &EnumVariable::new(
                                 &format!("holding_{}", b1),
                                 &domain,
-                                boolean,
+                                "boolean",
                                 None,
                                 &Kind::Command,
                             ),
@@ -310,12 +801,11 @@ pub fn blocks_model_test() {
                         )),
                     ]),
                     &Predicate::AND(vec![
-                        hand_empty.clone(),
                         Predicate::EQ(EnumValue::new(
                             &EnumVariable::new(
-                                &format!("clear_{}", b2),
+                                &format!("holding_{}", b1),
                                 &domain,
-                                boolean,
+                                "boolean",
                                 None,
                                 &Kind::Command,
                             ),
@@ -324,9 +814,9 @@ pub fn blocks_model_test() {
                         )),
                         Predicate::EQ(EnumValue::new(
                             &EnumVariable::new(
-                                &format!("holding_{}", b1),
+                                &format!("clear_{}", b2),
                                 &domain,
-                                boolean,
+                                "boolean",
                                 None,
                                 &Kind::Command,
                             ),
@@ -337,7 +827,7 @@ pub fn blocks_model_test() {
                             &EnumVariable::new(
                                 &format!("clear_{}", b1),
                                 &domain,
-                                boolean,
+                                "boolean",
                                 None,
                                 &Kind::Command,
                             ),
@@ -348,7 +838,18 @@ pub fn blocks_model_test() {
                             &EnumVariable::new(
                                 &format!("{}_on_{}", b1, b2),
                                 &domain,
-                                boolean,
+                                "boolean",
+                                None,
+                                &Kind::Command,
+                            ),
+                            "true",
+                            None,
+                        )),
+                        Predicate::EQ(EnumValue::new(
+                            &EnumVariable::new(
+                                &format!("hand_empty"),
+                                &domain,
+                                "boolean",
                                 None,
                                 &Kind::Command,
                             ),
@@ -367,12 +868,11 @@ pub fn blocks_model_test() {
                 unstack_transitions.push(Transition::new(
                     &format!("unstack_{}_from_{}", b1, b2),
                     &Predicate::AND(vec![
-                        hand_empty.clone(),
                         Predicate::EQ(EnumValue::new(
                             &EnumVariable::new(
                                 &format!("{}_on_{}", b1, b2),
                                 &domain,
-                                boolean,
+                                "boolean",
                                 None,
                                 &Kind::Command,
                             ),
@@ -383,7 +883,18 @@ pub fn blocks_model_test() {
                             &EnumVariable::new(
                                 &format!("clear_{}", b1),
                                 &domain,
-                                boolean,
+                                "boolean",
+                                None,
+                                &Kind::Command,
+                            ),
+                            "true",
+                            None,
+                        )),
+                        Predicate::EQ(EnumValue::new(
+                            &EnumVariable::new(
+                                &format!("hand_empty"),
+                                &domain,
+                                "boolean",
                                 None,
                                 &Kind::Command,
                             ),
@@ -392,12 +903,22 @@ pub fn blocks_model_test() {
                         )),
                     ]),
                     &Predicate::AND(vec![
-                        hand_full.clone(),
+                        Predicate::EQ(EnumValue::new(
+                            &EnumVariable::new(
+                                &format!("hand_empty"),
+                                &domain,
+                                "boolean",
+                                None,
+                                &Kind::Command,
+                            ),
+                            "false",
+                            None,
+                        )),
                         Predicate::EQ(EnumValue::new(
                             &EnumVariable::new(
                                 &format!("clear_{}", b2),
                                 &domain,
-                                boolean,
+                                "boolean",
                                 None,
                                 &Kind::Command,
                             ),
@@ -408,7 +929,7 @@ pub fn blocks_model_test() {
                             &EnumVariable::new(
                                 &format!("clear_{}", b1),
                                 &domain,
-                                boolean,
+                                "boolean",
                                 None,
                                 &Kind::Command,
                             ),
@@ -419,7 +940,7 @@ pub fn blocks_model_test() {
                             &EnumVariable::new(
                                 &format!("holding_{}", b1),
                                 &domain,
-                                boolean,
+                                "boolean",
                                 None,
                                 &Kind::Command,
                             ),
@@ -430,7 +951,7 @@ pub fn blocks_model_test() {
                             &EnumVariable::new(
                                 &format!("{}_on_{}", b1, b2),
                                 &domain,
-                                boolean,
+                                "boolean",
                                 None,
                                 &Kind::Command,
                             ),
@@ -443,17 +964,36 @@ pub fn blocks_model_test() {
         }
     }
 
+    // explicitly have to say that others are not clear?
     let mut clear_predicates = vec![];
-    for x in vec!["C", "F"] {
+    let clear_vec = vec!["C", "F"];
+    let unclear_vec = IterOps::difference(blocks.clone(), clear_vec.clone());
+    println!("{:?}", unclear_vec);
+
+    for x in clear_vec {
         clear_predicates.push(Predicate::EQ(EnumValue::new(
             &EnumVariable::new(
                 &format!("clear_{}", x),
                 &domain,
-                boolean,
+                "boolean",
                 None,
                 &Kind::Command,
             ),
             "true",
+            None,
+        )))
+    }
+
+    for x in unclear_vec {
+        clear_predicates.push(Predicate::EQ(EnumValue::new(
+            &EnumVariable::new(
+                &format!("clear_{}", x),
+                &domain,
+                "boolean",
+                None,
+                &Kind::Command,
+            ),
+            "false",
             None,
         )))
     }
@@ -464,7 +1004,7 @@ pub fn blocks_model_test() {
             &EnumVariable::new(
                 &format!("ontable_{}", x),
                 &domain,
-                boolean,
+                "boolean",
                 None,
                 &Kind::Command,
             ),
@@ -475,20 +1015,21 @@ pub fn blocks_model_test() {
 
     let mut on_predicates = vec![];
     for (b1, b2) in vec![
-        ("C", "E"),
-        ("E", "J"),
-        ("J", "B"),
-        ("B", "G"),
-        ("G", "H"),
-        ("H", "A"),
-        ("A", "D"),
-        ("D", "I"),
+        ("A", "B")
+        // ("C", "E"),
+        // ("E", "J"),
+        // ("J", "B"),
+        // ("B", "G"),
+        // ("G", "H"),
+        // ("H", "A"),
+        // ("A", "D"),
+        // ("D", "I"),
     ] {
         on_predicates.push(Predicate::EQ(EnumValue::new(
             &EnumVariable::new(
                 &format!("{}_on_{}", b1, b2),
                 &domain,
-                boolean,
+                "boolean",
                 None,
                 &Kind::Command,
             ),
@@ -501,26 +1042,37 @@ pub fn blocks_model_test() {
         Predicate::AND(clear_predicates),
         Predicate::AND(ontable_predicates),
         Predicate::AND(on_predicates),
-        hand_empty,
+        Predicate::EQ(EnumValue::new(
+            &EnumVariable::new(
+                &format!("hand_empty"),
+                &domain,
+                "boolean",
+                None,
+                &Kind::Command,
+            ),
+            "true",
+            None,
+        )),
     ]);
 
     let mut goal_on_predicates = vec![];
     for (b1, b2) in vec![
-        ("D", "C"),
-        ("C", "F"),
-        ("F", "J"),
-        ("J", "E"),
-        ("E", "H"),
-        ("H", "B"),
+        // ("D", "C"),
+        // ("C", "F"),
+        // ("F", "J"),
+        // ("J", "E"),
+        // ("E", "H"),
+        // ("H", "B"),
+        // ("B", "A"),
+        // ("A", "G"),
+        // ("G", "I"),
         ("B", "A"),
-        ("A", "G"),
-        ("G", "I"),
     ] {
         goal_on_predicates.push(Predicate::EQ(EnumValue::new(
             &EnumVariable::new(
                 &format!("{}_on_{}", b1, b2),
                 &domain,
-                boolean,
+                "boolean",
                 None,
                 &Kind::Command,
             ),
@@ -539,16 +1091,131 @@ pub fn blocks_model_test() {
         transitions.extend(t)
     }
 
+    // Added invariants to make it work:
+    // 1. [x] block can't be on another block if that block is on the first block
+    // 2. [x] if holding any block, the gripper can't be empty
+    // 3. [x] at most one block can be held
+    // 4. [x] a block can't simultaneously be on several different blocks
+    // 5. [ ] if block is on table, it is not on a block
+    let mut invariants = vec![];
+    let mut holding = vec![];
+    for b1 in &blocks {
+        holding.push(Predicate::EQ(EnumValue::new(
+            &EnumVariable::new(
+                &format!("holding_{}", b1),
+                &domain,
+                "boolean",
+                None,
+                &Kind::Command,
+            ),
+            "true",
+            None,
+        )));
+        for b2 in &blocks {
+            if b1 != b2 {
+                invariants.push(Predicate::NOT(Box::new(Predicate::AND(vec![
+                    Predicate::EQ(EnumValue::new(
+                        &EnumVariable::new(
+                            &format!("{}_on_{}", b1, b2),
+                            &domain,
+                            "boolean",
+                            None,
+                            &Kind::Command,
+                        ),
+                        "true",
+                        None,
+                    )),
+                    Predicate::EQ(EnumValue::new(
+                        &EnumVariable::new(
+                            &format!("{}_on_{}", b2, b1),
+                            &domain,
+                            "boolean",
+                            None,
+                            &Kind::Command,
+                        ),
+                        "true",
+                        None,
+                    )),
+                ]))))
+            }
+        }
+    }
+
+    for b1 in &blocks {
+        let mut local_vec = vec![];
+        for b2 in &blocks {
+            if b1 != b2 {
+                local_vec.push(Predicate::EQ(EnumValue::new(
+                    &EnumVariable::new(
+                        &format!("{}_on_{}", b1, b2),
+                        &domain,
+                        "boolean",
+                        None,
+                        &Kind::Command,
+                    ),
+                    "true",
+                    None,
+                )))
+            }
+        }
+
+        invariants.push(Predicate::NOT(Box::new(Predicate::AND(vec![
+            Predicate::EQ(EnumValue::new(
+                &EnumVariable::new(
+                    &format!("ontable_{}", b1),
+                    &domain,
+                    "boolean",
+                    None,
+                    &Kind::Command,
+                ),
+                "true",
+                None,
+            )),
+            Predicate::OR(local_vec.clone()),
+        ]))));
+
+        invariants.push(Predicate::OR(vec![
+            Predicate::PBEQ(local_vec.clone(), 1),
+            Predicate::PBEQ(local_vec, 0),
+        ]))
+    }
+
+    // for b in &blocks {
+    //     invariants.push(Predicate::AND(vec![]))
+    // }
+
+    invariants.push(Predicate::NOT(Box::new(Predicate::AND(vec![
+        Predicate::EQ(EnumValue::new(
+            &EnumVariable::new(
+                &format!("hand_empty"),
+                &domain,
+                "boolean",
+                None,
+                &Kind::Command,
+            ),
+            "true",
+            None,
+        )),
+        Predicate::OR(holding.clone()),
+    ]))));
+
+    invariants.push(Predicate::OR(vec![
+        Predicate::PBEQ(holding.clone(), 1),
+        Predicate::PBEQ(holding, 0),
+    ]));
+
     let goal = Predicate::AND(goal_on_predicates);
     let problem = PlanningProblem::new(
         "blocks_world",
         &initial,
         &goal,
         &transitions,
+        &Predicate::AND(invariants),
         &50,
         &Paradigm::Raar,
     );
 
     let result = incremental(&problem);
-    pprint_result(&result)
+    pprint_result(&result);
+    pprint_result_trans_only(&result);
 }

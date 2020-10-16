@@ -1,4 +1,4 @@
-use super::*;
+use lib::*;
 
 // working, but want to make it easier with measured to command
 // pub fn raar_model() -> PlanningProblem {
@@ -285,6 +285,7 @@ pub fn raar_model() -> PlanningProblem {
         &Predicate::AND(vec![act_idle.clone(), act_ref_idle.clone(), act_left.clone(), act_ref_left.clone()]),
         &Predicate::AND(vec![act_active.clone(), ref_active.clone(), act_right.clone(), ref_right.clone()]),
         &vec![t1, t2, t3, t4, t5, t6, t7, t8],
+        &Predicate::TRUE,
         &12,
         &Paradigm::Raar
     );
