@@ -1,6 +1,9 @@
 #[macro_use]
 extern crate derivative;
 
+pub mod models;
+pub use models::*;
+
 pub mod basics;
 pub use basics::*;
 

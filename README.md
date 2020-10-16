@@ -6,7 +6,7 @@
 2.  [x] publish complete state
 3.  [x] update command vars to match measured values on refresh (raar)
 4.  [x] raar: act, ref and act_ref have to have the same domain and same r#type
-5.  [ ] add argument to choose to only plan or to run and plan
+5.  [x] running arguments
 6.  [ ] blocksworld would be an ideal example to compare bool vs. enum performance
 7.  [ ] other command paradigm or are we done?
 8.  [ ] testing
@@ -17,17 +17,16 @@
 13. [ ] benchmarks; blocks, barman, childsnack, gripper, hiking
 14. [ ] improve runner and don't replan after every state change
 15. [ ] gui needed asap
-16. [ ] parsing pddls, look into some libs, planners
+16. [x] look into parsing pddls: conclusion: won't work
 17. [ ] fix command lifetime
 18. [x] match published data to sink when fresh timeouts
 19. [ ] compositional algorithm
 20. [ ] when to call the planner
-21. [ ] gather complete state instead of measured
-22. [ ] handle estimated
-23. [ ] move model to models
-24. [ ] make model launch choice argument
-25. [x] check for measured in domain
-26. [ ] flow graph to readme
+21. [ ] handle estimated
+22. [x] move model to models
+23. [x] make model launch choice argument
+24. [x] check for measured in domain
+25. [ ] flow graph to readme
 
 ### low priority
 1. [ ] nondeterminism

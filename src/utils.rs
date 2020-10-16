@@ -1,8 +1,8 @@
 use super::*;
 use itertools::sorted;
-use std::time::Duration;
 use z3_sys::*;
 use z3_v2::*;
+// mod models;
 
 pub trait IterOps<T, I>: IntoIterator<Item = T>
 where
@@ -53,32 +53,73 @@ where
 
 pub struct Args {
     pub plan_only: bool,
-    pub problem: String
+    pub print_all: bool,
+    pub problem: PlanningProblem,
 }
 
 /// Handle arguments
 pub fn handle_args(args: &Vec<String>) -> Args {
     let mut mut_args = args.to_owned();
     mut_args.drain(0..1);
+
+    let mut plan_only = false;
+    let mut print_all = false;
+    let mut problem_name = String::from("initial");
+    let mut instance = 0;
+
     match mut_args.len() {
-        0 => panic!("problem argument not provided"),
-        1 => Args {
-            plan_only: false,
-            problem: mut_args.drain(0..1).collect::<Vec<String>>()[0].parse::<String>().unwrap_or_default()
-        },
+        0 => (),
+        1 => {
+            problem_name = mut_args.drain(0..1).collect::<Vec<String>>()[0]
+                .parse::<String>()
+                .unwrap_or_default()
+        }
         2 => {
-            let plan_only_arg = mut_args.drain(0..1).collect::<Vec<String>>()[0].parse::<String>().unwrap_or_default();
-            let plan_only: bool = match plan_only_arg.as_str() {
-                "" => false,
-                "plan-only" => true,
-                _ => false
-            };
-            Args {
-                plan_only: plan_only,
-                problem: mut_args.drain(0..1).collect::<Vec<String>>()[0].parse::<String>().unwrap_or_default()
+            let arg1 = mut_args.drain(0..1).collect::<Vec<String>>()[0]
+                .parse::<String>()
+                .unwrap_or_default();
+            let arg2 = mut_args.drain(0..1).collect::<Vec<String>>()[0]
+                .parse::<String>()
+                .unwrap_or_default();
+            for arg in vec![arg1, arg2] {
+                match arg.as_str() {
+                    "plan-only" => plan_only = true,
+                    "print-all" => print_all = true,
+                    _ => problem_name = arg,
+                }
+            }
+        }
+        3 => {
+            let arg1 = mut_args.drain(0..1).collect::<Vec<String>>()[0]
+                .parse::<String>()
+                .unwrap_or_default();
+            let arg2 = mut_args.drain(0..1).collect::<Vec<String>>()[0]
+                .parse::<String>()
+                .unwrap_or_default();
+            let arg3 = mut_args.drain(0..1).collect::<Vec<String>>()[0]
+                .parse::<String>()
+                .unwrap_or_default();
+            for arg in vec![arg1, arg2, arg3] {
+                match arg.as_str() {
+                    "plan-only" => plan_only = true,
+                    "print-all" => print_all = true,
+                    _ => problem_name = arg,
+                }
             }
         }
         _ => panic!("too many arguments"),
+    }
+
+    let problem = match problem_name.as_str() {
+        "initial" => models::initial::raar_model(),
+        "blocks" => models::blocksworld::instances::instance4::instance_4_a(),
+        _ => panic!("unknown model"),
+    };
+
+    Args {
+        plan_only: plan_only,
+        print_all: print_all,
+        problem: problem,
     }
 }
 
@@ -134,11 +175,10 @@ pub fn get_planning_result(
         .collect();
     let vars = get_problem_vars(&prob);
 
-    println!("MODEL:");
-    for m in &model_vec {
-        println!("{:?}", m);
-    }
-    
+    // println!("MODEL:");
+    // for m in &model_vec {
+    //     println!("{:?}", m);
+    // }
 
     let mut trace: Vec<PlanningFrame> = vec![];
     for i in 0..nr_steps - 1 {
