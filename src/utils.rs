@@ -65,7 +65,6 @@ pub fn handle_args(args: &Vec<String>) -> Args {
     let mut plan_only = false;
     let mut print_all = false;
     let mut problem_name = String::from("initial");
-    let mut instance = 0;
 
     match mut_args.len() {
         0 => (),
@@ -112,7 +111,8 @@ pub fn handle_args(args: &Vec<String>) -> Args {
 
     let problem = match problem_name.as_str() {
         "initial" => models::initial::raar_model(),
-        "blocks" => models::blocksworld::instances::instance4::instance_4_a(),
+        "blocks_4_a" => models::blocksworld::instances::instance4::instance_4_a(),
+        "blocks_4_b" => models::blocksworld::instances::instance4::instance_4_b(),
         _ => panic!("unknown model"),
     };
 
