@@ -137,12 +137,7 @@ pub fn get_predicate_vars(pred: &Predicate) -> Vec<EnumVariable> {
         Predicate::OR(x) => s.extend(x.iter().flat_map(|p| get_predicate_vars(p))),
         Predicate::NOT(x) => s.extend(get_predicate_vars(x)),
         Predicate::EQ(x) => s.push(x.var.clone()),
-        Predicate::HOLD(x) => s.push(x.clone()),
         Predicate::PBEQ(x, _) => s.extend(x.iter().flat_map(|p| get_predicate_vars(p))),
-        Predicate::EQRR(x, y) => {
-            s.push(x.clone());
-            s.push(y.clone());
-        }
     }
     s.sort();
     s.dedup();

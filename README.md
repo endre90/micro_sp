@@ -7,31 +7,42 @@
 3.  [x] update command vars to match measured values on refresh (raar)
 4.  [x] raar: act, ref and act_ref have to have the same domain and same r#type
 5.  [x] running arguments
-6.  [ ] blocksworld would be an ideal example to compare bool vs. enum performance
-7.  [ ] other command paradigm or are we done?
-8.  [ ] testing
-9.  [x] structure and modules
-10. [ ] generate dummy driver from the model
-11. [x] documentation, probably not done
-12. [ ] proper readme
-13. [x] proper get planning result
-14. [ ] benchmarks blocks 
-15. [ ] benchmarks barman
-16. [ ] benchmarks childsnack
-17. [ ] benchmarks gripper
-18. [ ] benchmarks hiking
-19. [ ] improve runner and don't replan after every state change
-20. [ ] gui needed asap
-21. [x] look into parsing pddls: conclusion: won't work
-22. [ ] fix command lifetime
-23. [x] match published data to sink when fresh timeouts
-24. [ ] compositional algorithm
-25. [ ] when to call the planner
-26. [ ] handle estimated
-27. [x] move model to models
-28. [x] make model launch choice argument
-29. [x] check for measured in domain
-30. [ ] flow graph to readme
+6.  [ ] move models to separate crate
+7.  [ ] add boolean variables
+8.  [x] move setup to parser
+9.  [ ] blocksworld would be an ideal example to compare bool vs. enum performance
+10. [ ] other command paradigm or are we done?
+11. [ ] testing
+12. [x] structure and modules
+13. [ ] generate dummy driver from the model
+14. [x] documentation, probably not done
+15. [ ] proper readme
+16. [x] proper get planning result
+17. [ ] benchmarks blocksworld:
+    1. [x] micro_sp inc enumerated boolean
+    2. [ ] micro_sp inc pure boolean
+    3. [ ] micro_sp inc pure enumeration
+    4. [ ] micro_sp seq enumerated boolean
+    5. [ ] micro_sp seq pure boolean
+    6. [ ] micro_sp seq pure enumeration
+    7. [ ] incplan
+18. [ ] benchmarks barman
+19. [ ] benchmarks childsnack
+20. [ ] benchmarks gripper
+21. [ ] benchmarks hiking
+22. [ ] make a more general parser for boilerplate domain
+23. [ ] improve runner and don't replan after every state change
+24. [ ] gui needed asap
+25. [x] look into parsing pddls: conclusion: won't work
+26. [ ] fix command lifetime
+27. [x] match published data to sink when fresh timeouts
+28. [ ] compositional algorithm
+29. [ ] when to call the planner
+30. [ ] handle estimated
+31. [x] move model to models
+32. [x] make model launch choice argument
+33. [x] check for measured in domain
+34. [ ] flow graph to readme
 
 ### low priority
 1. [ ] improve Qol
@@ -42,4 +53,3 @@
 6. [ ] maybe some quality of life for modeling
 7. [ ] generate both raar and invar paradigms from a hl model?
 8. [ ] explore all paths and generate graph
-9. [ ] maybe move models and instances to separate crate

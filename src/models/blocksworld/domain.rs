@@ -1,6 +1,6 @@
 use super::*;
 
-pub fn blocksworld_model(blocks: &Vec<&str>) -> (Vec<Transition>, Predicate) {
+pub fn blocksworld_model_enumerated_booleans(blocks: &Vec<&str>) -> (Vec<Transition>, Predicate) {
     let domain = vec!["true", "false"];
 
     let mut pick_up_transitions = vec![];

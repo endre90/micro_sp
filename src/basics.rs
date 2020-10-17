@@ -32,7 +32,7 @@ impl Parameter {
 #[derive(Debug, PartialEq, Clone, PartialOrd, Eq, Ord, Serialize, Deserialize)]
 pub enum Paradigm {
     Raar,
-    Invar
+    Invar,
 }
 
 /// Variables, transitions and states can be of Measured (input), Command (output) and
@@ -68,17 +68,10 @@ impl EnumVariable {
         EnumVariable {
             name: name.to_owned(),
             r#type: r#type.to_owned(),
-            domain: 
-            // {
-            //     let mut domain2 = domain.clone();
-            //     domain2.push("dummy");
-            //     let domain3 = domain2.iter().map(|x| { println!("{}", x); x.to_string()}).collect();
-            //     domain3
-            // },
-            domain
-                    .iter()
-                    .map(|x| x.to_string())
-                    .collect::<Vec<String>>(),
+            domain: domain
+                .iter()
+                .map(|x| x.to_string())
+                .collect::<Vec<String>>(),
             param: match param {
                 Some(x) => x.to_owned(),
                 None => Parameter::none(),
