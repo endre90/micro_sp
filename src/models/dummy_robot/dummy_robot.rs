@@ -42,7 +42,7 @@ pub fn raar_model() -> PlanningProblem {
         &pos_domain,
         "pos",
         None,
-        &Kind::Measured
+        &Kind::Handshake
     );
 
     let act_ref_stat = EnumVariable::new(
@@ -50,7 +50,7 @@ pub fn raar_model() -> PlanningProblem {
         &stat_domain,
         "stat",
         None,
-        &Kind::Measured
+        &Kind::Handshake
     );
 
     let act_left = Predicate::EQ(EnumValue::new(&act_pos, "left", None));

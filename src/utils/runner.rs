@@ -2,10 +2,17 @@ use super::*;
 use itertools::sorted;
 
 /// For a given source state in a plan, return a corresponding sink state.
-pub fn get_sink(result: &PlanningResult, source: &State) -> CompleteState {
-    match source.kind == Kind::Measured {
+pub fn get_sink(
+    result: &PlanningResult,
+    measured_source: &State,
+    handshake_source: &State,
+) -> CompleteState {
+    match measured_source.kind == Kind::Measured && handshake_source.kind == Kind::Handshake {
         true => match result.trace.iter().find(|x| {
-            sorted(x.source.measured.vec.clone()).collect::<Vec<EnumValue>>() == source.vec.clone()
+            sorted(x.source.measured.vec.clone()).collect::<Vec<EnumValue>>()
+                == measured_source.vec.clone()
+                && sorted(x.source.handshake.vec.clone()).collect::<Vec<EnumValue>>()
+                    == handshake_source.vec.clone()
         }) {
             Some(x) => x.sink.to_owned(),
             None => CompleteState::empty(),
@@ -66,13 +73,18 @@ pub fn complete_state_to_predicate(state: &CompleteState) -> Predicate {
 /// When called, generate a new planning problem where the initial state is the current measured state.
 /// When Paradigm::Raar, the reference variables should take values from their actual counterparts when
 /// problem is refreshing (actually, maybe always, not only when Paradigm::Raar?. test).
-pub fn refresh_problem(prob: &PlanningProblem, current: &State) -> PlanningProblem {
+pub fn refresh_problem(
+    prob: &PlanningProblem,
+    current_measured: &State,
+    current_handshake: &State,
+) -> PlanningProblem {
     match prob.paradigm {
         Paradigm::Raar => PlanningProblem {
             name: prob.name.to_owned(),
             init: Predicate::AND(vec![
-                state_to_predicate(&current),
-                state_to_predicate(&measured_to_command(&current, &prob)),
+                state_to_predicate(&current_measured),
+                state_to_predicate(&current_handshake),
+                state_to_predicate(&measured_to_command(&current_measured, &prob)),
             ]),
             goal: prob.goal.to_owned(),
             trans: prob.trans.to_owned(),
@@ -82,7 +94,10 @@ pub fn refresh_problem(prob: &PlanningProblem, current: &State) -> PlanningProbl
         },
         Paradigm::Invar => PlanningProblem {
             name: prob.name.to_owned(),
-            init: state_to_predicate(&current),
+            init: Predicate::AND(vec![
+                state_to_predicate(&current_measured),
+                state_to_predicate(&current_handshake),
+            ]),
             goal: prob.goal.to_owned(),
             trans: prob.trans.to_owned(),
             invar: prob.invar.to_owned(),

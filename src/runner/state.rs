@@ -8,8 +8,10 @@ use tokio::time::{delay_for, interval, Duration, Instant};
 /// publishers.
 pub async fn state(
     measured_arc: Arc<Mutex<String>>,
+    handshake_arc: Arc<Mutex<String>>,
     command_arc: Arc<Mutex<(String, bool)>>,
     ros_receivers: Vec<(String, tokio::sync::mpsc::Receiver<String>)>,
+    ros_handshakers: Vec<(String, tokio::sync::mpsc::Receiver<String>)>,
     ros_senders: Vec<(String, tokio::sync::mpsc::Sender<String>)>,
     state_sender: Option<(String, tokio::sync::mpsc::Sender<String>)>,
 ) -> io::Result<()> {
@@ -23,6 +25,18 @@ pub async fn state(
             let _res = tokio::try_join!(receiver);
         });
         measured_list.push(amkvp1);
+    }
+
+    let mut handshake_list = vec![];
+    for r in ros_handshakers {
+        let past_time = Instant::now().checked_sub(Duration::new(6, 0));
+        let amkvp = Arc::new(Mutex::new((r.0.clone(), past_time.unwrap())));
+        let amkvp1 = amkvp.clone();
+        tokio::task::spawn(async {
+            let receiver = receiver::receiver(amkvp, r.1);
+            let _res = tokio::try_join!(receiver);
+        });
+        handshake_list.push(amkvp1);
     }
 
     let mut command_list = vec![];
@@ -68,9 +82,22 @@ pub async fn state(
             })
             .collect::<Vec<EnumValue>>();
         let measured_state = State::new(&measured_vec, &Kind::Measured);
-        // let measured_state = CompleteState::from_vec(&measured_vec);
+
+        let handshake_vec = &handshake_list
+            .iter()
+            .map(|x| {
+                let des: EnumValue = serde_json::from_str(&x.lock().unwrap().0).unwrap();
+                let duration = match looping_now.checked_duration_since(x.lock().unwrap().1) {
+                    Some(x) => x,
+                    None => Duration::new(6, 0),
+                };
+                EnumValue::new(&des.var, &des.val, Some(&duration))
+            })
+            .collect::<Vec<EnumValue>>();
+        let handshake_state = State::new(&handshake_vec, &Kind::Handshake);
 
         *measured_arc.lock().unwrap() = serde_json::to_string(&measured_state)?;
+        *handshake_arc.lock().unwrap() = serde_json::to_string(&handshake_state)?;
         delay_for(Duration::from_millis(10)).await;
 
         let sink: State = serde_json::from_str(&command_arc.lock().unwrap().0)?;
@@ -78,10 +105,8 @@ pub async fn state(
 
         *state_amkvp_clone.lock().unwrap() = (
             serde_json::to_string(&CompleteState::from_states(
-                // &measured_state.measured,
-                // &sink,
-                // &measured_state.estimated,
                 &measured_state,
+                &handshake_state,
                 &sink,
                 &State::new(&vec![], &Kind::Estimated),
             ))?,

@@ -36,10 +36,11 @@ pub enum Paradigm {
 }
 
 /// Variables, transitions and states can be of Measured (input), Command (output) and
-/// Estimated (internal) kind.
+/// Estimated (internal) kind. Handshake is the "MeasuredCommand" kind.
 #[derive(Debug, PartialEq, Clone, PartialOrd, Eq, Ord, Serialize, Deserialize)]
 pub enum Kind {
     Measured,
+    Handshake,
     Command,
     Estimated,
 }
@@ -138,6 +139,7 @@ impl State {
 #[derive(Debug, PartialEq, Clone, PartialOrd, Eq, Ord, Serialize, Deserialize)]
 pub struct CompleteState {
     pub measured: State,
+    pub handshake: State,
     pub command: State,
     pub estimated: State,
 }
@@ -147,15 +149,26 @@ impl CompleteState {
     pub fn empty() -> CompleteState {
         CompleteState {
             measured: State::new(&vec![], &Kind::Measured),
+            handshake: State::new(&vec![], &Kind::Handshake),
             command: State::new(&vec![], &Kind::Command),
             estimated: State::new(&vec![], &Kind::Estimated),
         }
     }
-    /// Collect a complete state from measured, command and estimated state. States can also be empty.
-    pub fn from_states(measured: &State, command: &State, estimated: &State) -> CompleteState {
+    /// Collect a complete state from measured, handshake,
+    /// command and estimated state. States can also be empty.
+    pub fn from_states(
+        measured: &State,
+        handshake: &State,
+        command: &State,
+        estimated: &State,
+    ) -> CompleteState {
         CompleteState {
             measured: match measured.kind == Kind::Measured {
                 true => measured.to_owned(),
+                false => panic!("kind must match when constructing state"),
+            },
+            handshake: match handshake.kind == Kind::Handshake {
+                true => handshake.to_owned(),
                 false => panic!("kind must match when constructing state"),
             },
             command: match command.kind == Kind::Command {
@@ -177,6 +190,13 @@ impl CompleteState {
                     .map(|x| x.to_owned())
                     .collect(),
                 &Kind::Measured,
+            ),
+            handshake: State::new(
+                &vec.iter()
+                    .filter(|x| x.var.kind == Kind::Handshake)
+                    .map(|x| x.to_owned())
+                    .collect(),
+                &Kind::Handshake,
             ),
             command: State::new(
                 &vec.iter()

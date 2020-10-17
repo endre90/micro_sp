@@ -8,8 +8,6 @@ use tokio::sync::mpsc::channel;
 /// for command kind variables. These subs and pubs run asynchronously in
 /// their green threads.
 pub async fn node(ros_ctx: &Context, prob: &PlanningProblem) -> r2r::Node {
-    // let ros_ctx = Context::create()
-    //     .expect("Error 3357ef39-2674-46c8-9841-bd126e70e059: Creating ros context failed.");
     let mut node = Node::create(ros_ctx.clone(), "micro_sp", "")
         .expect("Error 8fddc8c1-7cce-4cd7-97e0-c16438ac3a28: Creating ros node failed.");
     let problem = prob.clone();
@@ -19,12 +17,17 @@ pub async fn node(ros_ctx: &Context, prob: &PlanningProblem) -> r2r::Node {
         .filter(|x| x.kind == Kind::Measured)
         .map(|x| EnumValue::new(x, "dummy_value", None))
         .collect();
+    let hnd_var_vals: Vec<EnumValue> = vars
+        .iter()
+        .filter(|x| x.kind == Kind::Handshake)
+        .map(|x| EnumValue::new(x, "dummy_value", None))
+        .collect();
     let cmd_var_vals: Vec<EnumValue> = vars
         .iter()
         .filter(|x| x.kind == Kind::Command)
         .map(|x| EnumValue::new(x, "dummy_value", None))
         .collect();
-    // generate subscribers for Kind::Measured kind variables (maybe all? testing needed)
+    // generate subscribers for Kind::Measured kind variables
     let mut ros_receivers: Vec<(String, tokio::sync::mpsc::Receiver<String>)> = vec![];
     for v in &msr_var_vals {
         let (mut tx, rx) = channel::<String>(10);
@@ -34,7 +37,19 @@ pub async fn node(ros_ctx: &Context, prob: &PlanningProblem) -> r2r::Node {
         };
         let _subref = node
             .subscribe(&format!("/{}", v.var.name), Box::new(sub))
-            .expect("69900836-cc9c-4ea5-9f2f-1f585dae70b1: Creating subscribers failed.");
+            .expect("69900836-cc9c-4ea5-9f2f-1f585dae70b1: Creating measured subscribers failed.");
+    }
+    // generate subscribers for Kind::Handshake kind variables
+    let mut ros_handshakers: Vec<(String, tokio::sync::mpsc::Receiver<String>)> = vec![];
+    for v in &hnd_var_vals {
+        let (mut tx, rx) = channel::<String>(10);
+        ros_handshakers.push((serde_json::to_string(&v).unwrap_or_default(), rx));
+        let sub = move |x: r2r::std_msgs::msg::String| {
+            tx.try_send(x.data).unwrap_or_default();
+        };
+        let _subref = node
+            .subscribe(&format!("/{}", v.var.name), Box::new(sub))
+            .expect("69900836-cc9c-4ea5-9f2f-1f585dae70b1: Creating handshake subscribers failed.");
     }
     // generate publishers for Kind::Command kind variables
     let mut ros_senders: Vec<(String, tokio::sync::mpsc::Sender<String>)> = vec![];
@@ -63,7 +78,13 @@ pub async fn node(ros_ctx: &Context, prob: &PlanningProblem) -> r2r::Node {
         let _res = tokio::try_join!(writer);
     });
     tokio::task::spawn(async {
-        let recv = runner::ticker::ticker(problem, ros_receivers, ros_senders, Some(state_sender));
+        let recv = runner::ticker::ticker(
+            problem,
+            ros_receivers,
+            ros_handshakers,
+            ros_senders,
+            Some(state_sender),
+        );
         let _res = tokio::try_join!(recv);
     });
     node
