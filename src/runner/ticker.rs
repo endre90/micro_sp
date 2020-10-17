@@ -5,7 +5,7 @@ use tokio::time::{interval, Duration};
 
 /// The runner gets the current measured state, calls the planner when
 /// needed and sets the corresponding sink state from the plan as command.
-pub async fn runner(
+pub async fn ticker(
     prob: PlanningProblem,
     ros_receivers: Vec<(String, tokio::sync::mpsc::Receiver<String>)>,
     ros_senders: Vec<(String, tokio::sync::mpsc::Sender<String>)>,

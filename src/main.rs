@@ -83,7 +83,7 @@ async fn main() -> io::Result<()> {
                 let _res = tokio::try_join!(writer);
             });
             tokio::task::spawn(async {
-                let recv = runner::runner::runner(problem, ros_receivers, ros_senders, state_sender);
+                let recv = runner::ticker::ticker(problem, ros_receivers, ros_senders, state_sender);
                 let _res = tokio::try_join!(recv);
             });
             loop {
