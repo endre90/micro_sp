@@ -1,12 +1,8 @@
 use lib::*;
 use std::io;
 use tokio::sync::mpsc::channel;
-mod publisher;
-mod receiver;
-mod runner;
-mod sender;
 mod models;
-mod state;
+mod runner;
 use r2r::*;
 use std::env;
 
@@ -70,7 +66,7 @@ async fn main() -> io::Result<()> {
                 let (tx, rx) = channel::<String>(10);
                 ros_senders.push((serde_json::to_string(&v)?, tx));
                 tokio::task::spawn(async {
-                    let writer = publisher::publisher(publisher, rx);
+                    let writer = runner::publisher::publisher(publisher, rx);
                     let _res = tokio::try_join!(writer);
                 });
             }
@@ -83,11 +79,11 @@ async fn main() -> io::Result<()> {
             let (tx, rx) = channel::<String>(10);
             let state_sender = (serde_json::to_string(&CompleteState::empty())?, tx);
             tokio::task::spawn(async {
-                let writer = publisher::publisher(state_publisher, rx);
+                let writer = runner::publisher::publisher(state_publisher, rx);
                 let _res = tokio::try_join!(writer);
             });
             tokio::task::spawn(async {
-                let recv = runner::runner(problem, ros_receivers, ros_senders, state_sender);
+                let recv = runner::runner::runner(problem, ros_receivers, ros_senders, state_sender);
                 let _res = tokio::try_join!(recv);
             });
             loop {

@@ -30,19 +30,20 @@
 19. [ ] benchmarks childsnack
 20. [ ] benchmarks gripper
 21. [ ] benchmarks hiking
-22. [ ] make a more general parser for boilerplate domain
-23. [ ] improve runner and don't replan after every state change
-24. [ ] gui needed asap
-25. [x] look into parsing pddls: conclusion: won't work
-26. [ ] fix command lifetime
-27. [x] match published data to sink when fresh timeouts
-28. [ ] compositional algorithm
-29. [ ] when to call the planner
-30. [ ] handle estimated
-31. [x] move model to models
-32. [x] make model launch choice argument
-33. [x] check for measured in domain
-34. [ ] flow graph to readme
+22. [ ] make a more general parser for boilerplate domain ? maybe not
+23. [ ] clear warnings
+24. [ ] improve runner and don't replan after every state change
+25. [ ] gui needed asap
+26. [x] look into parsing pddls: conclusion: won't work
+27. [ ] fix command lifetime
+28. [x] match published data to sink when fresh timeouts
+29. [ ] compositional algorithm
+30. [ ] when to call the planner
+31. [ ] handle estimated
+32. [x] move model to models
+33. [x] make model launch choice argument
+34. [x] check for measured in domain
+35. [ ] flow graph to readme
 
 ### low priority
 1. [ ] improve Qol
