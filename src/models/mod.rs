@@ -1,4 +1,4 @@
 use super::*;
 
-pub mod initial;
+pub mod dummy_robot;
 pub mod blocksworld;

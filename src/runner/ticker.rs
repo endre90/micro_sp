@@ -9,7 +9,7 @@ pub async fn ticker(
     prob: PlanningProblem,
     ros_receivers: Vec<(String, tokio::sync::mpsc::Receiver<String>)>,
     ros_senders: Vec<(String, tokio::sync::mpsc::Sender<String>)>,
-    state_sender: (String, tokio::sync::mpsc::Sender<String>),
+    state_sender: Option<(String, tokio::sync::mpsc::Sender<String>)>,
 ) -> io::Result<()> {
     let measured_arc = Arc::new(Mutex::new(
         serde_json::to_string(&State::new(&vec![], &Kind::Measured)).unwrap(),

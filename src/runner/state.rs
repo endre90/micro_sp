@@ -11,7 +11,7 @@ pub async fn state(
     command_arc: Arc<Mutex<(String, bool)>>,
     ros_receivers: Vec<(String, tokio::sync::mpsc::Receiver<String>)>,
     ros_senders: Vec<(String, tokio::sync::mpsc::Sender<String>)>,
-    state_sender: (String, tokio::sync::mpsc::Sender<String>),
+    state_sender: Option<(String, tokio::sync::mpsc::Sender<String>)>,
 ) -> io::Result<()> {
     let mut measured_list = vec![];
     for r in ros_receivers {
@@ -42,10 +42,16 @@ pub async fn state(
         Instant::now(),
     )));
     let state_amkvp_clone = state_amkvp.clone();
-    tokio::task::spawn(async {
-        let sender = sender::complete_state_sender(state_amkvp, state_sender.1);
-        let _res = tokio::try_join!(sender);
-    });
+    match state_sender {
+        Some(x) => {    
+            tokio::task::spawn(async {
+                let sender = sender::complete_state_sender(state_amkvp, x.1);
+                let _res = tokio::try_join!(sender);
+            });
+        },
+        None => ()
+    }
+    
 
     loop {
         let looping_now = Instant::now();
@@ -80,7 +86,7 @@ pub async fn state(
                 &State::new(&vec![], &Kind::Estimated),
             ))?,
             Instant::now(),
-        );
+        ); 
 
         let _command_vec = &command_list
             .iter()
