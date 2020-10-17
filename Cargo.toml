@@ -21,6 +21,7 @@ lazy_static = "1.4.0"
 crossbeam = "0.7"
 derivative = "2.1.1"
 arrayvec = "0.5.1"
+structopt = "0.3.20"
 
 [dev-dependencies]
 serial_test = "0.4.0"

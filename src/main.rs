@@ -5,6 +5,8 @@ mod models;
 mod runner;
 use r2r::*;
 use std::env;
+use std::path::PathBuf;
+use structopt::StructOpt;
 
 /// A 'micro_sp' ROS2 node is made here. Based on the provided model,
 /// subscribers are generated for measured kind variables and publishers
@@ -12,10 +14,14 @@ use std::env;
 /// their green threads.
 #[tokio::main]
 async fn main() -> io::Result<()> {
-    let args: Vec<String> = env::args().collect();
-    let ha = handle_args(&args);
+
+    let ha = handle_args_2();
+
+    // let args: Vec<String> = env::args().collect();
+    // let ha = handle_args(&args);
 
     match ha.plan_only {
+        
         true => match ha.print_all {
             true => {
                 let result = incremental(&ha.problem);
