@@ -121,7 +121,7 @@ pub fn pprint_result(result: &PlanningResult) -> () {
         println!("trans: {:?}", result.trace[t].trans);
         println!("------------------------------------------------------");
         println!(
-            "       | measured: {:?}",
+            "       | measured:  {:?}",
             sorted(
                 result.trace[t]
                     .source
@@ -133,7 +133,19 @@ pub fn pprint_result(result: &PlanningResult) -> () {
             .collect::<Vec<String>>()
         );
         println!(
-            "source | command: {:?}",
+            "source | handshake: {:?}",
+            sorted(
+                result.trace[t]
+                    .source
+                    .handshake
+                    .vec
+                    .iter()
+                    .map(|x| format!("{} -> {}", x.var.name, x.val))
+            )
+            .collect::<Vec<String>>()
+        );
+        println!(
+            "       | command:   {:?}",
             sorted(
                 result.trace[t]
                     .source
@@ -158,7 +170,7 @@ pub fn pprint_result(result: &PlanningResult) -> () {
         );
         println!("------------------------------------------------------");
         println!(
-            "       | measured: {:?}",
+            "       | measured:  {:?}",
             sorted(
                 result.trace[t]
                     .sink
@@ -170,7 +182,19 @@ pub fn pprint_result(result: &PlanningResult) -> () {
             .collect::<Vec<String>>()
         );
         println!(
-            " sink  | command: {:?}",
+            " sink  | handshake: {:?}",
+            sorted(
+                result.trace[t]
+                    .sink
+                    .handshake
+                    .vec
+                    .iter()
+                    .map(|x| format!("{} -> {}", x.var.name, x.val))
+            )
+            .collect::<Vec<String>>()
+        );
+        println!(
+            "       | command:   {:?}",
             sorted(
                 result.trace[t]
                     .sink

@@ -19,12 +19,21 @@ async fn main() -> io::Result<()> {
             }
         },
         true => {
-
             let ros_ctx = Context::create()
                 .expect("Error 3357ef39-2674-46c8-9841-bd126e70e059: Creating ros context failed.");
-            let mut node = runner::node::node(&ros_ctx, &ha.problem).await;
-            loop {
-                node.spin_once(std::time::Duration::from_millis(10));
+            // let mut node = runner::node::node(&ros_ctx, &ha.problem).await;
+            match ha.dummy {
+                true => {
+                    let mut dummy = runner::dummy::raar_dummy(&ros_ctx, &ha.problem).await;
+                    loop {
+                        // node.spin_once(std::time::Duration::from_millis(10));
+                        dummy.spin_once(std::time::Duration::from_millis(10));
+                    }
+                }
+                false => ()
+                // loop {
+                //     node.spin_once(std::time::Duration::from_millis(10));
+                // },
             }
         }
     }

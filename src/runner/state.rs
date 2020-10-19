@@ -98,7 +98,7 @@ pub async fn state(
 
         *measured_arc.lock().unwrap() = serde_json::to_string(&measured_state)?;
         *handshake_arc.lock().unwrap() = serde_json::to_string(&handshake_state)?;
-        delay_for(Duration::from_millis(10)).await;
+        delay_for(Duration::from_millis(10)).await; // why do I have this?
 
         let sink: State = serde_json::from_str(&command_arc.lock().unwrap().0)?;
         let fresh: bool = command_arc.lock().unwrap().1;
@@ -138,7 +138,7 @@ pub async fn state(
             })
             .collect::<Vec<EnumValue>>();
 
-        let mut interval = interval(Duration::from_millis(100));
+        let mut interval = interval(Duration::from_millis(25));
         interval.tick().await;
         interval.tick().await;
     }

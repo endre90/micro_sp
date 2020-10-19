@@ -62,6 +62,14 @@ pub async fn ticker(
             false => false,
         };
 
+        let not_dummy_measurement = match current_measured_state.vec.len() > 0 {
+            true => current_measured_state
+                .vec
+                .iter()
+                .all(|x| x.val != "dummy_value"),
+            false => false,
+        };
+
         let fresh_handshake = match current_handshake_state.vec.len() > 0 {
             true => current_handshake_state
                 .vec
@@ -72,7 +80,7 @@ pub async fn ticker(
 
         let fresh = fresh_measurement && fresh_handshake;
 
-        if fresh {
+        if fresh && not_dummy_measurement {
             if sink == State::new(&vec![], &Kind::Command) {
                 result = incremental(&refresh_problem(
                     &prob,
