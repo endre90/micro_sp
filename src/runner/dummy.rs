@@ -21,11 +21,11 @@ pub async fn raar_dummy(ros_ctx: &Context, prob: &PlanningProblem) -> r2r::Node 
         .filter(|x| x.kind == Kind::Measured)
         .map(|x| EnumValue::new(x, "dummy_value", None))
         .collect();
-    let hnd_var_vals: Vec<EnumValue> = vars
-        .iter()
-        .filter(|x| x.kind == Kind::Handshake)
-        .map(|x| EnumValue::new(x, "dummy_value", None))
-        .collect();
+    // let hnd_var_vals: Vec<EnumValue> = vars
+    //     .iter()
+    //     .filter(|x| x.kind == Kind::Handshake)
+    //     .map(|x| EnumValue::new(x, "dummy_value", None))
+    //     .collect();
     let cmd_var_vals: Vec<EnumValue> = vars
         .iter()
         .filter(|x| x.kind == Kind::Command)
@@ -56,22 +56,22 @@ pub async fn raar_dummy(ros_ctx: &Context, prob: &PlanningProblem) -> r2r::Node 
             let _res = tokio::try_join!(writer);
         });
     }
-    // generate publishers for Kind::Handshake kind variables
-    let mut ros_handshakers: Vec<(String, tokio::sync::mpsc::Sender<String>)> = vec![];
-    for v in hnd_var_vals.clone() {
-        let publisher = node
-            .create_publisher::<std_msgs::msg::String>(&format!("/{}", v.var.name))
-            .expect("Error f93c6d99-5725-467a-8a96-e49f72b3485f: Creating publishers failed.");
-        let (tx, rx) = channel::<String>(10);
-        ros_handshakers.push((serde_json::to_string(&v).unwrap_or_default(), tx));
-        tokio::task::spawn(async {
-            let writer = runner::publisher::publisher(publisher, rx);
-            let _res = tokio::try_join!(writer);
-        });
-    }
+    // // generate publishers for Kind::Handshake kind variables
+    // let mut ros_handshakers: Vec<(String, tokio::sync::mpsc::Sender<String>)> = vec![];
+    // for v in hnd_var_vals.clone() {
+    //     let publisher = node
+    //         .create_publisher::<std_msgs::msg::String>(&format!("/{}", v.var.name))
+    //         .expect("Error f93c6d99-5725-467a-8a96-e49f72b3485f: Creating publishers failed.");
+    //     let (tx, rx) = channel::<String>(10);
+    //     ros_handshakers.push((serde_json::to_string(&v).unwrap_or_default(), tx));
+    //     tokio::task::spawn(async {
+    //         let writer = runner::publisher::publisher(publisher, rx);
+    //         let _res = tokio::try_join!(writer);
+    //     });
+    // }
 
     tokio::task::spawn(async {
-        let recv = mapper(ros_receivers, ros_handshakers, ros_senders);
+        let recv = mapper(ros_receivers, ros_senders); //, ros_handshakers, ros_senders);
         let _res = tokio::try_join!(recv);
     });
     node
@@ -79,7 +79,7 @@ pub async fn raar_dummy(ros_ctx: &Context, prob: &PlanningProblem) -> r2r::Node 
 
 async fn mapper(
     ros_receivers: Vec<(String, tokio::sync::mpsc::Receiver<String>)>,
-    ros_handshakers: Vec<(String, tokio::sync::mpsc::Sender<String>)>,
+    // ros_handshakers: Vec<(String, tokio::sync::mpsc::Sender<String>)>,
     ros_senders: Vec<(String, tokio::sync::mpsc::Sender<String>)>,
 ) -> io::Result<()> {
     let mut command_list = vec![];
@@ -94,17 +94,17 @@ async fn mapper(
         command_list.push(amkvp1);
     }
 
-    let mut handshake_list = vec![];
-    for r in ros_handshakers {
-        let past_time = Instant::now().checked_sub(Duration::new(6, 0));
-        let amkvp = Arc::new(Mutex::new((r.0.clone(), past_time.unwrap())));
-        let amkvp1 = amkvp.clone();
-        tokio::task::spawn(async {
-            let sender = sender::sender(amkvp, r.1, Arc::new(Mutex::new(0)));
-            let _res = tokio::try_join!(sender);
-        });
-        handshake_list.push(amkvp1);
-    }
+    // let mut handshake_list = vec![];
+    // for r in ros_handshakers {
+    //     let past_time = Instant::now().checked_sub(Duration::new(6, 0));
+    //     let amkvp = Arc::new(Mutex::new((r.0.clone(), past_time.unwrap())));
+    //     let amkvp1 = amkvp.clone();
+    //     tokio::task::spawn(async {
+    //         let sender = sender::sender(amkvp, r.1, Arc::new(Mutex::new(0)));
+    //         let _res = tokio::try_join!(sender);
+    //     });
+    //     handshake_list.push(amkvp1);
+    // }
 
     let mut measured_list = vec![];
     for r in ros_senders {
@@ -155,24 +155,24 @@ async fn mapper(
             })
             .collect::<Vec<EnumValue>>();
 
-        let _handshake_list = &handshake_list
-            .iter()
-            .map(|x| {
-                let des: EnumValue = serde_json::from_str(&x.lock().unwrap().0).unwrap();
-                let dummy = EnumValue::new(&des.var, "dummy_value", None);
-                let get_val: &EnumValue = command_vec
-                    .iter()
-                    .find(|y| y.var.r#type == des.var.r#type)
-                    .unwrap_or(&dummy);
-                let update = EnumValue::new(&des.var, &get_val.val, None);
-                *x.lock().unwrap() = (serde_json::to_string(&update).unwrap(), Instant::now());
-                EnumValue::new(
-                    &des.var,
-                    &update.val,
-                    Some(&looping_now.saturating_duration_since(x.lock().unwrap().1)),
-                )
-            })
-            .collect::<Vec<EnumValue>>();
+        // let _handshake_list = &handshake_list
+        //     .iter()
+        //     .map(|x| {
+        //         let des: EnumValue = serde_json::from_str(&x.lock().unwrap().0).unwrap();
+        //         let dummy = EnumValue::new(&des.var, "dummy_value", None);
+        //         let get_val: &EnumValue = command_vec
+        //             .iter()
+        //             .find(|y| y.var.r#type == des.var.r#type)
+        //             .unwrap_or(&dummy);
+        //         let update = EnumValue::new(&des.var, &get_val.val, None);
+        //         *x.lock().unwrap() = (serde_json::to_string(&update).unwrap(), Instant::now());
+        //         EnumValue::new(
+        //             &des.var,
+        //             &update.val,
+        //             Some(&looping_now.saturating_duration_since(x.lock().unwrap().1)),
+        //         )
+        //     })
+        //     .collect::<Vec<EnumValue>>();
 
         let mut interval = interval(Duration::from_millis(25));
         interval.tick().await;

@@ -40,7 +40,7 @@ pub enum Paradigm {
 #[derive(Debug, PartialEq, Clone, PartialOrd, Eq, Ord, Serialize, Deserialize)]
 pub enum Kind {
     Measured,
-    Handshake,
+    // Handshake,
     Command,
     Estimated,
 }
@@ -139,7 +139,7 @@ impl State {
 #[derive(Debug, PartialEq, Clone, PartialOrd, Eq, Ord, Serialize, Deserialize)]
 pub struct CompleteState {
     pub measured: State,
-    pub handshake: State,
+    // pub handshake: State,
     pub command: State,
     pub estimated: State,
 }
@@ -149,7 +149,7 @@ impl CompleteState {
     pub fn empty() -> CompleteState {
         CompleteState {
             measured: State::new(&vec![], &Kind::Measured),
-            handshake: State::new(&vec![], &Kind::Handshake),
+            // handshake: State::new(&vec![], &Kind::Handshake),
             command: State::new(&vec![], &Kind::Command),
             estimated: State::new(&vec![], &Kind::Estimated),
         }
@@ -158,7 +158,7 @@ impl CompleteState {
     /// command and estimated state. States can also be empty.
     pub fn from_states(
         measured: &State,
-        handshake: &State,
+        // handshake: &State,
         command: &State,
         estimated: &State,
     ) -> CompleteState {
@@ -167,10 +167,10 @@ impl CompleteState {
                 true => measured.to_owned(),
                 false => panic!("kind must match when constructing state"),
             },
-            handshake: match handshake.kind == Kind::Handshake {
-                true => handshake.to_owned(),
-                false => panic!("kind must match when constructing state"),
-            },
+            // handshake: match handshake.kind == Kind::Handshake {
+            //     true => handshake.to_owned(),
+            //     false => panic!("kind must match when constructing state"),
+            // },
             command: match command.kind == Kind::Command {
                 true => command.to_owned(),
                 false => panic!("kind must match when constructing state"),
@@ -191,13 +191,13 @@ impl CompleteState {
                     .collect(),
                 &Kind::Measured,
             ),
-            handshake: State::new(
-                &vec.iter()
-                    .filter(|x| x.var.kind == Kind::Handshake)
-                    .map(|x| x.to_owned())
-                    .collect(),
-                &Kind::Handshake,
-            ),
+            // handshake: State::new(
+            //     &vec.iter()
+            //         .filter(|x| x.var.kind == Kind::Handshake)
+            //         .map(|x| x.to_owned())
+            //         .collect(),
+            //     &Kind::Handshake,
+            // ),
             command: State::new(
                 &vec.iter()
                     .filter(|x| x.var.kind == Kind::Command)

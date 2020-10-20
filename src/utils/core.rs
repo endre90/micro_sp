@@ -77,11 +77,11 @@ pub fn get_planning_result(
             .filter(|x| x.var.kind == Kind::Measured)
             .map(|y| y.clone())
             .collect::<Vec<EnumValue>>();
-        let handshake_source: Vec<EnumValue> = enum_vals_source
-            .iter()
-            .filter(|x| x.var.kind == Kind::Handshake)
-            .map(|y| y.clone())
-            .collect::<Vec<EnumValue>>();
+        // let handshake_source: Vec<EnumValue> = enum_vals_source
+        //     .iter()
+        //     .filter(|x| x.var.kind == Kind::Handshake)
+        //     .map(|y| y.clone())
+        //     .collect::<Vec<EnumValue>>();
         let command_source: Vec<EnumValue> = enum_vals_source
             .iter()
             .filter(|x| x.var.kind == Kind::Command)
@@ -98,11 +98,11 @@ pub fn get_planning_result(
             .filter(|x| x.var.kind == Kind::Measured)
             .map(|y| y.clone())
             .collect();
-        let handshake_sink: Vec<EnumValue> = enum_vals_sink
-            .iter()
-            .filter(|x| x.var.kind == Kind::Handshake)
-            .map(|y| y.clone())
-            .collect();
+        // let handshake_sink: Vec<EnumValue> = enum_vals_sink
+        //     .iter()
+        //     .filter(|x| x.var.kind == Kind::Handshake)
+        //     .map(|y| y.clone())
+        //     .collect();
         let command_sink: Vec<EnumValue> = enum_vals_sink
             .iter()
             .filter(|x| x.var.kind == Kind::Command)
@@ -125,14 +125,14 @@ pub fn get_planning_result(
         trace.push(PlanningFrame {
             source: CompleteState::from_states(
                 &State::new(&measured_source, &Kind::Measured),
-                &State::new(&handshake_source, &Kind::Handshake),
+                // &State::new(&handshake_source, &Kind::Handshake),
                 &State::new(&command_source, &Kind::Command),
                 &State::new(&estimated_source, &Kind::Estimated),
             ),
             trans: String::from(trans),
             sink: CompleteState::from_states(
                 &State::new(&measured_sink, &Kind::Measured),
-                &State::new(&handshake_sink, &Kind::Handshake),
+                // &State::new(&handshake_sink, &Kind::Handshake),
                 &State::new(&command_sink, &Kind::Command),
                 &State::new(&estimated_sink, &Kind::Estimated),
             ),

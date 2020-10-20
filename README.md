@@ -28,7 +28,7 @@ A dummy driver (inverse of a micro_sp node) can be launched providing the argume
 5.  [x] proper command line arguments
 6.  [ ] need new "start/stop running" and "set goal" topics to communicate with the runner
 7.  [ ] the "start/stop running" should actually set the reference values     ?       
-8.  [ ] have to add delay for dummy act             
+8.  [x] have to add delay for dummy act             
 9.  [ ] add boolean variables
 10. [x] add handshake kind
 11. [ ] the algorithms should probably be solver agnostic
