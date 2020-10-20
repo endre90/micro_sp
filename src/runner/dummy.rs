@@ -94,19 +94,13 @@ async fn mapper(
         command_list.push(amkvp1);
     }
 
-    // thread::spawn(move || {
-    //     send.send("Hello world!").unwrap();
-    //     thread::sleep(Duration::from_secs(2)); // block for two seconds
-    //     send.send("Delayed for 2 seconds").unwrap();
-    // });
-
     let mut handshake_list = vec![];
     for r in ros_handshakers {
         let past_time = Instant::now().checked_sub(Duration::new(6, 0));
         let amkvp = Arc::new(Mutex::new((r.0.clone(), past_time.unwrap())));
         let amkvp1 = amkvp.clone();
         tokio::task::spawn(async {
-            let sender = sender::sender(amkvp, r.1);
+            let sender = sender::sender(amkvp, r.1, Arc::new(Mutex::new(0)));
             let _res = tokio::try_join!(sender);
         });
         handshake_list.push(amkvp1);
@@ -118,16 +112,17 @@ async fn mapper(
         let amkvp = Arc::new(Mutex::new((r.0.clone(), past_time.unwrap())));
         let amkvp1 = amkvp.clone();
         tokio::task::spawn(async {
-            delay_for(Duration::from_millis(2000)).await;
-            let sender = sender::sender(amkvp, r.1);
+            let sender = sender::sender(amkvp, r.1, Arc::new(Mutex::new(4000)));
             let _res = tokio::try_join!(sender);
         });
         measured_list.push(amkvp1);
     }
 
+    // let mut delay_acc = ["dummy_value"; 100];
+
     loop {
         let looping_now = Instant::now();
-
+        // delay_for(Duration::from_millis(3000)).await;
         let command_vec = &command_list
             .iter()
             .map(|x| {
@@ -140,37 +135,44 @@ async fn mapper(
             })
             .collect::<Vec<EnumValue>>();
 
-        let _measured_vec = &measured_list.iter().map(|x| {
-            let des: EnumValue = serde_json::from_str(&x.lock().unwrap().0).unwrap();
-            let dummy = EnumValue::new(&des.var, "dummy_value", None);
-            let get_val: &EnumValue = command_vec
-                .iter()
-                .find(|y| y.var.r#type == des.var.r#type)
-                .unwrap_or(&dummy);
-            let update = EnumValue::new(&des.var, &get_val.val, None);
-            *x.lock().unwrap() = (serde_json::to_string(&update).unwrap(), Instant::now());
-            EnumValue::new(
-                &des.var,
-                &update.val,
-                Some(&looping_now.saturating_duration_since(x.lock().unwrap().1)),
-            )
-        }).collect::<Vec<EnumValue>>();
+        let _measured_vec = &measured_list
+            .iter()
+            .map(|x| {
+                let des: EnumValue = serde_json::from_str(&x.lock().unwrap().0).unwrap();
+                let dummy = EnumValue::new(&des.var, "dummy_value", None);
+                let get_val: &EnumValue = command_vec
+                    .iter()
+                    .find(|y| y.var.r#type == des.var.r#type)
+                    .unwrap_or(&dummy);
+                let update = EnumValue::new(&des.var, &get_val.val, None);
 
-        let _handshake_list = &handshake_list.iter().map(|x| {
-            let des: EnumValue = serde_json::from_str(&x.lock().unwrap().0).unwrap();
-            let dummy = EnumValue::new(&des.var, "dummy_value", None);
-            let get_val: &EnumValue = command_vec
-                .iter()
-                .find(|y| y.var.r#type == des.var.r#type)
-                .unwrap_or(&dummy);
-            let update = EnumValue::new(&des.var, &get_val.val, None);
-            *x.lock().unwrap() = (serde_json::to_string(&update).unwrap(), Instant::now());
-            EnumValue::new(
-                &des.var,
-                &update.val,
-                Some(&looping_now.saturating_duration_since(x.lock().unwrap().1)),
-            )
-        }).collect::<Vec<EnumValue>>();
+                *x.lock().unwrap() = (serde_json::to_string(&update).unwrap(), Instant::now());
+                EnumValue::new(
+                    &des.var,
+                    &update.val,
+                    Some(&looping_now.saturating_duration_since(x.lock().unwrap().1)),
+                )
+            })
+            .collect::<Vec<EnumValue>>();
+
+        let _handshake_list = &handshake_list
+            .iter()
+            .map(|x| {
+                let des: EnumValue = serde_json::from_str(&x.lock().unwrap().0).unwrap();
+                let dummy = EnumValue::new(&des.var, "dummy_value", None);
+                let get_val: &EnumValue = command_vec
+                    .iter()
+                    .find(|y| y.var.r#type == des.var.r#type)
+                    .unwrap_or(&dummy);
+                let update = EnumValue::new(&des.var, &get_val.val, None);
+                *x.lock().unwrap() = (serde_json::to_string(&update).unwrap(), Instant::now());
+                EnumValue::new(
+                    &des.var,
+                    &update.val,
+                    Some(&looping_now.saturating_duration_since(x.lock().unwrap().1)),
+                )
+            })
+            .collect::<Vec<EnumValue>>();
 
         let mut interval = interval(Duration::from_millis(25));
         interval.tick().await;

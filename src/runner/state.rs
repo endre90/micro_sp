@@ -45,7 +45,7 @@ pub async fn state(
         let amkvp = Arc::new(Mutex::new((r.0.clone(), past_time.unwrap())));
         let amkvp1 = amkvp.clone();
         tokio::task::spawn(async {
-            let sender = sender::sender(amkvp, r.1);
+            let sender = sender::sender(amkvp, r.1, Arc::new(Mutex::new(0)));
             let _res = tokio::try_join!(sender);
         });
         command_list.push(amkvp1);
