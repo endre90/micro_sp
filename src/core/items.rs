@@ -218,19 +218,26 @@ impl CompleteState {
 
 /// A transition that updates the state according to the guard and update predicates.
 /// The transition has a kind since it is assumed that transitions are changing one
-/// variable at a time.
+/// variable at a time. When incremental planning, the guard and update predicates
+/// are concjunctions of predicated from the guard and update vector. During
+/// compositional planning, the guard and update predicates are a conjunction
+/// of activated predicates from the vectors.
 #[derive(Debug, PartialEq, Clone, PartialOrd, Eq, Ord)]
 pub struct Transition {
     pub name: String,
-    pub guard: Predicate,
-    pub update: Predicate,
+    pub guard: Vec<Predicate>,
+    pub update: Vec<Predicate>,
     pub kind: Kind,
 }
 
 impl Transition {
     /// Make a new named transition from guard and update predicates.
-    pub fn new(name: &str, guard: &Predicate, update: &Predicate) -> Transition {
-        let updates = get_predicate_vars(&update);
+    pub fn new(name: &str, guard: &Vec<Predicate>, update: &Vec<Predicate>) -> Transition {
+        let updates: Vec<EnumVariable> = update
+            .iter()
+            .map(|x| get_predicate_vars(&x))
+            .flatten()
+            .collect();
         Transition {
             name: name.to_string(),
             guard: guard.to_owned(),

@@ -18,7 +18,7 @@ pub fn raar_model() -> PlanningProblem {
     // let act_ref_pos = EnumVariable::new("act_ref_pos", &pos_domain, "pos", None, &Kind::Handshake);
 
     // let act_ref_stat =
-        // EnumVariable::new("act_ref_stat", &stat_domain, "stat", None, &Kind::Handshake);
+    // EnumVariable::new("act_ref_stat", &stat_domain, "stat", None, &Kind::Handshake);
 
     let ref_pos_dummy = Predicate::EQ(EnumValue::new(&ref_pos, "dummy_value", None));
     let ref_stat_dummy = Predicate::EQ(EnumValue::new(&ref_pos, "dummy_value", None));
@@ -81,82 +81,104 @@ pub fn raar_model() -> PlanningProblem {
     // let act_ref_active = Predicate::EQ(EnumValue::new(&act_ref_stat, "active", None));
     // let not_act_ref_active = Predicate::NOT(Box::new(act_ref_active.clone()));
 
+
     let t1 = Transition::new(
         "start_activate",
-        &Predicate::AND(vec![not_act_active.clone(), not_ref_active.clone(), not_any_measured_dummy.clone()]), //, not_act_ref_active.clone(), not_any_measured_dummy.clone()]),
-        &Predicate::AND(vec![not_act_active.clone(), ref_active.clone()]),
+        &vec![Predicate::AND(vec![
+            not_act_active.clone(),
+            not_ref_active.clone(),
+            not_any_measured_dummy.clone(),
+            Predicate::EQRR(act_pos.clone(), ref_pos.clone()),
+        ])],
+        &vec![Predicate::AND(vec![
+            not_act_active.clone(),
+            ref_active.clone(),
+        ])],
     );
 
     let t2 = Transition::new(
         "finish_activate",
-        &Predicate::AND(vec![not_act_active.clone(), ref_active.clone(), not_any_measured_dummy.clone()]), // act_ref_active.clone(), not_any_measured_dummy.clone()]),
-        &Predicate::AND(vec![act_active.clone(), ref_active.clone()]),
+        &vec![Predicate::AND(vec![
+            not_act_active.clone(),
+            ref_active.clone(),
+            not_any_measured_dummy.clone(),
+            Predicate::EQRR(act_pos.clone(), ref_pos.clone()),
+        ])],
+        &vec![Predicate::AND(vec![act_active.clone(), ref_active.clone()])],
     );
 
     let t3 = Transition::new(
         "start_deactivate",
-        &Predicate::AND(vec![not_act_idle.clone(), not_ref_idle.clone(), not_any_measured_dummy.clone()]), // not_act_ref_idle.clone(), not_any_measured_dummy.clone()]),
-        &Predicate::AND(vec![ref_idle.clone(), ref_idle.clone()]),
+        &vec![Predicate::AND(vec![
+            not_act_idle.clone(),
+            not_ref_idle.clone(),
+            not_any_measured_dummy.clone(),
+            Predicate::EQRR(act_pos.clone(), ref_pos.clone()),
+        ])],
+        &vec![Predicate::AND(vec![ref_idle.clone(), ref_idle.clone()])],
     );
 
     let t4 = Transition::new(
         "finish_deactivate",
-        &Predicate::AND(vec![not_act_active.clone(), ref_idle.clone(), not_any_measured_dummy.clone()]), // not_any_measured_dummy.clone()]),
-        &Predicate::AND(vec![act_idle.clone(), ref_idle.clone()]),
+        &vec![Predicate::AND(vec![
+            not_act_active.clone(),
+            ref_idle.clone(),
+            not_any_measured_dummy.clone(),
+            Predicate::EQRR(act_pos.clone(), ref_pos.clone()),
+        ])],
+        &vec![Predicate::AND(vec![act_idle.clone(), ref_idle.clone()])],
     );
 
     let t5 = Transition::new(
         "start_move_left",
-        &Predicate::AND(vec![
+        &vec![Predicate::AND(vec![
             not_act_left.clone(),
             not_ref_left.clone(),
             act_active.clone(),
             ref_active.clone(),
-            not_any_measured_dummy.clone()
-        ]),
-        &Predicate::AND(vec![ref_left.clone(), not_act_left.clone()]),
+            Predicate::EQRR(act_stat.clone(), ref_stat.clone()),
+            not_any_measured_dummy.clone(),
+        ])],
+        &vec![Predicate::AND(vec![ref_left.clone(), not_act_left.clone()])],
     );
 
     let t6 = Transition::new(
         "finish_move_left",
-        &Predicate::AND(vec![
+        &vec![Predicate::AND(vec![
             not_act_left.clone(),
             ref_left.clone(),
             act_active.clone(),
             ref_active.clone(),
-            not_any_measured_dummy.clone()
-        ]),
-        &Predicate::AND(vec![
-            act_left.clone(),
-            ref_left.clone()
-        ]),
+            Predicate::EQRR(act_stat.clone(), ref_stat.clone()),
+            not_any_measured_dummy.clone(),
+        ])],
+        &vec![Predicate::AND(vec![act_left.clone(), ref_left.clone()])],
     );
 
     let t7 = Transition::new(
         "start_move_right",
-        &Predicate::AND(vec![
+        &vec![Predicate::AND(vec![
             not_act_right.clone(),
             not_ref_right.clone(),
             act_active.clone(),
             ref_active.clone(),
-            not_any_measured_dummy.clone()
-        ]),
-        &Predicate::AND(vec![ref_right.clone(), not_act_right.clone()]),
+            Predicate::EQRR(act_stat.clone(), ref_stat.clone()),
+            not_any_measured_dummy.clone(),
+        ])],
+        &vec![Predicate::AND(vec![ref_right.clone(), not_act_right.clone()])],
     );
 
     let t8 = Transition::new(
         "finish_move_right",
-        &Predicate::AND(vec![
+        &vec![Predicate::AND(vec![
             not_act_right.clone(),
             ref_right.clone(),
             act_active.clone(),
             ref_active.clone(),
-            not_any_measured_dummy.clone()
-        ]),
-        &Predicate::AND(vec![
-            act_right.clone(),
-            ref_right.clone()
-        ]),
+            Predicate::EQRR(act_stat.clone(), ref_stat.clone()),
+            not_any_measured_dummy.clone(),
+        ])],
+        &vec![Predicate::AND(vec![act_right.clone(), ref_right.clone()])],
     );
 
     let problem = PlanningProblem::new(

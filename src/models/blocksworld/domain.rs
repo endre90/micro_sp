@@ -11,7 +11,7 @@ pub fn blocksworld_model_enumerated_booleans(blocks: &Vec<&str>) -> (Vec<Transit
     for block in blocks {
         pick_up_transitions.push(Transition::new(
             &format!("pick_up_{}", block),
-            &Predicate::AND(vec![
+            &vec![Predicate::AND(vec![
                 Predicate::EQ(EnumValue::new(
                     &EnumVariable::new(
                         &format!("clear_{}", block),
@@ -45,7 +45,7 @@ pub fn blocksworld_model_enumerated_booleans(blocks: &Vec<&str>) -> (Vec<Transit
                     "true",
                     None,
                 )),
-            ]),
+            ])],
             &Predicate::AND(vec![
                 Predicate::EQ(EnumValue::new(
                     &EnumVariable::new(

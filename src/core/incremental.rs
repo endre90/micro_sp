@@ -12,7 +12,7 @@ pub struct PlanningProblem {
     pub trans: Vec<Transition>,
     pub invar: Predicate,
     pub max_steps: u32,
-    pub paradigm: Paradigm
+    pub paradigm: Paradigm,
 }
 
 /// A frame holds states about what happens in a step.
@@ -41,7 +41,7 @@ impl PlanningProblem {
         trans: &Vec<Transition>,
         invar: &Predicate,
         max_steps: &u32,
-        paradigm: &Paradigm
+        paradigm: &Paradigm,
     ) -> PlanningProblem {
         PlanningProblem {
             name: name.to_string(),
@@ -50,7 +50,7 @@ impl PlanningProblem {
             trans: trans.to_owned(),
             invar: invar.to_owned(),
             max_steps: max_steps.to_owned(),
-            paradigm: paradigm.to_owned()
+            paradigm: paradigm.to_owned(),
         }
     }
 }
@@ -63,7 +63,12 @@ pub fn keep_variable_values(
     trans: &Transition,
     step: &u32,
 ) -> Z3_ast {
-    let changed = get_predicate_vars(&trans.update);
+    let changed = trans
+        .update
+        .iter()
+        .map(|x| get_predicate_vars(&x))
+        .flatten()
+        .collect();
     let unchanged = IterOps::difference(vars, &changed);
 
     ANDZ3::new(
@@ -95,7 +100,7 @@ pub fn keep_variable_values(
 }
 
 /// The incremental algorithm that calls z3 to find a plan.
-/// 
+///
 /// Based on Gocht and Balyo's algorithm from 2017.
 pub fn incremental(prob: &PlanningProblem) -> PlanningResult {
     let cfg = ConfigZ3::new();
@@ -107,7 +112,6 @@ pub fn incremental(prob: &PlanningProblem) -> PlanningResult {
 
     SlvPushZ3::new(&ctx, &slv); // create backtracking point
     SlvAssertZ3::new(&ctx, &slv, predicate_to_ast(&ctx, &prob.goal, &0));
-    
 
     let now = Instant::now();
     let mut plan_found: bool = false;
@@ -138,8 +142,12 @@ pub fn incremental(prob: &PlanningProblem) -> PlanningResult {
                                             ),
                                             BoolZ3::new(&ctx, true),
                                         ),
-                                        predicate_to_ast(&ctx, &x.guard, &(step - 1)),
-                                        predicate_to_ast(&ctx, &x.update, &(step)),
+                                        predicate_to_ast(
+                                            &ctx,
+                                            &Predicate::AND(x.guard.clone()),
+                                            &(step - 1),
+                                        ),
+                                        predicate_to_ast(&ctx, &Predicate::AND(x.update.clone()), &(step)),
                                         keep_variable_values(
                                             &ctx,
                                             &get_problem_vars(&prob),
@@ -156,14 +164,12 @@ pub fn incremental(prob: &PlanningProblem) -> PlanningResult {
                 SlvAssertZ3::new(&ctx, &slv, predicate_to_ast(&ctx, &prob.invar, &step));
                 SlvPushZ3::new(&ctx, &slv);
                 SlvAssertZ3::new(&ctx, &slv, predicate_to_ast(&ctx, &prob.goal, &step));
-                
 
                 // let asserts = SlvGetAssertsZ3::new(&ctx, &slv);
                 // let asrtvec = Z3AstVectorToVectorAstZ3::new(&ctx, asserts);
                 // for asrt in asrtvec {
                 //     println!("{}", AstToStringZ3::new(&ctx, asrt));
                 // }
-
             }
             true => {
                 plan_found = true;
@@ -173,8 +179,6 @@ pub fn incremental(prob: &PlanningProblem) -> PlanningResult {
     }
 
     let planning_time = now.elapsed();
-
-  
 
     match plan_found {
         true => get_planning_result(

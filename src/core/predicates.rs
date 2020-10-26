@@ -11,6 +11,7 @@ pub enum Predicate {
     AND(Vec<Predicate>),
     OR(Vec<Predicate>),
     EQ(EnumValue),
+    EQRR(EnumVariable, EnumVariable),
     PBEQ(Vec<Predicate>, i32)
 }
 
@@ -27,6 +28,18 @@ pub fn predicate_to_ast(ctx: &ContextZ3, pred: &Predicate, step: &u32) -> Z3_ast
             let elems = &sort.enum_asts;
             let index = x.var.domain.iter().position(|r| r == &x.val).unwrap_or_default();
             EQZ3::new(&ctx, EnumVarZ3::new(&ctx, sort.r, format!("{}_s{}", x.var.name.to_string(), step).as_str()), elems[index])
+        },
+        Predicate::EQRR(x, y) => {
+            match x.r#type == y.r#type {
+                true => {
+                    let sort_1 = EnumSortZ3::new(&ctx, &x.r#type, x.domain.iter().map(|x| x.as_str()).collect());
+                    let sort_2 = EnumSortZ3::new(&ctx, &y.r#type, y.domain.iter().map(|y| y.as_str()).collect());
+                    let v_1 = EnumVarZ3::new(&ctx, sort_1.r, format!("{}_s{}", x.name.to_string(), step).as_str());
+                    let v_2 = EnumVarZ3::new(&ctx, sort_2.r, format!("{}_s{}", y.name.to_string(), step).as_str());
+                    EQZ3::new(&ctx, v_1, v_2)
+                }
+                false => panic!("Error c8022e33-ed30-43af-8e45-8cfdaf09e8a5: Sorts '{}' and '{}' are incompatible.", x.r#type, y.r#type)                
+            }
         },
         Predicate::PBEQ(x, k) => PBEQZ3::new(&ctx, x.iter().map(|z| predicate_to_ast(&ctx, z, step)).collect(), *k),
     }

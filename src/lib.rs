@@ -8,6 +8,7 @@ pub mod core;
 pub use crate::core::items::*;
 pub use crate::core::predicates::*;
 pub use crate::core::incremental::*;
+pub use crate::core::compositional::*;
 
 pub mod runner;
 pub use crate::runner::publisher::*;
