@@ -34,10 +34,10 @@ fn test_generate_predicate() {
     let var2_c = EnumVariable::new("var2_c", &d, "t2", Some(&p2), &Kind::Command);
 
     let pp = ParamPredicate::new(&vec![
-        Predicate::EQ(EnumValue::new(&var1_m, "a", None)),
-        Predicate::EQ(EnumValue::new(&var1_c, "b", None)),
-        Predicate::EQ(EnumValue::new(&var2_m, "c", None)),
-        Predicate::EQ(EnumValue::new(&var2_c, "a", None)),
+        Predicate::SET(EnumValue::new(&var1_m, "a", None)),
+        Predicate::SET(EnumValue::new(&var1_c, "b", None)),
+        Predicate::SET(EnumValue::new(&var2_m, "c", None)),
+        Predicate::SET(EnumValue::new(&var2_c, "a", None)),
     ]);
 
     let params = vec![p1, p2];

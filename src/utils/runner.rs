@@ -28,7 +28,7 @@ pub fn state_to_predicate(state: &State) -> Predicate {
             .vec
             .iter()
             .map(|x| {
-                Predicate::EQ(EnumValue::new(
+                Predicate::SET(EnumValue::new(
                     &EnumVariable::new(
                         &x.var.name,
                         &x.var.domain.iter().map(|x| x.as_str()).collect(),

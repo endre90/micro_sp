@@ -85,7 +85,7 @@ pub fn parser(name: &str) -> PlanningProblem {
     let unclear_vec = IterOps::difference(blocks.clone(), clear_vec.clone());
 
     for x in clear_vec {
-        clear_predicates.push(Predicate::EQ(EnumValue::new(
+        clear_predicates.push(Predicate::SET(EnumValue::new(
             &EnumVariable::new(
                 &format!("clear_{}", x),
                 &domain,
@@ -99,7 +99,7 @@ pub fn parser(name: &str) -> PlanningProblem {
     }
 
     for x in unclear_vec {
-        clear_predicates.push(Predicate::EQ(EnumValue::new(
+        clear_predicates.push(Predicate::SET(EnumValue::new(
             &EnumVariable::new(
                 &format!("clear_{}", x),
                 &domain,
@@ -114,7 +114,7 @@ pub fn parser(name: &str) -> PlanningProblem {
 
     let mut ontable_predicates = vec![];
     for x in ontable_vec {
-        ontable_predicates.push(Predicate::EQ(EnumValue::new(
+        ontable_predicates.push(Predicate::SET(EnumValue::new(
             &EnumVariable::new(
                 &format!("ontable_{}", x),
                 &domain,
@@ -129,7 +129,7 @@ pub fn parser(name: &str) -> PlanningProblem {
 
     let mut on_predicates = vec![];
     for (b1, b2) in on_init {
-        on_predicates.push(Predicate::EQ(EnumValue::new(
+        on_predicates.push(Predicate::SET(EnumValue::new(
             &EnumVariable::new(
                 &format!("{}_on_{}", b1, b2),
                 &domain,
@@ -146,7 +146,7 @@ pub fn parser(name: &str) -> PlanningProblem {
         Predicate::AND(clear_predicates),
         Predicate::AND(ontable_predicates),
         Predicate::AND(on_predicates),
-        Predicate::EQ(EnumValue::new(
+        Predicate::SET(EnumValue::new(
             &EnumVariable::new(
                 &format!("hand_empty"),
                 &domain,
@@ -161,7 +161,7 @@ pub fn parser(name: &str) -> PlanningProblem {
 
     let mut goal_on_predicates = vec![];
     for (b1, b2) in on_goal {
-        goal_on_predicates.push(Predicate::EQ(EnumValue::new(
+        goal_on_predicates.push(Predicate::SET(EnumValue::new(
             &EnumVariable::new(
                 &format!("{}_on_{}", b1, b2),
                 &domain,

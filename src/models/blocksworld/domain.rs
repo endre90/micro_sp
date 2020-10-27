@@ -12,7 +12,7 @@ pub fn blocksworld_model_enumerated_booleans(blocks: &Vec<&str>) -> (Vec<Transit
         pick_up_transitions.push(Transition::new(
             &format!("pick_up_{}", block),
             &Predicate::AND(vec![
-                Predicate::EQ(EnumValue::new(
+                Predicate::SET(EnumValue::new(
                     &EnumVariable::new(
                         &format!("clear_{}", block),
                         &domain,
@@ -23,7 +23,7 @@ pub fn blocksworld_model_enumerated_booleans(blocks: &Vec<&str>) -> (Vec<Transit
                     "true",
                     None,
                 )),
-                Predicate::EQ(EnumValue::new(
+                Predicate::SET(EnumValue::new(
                     &EnumVariable::new(
                         &format!("ontable_{}", block),
                         &domain,
@@ -34,7 +34,7 @@ pub fn blocksworld_model_enumerated_booleans(blocks: &Vec<&str>) -> (Vec<Transit
                     "true",
                     None,
                 )),
-                Predicate::EQ(EnumValue::new(
+                Predicate::SET(EnumValue::new(
                     &EnumVariable::new(
                         &format!("hand_empty"),
                         &domain,
@@ -47,7 +47,7 @@ pub fn blocksworld_model_enumerated_booleans(blocks: &Vec<&str>) -> (Vec<Transit
                 )),
             ]),
             &Predicate::AND(vec![
-                Predicate::EQ(EnumValue::new(
+                Predicate::SET(EnumValue::new(
                     &EnumVariable::new(
                         &format!("ontable_{}", block),
                         &domain,
@@ -58,7 +58,7 @@ pub fn blocksworld_model_enumerated_booleans(blocks: &Vec<&str>) -> (Vec<Transit
                     "false",
                     None,
                 )),
-                Predicate::EQ(EnumValue::new(
+                Predicate::SET(EnumValue::new(
                     &EnumVariable::new(
                         &format!("clear_{}", block),
                         &domain,
@@ -69,7 +69,7 @@ pub fn blocksworld_model_enumerated_booleans(blocks: &Vec<&str>) -> (Vec<Transit
                     "false",
                     None,
                 )),
-                Predicate::EQ(EnumValue::new(
+                Predicate::SET(EnumValue::new(
                     &EnumVariable::new(
                         &format!("holding_{}", block),
                         &domain,
@@ -80,7 +80,7 @@ pub fn blocksworld_model_enumerated_booleans(blocks: &Vec<&str>) -> (Vec<Transit
                     "true",
                     None,
                 )),
-                Predicate::EQ(EnumValue::new(
+                Predicate::SET(EnumValue::new(
                     &EnumVariable::new(
                         &format!("hand_empty"),
                         &domain,
@@ -98,7 +98,7 @@ pub fn blocksworld_model_enumerated_booleans(blocks: &Vec<&str>) -> (Vec<Transit
     for block in blocks {
         put_down_transitions.push(Transition::new(
             &format!("put_down_{}", block),
-            &Predicate::EQ(EnumValue::new(
+            &Predicate::SET(EnumValue::new(
                 &EnumVariable::new(
                     &format!("holding_{}", block),
                     &domain,
@@ -110,7 +110,7 @@ pub fn blocksworld_model_enumerated_booleans(blocks: &Vec<&str>) -> (Vec<Transit
                 None,
             )),
             &Predicate::AND(vec![
-                Predicate::EQ(EnumValue::new(
+                Predicate::SET(EnumValue::new(
                     &EnumVariable::new(
                         &format!("holding_{}", block),
                         &domain,
@@ -121,7 +121,7 @@ pub fn blocksworld_model_enumerated_booleans(blocks: &Vec<&str>) -> (Vec<Transit
                     "false",
                     None,
                 )),
-                Predicate::EQ(EnumValue::new(
+                Predicate::SET(EnumValue::new(
                     &EnumVariable::new(
                         &format!("clear_{}", block),
                         &domain,
@@ -132,7 +132,7 @@ pub fn blocksworld_model_enumerated_booleans(blocks: &Vec<&str>) -> (Vec<Transit
                     "true",
                     None,
                 )),
-                Predicate::EQ(EnumValue::new(
+                Predicate::SET(EnumValue::new(
                     &EnumVariable::new(
                         &format!("ontable_{}", block),
                         &domain,
@@ -143,7 +143,7 @@ pub fn blocksworld_model_enumerated_booleans(blocks: &Vec<&str>) -> (Vec<Transit
                     "true",
                     None,
                 )),
-                Predicate::EQ(EnumValue::new(
+                Predicate::SET(EnumValue::new(
                     &EnumVariable::new(
                         &format!("hand_empty"),
                         &domain,
@@ -164,7 +164,7 @@ pub fn blocksworld_model_enumerated_booleans(blocks: &Vec<&str>) -> (Vec<Transit
                 stack_transitions.push(Transition::new(
                     &format!("stack_{}_on_{}", b1, b2),
                     &Predicate::AND(vec![
-                        Predicate::EQ(EnumValue::new(
+                        Predicate::SET(EnumValue::new(
                             &EnumVariable::new(
                                 &format!("clear_{}", b2),
                                 &domain,
@@ -175,7 +175,7 @@ pub fn blocksworld_model_enumerated_booleans(blocks: &Vec<&str>) -> (Vec<Transit
                             "true",
                             None,
                         )),
-                        Predicate::EQ(EnumValue::new(
+                        Predicate::SET(EnumValue::new(
                             &EnumVariable::new(
                                 &format!("holding_{}", b1),
                                 &domain,
@@ -188,7 +188,7 @@ pub fn blocksworld_model_enumerated_booleans(blocks: &Vec<&str>) -> (Vec<Transit
                         )),
                     ]),
                     &Predicate::AND(vec![
-                        Predicate::EQ(EnumValue::new(
+                        Predicate::SET(EnumValue::new(
                             &EnumVariable::new(
                                 &format!("holding_{}", b1),
                                 &domain,
@@ -199,7 +199,7 @@ pub fn blocksworld_model_enumerated_booleans(blocks: &Vec<&str>) -> (Vec<Transit
                             "false",
                             None,
                         )),
-                        Predicate::EQ(EnumValue::new(
+                        Predicate::SET(EnumValue::new(
                             &EnumVariable::new(
                                 &format!("clear_{}", b2),
                                 &domain,
@@ -210,7 +210,7 @@ pub fn blocksworld_model_enumerated_booleans(blocks: &Vec<&str>) -> (Vec<Transit
                             "false",
                             None,
                         )),
-                        Predicate::EQ(EnumValue::new(
+                        Predicate::SET(EnumValue::new(
                             &EnumVariable::new(
                                 &format!("clear_{}", b1),
                                 &domain,
@@ -221,7 +221,7 @@ pub fn blocksworld_model_enumerated_booleans(blocks: &Vec<&str>) -> (Vec<Transit
                             "true",
                             None,
                         )),
-                        Predicate::EQ(EnumValue::new(
+                        Predicate::SET(EnumValue::new(
                             &EnumVariable::new(
                                 &format!("{}_on_{}", b1, b2),
                                 &domain,
@@ -232,7 +232,7 @@ pub fn blocksworld_model_enumerated_booleans(blocks: &Vec<&str>) -> (Vec<Transit
                             "true",
                             None,
                         )),
-                        Predicate::EQ(EnumValue::new(
+                        Predicate::SET(EnumValue::new(
                             &EnumVariable::new(
                                 &format!("hand_empty"),
                                 &domain,
@@ -255,7 +255,7 @@ pub fn blocksworld_model_enumerated_booleans(blocks: &Vec<&str>) -> (Vec<Transit
                 unstack_transitions.push(Transition::new(
                     &format!("unstack_{}_from_{}", b1, b2),
                     &Predicate::AND(vec![
-                        Predicate::EQ(EnumValue::new(
+                        Predicate::SET(EnumValue::new(
                             &EnumVariable::new(
                                 &format!("{}_on_{}", b1, b2),
                                 &domain,
@@ -266,7 +266,7 @@ pub fn blocksworld_model_enumerated_booleans(blocks: &Vec<&str>) -> (Vec<Transit
                             "true",
                             None,
                         )),
-                        Predicate::EQ(EnumValue::new(
+                        Predicate::SET(EnumValue::new(
                             &EnumVariable::new(
                                 &format!("clear_{}", b1),
                                 &domain,
@@ -277,7 +277,7 @@ pub fn blocksworld_model_enumerated_booleans(blocks: &Vec<&str>) -> (Vec<Transit
                             "true",
                             None,
                         )),
-                        Predicate::EQ(EnumValue::new(
+                        Predicate::SET(EnumValue::new(
                             &EnumVariable::new(
                                 &format!("hand_empty"),
                                 &domain,
@@ -290,7 +290,7 @@ pub fn blocksworld_model_enumerated_booleans(blocks: &Vec<&str>) -> (Vec<Transit
                         )),
                     ]),
                     &Predicate::AND(vec![
-                        Predicate::EQ(EnumValue::new(
+                        Predicate::SET(EnumValue::new(
                             &EnumVariable::new(
                                 &format!("hand_empty"),
                                 &domain,
@@ -301,7 +301,7 @@ pub fn blocksworld_model_enumerated_booleans(blocks: &Vec<&str>) -> (Vec<Transit
                             "false",
                             None,
                         )),
-                        Predicate::EQ(EnumValue::new(
+                        Predicate::SET(EnumValue::new(
                             &EnumVariable::new(
                                 &format!("clear_{}", b2),
                                 &domain,
@@ -312,7 +312,7 @@ pub fn blocksworld_model_enumerated_booleans(blocks: &Vec<&str>) -> (Vec<Transit
                             "true",
                             None,
                         )),
-                        Predicate::EQ(EnumValue::new(
+                        Predicate::SET(EnumValue::new(
                             &EnumVariable::new(
                                 &format!("clear_{}", b1),
                                 &domain,
@@ -323,7 +323,7 @@ pub fn blocksworld_model_enumerated_booleans(blocks: &Vec<&str>) -> (Vec<Transit
                             "false",
                             None,
                         )),
-                        Predicate::EQ(EnumValue::new(
+                        Predicate::SET(EnumValue::new(
                             &EnumVariable::new(
                                 &format!("holding_{}", b1),
                                 &domain,
@@ -334,7 +334,7 @@ pub fn blocksworld_model_enumerated_booleans(blocks: &Vec<&str>) -> (Vec<Transit
                             "true",
                             None,
                         )),
-                        Predicate::EQ(EnumValue::new(
+                        Predicate::SET(EnumValue::new(
                             &EnumVariable::new(
                                 &format!("{}_on_{}", b1, b2),
                                 &domain,
@@ -370,7 +370,7 @@ pub fn blocksworld_model_enumerated_booleans(blocks: &Vec<&str>) -> (Vec<Transit
     let mut invariants = vec![];
     let mut holding = vec![];
     for b1 in blocks {
-        holding.push(Predicate::EQ(EnumValue::new(
+        holding.push(Predicate::SET(EnumValue::new(
             &EnumVariable::new(
                 &format!("holding_{}", b1),
                 &domain,
@@ -384,7 +384,7 @@ pub fn blocksworld_model_enumerated_booleans(blocks: &Vec<&str>) -> (Vec<Transit
         for b2 in blocks {
             if b1 != b2 {
                 invariants.push(Predicate::NOT(Box::new(Predicate::AND(vec![
-                    Predicate::EQ(EnumValue::new(
+                    Predicate::SET(EnumValue::new(
                         &EnumVariable::new(
                             &format!("{}_on_{}", b1, b2),
                             &domain,
@@ -395,7 +395,7 @@ pub fn blocksworld_model_enumerated_booleans(blocks: &Vec<&str>) -> (Vec<Transit
                         "true",
                         None,
                     )),
-                    Predicate::EQ(EnumValue::new(
+                    Predicate::SET(EnumValue::new(
                         &EnumVariable::new(
                             &format!("{}_on_{}", b2, b1),
                             &domain,
@@ -415,7 +415,7 @@ pub fn blocksworld_model_enumerated_booleans(blocks: &Vec<&str>) -> (Vec<Transit
         let mut local_vec = vec![];
         for b2 in blocks {
             if b1 != b2 {
-                local_vec.push(Predicate::EQ(EnumValue::new(
+                local_vec.push(Predicate::SET(EnumValue::new(
                     &EnumVariable::new(
                         &format!("{}_on_{}", b1, b2),
                         &domain,
@@ -430,7 +430,7 @@ pub fn blocksworld_model_enumerated_booleans(blocks: &Vec<&str>) -> (Vec<Transit
         }
 
         invariants.push(Predicate::NOT(Box::new(Predicate::AND(vec![
-            Predicate::EQ(EnumValue::new(
+            Predicate::SET(EnumValue::new(
                 &EnumVariable::new(
                     &format!("ontable_{}", b1),
                     &domain,
@@ -455,7 +455,7 @@ pub fn blocksworld_model_enumerated_booleans(blocks: &Vec<&str>) -> (Vec<Transit
     // }
 
     invariants.push(Predicate::NOT(Box::new(Predicate::AND(vec![
-        Predicate::EQ(EnumValue::new(
+        Predicate::SET(EnumValue::new(
             &EnumVariable::new(
                 &format!("hand_empty"),
                 &domain,

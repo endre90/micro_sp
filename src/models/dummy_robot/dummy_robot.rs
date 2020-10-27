@@ -20,12 +20,12 @@ pub fn raar_model() -> PlanningProblem {
     // let act_ref_stat =
     // EnumVariable::new("act_ref_stat", &stat_domain, "stat", None, &Kind::Handshake);
 
-    let ref_pos_dummy = Predicate::EQ(EnumValue::new(&ref_pos, "dummy_value", None));
-    let ref_stat_dummy = Predicate::EQ(EnumValue::new(&ref_pos, "dummy_value", None));
-    let act_pos_dummy = Predicate::EQ(EnumValue::new(&act_pos, "dummy_value", None));
-    let act_stat_dummy = Predicate::EQ(EnumValue::new(&act_pos, "dummy_value", None));
-    // let act_ref_pos_dummy = Predicate::EQ(EnumValue::new(&act_pos, "dummy_value", None));
-    // let act_ref_stat_dummy = Predicate::EQ(EnumValue::new(&act_pos, "dummy_value", None));
+    let ref_pos_dummy = Predicate::SET(EnumValue::new(&ref_pos, "dummy_value", None));
+    let ref_stat_dummy = Predicate::SET(EnumValue::new(&ref_pos, "dummy_value", None));
+    let act_pos_dummy = Predicate::SET(EnumValue::new(&act_pos, "dummy_value", None));
+    let act_stat_dummy = Predicate::SET(EnumValue::new(&act_pos, "dummy_value", None));
+    // let act_ref_pos_dummy = Predicate::SET(EnumValue::new(&act_pos, "dummy_value", None));
+    // let act_ref_stat_dummy = Predicate::SET(EnumValue::new(&act_pos, "dummy_value", None));
 
     let not_ref_pos_dummy = Predicate::NOT(Box::new(ref_pos_dummy.clone()));
     let not_ref_stat_dummy = Predicate::NOT(Box::new(ref_stat_dummy.clone()));
@@ -51,34 +51,34 @@ pub fn raar_model() -> PlanningProblem {
         // act_ref_stat_dummy.clone(),
     ]);
 
-    let act_left = Predicate::EQ(EnumValue::new(&act_pos, "left", None));
+    let act_left = Predicate::SET(EnumValue::new(&act_pos, "left", None));
     let not_act_left = Predicate::NOT(Box::new(act_left.clone()));
-    let act_right = Predicate::EQ(EnumValue::new(&act_pos, "right", None));
+    let act_right = Predicate::SET(EnumValue::new(&act_pos, "right", None));
     let not_act_right = Predicate::NOT(Box::new(act_right.clone()));
 
-    let act_idle = Predicate::EQ(EnumValue::new(&act_stat, "idle", None));
+    let act_idle = Predicate::SET(EnumValue::new(&act_stat, "idle", None));
     let not_act_idle = Predicate::NOT(Box::new(act_idle.clone()));
-    let act_active = Predicate::EQ(EnumValue::new(&act_stat, "active", None));
+    let act_active = Predicate::SET(EnumValue::new(&act_stat, "active", None));
     let not_act_active = Predicate::NOT(Box::new(act_active.clone()));
 
-    let ref_left = Predicate::EQ(EnumValue::new(&ref_pos, "left", None));
+    let ref_left = Predicate::SET(EnumValue::new(&ref_pos, "left", None));
     let not_ref_left = Predicate::NOT(Box::new(ref_left.clone()));
-    let ref_right = Predicate::EQ(EnumValue::new(&ref_pos, "right", None));
+    let ref_right = Predicate::SET(EnumValue::new(&ref_pos, "right", None));
     let not_ref_right = Predicate::NOT(Box::new(ref_right.clone()));
 
-    let ref_idle = Predicate::EQ(EnumValue::new(&ref_stat, "idle", None));
+    let ref_idle = Predicate::SET(EnumValue::new(&ref_stat, "idle", None));
     let not_ref_idle = Predicate::NOT(Box::new(ref_idle.clone()));
-    let ref_active = Predicate::EQ(EnumValue::new(&ref_stat, "active", None));
+    let ref_active = Predicate::SET(EnumValue::new(&ref_stat, "active", None));
     let not_ref_active = Predicate::NOT(Box::new(ref_active.clone()));
 
-    // let act_ref_left = Predicate::EQ(EnumValue::new(&act_ref_pos, "left", None));
+    // let act_ref_left = Predicate::SET(EnumValue::new(&act_ref_pos, "left", None));
     // let not_act_ref_left = Predicate::NOT(Box::new(act_ref_left.clone()));
-    // let act_ref_right = Predicate::EQ(EnumValue::new(&act_ref_pos, "right", None));
+    // let act_ref_right = Predicate::SET(EnumValue::new(&act_ref_pos, "right", None));
     // let not_act_ref_right = Predicate::NOT(Box::new(act_ref_right.clone()));
 
-    // let act_ref_idle = Predicate::EQ(EnumValue::new(&act_ref_stat, "idle", None));
+    // let act_ref_idle = Predicate::SET(EnumValue::new(&act_ref_stat, "idle", None));
     // let not_act_ref_idle = Predicate::NOT(Box::new(act_ref_idle.clone()));
-    // let act_ref_active = Predicate::EQ(EnumValue::new(&act_ref_stat, "active", None));
+    // let act_ref_active = Predicate::SET(EnumValue::new(&act_ref_stat, "active", None));
     // let not_act_ref_active = Predicate::NOT(Box::new(act_ref_active.clone()));
 
     let t1 = Transition::new(
@@ -87,7 +87,7 @@ pub fn raar_model() -> PlanningProblem {
             not_act_active.clone(),
             not_ref_active.clone(),
             not_any_measured_dummy.clone(),
-            Predicate::EQRR(act_pos.clone(), ref_pos.clone()),
+            Predicate::EQ(act_pos.clone(), ref_pos.clone()),
         ]),
         &Predicate::AND(vec![not_act_active.clone(), ref_active.clone()]),
     );
@@ -98,7 +98,7 @@ pub fn raar_model() -> PlanningProblem {
             not_act_active.clone(),
             ref_active.clone(),
             not_any_measured_dummy.clone(),
-            Predicate::EQRR(act_pos.clone(), ref_pos.clone()),
+            Predicate::EQ(act_pos.clone(), ref_pos.clone()),
         ]),
         &Predicate::AND(vec![act_active.clone(), ref_active.clone()]),
     );
@@ -109,7 +109,7 @@ pub fn raar_model() -> PlanningProblem {
             not_act_idle.clone(),
             not_ref_idle.clone(),
             not_any_measured_dummy.clone(),
-            Predicate::EQRR(act_pos.clone(), ref_pos.clone()),
+            Predicate::EQ(act_pos.clone(), ref_pos.clone()),
         ]),
         &Predicate::AND(vec![ref_idle.clone(), ref_idle.clone()]),
     );
@@ -120,7 +120,7 @@ pub fn raar_model() -> PlanningProblem {
             not_act_active.clone(),
             ref_idle.clone(),
             not_any_measured_dummy.clone(),
-            Predicate::EQRR(act_pos.clone(), ref_pos.clone()),
+            Predicate::EQ(act_pos.clone(), ref_pos.clone()),
         ]),
         &Predicate::AND(vec![act_idle.clone(), ref_idle.clone()]),
     );
@@ -132,7 +132,7 @@ pub fn raar_model() -> PlanningProblem {
             not_ref_left.clone(),
             act_active.clone(),
             ref_active.clone(),
-            Predicate::EQRR(act_stat.clone(), ref_stat.clone()),
+            Predicate::EQ(act_stat.clone(), ref_stat.clone()),
             not_any_measured_dummy.clone(),
         ]),
         &Predicate::AND(vec![ref_left.clone(), not_act_left.clone()]),
@@ -145,7 +145,7 @@ pub fn raar_model() -> PlanningProblem {
             ref_left.clone(),
             act_active.clone(),
             ref_active.clone(),
-            Predicate::EQRR(act_stat.clone(), ref_stat.clone()),
+            Predicate::EQ(act_stat.clone(), ref_stat.clone()),
             not_any_measured_dummy.clone(),
         ]),
         &Predicate::AND(vec![act_left.clone(), ref_left.clone()]),
@@ -158,7 +158,7 @@ pub fn raar_model() -> PlanningProblem {
             not_ref_right.clone(),
             act_active.clone(),
             ref_active.clone(),
-            Predicate::EQRR(act_stat.clone(), ref_stat.clone()),
+            Predicate::EQ(act_stat.clone(), ref_stat.clone()),
             not_any_measured_dummy.clone(),
         ]),
         &Predicate::AND(vec![ref_right.clone(), not_act_right.clone()]),
@@ -171,7 +171,7 @@ pub fn raar_model() -> PlanningProblem {
             ref_right.clone(),
             act_active.clone(),
             ref_active.clone(),
-            Predicate::EQRR(act_stat.clone(), ref_stat.clone()),
+            Predicate::EQ(act_stat.clone(), ref_stat.clone()),
             not_any_measured_dummy.clone(),
         ]),
         &Predicate::AND(vec![act_right.clone(), ref_right.clone()]),

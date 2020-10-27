@@ -89,7 +89,7 @@ A dummy driver (inverse of a micro_sp node) can be launched providing the argume
 10. [ ] generate both raar and invar paradigms from a hl model?
 11. [ ] explore all paths and generate graph
     
-### docs and testing
+### docs and tests
 
 | where  | what          |               docs |              tests |
 | :----- | :------------ | -----------------: | -----------------: |
@@ -97,11 +97,9 @@ A dummy driver (inverse of a micro_sp node) can be launched providing the argume
 | core   | incremental   | :white_check_mark: | :white_check_mark: |
 | core   | items         | :heavy_check_mark: | :heavy_check_mark: |
 | core   | parameterized | :white_check_mark: | :white_check_mark: |
-| core   | predicates    | :white_check_mark: | :white_check_mark: |
-|        |
+| core   | predicates    | :heavy_check_mark: | :heavy_check_mark: |
 | models | blocksworld   | :white_check_mark: | :white_check_mark: |
 | models | dummy_robot   | :white_check_mark: | :white_check_mark: |
-|        |
 | runner | dummy         | :white_check_mark: | :white_check_mark: |
 | runner | node          | :white_check_mark: | :white_check_mark: |
 | runner | publisher     | :white_check_mark: | :white_check_mark: |
@@ -109,9 +107,7 @@ A dummy driver (inverse of a micro_sp node) can be launched providing the argume
 | runner | sender        | :white_check_mark: | :white_check_mark: |
 | runner | state         | :white_check_mark: | :white_check_mark: |
 | runner | ticker        | :white_check_mark: | :white_check_mark: |
-|        |
 | utils  | core          | :white_check_mark: | :white_check_mark: |
 | utils  | general       | :white_check_mark: | :white_check_mark: |
 | utils  | runner        | :white_check_mark: | :white_check_mark: |
-|        |
 | main   | main          | :white_check_mark: | :white_check_mark: |
