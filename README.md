@@ -96,7 +96,7 @@ A dummy driver (inverse of a micro_sp node) can be launched providing the argume
 | core   | compositional | :white_check_mark: | :white_check_mark: |
 | core   | incremental   | :heavy_check_mark: | :heavy_check_mark: |
 | core   | items         | :heavy_check_mark: | :heavy_check_mark: |
-| core   | parameterized | :white_check_mark: | :white_check_mark: |
+| core   | parameterized | :heavy_check_mark: | :heavy_check_mark: |
 | core   | predicates    | :heavy_check_mark: | :heavy_check_mark: |
 | models | blocksworld   | :white_check_mark: | :white_check_mark: |
 | models | dummy_robot   | :white_check_mark: | :white_check_mark: |

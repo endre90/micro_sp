@@ -49,6 +49,9 @@ impl ParamPredicate {
     }
 }
 
+/// A parameterized transition is basically a collection of guard and
+/// update predicates, which are turned on/off when the actual transition
+/// is being generated for the incremental algorithm.
 #[derive(Debug, PartialEq, Clone, PartialOrd, Eq, Ord)]
 pub struct ParamTransition {
     pub name: String,
@@ -105,6 +108,9 @@ impl ParamPlanningProblem {
     }
 }
 
+/// An extention on the orogonal PlanningResult that allows tracking
+/// of where the problem is in the composition. Level tracks the depth
+/// and concat tracks the step in the current level.
 #[derive(Debug, PartialEq, Clone, PartialOrd, Eq, Ord)]
 pub struct ParamPlanningResult {
     pub result: PlanningResult,
@@ -148,21 +154,20 @@ pub fn generate_transition(ptrans: &ParamTransition, params: &Vec<Parameter>) ->
 /// Generates the problem from a parameterized problem and solves it with the incremental algorithm.
 pub fn parameterized(
     prob: &ParamPlanningProblem,
-    params: &Vec<Parameter>,
     level: &u32,
     concat: &u32,
 ) -> ParamPlanningResult {
     ParamPlanningResult {
         result: incremental(&PlanningProblem::new(
             &prob.name,
-            &generate_predicate(&prob.init, &params),
-            &generate_predicate(&prob.goal, &params),
+            &generate_predicate(&prob.init, &prob.params),
+            &generate_predicate(&prob.goal, &prob.params),
             &prob
                 .trans
                 .iter()
-                .map(|x| generate_transition(x, &params))
+                .map(|x| generate_transition(x, &prob.params))
                 .collect(),
-            &generate_predicate(&prob.invars, &params),
+            &generate_predicate(&prob.invars, &prob.params),
             &prob.max_steps,
             &Paradigm::Raar,
         )),
