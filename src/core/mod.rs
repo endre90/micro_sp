@@ -1,6 +1,7 @@
 use super::*;
 
-pub mod items;
-pub mod predicates;
-pub mod incremental;
 pub mod compositional;
+pub mod incremental;
+pub mod items;
+pub mod parameterized;
+pub mod predicates;

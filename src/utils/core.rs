@@ -24,16 +24,16 @@ pub fn get_predicate_vars(pred: &Predicate) -> Vec<EnumVariable> {
 }
 
 /// Given a vector of predicates, return a vector of variables that play a role in them.
-pub fn get_predicates_vars(preds: &Vec<Predicate>) -> Vec<EnumVariable> {
-    preds.iter().map(|x| get_predicate_vars(&x)).flatten().collect()
+pub fn get_param_predicate_vars(ppred: &ParamPredicate) -> Vec<EnumVariable> {
+    ppred.preds.iter().map(|x| get_predicate_vars(&x)).flatten().collect()
 }
 
 /// Given a planning problem, return a vector of all variables defined for that problem.
 pub fn get_problem_vars(prob: &PlanningProblem) -> Vec<EnumVariable> {
     let mut s = Vec::new();
     for t in &prob.trans {
-        s.extend(get_predicates_vars(&t.guard));
-        s.extend(get_predicates_vars(&t.update));
+        s.extend(get_predicate_vars(&t.guard));
+        s.extend(get_predicate_vars(&t.update));
     }
     s.extend(get_predicate_vars(&prob.init));
     s.extend(get_predicate_vars(&prob.goal));
@@ -162,3 +162,4 @@ pub fn get_planning_result(
         },
     }
 }
+

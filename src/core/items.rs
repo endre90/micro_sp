@@ -225,19 +225,15 @@ impl CompleteState {
 #[derive(Debug, PartialEq, Clone, PartialOrd, Eq, Ord)]
 pub struct Transition {
     pub name: String,
-    pub guard: Vec<Predicate>,
-    pub update: Vec<Predicate>,
+    pub guard: Predicate,
+    pub update: Predicate,
     pub kind: Kind,
 }
 
 impl Transition {
     /// Make a new named transition from guard and update predicates.
-    pub fn new(name: &str, guard: &Vec<Predicate>, update: &Vec<Predicate>) -> Transition {
-        let updates: Vec<EnumVariable> = update
-            .iter()
-            .map(|x| get_predicate_vars(&x))
-            .flatten()
-            .collect();
+    pub fn new(name: &str, guard: &Predicate, update: &Predicate) -> Transition {
+        let updates = get_predicate_vars(&update);
         Transition {
             name: name.to_string(),
             guard: guard.to_owned(),

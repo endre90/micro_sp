@@ -63,12 +63,7 @@ pub fn keep_variable_values(
     trans: &Transition,
     step: &u32,
 ) -> Z3_ast {
-    let changed = trans
-        .update
-        .iter()
-        .map(|x| get_predicate_vars(&x))
-        .flatten()
-        .collect();
+    let changed = get_predicate_vars(&trans.update);
     let unchanged = IterOps::difference(vars, &changed);
 
     ANDZ3::new(
@@ -142,12 +137,8 @@ pub fn incremental(prob: &PlanningProblem) -> PlanningResult {
                                             ),
                                             BoolZ3::new(&ctx, true),
                                         ),
-                                        predicate_to_ast(
-                                            &ctx,
-                                            &Predicate::AND(x.guard.clone()),
-                                            &(step - 1),
-                                        ),
-                                        predicate_to_ast(&ctx, &Predicate::AND(x.update.clone()), &(step)),
+                                        predicate_to_ast(&ctx, &x.guard, &(step - 1)),
+                                        predicate_to_ast(&ctx, &x.update, &(step)),
                                         keep_variable_values(
                                             &ctx,
                                             &get_problem_vars(&prob),

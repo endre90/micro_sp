@@ -19,7 +19,20 @@ pub fn activate_next(params: &Vec<Parameter>) -> Vec<Parameter> {
         .collect()
 }
 
-
+// pub fn compositional(prob: &PlanningProblem, params: &Vec<Parameter>) -> PlanningResult {
+//     let return_result = match params.iter().all(|x| x.value) {
+//         true => {
+//             let first_result = incremental(&prob, &params.iter().map(|&x| x).collect(), &0, &0);
+//             recursive_subfn(&first_result, &prob, &params, &0)
+            
+//         },
+//         false => {
+//             let first_params = Activate::new(params);
+//             let first_result = ParamIncremental::new(&prob, &first_params.iter().map(|x| x).collect(), &0, &0);
+//             recursive_subfn(&first_result, &prob, &params, &0)
+//         }
+//     };
+// }
 
 #[test]
 fn test_activate_next() {
