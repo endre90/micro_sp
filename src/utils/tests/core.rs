@@ -1,9 +1,5 @@
 use super::*;
 
-// test these elsewhere:
-//      get_problem_vars
-//      get_planning_result
-
 #[test]
 fn test_get_predicate_vars() {
     let vars = get_predicate_vars(&Predicate::OR(vec![

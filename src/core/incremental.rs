@@ -4,8 +4,7 @@ use z3_sys::*;
 use z3_v2::*;
 
 /// A transition that updates the state according to the guard and update predicates.
-/// The transition has a kind since it is assumed that transitions are changing one
-/// variable at a time. When incremental planning, the guard and update predicates
+/// When incremental planning, the guard and update predicates
 /// are concjunctions of predicated from the guard and update vector. During
 /// compositional planning, the guard and update predicates are a conjunction
 /// of activated predicates from the vectors.
