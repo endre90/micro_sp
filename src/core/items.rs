@@ -2,32 +2,6 @@ use super::*;
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
 
-/// Variables with the same parameter belong to the same group during compositional planning.
-/// As such, they will be included in the model together after the next refinement.
-#[derive(Debug, PartialEq, Clone, PartialOrd, Eq, Ord, Serialize, Deserialize)]
-pub struct Parameter {
-    pub name: String,
-    pub value: bool,
-}
-
-impl Parameter {
-    /// Make a new paremeter that will enable or disable variables during compositional planning.
-    pub fn new(name: &str, value: &bool) -> Parameter {
-        Parameter {
-            name: name.to_owned(),
-            value: *value,
-        }
-    }
-    /// Make a dummy parameter that will include variables in every step during compositional
-    /// planning, or for incremental planning where no parameter is needed.
-    pub fn none() -> Parameter {
-        Parameter {
-            name: "NONE".to_owned(),
-            value: true,
-        }
-    }
-}
-
 /// Control and modelling paradigm. More about this later, might end up with only one.
 #[derive(Debug, PartialEq, Clone, PartialOrd, Eq, Ord, Serialize, Deserialize)]
 pub enum Paradigm {
@@ -40,7 +14,6 @@ pub enum Paradigm {
 #[derive(Debug, PartialEq, Clone, PartialOrd, Eq, Ord, Serialize, Deserialize)]
 pub enum Kind {
     Measured,
-    // Handshake,
     Command,
     Estimated,
 }
@@ -139,7 +112,6 @@ impl State {
 #[derive(Debug, PartialEq, Clone, PartialOrd, Eq, Ord, Serialize, Deserialize)]
 pub struct CompleteState {
     pub measured: State,
-    // pub handshake: State,
     pub command: State,
     pub estimated: State,
 }
@@ -156,21 +128,12 @@ impl CompleteState {
     }
     /// Collect a complete state from measured, handshake,
     /// command and estimated state. States can also be empty.
-    pub fn from_states(
-        measured: &State,
-        // handshake: &State,
-        command: &State,
-        estimated: &State,
-    ) -> CompleteState {
+    pub fn from_states(measured: &State, command: &State, estimated: &State) -> CompleteState {
         CompleteState {
             measured: match measured.kind == Kind::Measured {
                 true => measured.to_owned(),
                 false => panic!("kind must match when constructing state"),
             },
-            // handshake: match handshake.kind == Kind::Handshake {
-            //     true => handshake.to_owned(),
-            //     false => panic!("kind must match when constructing state"),
-            // },
             command: match command.kind == Kind::Command {
                 true => command.to_owned(),
                 false => panic!("kind must match when constructing state"),
@@ -191,13 +154,6 @@ impl CompleteState {
                     .collect(),
                 &Kind::Measured,
             ),
-            // handshake: State::new(
-            //     &vec.iter()
-            //         .filter(|x| x.var.kind == Kind::Handshake)
-            //         .map(|x| x.to_owned())
-            //         .collect(),
-            //     &Kind::Handshake,
-            // ),
             command: State::new(
                 &vec.iter()
                     .filter(|x| x.var.kind == Kind::Command)
@@ -212,36 +168,6 @@ impl CompleteState {
                     .collect(),
                 &Kind::Estimated,
             ),
-        }
-    }
-}
-
-/// A transition that updates the state according to the guard and update predicates.
-/// The transition has a kind since it is assumed that transitions are changing one
-/// variable at a time. When incremental planning, the guard and update predicates
-/// are concjunctions of predicated from the guard and update vector. During
-/// compositional planning, the guard and update predicates are a conjunction
-/// of activated predicates from the vectors.
-#[derive(Debug, PartialEq, Clone, PartialOrd, Eq, Ord)]
-pub struct Transition {
-    pub name: String,
-    pub guard: Predicate,
-    pub update: Predicate,
-    pub kind: Kind,
-}
-
-impl Transition {
-    /// Make a new named transition from guard and update predicates.
-    pub fn new(name: &str, guard: &Predicate, update: &Predicate) -> Transition {
-        let updates = get_predicate_vars(&update);
-        Transition {
-            name: name.to_string(),
-            guard: guard.to_owned(),
-            update: update.to_owned(),
-            kind: match updates.len() > 0 {
-                true => updates[0].kind.to_owned(),
-                false => panic!("no update?"),
-            },
         }
     }
 }

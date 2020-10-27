@@ -23,7 +23,7 @@ pub fn get_predicate_vars(pred: &Predicate) -> Vec<EnumVariable> {
     s
 }
 
-/// Given a vector of predicates, return a vector of variables that play a role in them.
+/// Given a parameterized predicate, return a vector of variables that play a role in it.
 pub fn get_param_predicate_vars(ppred: &ParamPredicate) -> Vec<EnumVariable> {
     ppred.preds.iter().map(|x| get_predicate_vars(&x)).flatten().collect()
 }

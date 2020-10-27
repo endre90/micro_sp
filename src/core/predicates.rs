@@ -15,10 +15,6 @@ pub enum Predicate {
     PBEQ(Vec<Predicate>, i32)
 }
 
-pub struct ParamPredicate {
-    pub preds: Vec<Predicate>
-}
-
 /// Transforms a Predicate to an object that z3 can handle.
 pub fn predicate_to_ast(ctx: &ContextZ3, pred: &Predicate, step: &u32) -> Z3_ast {
     match pred {

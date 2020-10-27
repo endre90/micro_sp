@@ -3,6 +3,46 @@ use std::time::Instant;
 use z3_sys::*;
 use z3_v2::*;
 
+/// A transition that updates the state according to the guard and update predicates.
+/// The transition has a kind since it is assumed that transitions are changing one
+/// variable at a time. When incremental planning, the guard and update predicates
+/// are concjunctions of predicated from the guard and update vector. During
+/// compositional planning, the guard and update predicates are a conjunction
+/// of activated predicates from the vectors.
+#[derive(Debug, PartialEq, Clone, PartialOrd, Eq, Ord)]
+pub struct Transition {
+    pub name: String,
+    pub guard: Predicate,
+    pub update: Predicate,
+    pub kind: Kind,
+}
+
+impl Transition {
+    /// Make a new named transition from guard and update predicates.
+    pub fn new(name: &str, guard: &Predicate, update: &Predicate) -> Transition {
+        let updates = get_predicate_vars(&update);
+        Transition {
+            name: name.to_string(),
+            guard: guard.to_owned(),
+            update: update.to_owned(),
+            kind: if updates.len() > 0 {
+                if updates.iter().all(|x| x.kind == Kind::Measured) {
+                    Kind::Measured
+                } else if updates.iter().all(|x| x.kind == Kind::Command) {
+                    Kind::Command
+                } else if updates.iter().all(|x| x.kind == Kind::Estimated) {
+                    Kind::Estimated
+                } else {
+                    panic!("All variables in the update of a transition mut be of same Kind.")
+                }
+            } else {
+                panic!("no update?")
+            }
+        }
+    }
+}
+
+
 /// A planning problem that is given to the incremental solver.
 #[derive(Debug, PartialEq, Clone, PartialOrd, Eq, Ord)]
 pub struct PlanningProblem {
@@ -10,7 +50,7 @@ pub struct PlanningProblem {
     pub init: Predicate,
     pub goal: Predicate,
     pub trans: Vec<Transition>,
-    pub invar: Predicate,
+    pub invars: Predicate,
     pub max_steps: u32,
     pub paradigm: Paradigm,
 }
@@ -39,7 +79,7 @@ impl PlanningProblem {
         init: &Predicate,
         goal: &Predicate,
         trans: &Vec<Transition>,
-        invar: &Predicate,
+        invars: &Predicate,
         max_steps: &u32,
         paradigm: &Paradigm,
     ) -> PlanningProblem {
@@ -48,7 +88,7 @@ impl PlanningProblem {
             init: init.to_owned(),
             goal: goal.to_owned(),
             trans: trans.to_owned(),
-            invar: invar.to_owned(),
+            invars: invars.to_owned(),
             max_steps: max_steps.to_owned(),
             paradigm: paradigm.to_owned(),
         }
@@ -103,7 +143,7 @@ pub fn incremental(prob: &PlanningProblem) -> PlanningResult {
     let slv = SolverZ3::new(&ctx);
 
     SlvAssertZ3::new(&ctx, &slv, predicate_to_ast(&ctx, &prob.init, &0));
-    SlvAssertZ3::new(&ctx, &slv, predicate_to_ast(&ctx, &prob.invar, &0));
+    SlvAssertZ3::new(&ctx, &slv, predicate_to_ast(&ctx, &prob.invars, &0));
 
     SlvPushZ3::new(&ctx, &slv); // create backtracking point
     SlvAssertZ3::new(&ctx, &slv, predicate_to_ast(&ctx, &prob.goal, &0));
@@ -152,7 +192,7 @@ pub fn incremental(prob: &PlanningProblem) -> PlanningResult {
                     ),
                 );
 
-                SlvAssertZ3::new(&ctx, &slv, predicate_to_ast(&ctx, &prob.invar, &step));
+                SlvAssertZ3::new(&ctx, &slv, predicate_to_ast(&ctx, &prob.invars, &step));
                 SlvPushZ3::new(&ctx, &slv);
                 SlvAssertZ3::new(&ctx, &slv, predicate_to_ast(&ctx, &prob.goal, &step));
 
