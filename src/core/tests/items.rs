@@ -29,7 +29,7 @@ fn is_fruit(fruit: &str, kind: &Kind) -> EnumVariable {
 }
 
 #[test]
-fn new_variable() {
+fn test_new_variable() {
     assert_eq!(
         make_fruit("banana", &Kind::Command),
         is_fruit("banana", &Kind::Command)
@@ -37,7 +37,7 @@ fn new_variable() {
 }
 
 #[test]
-fn new_value() {
+fn test_new_value() {
     assert_eq!(
         EnumValue::new(
             &make_fruit("banana", &Kind::Command),
@@ -54,7 +54,7 @@ fn new_value() {
 
 #[test]
 #[should_panic]
-fn new_value_panic() {
+fn test_new_value_panic() {
     EnumValue::new(
         &make_fruit("banana", &Kind::Command),
         "not_in_domain",
@@ -63,7 +63,7 @@ fn new_value_panic() {
 }
 
 #[test]
-fn new_state_empty() {
+fn test_new_state_empty() {
     assert_eq!(
         State::new(&vec!(), &Kind::Command),
         State {
@@ -74,7 +74,7 @@ fn new_state_empty() {
 }
 
 #[test]
-fn new_state() {
+fn test_new_state() {
     assert_eq!(
         State::new(
             &vec!(
@@ -111,7 +111,7 @@ fn new_state() {
 
 #[test]
 #[should_panic]
-fn new_state_panic() {
+fn test_new_state_panic() {
     State::new(
         &vec![EnumValue::new(
             &make_fruit("banana", &Kind::Estimated),
@@ -123,7 +123,7 @@ fn new_state_panic() {
 }
 
 #[test]
-fn new_complete_state_empty() {
+fn test_new_complete_state_empty() {
     assert_eq!(
         CompleteState::empty(),
         CompleteState {
@@ -144,7 +144,7 @@ fn new_complete_state_empty() {
 }
 
 #[test]
-fn new_complete_state_from_states() {
+fn test_new_complete_state_from_states() {
     assert_eq!(
         CompleteState::from_states(
             &State::new(&vec!(), &Kind::Measured),
@@ -170,7 +170,7 @@ fn new_complete_state_from_states() {
 
 #[test]
 #[should_panic]
-fn new_complete_state_panic() {
+fn test_new_complete_state_panic() {
     CompleteState::from_states(
         &State::new(&vec![], &Kind::Measured),
         &State::new(
@@ -186,7 +186,7 @@ fn new_complete_state_panic() {
 }
 
 #[test]
-fn new_complete_state_from_vec() {
+fn test_new_complete_state_from_vec() {
     assert_eq!(
         CompleteState::from_vec(&vec!(
             EnumValue::new(

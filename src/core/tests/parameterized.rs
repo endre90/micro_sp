@@ -1,7 +1,7 @@
 use super::*;
 
 #[test]
-fn new_parameter() {
+fn test_new_parameter() {
     assert_eq!(
         Parameter::new("some_name", &false),
         Parameter {
@@ -12,7 +12,7 @@ fn new_parameter() {
 }
 
 #[test]
-fn none_parameter() {
+fn test_none_parameter() {
     assert_eq!(
         Parameter::none(),
         Parameter {

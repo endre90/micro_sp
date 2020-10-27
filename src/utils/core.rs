@@ -58,11 +58,6 @@ pub fn get_planning_result(
         .collect();
     let vars = get_problem_vars(&prob);
 
-    // println!("MODEL:");
-    // for m in &model_vec {
-    //     println!("{:?}", m);
-    // }
-
     let mut trace: Vec<PlanningFrame> = vec![];
     for i in 0..nr_steps - 1 {
         let enum_vals_source: Vec<EnumValue> = model_vec
@@ -86,11 +81,6 @@ pub fn get_planning_result(
             .filter(|x| x.var.kind == Kind::Measured)
             .map(|y| y.clone())
             .collect::<Vec<EnumValue>>();
-        // let handshake_source: Vec<EnumValue> = enum_vals_source
-        //     .iter()
-        //     .filter(|x| x.var.kind == Kind::Handshake)
-        //     .map(|y| y.clone())
-        //     .collect::<Vec<EnumValue>>();
         let command_source: Vec<EnumValue> = enum_vals_source
             .iter()
             .filter(|x| x.var.kind == Kind::Command)
@@ -107,11 +97,7 @@ pub fn get_planning_result(
             .filter(|x| x.var.kind == Kind::Measured)
             .map(|y| y.clone())
             .collect();
-        // let handshake_sink: Vec<EnumValue> = enum_vals_sink
-        //     .iter()
-        //     .filter(|x| x.var.kind == Kind::Handshake)
-        //     .map(|y| y.clone())
-        //     .collect();
+
         let command_sink: Vec<EnumValue> = enum_vals_sink
             .iter()
             .filter(|x| x.var.kind == Kind::Command)

@@ -14,34 +14,26 @@ pub struct Transition {
     pub name: String,
     pub guard: Predicate,
     pub update: Predicate,
-    pub kind: Kind,
 }
 
 impl Transition {
     /// Make a new named transition from guard and update predicates.
     pub fn new(name: &str, guard: &Predicate, update: &Predicate) -> Transition {
-        let updates = get_predicate_vars(&update);
         Transition {
             name: name.to_string(),
             guard: guard.to_owned(),
             update: update.to_owned(),
-            kind: if updates.len() > 0 {
-                if updates.iter().all(|x| x.kind == Kind::Measured) {
-                    Kind::Measured
-                } else if updates.iter().all(|x| x.kind == Kind::Command) {
-                    Kind::Command
-                } else if updates.iter().all(|x| x.kind == Kind::Estimated) {
-                    Kind::Estimated
-                } else {
-                    panic!("All variables in the update of a transition mut be of same Kind.")
-                }
-            } else {
-                panic!("no update?")
-            }
         }
     }
 }
 
+/// A frame holds states about what happens in a step.
+#[derive(PartialEq, Eq, Clone, Debug, PartialOrd, Ord)]
+pub struct PlanningFrame {
+    pub source: CompleteState,
+    pub sink: CompleteState,
+    pub trans: String,
+}
 
 /// A planning problem that is given to the incremental solver.
 #[derive(Debug, PartialEq, Clone, PartialOrd, Eq, Ord)]
@@ -53,14 +45,6 @@ pub struct PlanningProblem {
     pub invars: Predicate,
     pub max_steps: u32,
     pub paradigm: Paradigm,
-}
-
-/// A frame holds states about what happens in a step.
-#[derive(PartialEq, Eq, Clone, Debug, PartialOrd, Ord)]
-pub struct PlanningFrame {
-    pub source: CompleteState,
-    pub sink: CompleteState,
-    pub trans: String,
 }
 
 /// A result is generated when the planner finds a satisfiable model.
