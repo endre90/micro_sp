@@ -1,6 +1,28 @@
 use super::*;
 
 #[test]
+fn new_parameter() {
+    assert_eq!(
+        Parameter::new("some_name", &false),
+        Parameter {
+            name: String::from("some_name"),
+            value: false
+        }
+    )
+}
+
+#[test]
+fn none_parameter() {
+    assert_eq!(
+        Parameter::none(),
+        Parameter {
+            name: String::from("NONE"),
+            value: true
+        }
+    )
+}
+
+#[test]
 fn test_generate_predicate() {
     let p1 = Parameter::new("p1", &true);
     let p2 = Parameter::new("p2", &false);
