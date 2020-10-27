@@ -5,3 +5,6 @@ pub mod incremental;
 pub mod items;
 pub mod parameterized;
 pub mod predicates;
+
+#[cfg(test)]
+pub mod tests;

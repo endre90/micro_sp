@@ -112,26 +112,8 @@ pub struct ParamPlanningResult {
     pub concat: u32,
 }
 
-// impl GeneratePredicate {
-//     pub fn new(params: &Vec<&Parameter>, ppred: &ParamPredicate) -> Predicate {
-//         let mut p_own = params.to_owned();
-//         let default_param = Parameter::default();
-//         p_own.push(&default_param);
-//         let mut pred_vec = vec![];
-//         for pred in &ppred.preds {
-//             let pred_vars: Vec<EnumVariable> = GetPredicateVars::new(&pred);
-//             for param in &p_own {
-//                 if pred_vars.iter().any(|x| x.param.name == param.name) && param.value {
-//                     pred_vec.push(pred.to_owned())
-//                 }
-//             }
-//         }
-//         pred_vec.sort();
-//         pred_vec.dedup();
-//         Predicate::AND(pred_vec)
-//     }
-// }
-
+/// Given a parameterized predicate and the vector of activation parameters,
+/// generate a predicate as a conjunction of predicates that are activated.
 pub fn generate_predicate(ppred: &ParamPredicate, params: &Vec<Parameter>) -> Predicate {
     let activated: Vec<Parameter> = params
         .iter()
@@ -152,56 +134,39 @@ pub fn generate_predicate(ppred: &ParamPredicate, params: &Vec<Parameter>) -> Pr
     )
 }
 
-#[test]
-fn test_generate_predicate() {
-    let p1 = Parameter::new("p1", &true);
-    let p2 = Parameter::new("p2", &false);
-    
-    let d = vec!["a", "b", "c"];
-
-    let var1_m = EnumVariable::new("var1_m", &d, "t1", Some(&p1), &Kind::Measured);
-    let var1_c = EnumVariable::new("var1_c", &d, "t1", Some(&p1), &Kind::Command);
-    let var2_m = EnumVariable::new("var2_m", &d, "t2", Some(&p2), &Kind::Measured);
-    let var2_c = EnumVariable::new("var2_c", &d, "t2", Some(&p2), &Kind::Command);
-
-    let pp = ParamPredicate::new(&vec![
-        Predicate::EQ(EnumValue::new(&var1_m, "a", None)),
-        Predicate::EQ(EnumValue::new(&var1_c, "b", None)),
-        Predicate::EQ(EnumValue::new(&var2_m, "c", None)),
-        Predicate::EQ(EnumValue::new(&var2_c, "a", None)),
-    ]);
-
-    let params = vec![p1, p2];
-    println!("generated {:?}", generate_predicate(&pp, &params));
+/// Given a parameterized trtansition and the vector of activation parameters,
+/// generate the transition guard and update as a conjunction of predicates in
+/// the parameterized transition that are activated.
+pub fn generate_transition(ptrans: &ParamTransition, params: &Vec<Parameter>) -> Transition {
+    Transition::new(
+        &ptrans.name,
+        &generate_predicate(&ptrans.guard, &params),
+        &generate_predicate(&ptrans.update, &params),
+    )
 }
 
-// pub fn parameterized(pprob: &ParamPlanningProblem, params: &Vec<Parameter>) -> ParamPlanningResult {
-// }
-
-// impl ParamIncremental {
-//     pub fn new(prob: &ParamPlanningProblem, params: &Vec<&Parameter>, level: &u32, concat: &u32) -> ParamPlanningResult {
-//         let generated_init = GeneratePredicate::new(&params, &prob.init);
-//         let generated_goals = GeneratePredicate::new(&params, &prob.goal);
-//         let generated_trans = GenerateTransitions::new(&params, &prob.trans);
-
-//         let generated_prob = PlanningProblem::new(
-//             prob.name.as_str(),
-//             &generated_init,
-//             &generated_goals,
-//             &generated_trans,
-//             &prob.ltl_specs,
-//             &prob.max_steps
-//         );
-
-//         let inc_result = Incremental::new(&generated_prob);
-
-//         ParamPlanningResult {
-//             plan_found: inc_result.plan_found,
-//             plan_length: inc_result.plan_length,
-//             level: *level,
-//             concat: *concat,
-//             trace: inc_result.trace,
-//             time_to_solve: inc_result.time_to_solve
-//         }
-//     }
-// }
+/// Generates the problem from a parameterized problem and solves it with the incremental algorithm.
+pub fn parameterized(
+    prob: &ParamPlanningProblem,
+    params: &Vec<Parameter>,
+    level: &u32,
+    concat: &u32,
+) -> ParamPlanningResult {
+    ParamPlanningResult {
+        result: incremental(&PlanningProblem::new(
+            &prob.name,
+            &generate_predicate(&prob.init, &params),
+            &generate_predicate(&prob.goal, &params),
+            &prob
+                .trans
+                .iter()
+                .map(|x| generate_transition(x, &params))
+                .collect(),
+            &generate_predicate(&prob.invars, &params),
+            &prob.max_steps,
+            &Paradigm::Raar,
+        )),
+        level: *level,
+        concat: *concat,
+    }
+}
