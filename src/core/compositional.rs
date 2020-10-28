@@ -148,53 +148,29 @@ pub fn compositional(prob: &ParamPlanningProblem, params: &Vec<Parameter>) -> Pl
         if !params.iter().all(|x| x.value) {
             if res.result.plan_found {
                 let mut level_subresults = vec![];
-                let mut inheritance = CompleteState::empty();
+                let mut inh = CompleteState::empty();
                 let mut concat: u32 = 0;
                 if res.result.plan_length != 0 {
-                    let activated_params = activate_next(&params);
+                    let act = activate_next(&params);
                     for i in 0..=res.result.trace.len() - 1 {
                         println!("CONCAT: {:?}", concat);
                         if i == 0 {
-                            let next_result = generate_and_solve(
-                                &Case::First,
-                                &inheritance,
-                                &prob,
-                                &res,
-                                &activated_params,
-                                &level,
-                                &concat,
-                            );
-                            level_subresults.push(next_result.to_owned());
-                            match next_result.result.trace.last() {
-                                Some(x) => inheritance = x.sink.clone(),
+                            let next = generate_and_solve(&Case::First, &inh, &prob, &res, &act, &level, &concat);
+                            level_subresults.push(next.to_owned());
+                            match next.result.trace.last() {
+                                Some(x) => inh = x.sink.clone(),
                                 None => panic!("Error cb10dd80-f6dd-4ae1-9119-116d8ba09dfa: No tail in the plan.")
                             }
                             concat = concat + 1;
                         } else if i == res.result.trace.len() - 1 {
-                            let next_result = generate_and_solve(
-                                &Case::Last,
-                                &inheritance,
-                                &prob,
-                                &res,
-                                &activated_params,
-                                &level,
-                                &concat,
-                            );
-                            level_subresults.push(next_result.to_owned());
+                            let next = generate_and_solve(&Case::Last, &inh, &prob, &res, &act, &level, &concat);
+                            level_subresults.push(next.to_owned());
                             concat = concat + 1;
                         } else {
-                            let next_result = generate_and_solve(
-                                &Case::Central,
-                                &inheritance,
-                                &prob,
-                                &res,
-                                &activated_params,
-                                &level,
-                                &concat,
-                            );
-                            level_subresults.push(next_result.to_owned());
-                            match next_result.result.trace.last() {
-                                Some(x) => inheritance = x.sink.clone(),
+                            let next = generate_and_solve(&Case::Central, &inh, &prob, &res, &act, &level, &concat);
+                            level_subresults.push(next.to_owned());
+                            match next.result.trace.last() {
+                                Some(x) => inh = x.sink.clone(),
                                 None => panic!("Error cb10dd80-f6dd-4ae1-9119-116d8ba09dfa: No tail in the plan.")
                             }
                             concat = concat + 1;
@@ -206,7 +182,7 @@ pub fn compositional(prob: &ParamPlanningProblem, params: &Vec<Parameter>) -> Pl
                     // }
                     println!("CONCATENATED");
                     pprint_result(&level_result.result);
-                    final_result = recursive(&level_result, &prob, &activated_params, &level);
+                    final_result = recursive(&level_result, &prob, &act, &level);
                 }
             }
         }

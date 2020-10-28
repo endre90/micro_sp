@@ -25,27 +25,28 @@ A dummy driver (inverse of a micro_sp node) can be launched providing the argume
 2.  [x] don't complicate, have parameterized
 3.  [x] layered (comp(param(inc)))
 4.  [x] publish complete state
-5.  [x] update command vars to match measured values on refresh (raar)
-6.  [x] raar: act, ref and act_ref have to have the same domain and same r#type
-7.  [ ] where is the state? who owns the state?
-8.  [x] proper command line arguments
-9.  [ ] need new "start/stop running" and "set goal" topics to communicate with the runner
-10. [ ] the "start/stop running" should actually set the reference values     ?       
-11. [x] have to add delay for dummy act             
-12. [ ] add boolean variables
-13. [x] add handshake kind
-14. [ ] the algorithms should probably be solver agnostic
-15. [x] move setup to parser
-16. [ ] other command paradigm or are we done?
-17. [ ] testing
-18. [x] structure and modules
-19. [ ] generate dummy driver from the model
-20. [x] documentation, probably not done
-21. [ ] dummy_value should be deeply integrated
-22. [ ] proper readme
-23. [x] proper get planning result
-24. [ ] include readmes to benches to describe added constraints
-25. [ ] benchmarks blocksworld:
+5.  [ ] think about how to parameterize modelling like the pddl people do
+6.  [x] update command vars to match measured values on refresh (raar)
+7.  [x] raar: act, ref and act_ref have to have the same domain and same r#type
+8.  [ ] where is the state? who owns the state?
+9.  [x] proper command line arguments
+10. [ ] need new "start/stop running" and "set goal" topics to communicate with the runner
+11. [ ] the "start/stop running" should actually set the reference values     ?       
+12. [x] have to add delay for dummy act             
+13. [ ] add boolean variables
+14. [x] add handshake kind
+15. [ ] the algorithms should probably be solver agnostic
+16. [x] move setup to parser
+17. [ ] other command paradigm or are we done?
+18. [ ] testing
+19. [x] structure and modules
+20. [ ] generate dummy driver from the model
+21. [x] documentation, probably not done
+22. [ ] dummy_value should be deeply integrated
+23. [ ] proper readme
+24. [x] proper get planning result
+25. [ ] include readmes to benches to describe added constraints
+26. [ ] benchmarks blocksworld:
     1. [x] micro_sp inc enumerated boolean
     2. [ ] micro_sp inc pure boolean
     3. [ ] micro_sp inc pure enumeration
@@ -53,28 +54,28 @@ A dummy driver (inverse of a micro_sp node) can be launched providing the argume
     5. [ ] micro_sp seq pure boolean
     6. [ ] micro_sp seq pure enumeration
     7. [ ] incplan
-26. [ ] benchmarks barman
-27. [ ] benchmarks childsnack
-28. [ ] benchmarks gripper
-29. [ ] benchmarks hiking
-30. [ ] study conversion from a pddl model to a real world "runneble" model
-31. [ ] enable other solvers beside z3
-32. [ ] make a more general parser for boilerplate domain ? maybe not
-33. [ ] clean the warnings
-34. [ ] improve runner and don't replan after every state change
-35. [ ] gui needed asap
-36. [ ] show current plan in gui
-37. [x] look into parsing pddls: conclusion: won't work
-38. [ ] fix command lifetime
-39. [x] match published data to sink when fresh timeouts
-40. [ ] compositional algorithm
-41. [ ] when to call the planner
-42. [ ] handle estimated
-43. [x] move model to models
-44. [x] check if measured value is in domain
-45. [ ] flow graph to readme
-46. [ ] maybe try to write a cdcl solver?
-47. [ ] some theories? hmm...
+27. [ ] benchmarks barman
+28. [ ] benchmarks childsnack
+29. [ ] benchmarks gripper
+30. [ ] benchmarks hiking
+31. [ ] study conversion from a pddl model to a real world "runneble" model
+32. [ ] enable other solvers beside z3
+33. [ ] make a more general parser for boilerplate domain ? maybe not
+34. [ ] clean the warnings
+35. [ ] improve runner and don't replan after every state change
+36. [ ] gui needed asap
+37. [ ] show current plan in gui
+38. [x] look into parsing pddls: conclusion: won't work
+39. [ ] fix command lifetime
+40. [x] match published data to sink when fresh timeouts
+41. [ ] compositional algorithm
+42. [ ] when to call the planner
+43. [ ] handle estimated
+44. [x] move model to models
+45. [x] check if measured value is in domain
+46. [ ] flow graph to readme
+47. [ ] maybe try to write a cdcl solver?
+48. [ ] some theories? hmm...
 
 ### low priority
 1. [ ] improve Qol
