@@ -21,36 +21,7 @@ pub fn get_sink(
     }
 }
 
-/// Collect the state as a vector of predicates.
-pub fn state_to_predicate_vector(state: &State) -> Vec<Predicate> {
-    state
-        .vec
-        .iter()
-        .map(|x| {
-            Predicate::SET(EnumValue::new(
-                &EnumVariable::new(
-                    &x.var.name,
-                    &x.var.domain.iter().map(|x| x.as_str()).collect(),
-                    &x.var.r#type,
-                    Some(&x.var.param),
-                    &x.var.kind,
-                ),
-                &x.val,
-                Some(&x.lifetime),
-            ))
-        })
-        .collect::<Vec<Predicate>>()
-}
 
-/// Generate a predicate from a given state as a conjunction of values.
-pub fn state_to_predicate(state: &State) -> Predicate {
-    Predicate::AND(state_to_predicate_vector(&state))
-}
-
-/// Generate a parameterized predicate from a given state.
-pub fn state_to_param_predicate(state: &State) -> ParamPredicate {
-    ParamPredicate::new(&state_to_predicate_vector(&state))
-}
 
 /// Refence variables should take actual values when problem is refreshed
 pub fn measured_to_command(state: &State, prob: &PlanningProblem) -> State {
@@ -67,16 +38,6 @@ pub fn measured_to_command(state: &State, prob: &PlanningProblem) -> State {
             .map(|y| mapped.push(EnumValue::new(&y, &mv.val, None)));
     }
     State::new(&mapped, &Kind::Command)
-}
-
-/// Generate a predicate from a complete state as a conjunction of values.
-pub fn complete_state_to_predicate(state: &CompleteState) -> Predicate {
-    Predicate::AND(vec![
-        state_to_predicate(&state.measured),
-        // state_to_predicate(&state.handshake),
-        state_to_predicate(&state.command),
-        state_to_predicate(&state.estimated),
-    ])
 }
 
 /// When called, generate a new planning problem where the initial state is the current measured state.

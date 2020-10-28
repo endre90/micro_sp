@@ -80,7 +80,7 @@ pub struct ParamPlanningProblem {
     pub trans: Vec<ParamTransition>,
     pub invars: ParamPredicate, // should this be parameterized?
     pub max_steps: u32,
-    pub params: Vec<Parameter>,
+    // pub params: Vec<Parameter>,
     // pub paradigm: Paradigm,
 }
 
@@ -92,7 +92,7 @@ impl ParamPlanningProblem {
         trans: &Vec<ParamTransition>,
         invars: &ParamPredicate,
         max_steps: &u32,
-        params: &Vec<Parameter>,
+        // params: &Vec<Parameter>,
         // paradigm: &Paradigm,
     ) -> ParamPlanningProblem {
         ParamPlanningProblem {
@@ -102,7 +102,7 @@ impl ParamPlanningProblem {
             trans: trans.to_owned(),
             invars: invars.to_owned(),
             max_steps: max_steps.to_owned(),
-            params: params.iter().map(|x| x.clone()).collect(),
+            // params: params.iter().map(|x| x.clone()).collect(),
             // paradigm: paradigm.to_owned(),
         }
     }
@@ -114,8 +114,8 @@ impl ParamPlanningProblem {
 #[derive(Debug, PartialEq, Clone, PartialOrd, Eq, Ord)]
 pub struct ParamPlanningResult {
     pub result: PlanningResult,
-    pub level: u32,
-    pub concat: u32,
+    // pub level: u32,
+    // pub concat: u32,
 }
 
 /// Given a parameterized predicate and the vector of activation parameters,
@@ -154,24 +154,25 @@ pub fn generate_transition(ptrans: &ParamTransition, params: &Vec<Parameter>) ->
 /// Generates the problem from a parameterized problem and solves it with the incremental algorithm.
 pub fn parameterized(
     prob: &ParamPlanningProblem,
-    level: &u32,
-    concat: &u32,
+    params: &Vec<Parameter>
+    // level: &u32,
+    // concat: &u32,
 ) -> ParamPlanningResult {
     ParamPlanningResult {
         result: incremental(&PlanningProblem::new(
             &prob.name,
-            &generate_predicate(&prob.init, &prob.params),
-            &generate_predicate(&prob.goal, &prob.params),
+            &generate_predicate(&prob.init, &params),
+            &generate_predicate(&prob.goal, &params),
             &prob
                 .trans
                 .iter()
-                .map(|x| generate_transition(x, &prob.params))
+                .map(|x| generate_transition(x, &params))
                 .collect(),
-            &generate_predicate(&prob.invars, &prob.params),
+            &generate_predicate(&prob.invars, &params),
             &prob.max_steps,
             &Paradigm::Raar,
         )),
-        level: *level,
-        concat: *concat,
+        // level: *level,
+        // concat: *concat,
     }
 }

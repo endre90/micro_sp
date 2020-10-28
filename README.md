@@ -22,8 +22,8 @@ A dummy driver (inverse of a micro_sp node) can be launched providing the argume
 ## TODO
 ### high prioriry 
 1.  [x] error handling, probably not done
-2.  [ ] don't complicate, have parameterized
-3.  [ ] layered (comp(param(inc)))
+2.  [x] don't complicate, have parameterized
+3.  [x] layered (comp(param(inc)))
 4.  [x] publish complete state
 5.  [x] update command vars to match measured values on refresh (raar)
 6.  [x] raar: act, ref and act_ref have to have the same domain and same r#type
@@ -91,23 +91,23 @@ A dummy driver (inverse of a micro_sp node) can be launched providing the argume
     
 ### docs and tests
 
-| where  | what          |               docs |              tests |
-| :----- | :------------ | -----------------: | -----------------: |
-| core   | compositional | :white_check_mark: | :white_check_mark: |
-| core   | incremental   | :heavy_check_mark: | :heavy_check_mark: |
-| core   | items         | :heavy_check_mark: | :heavy_check_mark: |
-| core   | parameterized | :heavy_check_mark: | :heavy_check_mark: |
-| core   | predicates    | :heavy_check_mark: | :heavy_check_mark: |
-| models | blocksworld   | :white_check_mark: | :white_check_mark: |
-| models | dummy_robot   | :white_check_mark: | :white_check_mark: |
-| runner | dummy         | :white_check_mark: | :white_check_mark: |
-| runner | node          | :white_check_mark: | :white_check_mark: |
-| runner | publisher     | :white_check_mark: | :white_check_mark: |
-| runner | receiver      | :white_check_mark: | :white_check_mark: |
-| runner | sender        | :white_check_mark: | :white_check_mark: |
-| runner | state         | :white_check_mark: | :white_check_mark: |
-| runner | ticker        | :white_check_mark: | :white_check_mark: |
-| utils  | core          | :white_check_mark: | :white_check_mark: |
-| utils  | general       | :white_check_mark: | :white_check_mark: |
-| utils  | runner        | :white_check_mark: | :white_check_mark: |
-| main   | main          | :white_check_mark: | :white_check_mark: |
+| where  | what          |               docs |              tests |            benches |
+| :----- | :------------ | -----------------: | -----------------: | -----------------: |
+| core   | compositional | :white_check_mark: | :white_check_mark: | :white_check_mark: |
+| core   | incremental   | :heavy_check_mark: | :heavy_check_mark: | :white_check_mark: |
+| core   | items         | :heavy_check_mark: | :heavy_check_mark: | :white_check_mark: |
+| core   | parameterized | :heavy_check_mark: | :heavy_check_mark: | :white_check_mark: |
+| core   | predicates    | :heavy_check_mark: | :heavy_check_mark: | :white_check_mark: |
+| models | blocksworld   | :white_check_mark: | :white_check_mark: | :white_check_mark: |
+| models | dummy_robot   | :white_check_mark: | :white_check_mark: | :white_check_mark: |
+| runner | dummy         | :white_check_mark: | :white_check_mark: | :white_check_mark: |
+| runner | node          | :white_check_mark: | :white_check_mark: | :white_check_mark: |
+| runner | publisher     | :white_check_mark: | :white_check_mark: | :white_check_mark: |
+| runner | receiver      | :white_check_mark: | :white_check_mark: | :white_check_mark: |
+| runner | sender        | :white_check_mark: | :white_check_mark: | :white_check_mark: |
+| runner | state         | :white_check_mark: | :white_check_mark: | :white_check_mark: |
+| runner | ticker        | :white_check_mark: | :white_check_mark: | :white_check_mark: |
+| utils  | core          | :white_check_mark: | :white_check_mark: | :white_check_mark: |
+| utils  | general       | :white_check_mark: | :white_check_mark: | :white_check_mark: |
+| utils  | runner        | :white_check_mark: | :white_check_mark: | :white_check_mark: |
+| main   | main          | :white_check_mark: | :white_check_mark: | :white_check_mark: |

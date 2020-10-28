@@ -15,7 +15,7 @@ pub fn get_predicate_vars(pred: &Predicate) -> Vec<EnumVariable> {
         Predicate::EQ(x, y) => {
             s.push(x.clone());
             s.push(y.clone());
-        },
+        }
         Predicate::PBEQ(x, _) => s.extend(x.iter().flat_map(|p| get_predicate_vars(p))),
     }
     s.sort();
@@ -25,7 +25,12 @@ pub fn get_predicate_vars(pred: &Predicate) -> Vec<EnumVariable> {
 
 /// Given a parameterized predicate, return a vector of variables that play a role in it.
 pub fn get_param_predicate_vars(ppred: &ParamPredicate) -> Vec<EnumVariable> {
-    ppred.preds.iter().map(|x| get_predicate_vars(&x)).flatten().collect()
+    ppred
+        .preds
+        .iter()
+        .map(|x| get_predicate_vars(&x))
+        .flatten()
+        .collect()
 }
 
 /// Given a planning problem, return a vector of all variables defined for that problem.
@@ -40,6 +45,55 @@ pub fn get_problem_vars(prob: &PlanningProblem) -> Vec<EnumVariable> {
     s.sort();
     s.dedup();
     s
+}
+
+/// Collect the state as a vector of predicates.
+pub fn state_to_predicate_vector(state: &State) -> Vec<Predicate> {
+    state
+        .vec
+        .iter()
+        .map(|x| {
+            Predicate::SET(EnumValue::new(
+                &EnumVariable::new(
+                    &x.var.name,
+                    &x.var.domain.iter().map(|x| x.as_str()).collect(),
+                    &x.var.r#type,
+                    Some(&x.var.param),
+                    &x.var.kind,
+                ),
+                &x.val,
+                Some(&x.lifetime),
+            ))
+        })
+        .collect::<Vec<Predicate>>()
+}
+
+/// Generate a predicate from a given state as a conjunction of values.
+pub fn state_to_predicate(state: &State) -> Predicate {
+    Predicate::AND(state_to_predicate_vector(&state))
+}
+
+/// Generate a parameterized predicate from a given state.
+pub fn state_to_param_predicate(state: &State) -> ParamPredicate {
+    ParamPredicate::new(&state_to_predicate_vector(&state))
+}
+
+/// Generate a predicate from a complete state as a conjunction of values.
+pub fn complete_state_to_predicate(state: &CompleteState) -> Predicate {
+    Predicate::AND(vec![
+        state_to_predicate(&state.measured),
+        state_to_predicate(&state.command),
+        state_to_predicate(&state.estimated),
+    ])
+}
+
+/// Generate a parameterized predicate from a complete state.
+pub fn complete_state_to_param_predicate(state: &CompleteState) -> ParamPredicate {
+    ParamPredicate::new(&vec![
+        state_to_predicate(&state.measured),
+        state_to_predicate(&state.command),
+        state_to_predicate(&state.estimated),
+    ])
 }
 
 /// After the incremental algorithm has found a model it is unrolled into a plan.
@@ -120,14 +174,12 @@ pub fn get_planning_result(
         trace.push(PlanningFrame {
             source: CompleteState::from_states(
                 &State::new(&measured_source, &Kind::Measured),
-                // &State::new(&handshake_source, &Kind::Handshake),
                 &State::new(&command_source, &Kind::Command),
                 &State::new(&estimated_source, &Kind::Estimated),
             ),
             trans: String::from(trans),
             sink: CompleteState::from_states(
                 &State::new(&measured_sink, &Kind::Measured),
-                // &State::new(&handshake_sink, &Kind::Handshake),
                 &State::new(&command_sink, &Kind::Command),
                 &State::new(&estimated_sink, &Kind::Estimated),
             ),
@@ -148,4 +200,3 @@ pub fn get_planning_result(
         },
     }
 }
-

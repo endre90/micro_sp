@@ -1,0 +1,35 @@
+Date : 2020-10-27 20:51:32
+Directory : /home/endre/rust_crates/micro_sp/src/models
+Total : 7 files,  787 codes, 10 comments, 65 blanks, all 862 lines
+
+Languages
++----------+------------+------------+------------+------------+------------+
+| language | files      | code       | comment    | blank      | total      |
++----------+------------+------------+------------+------------+------------+
+| Rust     |          6 |        766 |         10 |         63 |        839 |
+| Markdown |          1 |         21 |          0 |          2 |         23 |
++----------+------------+------------+------------+------------+------------+
+
+Directories
++------------------------------------------------------------------------------------+------------+------------+------------+------------+------------+
+| path                                                                               | files      | code       | comment    | blank      | total      |
++------------------------------------------------------------------------------------+------------+------------+------------+------------+------------+
+| .                                                                                  |          7 |        787 |         10 |         65 |        862 |
+| blocksworld                                                                        |          4 |        643 |         10 |         44 |        697 |
+| blocksworld/results                                                                |          1 |         21 |          0 |          2 |         23 |
+| dummy_robot                                                                        |          2 |        141 |          0 |         20 |        161 |
++------------------------------------------------------------------------------------+------------+------------+------------+------------+------------+
+
+Files
++------------------------------------------------------------------------------------+----------+------------+------------+------------+------------+
+| filename                                                                           | language | code       | comment    | blank      | total      |
++------------------------------------------------------------------------------------+----------+------------+------------+------------+------------+
+| /home/endre/rust_crates/micro_sp/src/models/blocksworld/domain.rs                  | Rust     |        454 |          9 |         16 |        479 |
+| /home/endre/rust_crates/micro_sp/src/models/blocksworld/mod.rs                     | Rust     |          3 |          0 |          1 |          4 |
+| /home/endre/rust_crates/micro_sp/src/models/blocksworld/parser.rs                  | Rust     |        165 |          1 |         25 |        191 |
+| /home/endre/rust_crates/micro_sp/src/models/blocksworld/results/blocksworld_inc.md | Markdown |         21 |          0 |          2 |         23 |
+| /home/endre/rust_crates/micro_sp/src/models/dummy_robot/dummy_robot.rs             | Rust     |        139 |          0 |         19 |        158 |
+| /home/endre/rust_crates/micro_sp/src/models/dummy_robot/mod.rs                     | Rust     |          2 |          0 |          1 |          3 |
+| /home/endre/rust_crates/micro_sp/src/models/mod.rs                                 | Rust     |          3 |          0 |          1 |          4 |
+| Total                                                                              |          |        787 |         10 |         65 |        862 |
++------------------------------------------------------------------------------------+----------+------------+------------+------------+------------+
