@@ -6,7 +6,7 @@ use std::io::prelude::*;
 
 #[test]
 fn test_parser() {
-    let model = parser1("instance-1");
+    let model = parser1("instance-2");
 
     let g_param = Parameter::new("g", &true);
     let r_param = Parameter::new("r", &true);
@@ -16,7 +16,7 @@ fn test_parser() {
     let params = vec![g_param, r_param, b_param, none];
 
     let result = parameterized(&model, &params);
-    pprint_result_trans_only(&result.result)
+    pprint_result(&result.result)
 }
 
 pub fn parser1(name: &str) -> ParamPlanningProblem {
@@ -111,26 +111,26 @@ pub fn parser1(name: &str) -> ParamPlanningProblem {
         .map(|x| EnumVariable::new(x, &vec!["true", "false"], "boolean", None, &Kind::Command))
         .collect();
 
-    println!("VARS");
-    for v in &vars {
-        println!("{:?}", v);
-    }
-    println!("===================================");
-
-    let instance_init_neg_variables: Vec<EnumVariable> =
-        vars.difference(instance_init_variables.clone());
-
-    println!("POSITIVE");
-    for v in &instance_init_variables {
-        println!("{:?}", v);
-    }
-    println!("===================================");
-
-    println!("NEGATIVE");
-    for v in &instance_init_neg_variables {
-        println!("{:?}", v);
-    }
-    println!("===================================");
+        println!("VARS");
+        for v in &vars {
+            println!("{:?}", v);
+        }
+        println!("===================================");
+    
+        let instance_init_neg_variables: Vec<EnumVariable> =
+            vars.difference(instance_init_variables.clone());
+    
+        println!("POSITIVE");
+        for v in &instance_init_variables {
+            println!("{:?}", v);
+        }
+        println!("===================================");
+    
+        println!("NEGATIVE");
+        for v in &instance_init_neg_variables {
+            println!("{:?}", v);
+        }
+        println!("===================================");
 
     let init_pred_list: Vec<Predicate> = instance_init_variables
         .iter()

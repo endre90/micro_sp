@@ -10,12 +10,124 @@ pub enum Paradigm {
 }
 
 /// Variables, transitions and states can be of Measured (input), Command (output) and
-/// Estimated (internal) kind. Handshake is the "MeasuredCommand" kind.
+/// Estimated (internal) kind.
 #[derive(Debug, PartialEq, Clone, PartialOrd, Eq, Ord, Serialize, Deserialize)]
 pub enum Kind {
     Measured,
     Command,
     Estimated,
+}
+
+#[derive(Derivative, Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum SPValue {
+    Bool(bool),
+    String(String),
+}
+
+// Used by Variables for defining type. Must be the same as SPValue
+#[derive(Derivative, Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum SPValueType {
+    Bool,
+    String,
+}
+
+/// A trait for converting a value to SPValue
+pub trait ToSPValue {
+    fn to_spvalue(&self) -> SPValue;
+}
+
+impl SPValue {
+    pub fn is_type(&self, t: SPValueType) -> bool {
+        match self {
+            SPValue::Bool(_) => SPValueType::Bool == t,
+            SPValue::String(_) => SPValueType::String == t,
+        }
+    }
+
+    pub fn has_type(&self) -> SPValueType {
+        match self {
+            SPValue::Bool(_) => SPValueType::Bool,
+            SPValue::String(_) => SPValueType::String
+        }
+    }
+}
+
+#[derive(Derivative, Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Variable {
+    pub name: String,
+    pub value_type: SPValueType,
+    pub domain: Vec<SPValue>,
+    pub param: Parameter,
+    pub r#type: String,
+    pub kind: Kind,
+}
+
+impl Variable {
+    pub fn new(
+        name: &str,
+        value_type: &SPValueType,
+        domain: &Vec<SPValue>,
+        param: Option<&Parameter>,
+        r#type: Option<&String>,
+        kind: Option<&Kind>,
+    ) -> Variable {
+        Variable {
+            name: name.to_owned(),
+            value_type: value_type.to_owned(),
+            domain: domain.iter().map(|x| x.to_owned()).collect(),
+            param: match param {
+                Some(x) => x.to_owned(),
+                None => Parameter::none(),
+            },
+            r#type: match r#type {
+                Some(x) => x.to_owned(),
+                None => String::from("NONE"),
+            },
+            kind: match kind {
+                Some(x) => x.to_owned(),
+                None => Kind::Estimated,
+            },
+        }
+    }
+}
+
+#[derive(Derivative, Debug, Clone, Eq, Serialize, Deserialize)]
+#[derivative(PartialEq)]
+pub struct Assignment {
+    pub var: Variable,
+    pub val: SPValue,
+    #[derivative(PartialEq = "ignore")]
+    pub lifetime: Duration,
+}
+
+impl Assignment {
+    pub fn new(var: &Variable, val: &SPValue, lifetime: Option<&Duration>) -> Assignment {
+        Assignment {
+            var: var.to_owned(),
+            val: match val.has_type() {
+                SPValueType::Bool => match var.value_type {
+                    SPValueType::Bool => {
+                        val.to_owned()
+                    },
+                    SPValueType::String => {
+                        panic!("can't assign non-boolean value to boolean variable!")
+                    }
+                },
+                SPValueType::String => match var.value_type {
+                    SPValueType::Bool => {
+                        panic!("can't assign boolean value to enum type variable!")
+                    },
+                    SPValueType::String => {
+                        val.to_owned()
+                    }
+                }
+            },
+            lifetime: match lifetime {
+                Some(x) => x.to_owned(),
+                None => Duration::new(6, 0),
+            },
+        }
+    }
 }
 
 /// An enumeration kind variable with a name (ex. banana), type (ex. fruit),
@@ -39,7 +151,7 @@ pub struct BoolVariable {
 
 impl BoolVariable {
     /// Make a new boolean variable.
-    pub fn new(name: &str, param:Option<&Parameter>, kind: &Kind) -> BoolVariable {
+    pub fn new(name: &str, param: Option<&Parameter>, kind: &Kind) -> BoolVariable {
         BoolVariable {
             name: name.to_owned(),
             param: match param {
@@ -129,18 +241,17 @@ impl BoolValue {
     }
 }
 
+// #[derive(Debug, PartialEq, Clone, PartialOrd, Eq, Ord, Serialize, Deserialize)]
+// pub enum Variable {
+//     BoolVariable(BoolVariable),
+//     EnumVariable(EnumVariable)
+// }
 
-#[derive(Debug, PartialEq, Clone, PartialOrd, Eq, Ord, Serialize, Deserialize)]
-pub enum Variable {
-    BoolVariable(BoolVariable),
-    EnumVariable(EnumVariable)
-}
-
-#[derive(Debug, PartialEq, Clone, PartialOrd, Eq, Ord, Serialize, Deserialize)]
-pub enum Value {
-    BoolValue(BoolValue),
-    EnumValue(EnumValue)
-}
+// #[derive(Debug, PartialEq, Clone, PartialOrd, Eq, Ord, Serialize, Deserialize)]
+// pub enum Value {
+//     BoolValue(BoolValue),
+//     EnumValue(EnumValue)
+// }
 
 /// A collection of variables of the same control kind.
 #[derive(Debug, PartialEq, Clone, PartialOrd, Eq, Ord, Serialize, Deserialize)]
