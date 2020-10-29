@@ -25,28 +25,30 @@ A dummy driver (inverse of a micro_sp node) can be launched providing the argume
 2.  [x] don't complicate, have parameterized
 3.  [x] layered (comp(param(inc)))
 4.  [x] publish complete state
-5.  [ ] think about how to parameterize modelling like the pddl people do
-6.  [x] update command vars to match measured values on refresh (raar)
-7.  [x] raar: act, ref and act_ref have to have the same domain and same r#type
-8.  [ ] where is the state? who owns the state?
-9.  [x] proper command line arguments
-10. [ ] need new "start/stop running" and "set goal" topics to communicate with the runner
-11. [ ] the "start/stop running" should actually set the reference values     ?       
-12. [x] have to add delay for dummy act             
-13. [ ] add boolean variables
-14. [x] add handshake kind
-15. [ ] the algorithms should probably be solver agnostic
-16. [x] move setup to parser
-17. [ ] other command paradigm or are we done?
-18. [ ] testing
-19. [x] structure and modules
-20. [ ] generate dummy driver from the model
-21. [x] documentation, probably not done
-22. [ ] dummy_value should be deeply integrated
-23. [ ] proper readme
-24. [x] proper get planning result
-25. [ ] include readmes to benches to describe added constraints
-26. [ ] benchmarks blocksworld:
+5.  [ ] use 'model' and 'instance'
+6.  [ ] ok, going towards making the pddl parser :(
+7.  [ ] think about how to parameterize modelling like the pddl people do
+8.  [x] update command vars to match measured values on refresh (raar)
+9.  [x] raar: act, ref and act_ref have to have the same domain and same r#type
+10. [ ] where is the state? who owns the state?
+11. [x] proper command line arguments
+12. [ ] need new "start/stop running" and "set goal" topics to communicate with the runner
+13. [ ] the "start/stop running" should actually set the reference values     ?       
+14. [x] have to add delay for dummy act             
+15. [ ] add boolean variables
+16. [x] add handshake kind
+17. [ ] the algorithms should probably be solver agnostic
+18. [x] move setup to parser
+19. [ ] other command paradigm or are we done?
+20. [ ] testing
+21. [x] structure and modules
+22. [ ] generate dummy driver from the model
+23. [x] documentation, probably not done
+24. [ ] dummy_value should be deeply integrated
+25. [ ] proper readme
+26. [x] proper get planning result
+27. [ ] include readmes to benches to describe added constraints
+28. [ ] benchmarks blocksworld:
     1. [x] micro_sp inc enumerated boolean
     2. [ ] micro_sp inc pure boolean
     3. [ ] micro_sp inc pure enumeration
@@ -54,28 +56,28 @@ A dummy driver (inverse of a micro_sp node) can be launched providing the argume
     5. [ ] micro_sp seq pure boolean
     6. [ ] micro_sp seq pure enumeration
     7. [ ] incplan
-27. [ ] benchmarks barman
-28. [ ] benchmarks childsnack
-29. [ ] benchmarks gripper
-30. [ ] benchmarks hiking
-31. [ ] study conversion from a pddl model to a real world "runneble" model
-32. [ ] enable other solvers beside z3
-33. [ ] make a more general parser for boilerplate domain ? maybe not
-34. [ ] clean the warnings
-35. [ ] improve runner and don't replan after every state change
-36. [ ] gui needed asap
-37. [ ] show current plan in gui
-38. [x] look into parsing pddls: conclusion: won't work
-39. [ ] fix command lifetime
-40. [x] match published data to sink when fresh timeouts
-41. [ ] compositional algorithm
-42. [ ] when to call the planner
-43. [ ] handle estimated
-44. [x] move model to models
-45. [x] check if measured value is in domain
-46. [ ] flow graph to readme
-47. [ ] maybe try to write a cdcl solver?
-48. [ ] some theories? hmm...
+29. [ ] benchmarks barman
+30. [ ] benchmarks childsnack
+31. [ ] benchmarks gripper
+32. [ ] benchmarks hiking
+33. [ ] study conversion from a pddl model to a real world "runneble" model
+34. [ ] enable other solvers beside z3
+35. [ ] make a more general parser for boilerplate domain ? maybe not
+36. [ ] clean the warnings
+37. [ ] improve runner and don't replan after every state change
+38. [ ] gui needed asap
+39. [ ] show current plan in gui
+40. [x] look into parsing pddls: conclusion: won't work
+41. [ ] fix command lifetime
+42. [x] match published data to sink when fresh timeouts
+43. [ ] compositional algorithm
+44. [ ] when to call the planner
+45. [ ] handle estimated
+46. [x] move model to models
+47. [x] check if measured value is in domain
+48. [ ] flow graph to readme
+49. [ ] maybe try to write a cdcl solver?
+50. [ ] some theories? hmm...
 
 ### low priority
 1. [ ] improve Qol
@@ -112,3 +114,10 @@ A dummy driver (inverse of a micro_sp node) can be launched providing the argume
 | utils  | general       | :white_check_mark: | :white_check_mark: | :white_check_mark: |
 | utils  | runner        | :white_check_mark: | :white_check_mark: | :white_check_mark: |
 | main   | main          | :white_check_mark: | :white_check_mark: | :white_check_mark: |
+
+## thoughts
+1. using a pddl instance and domain, to come up with a valid plan, negatives have to be
+instantiated for the initial state. Otherwise init == goal in step 0. If a pddl model
+should be run online with replanning, either generating these negatives in every step
+would be necessary or, better, invariants would have to be included.
+2. 

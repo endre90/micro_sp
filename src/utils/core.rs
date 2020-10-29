@@ -33,6 +33,28 @@ pub fn get_param_predicate_vars(ppred: &ParamPredicate) -> Vec<EnumVariable> {
         .collect()
 }
 
+pub fn get_model_vars(trans: &Vec<Transition>) -> Vec<EnumVariable> {
+    let mut s = Vec::new();
+    for t in trans {
+        s.extend(get_predicate_vars(&t.guard));
+        s.extend(get_predicate_vars(&t.update));
+    }
+    s.sort();
+    s.dedup();
+    s
+}
+
+pub fn get_param_model_vars(trans: &Vec<ParamTransition>) -> Vec<EnumVariable> {
+    let mut s = Vec::new();
+    for t in trans {
+        s.extend(get_param_predicate_vars(&t.guard));
+        s.extend(get_param_predicate_vars(&t.update));
+    }
+    s.sort();
+    s.dedup();
+    s
+}
+
 /// Given a planning problem, return a vector of all variables defined for that problem.
 pub fn get_problem_vars(prob: &PlanningProblem) -> Vec<EnumVariable> {
     let mut s = Vec::new();
@@ -111,6 +133,8 @@ pub fn get_planning_result(
         .map(|l| l.split(" -> ").collect())
         .collect();
     let vars = get_problem_vars(&prob);
+
+    // println!("{:#?}", model_vec);
 
     let mut trace: Vec<PlanningFrame> = vec![];
     for i in 0..nr_steps - 1 {

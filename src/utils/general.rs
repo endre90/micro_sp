@@ -37,6 +37,7 @@ pub fn handle_args() -> Args {
         problem: match args.model.as_str() {
             "dummy_robot" => models::dummy_robot::dummy_robot::raar_model(),
             "blocksworld" => blocksworld::parser::parser(args.instance.as_str()),
+            // "gripper" => gripper::parser::parser(args.instance.as_str()),
             _ => panic!("unknown problem")
         },
     }

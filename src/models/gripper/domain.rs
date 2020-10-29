@@ -4,16 +4,17 @@ pub fn gripper_model_enumerated_booleans(
     rooms: &Vec<&str>,
     grippers: &Vec<&str>,
     balls: &Vec<&str>,
-) -> (Vec<ParamTransition>, Predicate) {
+) -> (Vec<ParamTransition>, ParamPredicate) {
     let domain = vec!["true", "false"];
 
     let mut move_transitions = vec![];
     let mut pick_transitions = vec![];
     let mut drop_transitions = vec![];
 
-    let  g_param = Parameter::new("g", &false);
-    let  r_param = Parameter::new("r", &false);
-    let  b_param = Parameter::new("b", &false);
+    let  g_param = Parameter::new("g", &true);
+    let  r_param = Parameter::new("r", &true);
+    let  b_param = Parameter::new("b", &true);
+
     for room_a in rooms {
         for room_b in rooms {
             if room_a != room_b {
@@ -21,10 +22,11 @@ pub fn gripper_model_enumerated_booleans(
                     &format!("move_from_{}_to_{}", room_a, room_b),
                     &ParamPredicate::new(&vec![Predicate::SET(EnumValue::new(
                         &EnumVariable::new(
-                            &format!("robot_at_{}", room_a),
+                            &format!("at-robby_{}", room_a),
                             &domain,
                             "boolean",
-                            Some(&r_param),
+                            // Some(&r_param),
+                            None,
                             &Kind::Command,
                         ),
                         "true",
@@ -33,10 +35,11 @@ pub fn gripper_model_enumerated_booleans(
                     &ParamPredicate::new(&vec![
                         Predicate::SET(EnumValue::new(
                             &EnumVariable::new(
-                                &format!("robot_at_{}", room_b),
+                                &format!("at-robby_{}", room_b),
                                 &domain,
                                 "boolean",
-                                Some(&r_param),
+                                // Some(&r_param),
+                                None,
                                 &Kind::Command,
                             ),
                             "true",
@@ -44,10 +47,11 @@ pub fn gripper_model_enumerated_booleans(
                         )),
                         Predicate::SET(EnumValue::new(
                             &EnumVariable::new(
-                                &format!("robot_at_{}", room_a),
+                                &format!("at-robby_{}", room_a),
                                 &domain,
                                 "boolean",
-                                Some(&r_param),
+                                // Some(&r_param),
+                                None,
                                 &Kind::Command,
                             ),
                             "false",
@@ -64,16 +68,17 @@ pub fn gripper_model_enumerated_booleans(
             for ball in balls {
                 pick_transitions.push(ParamTransition::new(
                     &format!(
-                        "pick_ball_{}_in_room_{}_with_gripper_{}",
+                        "pick_{}_in_{}_with_{}_gripper",
                         ball, room, gripper
                     ),
                     &ParamPredicate::new(&vec![
                         Predicate::SET(EnumValue::new(
                             &EnumVariable::new(
-                                &format!("ball_{}_at_room_{}", ball, room),
+                                &format!("at_{}_{}", ball, room),
                                 &domain,
                                 "boolean",
-                                 Some(&b_param),
+                                //  Some(&b_param),
+                                None,
                                 &Kind::Command,
                             ),
                             "true",
@@ -81,10 +86,11 @@ pub fn gripper_model_enumerated_booleans(
                         )),
                         Predicate::SET(EnumValue::new(
                             &EnumVariable::new(
-                                &format!("robot_at_{}", room),
+                                &format!("at-robby_{}", room),
                                 &domain,
                                 "boolean",
-                                 Some(&r_param),
+                                //  Some(&r_param),
+                                None,
                                 &Kind::Command,
                             ),
                             "true",
@@ -92,10 +98,11 @@ pub fn gripper_model_enumerated_booleans(
                         )),
                         Predicate::SET(EnumValue::new(
                             &EnumVariable::new(
-                                &format!("gripper_{}_free", gripper),
+                                &format!("free_{}", gripper),
                                 &domain,
                                 "boolean",
-                                Some(&g_param),
+                                // Some(&g_param),
+                                None,
                                 &Kind::Command,
                             ),
                             "true",
@@ -105,10 +112,11 @@ pub fn gripper_model_enumerated_booleans(
                     &ParamPredicate::new(&vec![
                         Predicate::SET(EnumValue::new(
                             &EnumVariable::new(
-                                &format!("ball_{}_at_room_{}", ball, room),
+                                &format!("at_{}_{}", ball, room),
                                 &domain,
                                 "boolean",
-                                Some(&b_param),
+                                // Some(&b_param),
+                                None,
                                 &Kind::Command,
                             ),
                             "false",
@@ -119,7 +127,8 @@ pub fn gripper_model_enumerated_booleans(
                                 &format!("{}_carry_{}", gripper, ball),
                                 &domain,
                                 "boolean",
-                                Some(&b_param),
+                                // Some(&b_param),
+                                None,
                                 &Kind::Command,
                             ),
                             "true",
@@ -127,10 +136,11 @@ pub fn gripper_model_enumerated_booleans(
                         )),
                         Predicate::SET(EnumValue::new(
                             &EnumVariable::new(
-                                &format!("gripper_{}_free", gripper),
+                                &format!("free_{}", gripper),
                                 &domain,
                                 "boolean",
-                                Some(&g_param),
+                                // Some(&g_param),
+                                None,
                                 &Kind::Command,
                             ),
                             "false",
@@ -147,16 +157,17 @@ pub fn gripper_model_enumerated_booleans(
             for ball in balls {
                 drop_transitions.push(ParamTransition::new(
                     &format!(
-                        "drop_ball_{}_to_room_{}_from_gripper_{}",
+                        "drop_{}_to_{}_from_{}_gripper",
                         ball, room, gripper
                     ),
                     &ParamPredicate::new(&vec![
                         Predicate::SET(EnumValue::new(
                             &EnumVariable::new(
-                                &format!("carry_{}", ball),
+                                &format!("{}_carry_{}", gripper, ball),
                                 &domain,
                                 "boolean",
-                                Some(&b_param),
+                                // Some(&b_param),
+                                None,
                                 &Kind::Command,
                             ),
                             "true",
@@ -164,10 +175,11 @@ pub fn gripper_model_enumerated_booleans(
                         )),
                         Predicate::SET(EnumValue::new(
                             &EnumVariable::new(
-                                &format!("robot_at_{}", room),
+                                &format!("at-robby_{}", room),
                                 &domain,
                                 "boolean",
-                                Some(&r_param),
+                                // Some(&r_param),
+                                None,
                                 &Kind::Command,
                             ),
                             "true",
@@ -177,10 +189,11 @@ pub fn gripper_model_enumerated_booleans(
                     &ParamPredicate::new(&vec![
                         Predicate::SET(EnumValue::new(
                             &EnumVariable::new(
-                                &format!("ball_{}_at_room_{}", ball, room),
+                                &format!("at_{}_{}", ball, room),
                                 &domain,
                                 "boolean",
-                                Some(&b_param),
+                                // Some(&b_param),
+                                None,
                                 &Kind::Command,
                             ),
                             "true",
@@ -188,10 +201,11 @@ pub fn gripper_model_enumerated_booleans(
                         )),
                         Predicate::SET(EnumValue::new(
                             &EnumVariable::new(
-                                &format!("gripper_{}_free", gripper),
+                                &format!("free_{}", gripper),
                                 &domain,
                                 "boolean",
-                                Some(&g_param),
+                                // Some(&g_param),
+                                None,
                                 &Kind::Command,
                             ),
                             "true",
@@ -202,7 +216,8 @@ pub fn gripper_model_enumerated_booleans(
                                 &format!("{}_carry_{}", gripper, ball),
                                 &domain,
                                 "boolean",
-                                Some(&b_param),
+                                // Some(&b_param),
+                                None,
                                 &Kind::Command,
                             ),
                             "false",
@@ -220,5 +235,5 @@ pub fn gripper_model_enumerated_booleans(
     }
 
     // (transitions, Predicate::AND(invariants))
-    (transitions, Predicate::TRUE)
+    (transitions, ParamPredicate::new(&vec!(Predicate::TRUE)))
 }
