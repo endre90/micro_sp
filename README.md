@@ -95,7 +95,7 @@ A dummy driver (inverse of a micro_sp node) can be launched providing the argume
 10. [ ] generate both raar and invar paradigms from a hl model?
 11. [ ] explore all paths and generate graph
     
-### docs and tests
+### docs tests macros status
 
 | where  | what          |               docs |              tests |             macros |              mdocs |             mtests |            benches |
 | :----- | :------------ | -----------------: | -----------------: | -----------------: | -----------------: | -----------------: | -----------------: |

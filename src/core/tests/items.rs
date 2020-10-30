@@ -57,12 +57,6 @@ fn is_fruit(fruit: &str, kind: &Kind) -> EnumVariable {
 }
 
 #[test]
-fn test_bool_c_macro() {
-    let banana = bool_c!("banana", None);
-    println!("{:?}", banana)
-}
-
-#[test]
 fn test_new_variable() {
     assert_eq!(
         make_fruit("banana", &Kind::Command),
