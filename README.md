@@ -99,24 +99,24 @@ A dummy driver (inverse of a micro_sp node) can be launched providing the argume
 
 | where | what | docs | tests | macros |  | mdocs |  | mtests | benches |
 | :---- | :--- | ---: | ----: | -----: || -----------------: || -----------------: | -----------------: |
-| core   | compositional | :white_check_mark: | :white_check_mark: | :white_check_mark: || :white_check_mark: || :white_check_mark: | :white_check_mark: |
-| core   | incremental   | :white_check_mark: | :white_check_mark: | :white_check_mark: || :white_check_mark: || :white_check_mark: | :white_check_mark: |
-| core   | items         | :white_check_mark: | :white_check_mark: | :white_check_mark: || :white_check_mark: || :white_check_mark: | :white_check_mark: |
-| core   | parameterized | :white_check_mark: | :white_check_mark: | :white_check_mark: || :white_check_mark: || :white_check_mark: | :white_check_mark: |
-| core   | predicates    | :white_check_mark: | :white_check_mark: | :white_check_mark: || :white_check_mark: || :white_check_mark: | :white_check_mark: |
-| models | blocksworld   | :white_check_mark: | :white_check_mark: | :white_check_mark: || :white_check_mark: || :white_check_mark: | :white_check_mark: |
-| models | dummy_robot   | :white_check_mark: | :white_check_mark: | :white_check_mark: || :white_check_mark: || :white_check_mark: | :white_check_mark: |
-| runner | dummy         | :white_check_mark: | :white_check_mark: | :white_check_mark: || :white_check_mark: || :white_check_mark: | :white_check_mark: |
-| runner | node          | :white_check_mark: | :white_check_mark: | :white_check_mark: || :white_check_mark: || :white_check_mark: | :white_check_mark: |
-| runner | publisher     | :white_check_mark: | :white_check_mark: | :white_check_mark: || :white_check_mark: || :white_check_mark: | :white_check_mark: |
-| runner | receiver      | :white_check_mark: | :white_check_mark: | :white_check_mark: || :white_check_mark: || :white_check_mark: | :white_check_mark: |
-| runner | sender        | :white_check_mark: | :white_check_mark: | :white_check_mark: || :white_check_mark: || :white_check_mark: | :white_check_mark: |
-| runner | state         | :white_check_mark: | :white_check_mark: | :white_check_mark: || :white_check_mark: || :white_check_mark: | :white_check_mark: |
-| runner | ticker        | :white_check_mark: | :white_check_mark: | :white_check_mark: || :white_check_mark: || :white_check_mark: | :white_check_mark: |
-| utils  | core          | :white_check_mark: | :white_check_mark: | :white_check_mark: || :white_check_mark: || :white_check_mark: | :white_check_mark: |
-| utils  | general       | :white_check_mark: | :white_check_mark: | :white_check_mark: || :white_check_mark: || :white_check_mark: | :white_check_mark: |
-| utils  | runner        | :white_check_mark: | :white_check_mark: | :white_check_mark: || :white_check_mark: || :white_check_mark: | :white_check_mark: |
-| main   | main          | :white_check_mark: | :white_check_mark: | :white_check_mark: || :white_check_mark: || :white_check_mark: | :white_check_mark: |
+| core   | compositional | :white_check_mark: | :white_check_mark: | :white_check_mark: | :white_check_mark: | :white_check_mark: | :white_check_mark: |
+| core   | incremental   | :white_check_mark: | :white_check_mark: | :white_check_mark: | :white_check_mark: | :white_check_mark: | :white_check_mark: |
+| core   | items         | :white_check_mark: | :white_check_mark: | :white_check_mark: | :white_check_mark: | :white_check_mark: | :white_check_mark: |
+| core   | parameterized | :white_check_mark: | :white_check_mark: | :white_check_mark: | :white_check_mark: | :white_check_mark: | :white_check_mark: |
+| core   | predicates    | :white_check_mark: | :white_check_mark: | :white_check_mark: | :white_check_mark: | :white_check_mark: | :white_check_mark: |
+| models | blocksworld   | :white_check_mark: | :white_check_mark: | :white_check_mark: | :white_check_mark: | :white_check_mark: | :white_check_mark: |
+| models | dummy_robot   | :white_check_mark: | :white_check_mark: | :white_check_mark: | :white_check_mark: | :white_check_mark: | :white_check_mark: |
+| runner | dummy         | :white_check_mark: | :white_check_mark: | :white_check_mark: | :white_check_mark: | :white_check_mark: | :white_check_mark: |
+| runner | node          | :white_check_mark: | :white_check_mark: | :white_check_mark: | :white_check_mark: | :white_check_mark: | :white_check_mark: |
+| runner | publisher     | :white_check_mark: | :white_check_mark: | :white_check_mark: | :white_check_mark: | :white_check_mark: | :white_check_mark: |
+| runner | receiver      | :white_check_mark: | :white_check_mark: | :white_check_mark: | :white_check_mark: | :white_check_mark: | :white_check_mark: |
+| runner | sender        | :white_check_mark: | :white_check_mark: | :white_check_mark: | :white_check_mark: | :white_check_mark: | :white_check_mark: |
+| runner | state         | :white_check_mark: | :white_check_mark: | :white_check_mark: | :white_check_mark: | :white_check_mark: | :white_check_mark: |
+| runner | ticker        | :white_check_mark: | :white_check_mark: | :white_check_mark: | :white_check_mark: | :white_check_mark: | :white_check_mark: |
+| utils  | core          | :white_check_mark: | :white_check_mark: | :white_check_mark: | :white_check_mark: | :white_check_mark: | :white_check_mark: |
+| utils  | general       | :white_check_mark: | :white_check_mark: | :white_check_mark: | :white_check_mark: | :white_check_mark: | :white_check_mark: |
+| utils  | runner        | :white_check_mark: | :white_check_mark: | :white_check_mark: | :white_check_mark: | :white_check_mark: | :white_check_mark: |
+| main   | main          | :white_check_mark: | :white_check_mark: | :white_check_mark: | :white_check_mark: | :white_check_mark: | :white_check_mark: |
 
 ## thoughts
 1. using a pddl instance and domain, to come up with a valid plan, negatives have to be
