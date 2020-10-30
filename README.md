@@ -97,8 +97,8 @@ A dummy driver (inverse of a micro_sp node) can be launched providing the argume
     
 ### docs and tests
 
-| where | what | docs | tests | macros |  | mdocs |  | mtests | benches |
-| :---- | :--- | ---: | ----: | -----: || -----------------: || -----------------: | -----------------: |
+| where  | what          |               docs |              tests |             macros |              mdocs |             mtests |            benches |
+| :----- | :------------ | -----------------: | -----------------: | -----------------: | -----------------: | -----------------: | -----------------: |
 | core   | compositional | :white_check_mark: | :white_check_mark: | :white_check_mark: | :white_check_mark: | :white_check_mark: | :white_check_mark: |
 | core   | incremental   | :white_check_mark: | :white_check_mark: | :white_check_mark: | :white_check_mark: | :white_check_mark: | :white_check_mark: |
 | core   | items         | :white_check_mark: | :white_check_mark: | :white_check_mark: | :white_check_mark: | :white_check_mark: | :white_check_mark: |
