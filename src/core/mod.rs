@@ -6,5 +6,7 @@ pub mod items;
 pub mod parameterized;
 pub mod predicates;
 
+pub mod macros;
+
 #[cfg(test)]
 pub mod tests;

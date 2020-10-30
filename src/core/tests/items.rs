@@ -11,6 +11,34 @@ fn make_fruit(fruit: &str, kind: &Kind) -> EnumVariable {
     )
 }
 
+fn make_new_enum_fruit(fruit: &str) -> Variable {
+    Variable::new(
+        fruit,
+        &SPValueType::String,
+        &vec![
+            String::from("green").to_spvalue(),
+            String::from("ripe").to_spvalue(),
+            String::from("spoiled").to_spvalue(),
+        ],
+        None,
+        Some(&String::from("green")),
+        None,
+    )
+}
+
+fn make_new_bool_fruit(fruit: &str) -> Variable {
+    Variable::new(
+        fruit,
+        &SPValueType::Bool,
+        &vec![true.to_spvalue(), false.to_spvalue()],
+        None,
+        None,
+        None,
+    )
+}
+
+
+
 fn is_fruit(fruit: &str, kind: &Kind) -> EnumVariable {
     EnumVariable {
         name: String::from(fruit),
@@ -26,6 +54,12 @@ fn is_fruit(fruit: &str, kind: &Kind) -> EnumVariable {
         },
         kind: kind.to_owned(),
     }
+}
+
+#[test]
+fn test_bool_c_macro() {
+    let banana = bool_c!("banana", None);
+    println!("{:?}", banana)
 }
 
 #[test]

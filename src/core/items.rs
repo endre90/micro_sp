@@ -36,6 +36,18 @@ pub trait ToSPValue {
     fn to_spvalue(&self) -> SPValue;
 }
 
+impl ToSPValue for bool {
+    fn to_spvalue(&self) -> SPValue {
+        SPValue::Bool(*self)
+    }
+}
+
+impl ToSPValue for String {
+    fn to_spvalue(&self) -> SPValue {
+        SPValue::String(self.clone())
+    }
+}
+
 impl SPValue {
     pub fn is_type(&self, t: SPValueType) -> bool {
         match self {
@@ -47,7 +59,7 @@ impl SPValue {
     pub fn has_type(&self) -> SPValueType {
         match self {
             SPValue::Bool(_) => SPValueType::Bool,
-            SPValue::String(_) => SPValueType::String
+            SPValue::String(_) => SPValueType::String,
         }
     }
 }
@@ -89,6 +101,9 @@ impl Variable {
             },
         }
     }
+    pub fn domain(&self) -> &[SPValue] {
+        self.domain.as_slice()
+    }
 }
 
 #[derive(Derivative, Debug, Clone, Eq, Serialize, Deserialize)]
@@ -106,9 +121,7 @@ impl Assignment {
             var: var.to_owned(),
             val: match val.has_type() {
                 SPValueType::Bool => match var.value_type {
-                    SPValueType::Bool => {
-                        val.to_owned()
-                    },
+                    SPValueType::Bool => val.to_owned(),
                     SPValueType::String => {
                         panic!("can't assign non-boolean value to boolean variable!")
                     }
@@ -116,11 +129,9 @@ impl Assignment {
                 SPValueType::String => match var.value_type {
                     SPValueType::Bool => {
                         panic!("can't assign boolean value to enum type variable!")
-                    },
-                    SPValueType::String => {
-                        val.to_owned()
                     }
-                }
+                    SPValueType::String => val.to_owned(),
+                },
             },
             lifetime: match lifetime {
                 Some(x) => x.to_owned(),
@@ -260,6 +271,31 @@ pub struct State {
     pub kind: Kind,
 }
 
+/// A collection of variables of the same control kind.
+#[derive(Debug, PartialEq, Clone, Eq, Serialize, Deserialize)]
+pub struct NewState {
+    pub vec: Vec<Assignment>,
+    pub kind: Kind,
+}
+
+impl NewState {
+    pub fn new(vec: &Vec<Assignment>, kind: &Kind) -> NewState {
+        match vec.len() > 0 {
+            false => NewState {
+                vec: vec![],
+                kind: kind.to_owned(),
+            },
+            true => match vec.iter().all(|x| x.var.kind == *kind) {
+                false => panic!("can't make a state of other than variable kind"),
+                true => NewState {
+                    vec: vec.to_owned(),
+                    kind: kind.to_owned(),
+                },
+            },
+        }
+    }
+}
+
 // impl State {
 //     pub fn new(vec: &Vec<Value>, kind: &Kind) -> State {
 //         match vec.len() > 0 {
@@ -361,40 +397,71 @@ impl CompleteState {
             ),
         }
     }
+}
 
-    // /// Collect a complete state from a vector of values.
-    // pub fn from_vec(vec: &Vec<Value>) -> CompleteState {
-    //     CompleteState {
-    //         measured: State::new(
-    //             &vec.iter()
-    //                 .filter(|x| match x {
-    //                     Value::BoolValue(y) => y.var.kind == Kind::Measured,
-    //                     Value::EnumValue(y) => y.var.kind == Kind::Measured,
-    //                 })
-    //                 .map(|x| x.to_owned())
-    //                 .collect(),
-    //             &Kind::Measured,
-    //         ),
-    //         command: State::new(
-    //             &vec.iter()
-    //                 .filter(|x| match x {
-    //                     Value::BoolValue(y) => y.var.kind == Kind::Command,
-    //                     Value::EnumValue(y) => y.var.kind == Kind::Command,
-    //                 })
-    //                 .map(|x| x.to_owned())
-    //                 .collect(),
-    //             &Kind::Command,
-    //         ),
-    //         estimated: State::new(
-    //             &vec.iter()
-    //             .filter(|x| match x {
-    //                 Value::BoolValue(y) => y.var.kind == Kind::Estimated,
-    //                 Value::EnumValue(y) => y.var.kind == Kind::Estimated,
-    //             })
-    //                 .map(|x| x.to_owned())
-    //                 .collect(),
-    //             &Kind::Estimated,
-    //         ),
-    //     }
-    // }
+/// A struct containing the measured, command and estimated state. (Temporary?)
+#[derive(Debug, PartialEq, Clone, Eq, Serialize, Deserialize)]
+pub struct NewCompleteState {
+    pub measured: NewState,
+    pub command: NewState,
+    pub estimated: NewState,
+}
+
+impl NewCompleteState {
+    /// Create a new empty complete state. (Temporary?)
+    pub fn empty() -> NewCompleteState {
+        NewCompleteState {
+            measured: NewState::new(&vec![], &Kind::Measured),
+            command: NewState::new(&vec![], &Kind::Command),
+            estimated: NewState::new(&vec![], &Kind::Estimated),
+        }
+    }
+    /// Collect a complete state from measured, handshake,
+    /// command and estimated state. States can also be empty.
+    pub fn from_states(
+        measured: &NewState,
+        command: &NewState,
+        estimated: &NewState,
+    ) -> NewCompleteState {
+        NewCompleteState {
+            measured: match measured.kind == Kind::Measured {
+                true => measured.to_owned(),
+                false => panic!("kind must match when constructing state"),
+            },
+            command: match command.kind == Kind::Command {
+                true => command.to_owned(),
+                false => panic!("kind must match when constructing state"),
+            },
+            estimated: match estimated.kind == Kind::Estimated {
+                true => estimated.to_owned(),
+                false => panic!("kind must match when constructing state"),
+            },
+        }
+    }
+    /// Collect a complete state from a vector of values.
+    pub fn from_vec(vec: &Vec<Assignment>) -> NewCompleteState {
+        NewCompleteState {
+            measured: NewState::new(
+                &vec.iter()
+                    .filter(|x| x.var.kind == Kind::Measured)
+                    .map(|x| x.to_owned())
+                    .collect(),
+                &Kind::Measured,
+            ),
+            command: NewState::new(
+                &vec.iter()
+                    .filter(|x| x.var.kind == Kind::Command)
+                    .map(|x| x.to_owned())
+                    .collect(),
+                &Kind::Command,
+            ),
+            estimated: NewState::new(
+                &vec.iter()
+                    .filter(|x| x.var.kind == Kind::Estimated)
+                    .map(|x| x.to_owned())
+                    .collect(),
+                &Kind::Estimated,
+            ),
+        }
+    }
 }
