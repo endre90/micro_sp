@@ -230,6 +230,19 @@ macro_rules! new_bool_assign_e {
 /// make a new enumeration variable of command kind
 #[macro_export]
 macro_rules! enum_c {
+    ($name:expr, $domain:expr) => {
+        Variable::new(
+            $name,
+            &SPValueType::String,
+            &$domain
+                .iter()
+                .map(|x| String::from(x.to_owned()).to_spvalue())
+                .collect(),
+            None,
+            None,
+            Some(&Kind::Command),
+        )
+    };
     ($name:expr, $r#type:expr, $domain:expr) => {
         Variable::new(
             $name,
@@ -261,6 +274,19 @@ macro_rules! enum_c {
 /// make a new enumeration variable of measured kind
 #[macro_export]
 macro_rules! enum_m {
+    ($name:expr, $domain:expr) => {
+        Variable::new(
+            $name,
+            &SPValueType::String,
+            &$domain
+                .iter()
+                .map(|x| String::from(x.to_owned()).to_spvalue())
+                .collect(),
+            None,
+            None
+            Some(&Kind::Measured),
+        )
+    };
     ($name:expr, $r#type:expr, $domain:expr) => {
         Variable::new(
             $name,
@@ -292,6 +318,19 @@ macro_rules! enum_m {
 /// make a new enumeration variable of estimated kind
 #[macro_export]
 macro_rules! enum_e {
+    ($name:expr, $domain:expr) => {
+        Variable::new(
+            $name,
+            &SPValueType::String,
+            &$domain
+                .iter()
+                .map(|x| String::from(x.to_owned()).to_spvalue())
+                .collect(),
+            None,
+            None
+            Some(&Kind::Estimated),
+        )
+    };
     ($name:expr, $r#type:expr, $domain:expr) => {
         Variable::new(
             $name,
@@ -334,6 +373,23 @@ macro_rules! enum_assign {
 /// make a new enumeration variable of command kind and assign a value to it
 #[macro_export]
 macro_rules! new_enum_assign_c {
+    ($name:expr, $domain:expr, $val:expr) => {
+        Assignment::new(
+            &Variable::new(
+                $name,
+                &SPValueType::String,
+                &$domain
+                    .iter()
+                    .map(|x| String::from(x.to_owned()).to_spvalue())
+                    .collect(),
+                None,
+                None,
+                Some(&Kind::Command),
+            ),
+            &String::from($val.to_owned()).to_spvalue(),
+            None,
+        )
+    };
     ($name:expr, $r#type:expr, $domain:expr, $val:expr) => {
         Assignment::new(
             &Variable::new(
@@ -390,6 +446,23 @@ macro_rules! new_enum_assign_c {
 /// make a new enumeration variable of measured kind and assign a value to it
 #[macro_export]
 macro_rules! new_enum_assign_m {
+    ($name:expr, $domain:expr, $val:expr) => {
+        Assignment::new(
+            &Variable::new(
+                $name,
+                &SPValueType::String,
+                &$domain
+                    .iter()
+                    .map(|x| String::from(x.to_owned()).to_spvalue())
+                    .collect(),
+                None,
+                None,
+                Some(&Kind::Measured),
+            ),
+            &String::from($val.to_owned()).to_spvalue(),
+            None,
+        )
+    };
     ($name:expr, $r#type:expr, $domain:expr, $val:expr) => {
         Assignment::new(
             &Variable::new(
@@ -446,6 +519,23 @@ macro_rules! new_enum_assign_m {
 /// make a new enumeration variable of estimated kind and assign a value to it
 #[macro_export]
 macro_rules! new_enum_assign_e {
+    ($name:expr, $domain:expr, $val:expr) => {
+        Assignment::new(
+            &Variable::new(
+                $name,
+                &SPValueType::String,
+                &$domain
+                    .iter()
+                    .map(|x| String::from(x.to_owned()).to_spvalue())
+                    .collect(),
+                None,
+                None,
+                Some(&Kind::Estimated),
+            ),
+            &String::from($val.to_owned()).to_spvalue(),
+            None,
+        )
+    };
     ($name:expr, $r#type:expr, $domain:expr, $val:expr) => {
         Assignment::new(
             &Variable::new(

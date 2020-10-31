@@ -85,93 +85,53 @@ pub fn parser(name: &str) -> PlanningProblem {
     let unclear_vec = IterOps::difference(blocks.clone(), clear_vec.clone());
 
     for x in clear_vec {
-        clear_predicates.push(Predicate::SET(EnumValue::new(
-            &EnumVariable::new(
-                &format!("clear_{}", x),
-                &domain,
-                "boolean",
-                None,
-                &Kind::Command,
-            ),
-            "true",
-            None,
-        )))
+        clear_predicates.push(
+            pand!(
+                &pass!(&new_enum_assign_c!(&format!("clear_{}", x), &domain, "true"))
+            )
+        )
     }
 
     for x in unclear_vec {
-        clear_predicates.push(Predicate::SET(EnumValue::new(
-            &EnumVariable::new(
-                &format!("clear_{}", x),
-                &domain,
-                "boolean",
-                None,
-                &Kind::Command,
-            ),
-            "false",
-            None,
-        )))
+        clear_predicates.push(
+            pand!(
+                &pass!(&new_enum_assign_c!(&format!("clear_{}", x), &domain, "false"))
+            )
+        )
     }
 
     let mut ontable_predicates = vec![];
     for x in ontable_vec {
-        ontable_predicates.push(Predicate::SET(EnumValue::new(
-            &EnumVariable::new(
-                &format!("ontable_{}", x),
-                &domain,
-                "boolean",
-                None,
-                &Kind::Command,
-            ),
-            "true",
-            None,
-        )))
+        ontable_predicates.push(
+            pand!(
+                &pass!(&new_enum_assign_c!(&format!("ontable_{}", x), &domain, "true"))
+            )
+        )
     }
 
     let mut on_predicates = vec![];
     for (b1, b2) in on_init {
-        on_predicates.push(Predicate::SET(EnumValue::new(
-            &EnumVariable::new(
-                &format!("{}_on_{}", b1, b2),
-                &domain,
-                "boolean",
-                None,
-                &Kind::Command,
-            ),
-            "true",
-            None,
-        )))
+        on_predicates.push(
+            pand!(
+                &pass!(&new_enum_assign_c!(&format!("{}_on_{}", b1, b2), &domain, "true"))
+            )
+        )
     }
 
     let initial = Predicate::AND(vec![
         Predicate::AND(clear_predicates),
         Predicate::AND(ontable_predicates),
         Predicate::AND(on_predicates),
-        Predicate::SET(EnumValue::new(
-            &EnumVariable::new(
-                &format!("hand_empty"),
-                &domain,
-                "boolean",
-                None,
-                &Kind::Command,
-            ),
-            "true",
-            None,
-        )),
+        pass!(&new_enum_assign_c!(&format!("hand_empty"), &domain, "true"))
     ]);
 
     let mut goal_on_predicates = vec![];
     for (b1, b2) in on_goal {
-        goal_on_predicates.push(Predicate::SET(EnumValue::new(
-            &EnumVariable::new(
-                &format!("{}_on_{}", b1, b2),
-                &domain,
-                "boolean",
-                None,
-                &Kind::Command,
-            ),
-            "true",
-            None,
-        )))
+        goal_on_predicates.push(
+            pand!(
+                &pass!(&new_enum_assign_c!(&format!("{}_on_{}", b1, b2), &domain, "true"))
+            )
+        )
     }
 
     let goal = Predicate::AND(goal_on_predicates);
@@ -182,7 +142,6 @@ pub fn parser(name: &str) -> PlanningProblem {
         &model.0,
         &model.1,
         &50,
-        &Paradigm::Raar,
     );
 
     problem

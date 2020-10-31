@@ -11,150 +11,65 @@ pub fn blocksworld_model_enumerated_booleans(blocks: &Vec<&str>) -> (Vec<Transit
     for block in blocks {
         pick_up_transitions.push(Transition::new(
             &format!("pick_up_{}", block),
-            &Predicate::AND(vec![
-                Predicate::SET(EnumValue::new(
-                    &EnumVariable::new(
-                        &format!("clear_{}", block),
-                        &domain,
-                        "boolean",
-                        None,
-                        &Kind::Command,
-                    ),
-                    "true",
-                    None,
+            pand!(
+                &pass!(&new_enum_assign_c!(
+                    &format!("clear_{}", block),
+                    &domain,
+                    "true"
                 )),
-                Predicate::SET(EnumValue::new(
-                    &EnumVariable::new(
-                        &format!("ontable_{}", block),
-                        &domain,
-                        "boolean",
-                        None,
-                        &Kind::Command,
-                    ),
-                    "true",
-                    None,
+                &pass!(&new_enum_assign_c!(&format!("hand_empty"), &domain, "true"))
+            ),
+            pand!(
+                &pass!(&new_enum_assign_c!(
+                    &format!("clear_{}", block),
+                    &domain,
+                    "false"
                 )),
-                Predicate::SET(EnumValue::new(
-                    &EnumVariable::new(
-                        &format!("hand_empty"),
-                        &domain,
-                        "boolean",
-                        None,
-                        &Kind::Command,
-                    ),
-                    "true",
-                    None,
+                &pass!(&new_enum_assign_c!(
+                    &format!("ontable_{}", block),
+                    &domain,
+                    "false"
                 )),
-            ]),
-            &Predicate::AND(vec![
-                Predicate::SET(EnumValue::new(
-                    &EnumVariable::new(
-                        &format!("ontable_{}", block),
-                        &domain,
-                        "boolean",
-                        None,
-                        &Kind::Command,
-                    ),
-                    "false",
-                    None,
+                &pass!(&new_enum_assign_c!(
+                    &format!("holding_{}", block),
+                    &domain,
+                    "true"
                 )),
-                Predicate::SET(EnumValue::new(
-                    &EnumVariable::new(
-                        &format!("clear_{}", block),
-                        &domain,
-                        "boolean",
-                        None,
-                        &Kind::Command,
-                    ),
-                    "false",
-                    None,
-                )),
-                Predicate::SET(EnumValue::new(
-                    &EnumVariable::new(
-                        &format!("holding_{}", block),
-                        &domain,
-                        "boolean",
-                        None,
-                        &Kind::Command,
-                    ),
-                    "true",
-                    None,
-                )),
-                Predicate::SET(EnumValue::new(
-                    &EnumVariable::new(
-                        &format!("hand_empty"),
-                        &domain,
-                        "boolean",
-                        None,
-                        &Kind::Command,
-                    ),
-                    "false",
-                    None,
-                )),
-            ]),
+                &pass!(&new_enum_assign_c!(
+                    &format!("hand_empty"),
+                    &domain,
+                    "false"
+                ))
+            ),
         ))
     }
 
     for block in blocks {
         put_down_transitions.push(Transition::new(
             &format!("put_down_{}", block),
-            &Predicate::SET(EnumValue::new(
-                &EnumVariable::new(
+            pass!(&new_enum_assign_c!(
+                &format!("holding_{}", block),
+                &domain,
+                "true"
+            )),
+            pand!(
+                &pass!(&new_enum_assign_c!(
                     &format!("holding_{}", block),
                     &domain,
-                    "boolean",
-                    None,
-                    &Kind::Command,
-                ),
-                "true",
-                None,
-            )),
-            &Predicate::AND(vec![
-                Predicate::SET(EnumValue::new(
-                    &EnumVariable::new(
-                        &format!("holding_{}", block),
-                        &domain,
-                        "boolean",
-                        None,
-                        &Kind::Command,
-                    ),
-                    "false",
-                    None,
+                    "false"
                 )),
-                Predicate::SET(EnumValue::new(
-                    &EnumVariable::new(
-                        &format!("clear_{}", block),
-                        &domain,
-                        "boolean",
-                        None,
-                        &Kind::Command,
-                    ),
-                    "true",
-                    None,
+                &pass!(&new_enum_assign_c!(
+                    &format!("clear_{}", block),
+                    &domain,
+                    "true"
                 )),
-                Predicate::SET(EnumValue::new(
-                    &EnumVariable::new(
-                        &format!("ontable_{}", block),
-                        &domain,
-                        "boolean",
-                        None,
-                        &Kind::Command,
-                    ),
-                    "true",
-                    None,
+                &pass!(&new_enum_assign_c!(
+                    &format!("ontable_{}", block),
+                    &domain,
+                    "true"
                 )),
-                Predicate::SET(EnumValue::new(
-                    &EnumVariable::new(
-                        &format!("hand_empty"),
-                        &domain,
-                        "boolean",
-                        None,
-                        &Kind::Command,
-                    ),
-                    "true",
-                    None,
-                )),
-            ]),
+                &pass!(&new_enum_assign_c!(&format!("hand_empty"), &domain, "true"))
+            ),
         ))
     }
 
@@ -163,87 +78,41 @@ pub fn blocksworld_model_enumerated_booleans(blocks: &Vec<&str>) -> (Vec<Transit
             if b1 != b2 {
                 stack_transitions.push(Transition::new(
                     &format!("stack_{}_on_{}", b1, b2),
-                    &Predicate::AND(vec![
-                        Predicate::SET(EnumValue::new(
-                            &EnumVariable::new(
-                                &format!("clear_{}", b2),
-                                &domain,
-                                "boolean",
-                                None,
-                                &Kind::Command,
-                            ),
-                            "true",
-                            None,
+                    pand!(
+                        &pass!(&new_enum_assign_c!(
+                            &format!("clear_{}", b2),
+                            &domain,
+                            "true"
                         )),
-                        Predicate::SET(EnumValue::new(
-                            &EnumVariable::new(
-                                &format!("holding_{}", b1),
-                                &domain,
-                                "boolean",
-                                None,
-                                &Kind::Command,
-                            ),
-                            "true",
-                            None,
+                        &pass!(&new_enum_assign_c!(
+                            &format!("holding_{}", b1),
+                            &domain,
+                            "true"
+                        ))
+                    ),
+                    pand!(
+                        &pass!(&new_enum_assign_c!(
+                            &format!("clear_{}", b2),
+                            &domain,
+                            "false"
                         )),
-                    ]),
-                    &Predicate::AND(vec![
-                        Predicate::SET(EnumValue::new(
-                            &EnumVariable::new(
-                                &format!("holding_{}", b1),
-                                &domain,
-                                "boolean",
-                                None,
-                                &Kind::Command,
-                            ),
-                            "false",
-                            None,
+                        &pass!(&new_enum_assign_c!(
+                            &format!("holding_{}", b1),
+                            &domain,
+                            "false"
                         )),
-                        Predicate::SET(EnumValue::new(
-                            &EnumVariable::new(
-                                &format!("clear_{}", b2),
-                                &domain,
-                                "boolean",
-                                None,
-                                &Kind::Command,
-                            ),
-                            "false",
-                            None,
+                        &pass!(&new_enum_assign_c!(
+                            &format!("clear_{}", b1),
+                            &domain,
+                            "true"
                         )),
-                        Predicate::SET(EnumValue::new(
-                            &EnumVariable::new(
-                                &format!("clear_{}", b1),
-                                &domain,
-                                "boolean",
-                                None,
-                                &Kind::Command,
-                            ),
-                            "true",
-                            None,
+                        &pass!(&new_enum_assign_c!(
+                            &format!("{}_on_{}", b1, b2),
+                            &domain,
+                            "true"
                         )),
-                        Predicate::SET(EnumValue::new(
-                            &EnumVariable::new(
-                                &format!("{}_on_{}", b1, b2),
-                                &domain,
-                                "boolean",
-                                None,
-                                &Kind::Command,
-                            ),
-                            "true",
-                            None,
-                        )),
-                        Predicate::SET(EnumValue::new(
-                            &EnumVariable::new(
-                                &format!("hand_empty"),
-                                &domain,
-                                "boolean",
-                                None,
-                                &Kind::Command,
-                            ),
-                            "true",
-                            None,
-                        )),
-                    ]),
+                        &pass!(&new_enum_assign_c!(&format!("hand_empty"), &domain, "true"))
+                    ),
                 ))
             }
         }
@@ -254,98 +123,46 @@ pub fn blocksworld_model_enumerated_booleans(blocks: &Vec<&str>) -> (Vec<Transit
             if b1 != b2 {
                 unstack_transitions.push(Transition::new(
                     &format!("unstack_{}_from_{}", b1, b2),
-                    &Predicate::AND(vec![
-                        Predicate::SET(EnumValue::new(
-                            &EnumVariable::new(
-                                &format!("{}_on_{}", b1, b2),
-                                &domain,
-                                "boolean",
-                                None,
-                                &Kind::Command,
-                            ),
-                            "true",
-                            None,
+                    pand!(
+                        &pass!(&new_enum_assign_c!(
+                            &format!("{}_on_{}", b1, b2),
+                            &domain,
+                            "true"
                         )),
-                        Predicate::SET(EnumValue::new(
-                            &EnumVariable::new(
-                                &format!("clear_{}", b1),
-                                &domain,
-                                "boolean",
-                                None,
-                                &Kind::Command,
-                            ),
-                            "true",
-                            None,
+                        &pass!(&new_enum_assign_c!(
+                            &format!("clear_{}", b1),
+                            &domain,
+                            "true"
                         )),
-                        Predicate::SET(EnumValue::new(
-                            &EnumVariable::new(
-                                &format!("hand_empty"),
-                                &domain,
-                                "boolean",
-                                None,
-                                &Kind::Command,
-                            ),
-                            "true",
-                            None,
+                        &pass!(&new_enum_assign_c!(&format!("hand_empty"), &domain, "true"))
+                    ),
+                    pand!(
+                        &pass!(&new_enum_assign_c!(
+                            &format!("holding_{}", b1),
+                            &domain,
+                            "true"
                         )),
-                    ]),
-                    &Predicate::AND(vec![
-                        Predicate::SET(EnumValue::new(
-                            &EnumVariable::new(
-                                &format!("hand_empty"),
-                                &domain,
-                                "boolean",
-                                None,
-                                &Kind::Command,
-                            ),
-                            "false",
-                            None,
+                        &pass!(&new_enum_assign_c!(
+                            &format!("clear_{}", b2),
+                            &domain,
+                            "true"
                         )),
-                        Predicate::SET(EnumValue::new(
-                            &EnumVariable::new(
-                                &format!("clear_{}", b2),
-                                &domain,
-                                "boolean",
-                                None,
-                                &Kind::Command,
-                            ),
-                            "true",
-                            None,
+                        &pass!(&new_enum_assign_c!(
+                            &format!("clear_{}", b1),
+                            &domain,
+                            "false"
                         )),
-                        Predicate::SET(EnumValue::new(
-                            &EnumVariable::new(
-                                &format!("clear_{}", b1),
-                                &domain,
-                                "boolean",
-                                None,
-                                &Kind::Command,
-                            ),
-                            "false",
-                            None,
+                        &pass!(&new_enum_assign_c!(
+                            &format!("hand_empty"),
+                            &domain,
+                            "false"
                         )),
-                        Predicate::SET(EnumValue::new(
-                            &EnumVariable::new(
-                                &format!("holding_{}", b1),
-                                &domain,
-                                "boolean",
-                                None,
-                                &Kind::Command,
-                            ),
-                            "true",
-                            None,
-                        )),
-                        Predicate::SET(EnumValue::new(
-                            &EnumVariable::new(
-                                &format!("{}_on_{}", b1, b2),
-                                &domain,
-                                "boolean",
-                                None,
-                                &Kind::Command,
-                            ),
-                            "false",
-                            None,
-                        )),
-                    ]),
+                        &pass!(&new_enum_assign_c!(
+                            &format!("{}_on_{}", b1, b2),
+                            &domain,
+                            "false"
+                        ))
+                    ),
                 ))
             }
         }
@@ -370,43 +187,25 @@ pub fn blocksworld_model_enumerated_booleans(blocks: &Vec<&str>) -> (Vec<Transit
     let mut invariants = vec![];
     let mut holding = vec![];
     for b1 in blocks {
-        holding.push(Predicate::SET(EnumValue::new(
-            &EnumVariable::new(
-                &format!("holding_{}", b1),
-                &domain,
-                "boolean",
-                None,
-                &Kind::Command,
-            ),
-            "true",
-            None,
+        holding.push(pass!(&new_enum_assign_c!(
+            &format!("holding_{}", b1),
+            &domain,
+            "true"
         )));
         for b2 in blocks {
             if b1 != b2 {
-                invariants.push(Predicate::NOT(Box::new(Predicate::AND(vec![
-                    Predicate::SET(EnumValue::new(
-                        &EnumVariable::new(
-                            &format!("{}_on_{}", b1, b2),
-                            &domain,
-                            "boolean",
-                            None,
-                            &Kind::Command,
-                        ),
-                        "true",
-                        None,
+                invariants.push(pnot!(pand!(
+                    &pass!(&new_enum_assign_c!(
+                        &format!("{}_on_{}", b1, b2),
+                        &domain,
+                        "true"
                     )),
-                    Predicate::SET(EnumValue::new(
-                        &EnumVariable::new(
-                            &format!("{}_on_{}", b2, b1),
-                            &domain,
-                            "boolean",
-                            None,
-                            &Kind::Command,
-                        ),
-                        "true",
-                        None,
-                    )),
-                ]))))
+                    &pass!(&new_enum_assign_c!(
+                        &format!("{}_on_{}", b2, b1),
+                        &domain,
+                        "true"
+                    ))
+                )))
             }
         }
     }
@@ -415,34 +214,22 @@ pub fn blocksworld_model_enumerated_booleans(blocks: &Vec<&str>) -> (Vec<Transit
         let mut local_vec = vec![];
         for b2 in blocks {
             if b1 != b2 {
-                local_vec.push(Predicate::SET(EnumValue::new(
-                    &EnumVariable::new(
-                        &format!("{}_on_{}", b1, b2),
-                        &domain,
-                        "boolean",
-                        None,
-                        &Kind::Command,
-                    ),
-                    "true",
-                    None,
+                local_vec.push(pass!(&new_enum_assign_c!(
+                    &format!("{}_on_{}", b1, b2),
+                    &domain,
+                    "true"
                 )))
             }
         }
 
-        invariants.push(Predicate::NOT(Box::new(Predicate::AND(vec![
-            Predicate::SET(EnumValue::new(
-                &EnumVariable::new(
-                    &format!("ontable_{}", b1),
-                    &domain,
-                    "boolean",
-                    None,
-                    &Kind::Command,
-                ),
-                "true",
-                None,
+        invariants.push(pnot!(pand!(
+            &pass!(&new_enum_assign_c!(
+                &format!("ontable_{}", b1),
+                &domain,
+                "true"
             )),
-            Predicate::OR(local_vec.clone()),
-        ]))));
+            &por!(local_vec.clone())
+        )));
 
         invariants.push(Predicate::OR(vec![
             Predicate::PBEQ(local_vec.clone(), 1),
@@ -450,24 +237,10 @@ pub fn blocksworld_model_enumerated_booleans(blocks: &Vec<&str>) -> (Vec<Transit
         ]))
     }
 
-    // for b in &blocks {
-    //     invariants.push(Predicate::AND(vec![]))
-    // }
-
-    invariants.push(Predicate::NOT(Box::new(Predicate::AND(vec![
-        Predicate::SET(EnumValue::new(
-            &EnumVariable::new(
-                &format!("hand_empty"),
-                &domain,
-                "boolean",
-                None,
-                &Kind::Command,
-            ),
-            "true",
-            None,
-        )),
-        Predicate::OR(holding.clone()),
-    ]))));
+    invariants.push(pnot!(&pand!(
+        &pass!(&new_enum_assign_c!(&format!("hand_empty"), &domain, "true")),
+        &por!(holding.clone())
+    )));
 
     invariants.push(Predicate::OR(vec![
         Predicate::PBEQ(holding.clone(), 1),
@@ -476,3 +249,5 @@ pub fn blocksworld_model_enumerated_booleans(blocks: &Vec<&str>) -> (Vec<Transit
 
     (transitions, Predicate::AND(invariants))
 }
+
+// pub fn blocksworld_model_booleans(blocks: &Vec<&str>) -> (Vec<Transition>, Predicate)

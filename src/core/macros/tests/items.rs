@@ -337,6 +337,24 @@ fn test_enum_assign_macro_2() {
 }
 
 #[test]
+fn test_new_enum_assign_c_macro_0() {
+    let true_banana =
+        new_enum_assign_c!("banana", vec!("green", "ripe", "spoiled"), "ripe");
+    assert_eq!(
+        true_banana,
+        is_enum_fruit_something(
+            "banana",
+            "NONE",
+            &vec!("green", "ripe", "spoiled"),
+            "NONE",
+            &Kind::Command,
+            "ripe",
+            6000
+        )
+    )
+}
+
+#[test]
 fn test_new_enum_assign_c_macro_1() {
     let true_banana =
         new_enum_assign_c!("banana", "fruit", vec!("green", "ripe", "spoiled"), "ripe");
@@ -402,6 +420,24 @@ fn test_new_enum_assign_c_macro_3() {
 }
 
 #[test]
+fn test_new_enum_assign_m_macro_0() {
+    let true_banana =
+        new_enum_assign_m!("banana", vec!("green", "ripe", "spoiled"), "ripe");
+    assert_eq!(
+        true_banana,
+        is_enum_fruit_something(
+            "banana",
+            "NONE",
+            &vec!("green", "ripe", "spoiled"),
+            "NONE",
+            &Kind::Measured,
+            "ripe",
+            6000
+        )
+    )
+}
+
+#[test]
 fn test_new_enum_assign_m_macro_1() {
     let true_banana =
         new_enum_assign_m!("banana", "fruit", vec!("green", "ripe", "spoiled"), "ripe");
@@ -462,6 +498,24 @@ fn test_new_enum_assign_m_macro_3() {
             &Kind::Measured,
             "ripe",
             1234
+        )
+    )
+}
+
+#[test]
+fn test_new_enum_assign_e_macro_0() {
+    let true_banana =
+        new_enum_assign_e!("banana", vec!("green", "ripe", "spoiled"), "ripe");
+    assert_eq!(
+        true_banana,
+        is_enum_fruit_something(
+            "banana",
+            "NONE",
+            &vec!("green", "ripe", "spoiled"),
+            "NONE",
+            &Kind::Estimated,
+            "ripe",
+            6000
         )
     )
 }
