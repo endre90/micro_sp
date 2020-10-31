@@ -21,27 +21,27 @@ pub struct ArgsCLI {
     pub instance: String,
 }
 
-pub struct Args {
-    pub run: bool,
-    pub print: bool,
-    pub dummy: bool,
-    pub problem: PlanningProblem,
-}
+// pub struct Args {
+//     pub run: bool,
+//     pub print: bool,
+//     pub dummy: bool,
+//     pub problem: PlanningProblem,
+// }
 
-pub fn handle_args() -> Args {
-    let args = ArgsCLI::from_args();
-    Args {
-        run: args.run,
-        print: args.print,
-        dummy: args.dummy,
-        problem: match args.model.as_str() {
-            "dummy_robot" => models::dummy_robot::dummy_robot::raar_model(),
-            "blocksworld" => blocksworld::parser::parser(args.instance.as_str()),
-            // "gripper" => gripper::parser::parser(args.instance.as_str()),
-            _ => panic!("unknown problem")
-        },
-    }
-}
+// pub fn handle_args() -> Args {
+//     let args = ArgsCLI::from_args();
+//     Args {
+//         run: args.run,
+//         print: args.print,
+//         dummy: args.dummy,
+//         problem: match args.model.as_str() {
+//             "dummy_robot" => models::dummy_robot::dummy_robot::raar_model(),
+//             "blocksworld" => blocksworld::parser::parser(args.instance.as_str()),
+//             // "gripper" => gripper::parser::parser(args.instance.as_str()),
+//             _ => panic!("unknown problem")
+//         },
+//     }
+// }
 
 pub trait IterOps<T, I>: IntoIterator<Item = T>
 where

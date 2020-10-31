@@ -8,7 +8,7 @@ use z3_v2::*;
 /// are concjunctions of predicated from the guard and update vector. During
 /// compositional planning, the guard and update predicates are a conjunction
 /// of activated predicates from the vectors.
-#[derive(Debug, PartialEq, Clone, PartialOrd, Eq, Ord)]
+#[derive(Debug, PartialEq, Ord, PartialOrd, Clone, Eq)]
 pub struct Transition {
     pub name: String,
     pub guard: Predicate,
@@ -29,8 +29,8 @@ impl Transition {
 /// A frame holds states about what happens in a step.
 #[derive(PartialEq, Eq, Clone, Debug, PartialOrd, Ord)]
 pub struct PlanningFrame {
-    pub source: CompleteState,
-    pub sink: CompleteState,
+    pub source: State,
+    pub sink: State,
     pub trans: String,
 }
 
@@ -43,7 +43,6 @@ pub struct PlanningProblem {
     pub trans: Vec<Transition>,
     pub invars: Predicate,
     pub max_steps: u32,
-    pub paradigm: Paradigm,
 }
 
 /// A result is generated when the planner finds a satisfiable model.
@@ -64,7 +63,6 @@ impl PlanningProblem {
         trans: &Vec<Transition>,
         invars: &Predicate,
         max_steps: &u32,
-        paradigm: &Paradigm,
     ) -> PlanningProblem {
         PlanningProblem {
             name: name.to_string(),
@@ -73,7 +71,6 @@ impl PlanningProblem {
             trans: trans.to_owned(),
             invars: invars.to_owned(),
             max_steps: max_steps.to_owned(),
-            paradigm: paradigm.to_owned(),
         }
     }
 }
@@ -82,7 +79,7 @@ impl PlanningProblem {
 /// from the problem should keep their values from the previous step.
 pub fn keep_variable_values(
     ctx: &ContextZ3,
-    vars: &Vec<EnumVariable>,
+    vars: &Vec<Variable>,
     trans: &Transition,
     step: &u32,
 ) -> Z3_ast {
@@ -93,25 +90,51 @@ pub fn keep_variable_values(
         &ctx,
         unchanged
             .iter()
-            .map(|x| {
-                let sort = EnumSortZ3::new(
-                    &ctx,
-                    &x.r#type,
-                    x.domain.iter().map(|x| x.as_str()).collect(),
-                );
-                EQZ3::new(
-                    &ctx,
-                    EnumVarZ3::new(
+            .map(|x| match x.value_type {
+                SPValueType::Bool => {
+                    let sort = BoolSortZ3::new(&ctx);
+                    EQZ3::new(
                         &ctx,
-                        sort.r,
-                        format!("{}_s{}", x.name.to_string(), step).as_str(),
-                    ),
-                    EnumVarZ3::new(
+                        BoolVarZ3::new(
+                            &ctx,
+                            &sort,
+                            format!("{}_s{}", x.name.to_string(), step).as_str(),
+                        ),
+                        BoolVarZ3::new(
+                            &ctx,
+                            &sort,
+                            format!("{}_s{}", x.name.to_string(), step - 1).as_str(),
+                        ),
+                    )
+                }
+                SPValueType::String => {
+                    let sort = EnumSortZ3::new(
                         &ctx,
-                        sort.r,
-                        format!("{}_s{}", x.name.to_string(), step - 1).as_str(),
-                    ),
-                )
+                        &x.r#type,
+                        x.domain
+                            .iter()
+                            .map(|y| match y {
+                                SPValue::Bool(_) => {
+                                    panic!("can't assign boolean value to enum type variable!")
+                                }
+                                SPValue::String(z) => z.as_str(),
+                            })
+                            .collect(),
+                    );
+                    EQZ3::new(
+                        &ctx,
+                        EnumVarZ3::new(
+                            &ctx,
+                            sort.r,
+                            format!("{}_s{}", x.name.to_string(), step).as_str(),
+                        ),
+                        EnumVarZ3::new(
+                            &ctx,
+                            sort.r,
+                            format!("{}_s{}", x.name.to_string(), step - 1).as_str(),
+                        ),
+                    )
+                }
             })
             .collect(),
     )

@@ -20,16 +20,6 @@ fn test_deactivate_all() {
         "[Parameter { name: \"A\", value: false }, Parameter { name: \"B\", value: false }, Parameter { name: \"C\", value: false }]");
 }
 
-// #[test]
-// fn test_activate_next_in_problem() {
-//     let (problem, params) = models::dummy_robot::dummy_robot::parameterized_model();
-//     // let activated = activate_next_in_problem(&problem);
-//     assert_eq!(&format!("{:?}", problem.params), 
-//         "[Parameter { name: \"p1\", value: true }, Parameter { name: \"p2\", value: false }]"); 
-//     assert_eq!(&format!("{:?}", activated.params), 
-//         "[Parameter { name: \"p1\", value: true }, Parameter { name: \"p2\", value: true }]"); 
-// }
-
 #[test]
 fn test_generate_and_solve_first_case() {
     let (problem, params) = models::dummy_robot::dummy_robot::parameterized_model();

@@ -4,5 +4,5 @@ pub mod core;
 pub mod general;
 pub mod runner;
 
-#[cfg(test)]
-pub mod tests;
+// #[cfg(test)]
+// pub mod tests;

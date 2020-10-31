@@ -21,26 +21,26 @@ fn test_false_predicate() {
 
 #[test]
 fn test_not_predicate() {
-    let x = EnumVariable::new("x", &vec!["a", "b", "c", "d"], "type", None, &Kind::Estimated);
+    let x = enum_c!("x", "letters", vec!("a", "b", "c", "d"));
     let cfg = ConfigZ3::new();
     let ctx = ContextZ3::new(&cfg);
-    let n = Predicate::NOT(Box::new(Predicate::SET(EnumValue::new(&x, "b", None))));
+    let n = Predicate::NOT(Box::new(Predicate::ASS(enum_assign!(x, "b"))));
     let pred = predicate_to_ast(&ctx, &n, &3);
     assert_eq!("(not (= x_s3 b))", ast_to_string_z3!(&ctx, pred));
 }
 
 #[test]
 fn test_and_predicate() {
-    let x = EnumVariable::new("x", &vec!["a", "b", "c", "d"], "type", None, &Kind::Estimated);
-    let y = EnumVariable::new("y", &vec!["a", "b", "c", "d"], "type", None, &Kind::Estimated);
-    let z = EnumVariable::new("z", &vec!["a", "b", "c", "d"], "type", None, &Kind::Estimated);
+    let x = enum_e!("x", "letters", vec!("a", "b", "c", "d"));
+    let y = enum_e!("y", "letters", vec!("a", "b", "c", "d"));
+    let z = enum_e!("z", "letters", vec!("a", "b", "c", "d"));
 
     let cfg = ConfigZ3::new();
     let ctx = ContextZ3::new(&cfg);
     let n = Predicate::AND(vec![
-        Predicate::SET(EnumValue::new(&x, "a", None)),
-        Predicate::SET(EnumValue::new(&y, "b", None)),
-        Predicate::SET(EnumValue::new(&z, "c", None)),
+        Predicate::ASS(enum_assign!(x, "a")),
+        Predicate::ASS(enum_assign!(y, "b")),
+        Predicate::ASS(enum_assign!(z, "c")),
     ]);
     let pred = predicate_to_ast(&ctx, &n, &3);
     assert_eq!(
@@ -51,16 +51,16 @@ fn test_and_predicate() {
 
 #[test]
 fn test_or_predicate() {
-    let x = EnumVariable::new("x", &vec!["a", "b", "c", "d"], "type", None, &Kind::Estimated);
-    let y = EnumVariable::new("y", &vec!["a", "b", "c", "d"], "type", None, &Kind::Estimated);
-    let z = EnumVariable::new("z", &vec!["a", "b", "c", "d"], "type", None, &Kind::Estimated);
+    let x = enum_e!("x", "letters", vec!("a", "b", "c", "d"));
+    let y = enum_e!("y", "letters", vec!("a", "b", "c", "d"));
+    let z = enum_e!("z", "letters", vec!("a", "b", "c", "d"));
 
     let cfg = ConfigZ3::new();
     let ctx = ContextZ3::new(&cfg);
     let n = Predicate::OR(vec![
-        Predicate::SET(EnumValue::new(&x, "a", None)),
-        Predicate::SET(EnumValue::new(&y, "b", None)),
-        Predicate::SET(EnumValue::new(&z, "c", None)),
+        Predicate::ASS(enum_assign!(x, "a")),
+        Predicate::ASS(enum_assign!(y, "b")),
+        Predicate::ASS(enum_assign!(z, "c")),
     ]);
     let pred = predicate_to_ast(&ctx, &n, &3);
     assert_eq!(
@@ -70,13 +70,12 @@ fn test_or_predicate() {
 }
 
 #[test]
-fn test_set_predicate(){
-
-    let x = EnumVariable::new("x", &vec!("a", "b", "c", "d"), "letters", None, &Kind::Estimated);
+fn test_ass_predicate(){
+    let x = enum_e!("x", "letters", vec!("a", "b", "c", "d"));
 
     let cfg = ConfigZ3::new();
     let ctx = ContextZ3::new(&cfg);
-    let n = Predicate::SET(EnumValue::new(&x, "b", None));
+    let n = Predicate::ASS(enum_assign!(x, "b"));
     let pred = predicate_to_ast(&ctx, &n, &3);
     assert_eq!("(= x_s3 b)", ast_to_string_z3!(&ctx, pred));
 }
@@ -85,11 +84,11 @@ fn test_set_predicate(){
 #[should_panic]
 fn test_set_predicate_panic(){
 
-    let x = EnumVariable::new("x", &vec!("a", "b", "c", "d"), "letters", None, &Kind::Estimated);
+    let x = enum_e!("x", "letters", vec!("a", "b", "c", "d"));
 
     let cfg = ConfigZ3::new();
     let ctx = ContextZ3::new(&cfg);
-    let n = Predicate::SET(EnumValue::new(&x, "e", None));
+    let n = Predicate::ASS(enum_assign!(x, "e"));
     let pred = predicate_to_ast(&ctx, &n, &3);
     assert_eq!("(= x_s3 b)", ast_to_string_z3!(&ctx, pred));
 }
@@ -97,17 +96,17 @@ fn test_set_predicate_panic(){
 #[test]
 fn test_pbeq_predicate(){
 
-    let x = EnumVariable::new("x", &vec!("a", "b", "c", "d"), "type", None, &Kind::Estimated);
-    let y = EnumVariable::new("y", &vec!("a", "b", "c", "d"), "type", None, &Kind::Estimated);
-    let z = EnumVariable::new("z", &vec!("a", "b", "c", "d"), "type", None, &Kind::Estimated);
-
+    let x = enum_e!("x", "letters", vec!("a", "b", "c", "d"));
+    let y = enum_e!("y", "letters", vec!("a", "b", "c", "d"));
+    let z = enum_e!("z", "letters", vec!("a", "b", "c", "d"));
+    
     let cfg = ConfigZ3::new();
     let ctx = ContextZ3::new(&cfg);
     let slv = SolverZ3::new(&ctx);
 
-    let nb = Predicate::SET(EnumValue::new(&x, "a", None));
-    let nc = Predicate::SET(EnumValue::new(&y, "b", None));
-    let nd = Predicate::SET(EnumValue::new(&z, "c", None));
+    let nb = Predicate::ASS(enum_assign!(x, "a"));
+    let nc = Predicate::ASS(enum_assign!(y, "b"));
+    let nd = Predicate::ASS(enum_assign!(z, "c"));
     let pbeq = Predicate::PBEQ(vec!(nb, nc, nd), 2);
     let pred = predicate_to_ast(&ctx, &pbeq, &4);
 
