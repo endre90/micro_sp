@@ -78,5 +78,5 @@ fn test_keep_variable_values() {
 
 #[test]
 fn test_incremental() {
-    pprint_result(&incremental(&models::dummy_robot::dummy_robot::raar_model()));
+    pprint_result(&incremental(&models::dummy_robot::dummy_robot::model()));
 } 

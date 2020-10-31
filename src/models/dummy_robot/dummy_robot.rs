@@ -1,6 +1,6 @@
 use super::*;
 
-pub fn raar_model() -> PlanningProblem {
+pub fn model() -> PlanningProblem {
     let act_pos = enum_m!(
         "act_pos",
         "pos",
