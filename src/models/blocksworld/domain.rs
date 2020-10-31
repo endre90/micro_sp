@@ -194,7 +194,7 @@ pub fn blocksworld_model_enumerated_booleans(blocks: &Vec<&str>) -> (Vec<Transit
         )));
         for b2 in blocks {
             if b1 != b2 {
-                invariants.push(pnot!(pand!(
+                invariants.push(pnot!(&pand!(
                     &pass!(&new_enum_assign_c!(
                         &format!("{}_on_{}", b1, b2),
                         &domain,
@@ -222,13 +222,13 @@ pub fn blocksworld_model_enumerated_booleans(blocks: &Vec<&str>) -> (Vec<Transit
             }
         }
 
-        invariants.push(pnot!(pand!(
+        invariants.push(pnot!(&pand!(
             &pass!(&new_enum_assign_c!(
                 &format!("ontable_{}", b1),
                 &domain,
                 "true"
             )),
-            &por!(local_vec.clone())
+            &Predicate::OR(local_vec.clone())
         )));
 
         invariants.push(Predicate::OR(vec![
@@ -239,7 +239,7 @@ pub fn blocksworld_model_enumerated_booleans(blocks: &Vec<&str>) -> (Vec<Transit
 
     invariants.push(pnot!(&pand!(
         &pass!(&new_enum_assign_c!(&format!("hand_empty"), &domain, "true")),
-        &por!(holding.clone())
+        &Predicate::OR(holding.clone())
     )));
 
     invariants.push(Predicate::OR(vec![
