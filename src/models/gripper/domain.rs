@@ -11,10 +11,6 @@ pub fn gripper_model_enumerated_booleans(
     let mut pick_transitions = vec![];
     let mut drop_transitions = vec![];
 
-    let  g_param = Parameter::new("g", &true);
-    let  r_param = Parameter::new("r", &true);
-    let  b_param = Parameter::new("b", &true);
-
     for room_a in rooms {
         for room_b in rooms {
             if room_a != room_b { 
@@ -22,11 +18,11 @@ pub fn gripper_model_enumerated_booleans(
                     ptrans!(
                         &format!("move_from_{}_to_{}", room_a, room_b),
                         &ppred!(
-                            &pass!(&new_enum_assign_c!(&format!("at-robby_{}", room_a), "boolean", &domain, "true"))
+                            &pass!(&new_enum_assign_c!(&format!("at-robby_{}", room_a), "boolean", &domain, "true", ("r", &true)))
                         ),
                         &ppred!(
-                            &pass!(&new_enum_assign_c!(&format!("at-robby_{}", room_a), "boolean", &domain, "false")),
-                            &pass!(&new_enum_assign_c!(&format!("at-robby_{}", room_b), "boolean", &domain, "true"))
+                            &pass!(&new_enum_assign_c!(&format!("at-robby_{}", room_a), "boolean", &domain, "false", ("r", &true))),
+                            &pass!(&new_enum_assign_c!(&format!("at-robby_{}", room_b), "boolean", &domain, "true", ("r", &true)))
                         )
                     )
                 )
@@ -41,15 +37,15 @@ pub fn gripper_model_enumerated_booleans(
                     ptrans!(
                         &format!("pick_{}_in_{}_with_{}_gripper", ball, room, gripper),
                         &ppred!(
-                            &pass!(&new_enum_assign_c!(&format!("at_{}_{}", ball, room), "boolean", &domain, "true")),
-                            &pass!(&new_enum_assign_c!(&format!("at-robby_{}", room), "boolean", &domain, "true")),
-                            &pass!(&new_enum_assign_c!(&format!("free_{}", gripper), "boolean", &domain, "true"))
+                            &pass!(&new_enum_assign_c!(&format!("at_{}_{}", ball, room), "boolean", &domain, "true", ("b", &true))),
+                            &pass!(&new_enum_assign_c!(&format!("at-robby_{}", room), "boolean", &domain, "true", ("r", &true))),
+                            &pass!(&new_enum_assign_c!(&format!("free_{}", gripper), "boolean", &domain, "true", ("g", &true)))
 
                         ),
                         &ppred!(
-                            &pass!(&new_enum_assign_c!(&format!("at_{}_{}", ball, room), "boolean", &domain, "false")),
-                            &pass!(&new_enum_assign_c!(&format!("{}_carry_{}", gripper, ball), "boolean", &domain, "true")),
-                            &pass!(&new_enum_assign_c!(&format!("free_{}", gripper), "boolean", &domain, "false"))
+                            &pass!(&new_enum_assign_c!(&format!("at_{}_{}", ball, room), "boolean", &domain, "false", ("b", &true))),
+                            &pass!(&new_enum_assign_c!(&format!("{}_carry_{}", gripper, ball), "boolean", &domain, "true", ("g", &true))),
+                            &pass!(&new_enum_assign_c!(&format!("free_{}", gripper), "boolean", &domain, "false", ("g", &true)))
                         )
                     )
                 )
@@ -64,14 +60,14 @@ pub fn gripper_model_enumerated_booleans(
                     ptrans!(
                         &format!("drop_{}_to_{}_from_{}_gripper", ball, room, gripper),
                         &ppred!(
-                            &pass!(&new_enum_assign_c!(&format!("{}_carry_{}", gripper, ball), "boolean", &domain, "true")),
-                            &pass!(&new_enum_assign_c!(&format!("at-robby_{}", room), "boolean", &domain, "true"))
+                            &pass!(&new_enum_assign_c!(&format!("{}_carry_{}", gripper, ball), "boolean", &domain, "true", ("g", &true))),
+                            &pass!(&new_enum_assign_c!(&format!("at-robby_{}", room), "boolean", &domain, "true", ("r", &true)))
 
                         ),
                         &ppred!(
-                            &pass!(&new_enum_assign_c!(&format!("at_{}_{}", ball, room), "boolean", &domain, "true")),
-                            &pass!(&new_enum_assign_c!(&format!("{}_carry_{}", gripper, ball), "boolean", &domain, "false")),
-                            &pass!(&new_enum_assign_c!(&format!("free_{}", gripper), "boolean", &domain, "true"))
+                            &pass!(&new_enum_assign_c!(&format!("at_{}_{}", ball, room), "boolean", &domain, "true", ("b", &true))),
+                            &pass!(&new_enum_assign_c!(&format!("{}_carry_{}", gripper, ball), "boolean", &domain, "false", ("g", &true))),
+                            &pass!(&new_enum_assign_c!(&format!("free_{}", gripper), "boolean", &domain, "true", ("g", &true)))
                         )
                     )
                 )

@@ -9,7 +9,7 @@ fn test_parser_asdf() {
     let model = parser1("instance-2");
 
     let g_param = Parameter::new("g", &true);
-    let r_param = Parameter::new("r", &true);
+    let r_param = Parameter::new("r", &false);
     let b_param = Parameter::new("b", &true);
     let none = Parameter::new("NONE", &true); 
 
@@ -106,10 +106,13 @@ pub fn parser1(name: &str) -> ParamPlanningProblem {
     let init_vec_final_positive: Vec<&str> = init_vec_fin_pos.iter().map(|x| x.as_str()).collect();
     let goal_vec_final_positive: Vec<&str> = goal_vec_fin_pos.iter().map(|x| x.as_str()).collect();
 
-    let instance_init_variables: Vec<Variable> = init_vec_final_positive
-        .iter()
-        .map(|x| enum_c!(x, "boolean", vec!("true", "false")))
-        .collect();
+    let instance_init_variables: Vec<Variable> = vars.iter().filter(|x| Some(x.name.clone()) == init_vec_final_positive.iter().find(|y| **y == x.name).map(|x| x.to_owned().to_owned())).map(|x| x.to_owned()).collect();
+    let instance_goal_variables: Vec<Variable> = vars.iter().filter(|x| Some(x.name.clone()) == goal_vec_final_positive.iter().find(|y| **y == x.name).map(|x| x.to_owned().to_owned())).map(|x| x.to_owned()).collect();
+
+    // let instance_init_variables: Vec<Variable> = init_vec_final_positive
+    //     .iter()
+    //     .map(|x| enum_c!(x, "boolean", vec!("true", "false")))
+    //     .collect();
 
         println!("VARS");
         for v in &vars {
@@ -142,12 +145,17 @@ pub fn parser1(name: &str) -> ParamPlanningProblem {
         .map(|x| pass!(&enum_assign!(&x, "false"))) // Predicate::ASS(Assignment::new(&x, "false", None)))
         .collect();
 
-    let goal_pred_list = goal_vec_final_positive
+    let goal_pred_list: Vec<Predicate> = instance_goal_variables
         .iter()
-        .map(|x| {
-            pass!(new_enum_assign_c!(x, "boolean" , vec!("true", "false"), "true")) //&enum_c!(x, "boolean", vec!("true", "false")))
-        })
+        .map(|x| pass!(&enum_assign!(&x, "true"))) // Predicate::ASS(Assignment::new(&x, "true", None)))
         .collect();
+
+    // let goal_pred_list = goal_vec_final_positive
+    //     .iter()
+    //     .map(|x| {
+    //         pass!(new_enum_assign_c!(x, "boolean" , vec!("true", "false"), "true")) //&enum_c!(x, "boolean", vec!("true", "false")))
+    //     })
+    //     .collect();
 
     let mut init_list = vec![];
     for i in vec![init_pred_list, init_neg_pred_list] {

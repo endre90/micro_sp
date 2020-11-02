@@ -13,12 +13,12 @@ macro_rules! bool_c {
             Some(&Kind::Command),
         )
     };
-    ($name:expr, $param:expr) => {
+    ($name:expr, ($pvar:expr, $pval:expr)) => {
         Variable::new(
             $name,
             &SPValueType::Bool,
             &vec![true.to_spvalue(), false.to_spvalue()],
-            Some(&Parameter::new(&$param, &true)),
+            Some(&Parameter::new(&$pvar, &$pval)),
             None,
             Some(&Kind::Command),
         )
@@ -38,12 +38,12 @@ macro_rules! bool_m {
             Some(&Kind::Measured),
         )
     };
-    ($name:expr, $param:expr) => {
+    ($name:expr, ($pvar:expr, $pval:expr)) => {
         Variable::new(
             $name,
             &SPValueType::Bool,
             &vec![true.to_spvalue(), false.to_spvalue()],
-            Some(&Parameter::new(&$param, &true)),
+            Some(&Parameter::new(&$pvar, &$pval)),
             None,
             Some(&Kind::Measured),
         )
@@ -63,12 +63,12 @@ macro_rules! bool_e {
             Some(&Kind::Estimated),
         )
     };
-    ($name:expr, $param:expr) => {
+    ($name:expr, ($pvar:expr, $pval:expr)) => {
         Variable::new(
             $name,
             &SPValueType::Bool,
             &vec![true.to_spvalue(), false.to_spvalue()],
-            Some(&Parameter::new(&$param, &true)),
+            Some(&Parameter::new(&$pvar, &$pval)),
             None,
             Some(&Kind::Estimated),
         )
@@ -103,13 +103,13 @@ macro_rules! new_bool_assign_c {
             None,
         )
     };
-    ($name:expr, $val:expr, $param:expr) => {
+    ($name:expr, $val:expr, ($pvar:expr, $pval:expr)) => {
         Assignment::new(
             &Variable::new(
                 $name,
                 &SPValueType::Bool,
                 &vec![true.to_spvalue(), false.to_spvalue()],
-                Some(&Parameter::new(&$param, &true)),
+                Some(&Parameter::new(&$pvar, &$pval)),
                 None,
                 Some(&Kind::Command),
             ),
@@ -117,13 +117,13 @@ macro_rules! new_bool_assign_c {
             None,
         )
     };
-    ($name:expr, $val:expr, $param:expr, $life:expr) => {
+    ($name:expr, $val:expr, ($pvar:expr, $pval:expr), $life:expr) => {
         Assignment::new(
             &Variable::new(
                 $name,
                 &SPValueType::Bool,
                 &vec![true.to_spvalue(), false.to_spvalue()],
-                Some(&Parameter::new(&$param, &true)),
+                Some(&Parameter::new(&$pvar, &$pval)),
                 None,
                 Some(&Kind::Command),
             ),
@@ -150,13 +150,13 @@ macro_rules! new_bool_assign_m {
             None,
         )
     };
-    ($name:expr, $val:expr, $param:expr) => {
+    ($name:expr, $val:expr, ($pvar:expr, $pval:expr)) => {
         Assignment::new(
             &Variable::new(
                 $name,
                 &SPValueType::Bool,
                 &vec![true.to_spvalue(), false.to_spvalue()],
-                Some(&Parameter::new(&$param, &true)),
+                Some(&Parameter::new(&$pvar, &$pval)),
                 None,
                 Some(&Kind::Measured),
             ),
@@ -164,13 +164,13 @@ macro_rules! new_bool_assign_m {
             None,
         )
     };
-    ($name:expr, $val:expr, $param:expr, $life:expr) => {
+    ($name:expr, $val:expr, ($pvar:expr, $pval:expr), $life:expr) => {
         Assignment::new(
             &Variable::new(
                 $name,
                 &SPValueType::Bool,
                 &vec![true.to_spvalue(), false.to_spvalue()],
-                Some(&Parameter::new(&$param, &true)),
+                Some(&Parameter::new(&$pvar, &$pval)),
                 None,
                 Some(&Kind::Measured),
             ),
@@ -197,13 +197,13 @@ macro_rules! new_bool_assign_e {
             None,
         )
     };
-    ($name:expr, $val:expr, $param:expr) => {
+    ($name:expr, $val:expr, ($pvar:expr, $pval:expr)) => {
         Assignment::new(
             &Variable::new(
                 $name,
                 &SPValueType::Bool,
                 &vec![true.to_spvalue(), false.to_spvalue()],
-                Some(&Parameter::new(&$param, &true)),
+                Some(&Parameter::new(&$pvar, &$pval)),
                 None,
                 Some(&Kind::Estimated),
             ),
@@ -211,13 +211,13 @@ macro_rules! new_bool_assign_e {
             None,
         )
     };
-    ($name:expr, $val:expr, $param:expr, $life:expr) => {
+    ($name:expr, $val:expr, ($pvar:expr, $pval:expr), $life:expr) => {
         Assignment::new(
             &Variable::new(
                 $name,
                 &SPValueType::Bool,
                 &vec![true.to_spvalue(), false.to_spvalue()],
-                Some(&Parameter::new(&$param, &true)),
+                Some(&Parameter::new(&$pvar, &$pval)),
                 None,
                 Some(&Kind::Estimated),
             ),
@@ -256,7 +256,7 @@ macro_rules! enum_c {
             Some(&Kind::Command),
         )
     };
-    ($name:expr, $r#type:expr, $domain:expr, $param:expr) => {
+    ($name:expr, $r#type:expr, $domain:expr, ($pvar:expr, $pval:expr)) => {
         Variable::new(
             $name,
             &SPValueType::String,
@@ -264,7 +264,7 @@ macro_rules! enum_c {
                 .iter()
                 .map(|x| String::from(x.to_owned()).to_spvalue())
                 .collect(),
-                Some(&Parameter::new(&$param, &true)),
+                Some(&Parameter::new(&$pvar, &$pval)),
             Some(&String::from($r#type)),
             Some(&Kind::Command),
         )
@@ -300,7 +300,7 @@ macro_rules! enum_m {
             Some(&Kind::Measured),
         )
     };
-    ($name:expr, $r#type:expr, $domain:expr, $param:expr) => {
+    ($name:expr, $r#type:expr, $domain:expr, ($pvar:expr, $pval:expr)) => {
         Variable::new(
             $name,
             &SPValueType::String,
@@ -308,7 +308,7 @@ macro_rules! enum_m {
                 .iter()
                 .map(|x| String::from(x.to_owned()).to_spvalue())
                 .collect(),
-                Some(&Parameter::new(&$param, &true)),
+                Some(&Parameter::new(&$pvar, &$pval)),
             Some(&String::from($r#type)),
             Some(&Kind::Measured),
         )
@@ -344,7 +344,7 @@ macro_rules! enum_e {
             Some(&Kind::Estimated),
         )
     };
-    ($name:expr, $r#type:expr, $domain:expr, $param:expr) => {
+    ($name:expr, $r#type:expr, $domain:expr, ($pvar:expr, $pval:expr)) => {
         Variable::new(
             $name,
             &SPValueType::String,
@@ -352,7 +352,7 @@ macro_rules! enum_e {
                 .iter()
                 .map(|x| String::from(x.to_owned()).to_spvalue())
                 .collect(),
-                Some(&Parameter::new(&$param, &true)),
+                Some(&Parameter::new(&$pvar, &$pval)),
             Some(&String::from($r#type)),
             Some(&Kind::Estimated),
         )
@@ -407,7 +407,7 @@ macro_rules! new_enum_assign_c {
             None,
         )
     };
-    ($name:expr, $r#type:expr, $domain:expr, $val:expr, $param:expr) => {
+    ($name:expr, $r#type:expr, $domain:expr, $val:expr, ($pvar:expr, $pval:expr)) => {
         Assignment::new(
             &Variable::new(
                 $name,
@@ -416,7 +416,7 @@ macro_rules! new_enum_assign_c {
                     .iter()
                     .map(|x| String::from(x.to_owned()).to_spvalue())
                     .collect(),
-                Some(&Parameter::new(&$param, &true)),
+                Some(&Parameter::new(&$pvar, &$pval)),
                 Some(&String::from($r#type)),
                 Some(&Kind::Command),
             ),
@@ -424,7 +424,7 @@ macro_rules! new_enum_assign_c {
             None,
         )
     };
-    ($name:expr, $r#type:expr, $domain:expr, $val:expr, $param:expr, $life:expr) => {
+    ($name:expr, $r#type:expr, $domain:expr, $val:expr, ($pvar:expr, $pval:expr), $life:expr) => {
         Assignment::new(
             &Variable::new(
                 $name,
@@ -433,7 +433,7 @@ macro_rules! new_enum_assign_c {
                     .iter()
                     .map(|x| String::from(x.to_owned()).to_spvalue())
                     .collect(),
-                Some(&Parameter::new(&$param, &true)),
+                Some(&Parameter::new(&$pvar, &$pval)),
                 Some(&String::from($r#type)),
                 Some(&Kind::Command),
             ),
@@ -480,7 +480,7 @@ macro_rules! new_enum_assign_m {
             None,
         )
     };
-    ($name:expr, $r#type:expr, $domain:expr, $val:expr, $param:expr) => {
+    ($name:expr, $r#type:expr, $domain:expr, $val:expr, ($pvar:expr, $pval:expr)) => {
         Assignment::new(
             &Variable::new(
                 $name,
@@ -489,7 +489,7 @@ macro_rules! new_enum_assign_m {
                     .iter()
                     .map(|x| String::from(x.to_owned()).to_spvalue())
                     .collect(),
-                Some(&Parameter::new(&$param, &true)),
+                Some(&Parameter::new(&$pvar, &$pval)),
                 Some(&String::from($r#type)),
                 Some(&Kind::Measured),
             ),
@@ -497,7 +497,7 @@ macro_rules! new_enum_assign_m {
             None,
         )
     };
-    ($name:expr, $r#type:expr, $domain:expr, $val:expr, $param:expr, $life:expr) => {
+    ($name:expr, $r#type:expr, $domain:expr, $val:expr, ($pvar:expr, $pval:expr), $life:expr) => {
         Assignment::new(
             &Variable::new(
                 $name,
@@ -506,7 +506,7 @@ macro_rules! new_enum_assign_m {
                     .iter()
                     .map(|x| String::from(x.to_owned()).to_spvalue())
                     .collect(),
-                Some(&Parameter::new(&$param, &true)),
+                Some(&Parameter::new(&$pvar, &$pval)),
                 Some(&String::from($r#type)),
                 Some(&Kind::Measured),
             ),
@@ -553,7 +553,7 @@ macro_rules! new_enum_assign_e {
             None,
         )
     };
-    ($name:expr, $r#type:expr, $domain:expr, $val:expr, $param:expr) => {
+    ($name:expr, $r#type:expr, $domain:expr, $val:expr, ($pvar:expr, $pval:expr)) => {
         Assignment::new(
             &Variable::new(
                 $name,
@@ -562,7 +562,7 @@ macro_rules! new_enum_assign_e {
                     .iter()
                     .map(|x| String::from(x.to_owned()).to_spvalue())
                     .collect(),
-                Some(&Parameter::new(&$param, &true)),
+                Some(&Parameter::new(&$pvar, &$pval)),
                 Some(&String::from($r#type)),
                 Some(&Kind::Estimated),
             ),
@@ -570,7 +570,7 @@ macro_rules! new_enum_assign_e {
             None,
         )
     };
-    ($name:expr, $r#type:expr, $domain:expr, $val:expr, $param:expr, $life:expr) => {
+    ($name:expr, $r#type:expr, $domain:expr, $val:expr, ($pvar:expr, $pval:expr), $life:expr) => {
         Assignment::new(
             &Variable::new(
                 $name,
@@ -579,7 +579,7 @@ macro_rules! new_enum_assign_e {
                     .iter()
                     .map(|x| String::from(x.to_owned()).to_spvalue())
                     .collect(),
-                Some(&Parameter::new(&$param, &true)),
+                Some(&Parameter::new(&$pvar, &$pval)),
                 Some(&String::from($r#type)),
                 Some(&Kind::Estimated),
             ),
