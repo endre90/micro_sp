@@ -28,9 +28,9 @@ A dummy driver (inverse of a micro_sp node) can be launched providing the argume
 5.  [ ] write some macros finally
 6.  [ ] no completestate just state that holds all
 7.  [ ] implemment fmt
-8.  [ ] remove enum and bool and have only variable
+8.  [x] remove enum and bool and have only variable
 9.  [ ] use 'model' and 'instance'
-10. [ ] rename SET to ASS
+10. [x] rename SET to ASS
 11. [ ] ok, going towards making the pddl parser :(
 12. [ ] think about how to parameterize modelling like the pddl people do
 13. [x] update command vars to match measured values on refresh (raar)
@@ -53,36 +53,38 @@ A dummy driver (inverse of a micro_sp node) can be launched providing the argume
 30. [ ] proper readme
 31. [x] proper get planning result
 32. [ ] include readmes to benches to describe added constraints
-33. [ ] benchmarks blocksworld:
-    1. [x] micro_sp inc enumerated boolean
-    2. [ ] micro_sp inc pure boolean
-    3. [ ] micro_sp inc pure enumeration
-    4. [ ] micro_sp seq enumerated boolean
-    5. [ ] micro_sp seq pure boolean
-    6. [ ] micro_sp seq pure enumeration
-    7. [ ] incplan
-34. [ ] benchmarks barman
-35. [ ] benchmarks childsnack
-36. [ ] benchmarks gripper
-37. [ ] benchmarks hiking
-38. [ ] study conversion from a pddl model to a real world "runneble" model
-39. [ ] enable other solvers beside z3
-40. [ ] make a more general parser for boilerplate domain ? maybe not
-41. [ ] clean the warnings
-42. [ ] improve runner and don't replan after every state change
-43. [ ] gui needed asap
-44. [ ] show current plan in gui
-45. [x] look into parsing pddls: conclusion: won't work
-46. [ ] fix command lifetime
-47. [x] match published data to sink when fresh timeouts
-48. [ ] compositional algorithm
-49. [ ] when to call the planner
-50. [ ] handle estimated
-51. [x] move model to models
-52. [x] check if measured value is in domain
-53. [ ] flow graph to readme
-54. [ ] maybe try to write a cdcl solver?
-55. [ ] some theories? hmm...
+33. [x] add a timeout
+34. [ ] benchmarks blocksworld:
+    1. [x] micro_sp inc enumerated boolean w/ invariants
+    2. [ ] micro_sp inc enumerated boolean explicit (neg-pddl)
+    3. [ ] micro_sp inc pure boolean
+    4. [ ] micro_sp inc pure enumeration
+    5. [ ] micro_sp seq enumerated boolean
+    6. [ ] micro_sp seq pure boolean
+    7. [ ] micro_sp seq pure enumeration
+    8. [ ] incplan
+35. [ ] benchmarks barman
+36. [ ] benchmarks childsnack
+37. [ ] benchmarks gripper
+38. [ ] benchmarks hiking
+39. [ ] study conversion from a pddl model to a real world "runneble" model
+40. [ ] enable other solvers beside z3
+41. [ ] make a more general parser for boilerplate domain ? maybe not
+42. [ ] clean the warnings
+43. [ ] improve runner and don't replan after every state change
+44. [ ] gui needed asap
+45. [ ] show current plan in gui
+46. [x] look into parsing pddls: conclusion: won't work
+47. [ ] fix command lifetime
+48. [x] match published data to sink when fresh timeouts
+49. [ ] compositional algorithm
+50. [ ] when to call the planner
+51. [ ] handle estimated
+52. [x] move model to models
+53. [x] check if measured value is in domain
+54. [ ] flow graph to readme
+55. [ ] maybe try to write a cdcl solver?
+56. [ ] some theories? hmm...
 
 ### low priority
 1. [ ] improve Qol

@@ -5,8 +5,8 @@ use std::io;
 use std::io::prelude::*;
 
 #[test]
-fn test_parser() {
-    let model = parser1("instance-1");
+fn test_parser_asdf() {
+    let model = parser1("instance-2");
 
     let g_param = Parameter::new("g", &true);
     let r_param = Parameter::new("r", &true);
@@ -15,8 +15,8 @@ fn test_parser() {
 
     let params = vec![g_param, r_param, b_param, none];
 
-    let result = parameterized(&model, &params);
-    pprint_result(&result.result)
+    let result = parameterized(&model, &params, 1200);
+    pprint_result_trans_only(&result)
 }
 
 pub fn parser1(name: &str) -> ParamPlanningProblem {
@@ -106,9 +106,9 @@ pub fn parser1(name: &str) -> ParamPlanningProblem {
     let init_vec_final_positive: Vec<&str> = init_vec_fin_pos.iter().map(|x| x.as_str()).collect();
     let goal_vec_final_positive: Vec<&str> = goal_vec_fin_pos.iter().map(|x| x.as_str()).collect();
 
-    let instance_init_variables: Vec<EnumVariable> = init_vec_final_positive
+    let instance_init_variables: Vec<Variable> = init_vec_final_positive
         .iter()
-        .map(|x| EnumVariable::new(x, &vec!["true", "false"], "boolean", None, &Kind::Command))
+        .map(|x| enum_c!(x, "boolean", vec!("true", "false")))
         .collect();
 
         println!("VARS");
@@ -117,7 +117,7 @@ pub fn parser1(name: &str) -> ParamPlanningProblem {
         }
         println!("===================================");
     
-        let instance_init_neg_variables: Vec<EnumVariable> =
+        let instance_init_neg_variables: Vec<Variable> =
             vars.difference(instance_init_variables.clone());
     
         println!("POSITIVE");
@@ -134,22 +134,18 @@ pub fn parser1(name: &str) -> ParamPlanningProblem {
 
     let init_pred_list: Vec<Predicate> = instance_init_variables
         .iter()
-        .map(|x| Predicate::SET(EnumValue::new(&x, "true", None)))
+        .map(|x| pass!(&enum_assign!(&x, "true"))) // Predicate::ASS(Assignment::new(&x, "true", None)))
         .collect();
 
     let init_neg_pred_list: Vec<Predicate> = instance_init_neg_variables
         .iter()
-        .map(|x| Predicate::SET(EnumValue::new(&x, "false", None)))
+        .map(|x| pass!(&enum_assign!(&x, "false"))) // Predicate::ASS(Assignment::new(&x, "false", None)))
         .collect();
 
     let goal_pred_list = goal_vec_final_positive
         .iter()
         .map(|x| {
-            Predicate::SET(EnumValue::new(
-                &EnumVariable::new(x, &vec!["true", "false"], "boolean", None, &Kind::Command),
-                "true",
-                None,
-            ))
+            pass!(new_enum_assign_c!(x, "boolean" , vec!("true", "false"), "true")) //&enum_c!(x, "boolean", vec!("true", "false")))
         })
         .collect();
 

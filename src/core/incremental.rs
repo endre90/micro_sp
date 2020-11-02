@@ -1,5 +1,6 @@
 use super::*;
 use std::time::Instant;
+use std::time::Duration;
 use z3_sys::*;
 use z3_v2::*;
 
@@ -143,7 +144,7 @@ pub fn keep_variable_values(
 /// The incremental algorithm that calls z3 to find a plan.
 ///
 /// Based on Gocht and Balyo's algorithm from 2017.
-pub fn incremental(prob: &PlanningProblem) -> PlanningResult {
+pub fn incremental(prob: &PlanningProblem, timeout: u64) -> PlanningResult {
     let cfg = ConfigZ3::new();
     let ctx = ContextZ3::new(&cfg);
     let slv = SolverZ3::new(&ctx);
@@ -158,7 +159,8 @@ pub fn incremental(prob: &PlanningProblem) -> PlanningResult {
     let mut plan_found: bool = false;
     let mut step: u32 = 0;
 
-    while step < prob.max_steps + 1 {
+    while now.elapsed() < Duration::from_secs(timeout) {
+        println!("elapsed: {:?}", now.elapsed());
         step = step + 1;
         match SlvCheckZ3::new(&ctx, &slv) == 1 {
             false => {

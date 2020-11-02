@@ -24,37 +24,37 @@ pub fn get_predicate_vars(pred: &Predicate) -> Vec<Variable> {
     s
 }
 
-// /// Given a parameterized predicate, return a vector of variables that play a role in it.
-// pub fn get_param_predicate_vars(ppred: &ParamPredicate) -> Vec<EnumVariable> {
-//     ppred
-//         .preds
-//         .iter()
-//         .map(|x| get_predicate_vars(&x))
-//         .flatten()
-//         .collect()
-// }
+/// Given a parameterized predicate, return a vector of variables that play a role in it.
+pub fn get_param_predicate_vars(ppred: &ParamPredicate) -> Vec<Variable> {
+    ppred
+        .preds
+        .iter()
+        .map(|x| get_predicate_vars(&x))
+        .flatten()
+        .collect()
+}
 
-// pub fn get_model_vars(trans: &Vec<Transition>) -> Vec<EnumVariable> {
-//     let mut s = Vec::new();
-//     for t in trans {
-//         s.extend(get_predicate_vars(&t.guard));
-//         s.extend(get_predicate_vars(&t.update));
-//     }
-//     s.sort();
-//     s.dedup();
-//     s
-// }
+pub fn get_model_vars(trans: &Vec<Transition>) -> Vec<Variable> {
+    let mut s = Vec::new();
+    for t in trans {
+        s.extend(get_predicate_vars(&t.guard));
+        s.extend(get_predicate_vars(&t.update));
+    }
+    s.sort();
+    s.dedup();
+    s
+}
 
-// pub fn get_param_model_vars(trans: &Vec<ParamTransition>) -> Vec<EnumVariable> {
-//     let mut s = Vec::new();
-//     for t in trans {
-//         s.extend(get_param_predicate_vars(&t.guard));
-//         s.extend(get_param_predicate_vars(&t.update));
-//     }
-//     s.sort();
-//     s.dedup();
-//     s
-// }
+pub fn get_param_model_vars(trans: &Vec<ParamTransition>) -> Vec<Variable> {
+    let mut s = Vec::new();
+    for t in trans {
+        s.extend(get_param_predicate_vars(&t.guard));
+        s.extend(get_param_predicate_vars(&t.update));
+    }
+    s.sort();
+    s.dedup();
+    s
+}
 
 /// Given a planning problem, return a vector of all variables defined for that problem.
 pub fn get_problem_vars(prob: &PlanningProblem) -> Vec<Variable> {

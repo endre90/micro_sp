@@ -17,137 +17,19 @@ pub fn gripper_model_enumerated_booleans(
 
     for room_a in rooms {
         for room_b in rooms {
-            if room_a != room_b {
-                move_transitions.push(ParamTransition::new(
-                    &format!("move_from_{}_to_{}", room_a, room_b),
-                    &ParamPredicate::new(&vec![Predicate::SET(EnumValue::new(
-                        &EnumVariable::new(
-                            &format!("at-robby_{}", room_a),
-                            &domain,
-                            "boolean",
-                            // Some(&r_param),
-                            None,
-                            &Kind::Command,
+            if room_a != room_b { 
+                move_transitions.push(
+                    ptrans!(
+                        &format!("move_from_{}_to_{}", room_a, room_b),
+                        &ppred!(
+                            &pass!(&new_enum_assign_c!(&format!("at-robby_{}", room_a), "boolean", &domain, "true"))
                         ),
-                        "true",
-                        None,
-                    ))]),
-                    &ParamPredicate::new(&vec![
-                        Predicate::SET(EnumValue::new(
-                            &EnumVariable::new(
-                                &format!("at-robby_{}", room_b),
-                                &domain,
-                                "boolean",
-                                // Some(&r_param),
-                                None,
-                                &Kind::Command,
-                            ),
-                            "true",
-                            None,
-                        )),
-                        Predicate::SET(EnumValue::new(
-                            &EnumVariable::new(
-                                &format!("at-robby_{}", room_a),
-                                &domain,
-                                "boolean",
-                                // Some(&r_param),
-                                None,
-                                &Kind::Command,
-                            ),
-                            "false",
-                            None,
-                        )),
-                    ]),
-                ))
-            }
-        }
-    }
-    
-    for room in rooms {
-        for gripper in grippers {
-            for ball in balls {
-                pick_transitions.push(ParamTransition::new(
-                    &format!(
-                        "pick_{}_in_{}_with_{}_gripper",
-                        ball, room, gripper
-                    ),
-                    &ParamPredicate::new(&vec![
-                        Predicate::SET(EnumValue::new(
-                            &EnumVariable::new(
-                                &format!("at_{}_{}", ball, room),
-                                &domain,
-                                "boolean",
-                                //  Some(&b_param),
-                                None,
-                                &Kind::Command,
-                            ),
-                            "true",
-                            None,
-                        )),
-                        Predicate::SET(EnumValue::new(
-                            &EnumVariable::new(
-                                &format!("at-robby_{}", room),
-                                &domain,
-                                "boolean",
-                                //  Some(&r_param),
-                                None,
-                                &Kind::Command,
-                            ),
-                            "true",
-                            None,
-                        )),
-                        Predicate::SET(EnumValue::new(
-                            &EnumVariable::new(
-                                &format!("free_{}", gripper),
-                                &domain,
-                                "boolean",
-                                // Some(&g_param),
-                                None,
-                                &Kind::Command,
-                            ),
-                            "true",
-                            None,
-                        )),
-                    ]),
-                    &ParamPredicate::new(&vec![
-                        Predicate::SET(EnumValue::new(
-                            &EnumVariable::new(
-                                &format!("at_{}_{}", ball, room),
-                                &domain,
-                                "boolean",
-                                // Some(&b_param),
-                                None,
-                                &Kind::Command,
-                            ),
-                            "false",
-                            None,
-                        )),
-                        Predicate::SET(EnumValue::new(
-                            &EnumVariable::new(
-                                &format!("{}_carry_{}", gripper, ball),
-                                &domain,
-                                "boolean",
-                                // Some(&b_param),
-                                None,
-                                &Kind::Command,
-                            ),
-                            "true",
-                            None,
-                        )),
-                        Predicate::SET(EnumValue::new(
-                            &EnumVariable::new(
-                                &format!("free_{}", gripper),
-                                &domain,
-                                "boolean",
-                                // Some(&g_param),
-                                None,
-                                &Kind::Command,
-                            ),
-                            "false",
-                            None,
-                        )),
-                    ]),
-                ))
+                        &ppred!(
+                            &pass!(&new_enum_assign_c!(&format!("at-robby_{}", room_a), "boolean", &domain, "false")),
+                            &pass!(&new_enum_assign_c!(&format!("at-robby_{}", room_b), "boolean", &domain, "true"))
+                        )
+                    )
+                )
             }
         }
     }
@@ -155,76 +37,44 @@ pub fn gripper_model_enumerated_booleans(
     for room in rooms {
         for gripper in grippers {
             for ball in balls {
-                drop_transitions.push(ParamTransition::new(
-                    &format!(
-                        "drop_{}_to_{}_from_{}_gripper",
-                        ball, room, gripper
-                    ),
-                    &ParamPredicate::new(&vec![
-                        Predicate::SET(EnumValue::new(
-                            &EnumVariable::new(
-                                &format!("{}_carry_{}", gripper, ball),
-                                &domain,
-                                "boolean",
-                                // Some(&b_param),
-                                None,
-                                &Kind::Command,
-                            ),
-                            "true",
-                            None,
-                        )),
-                        Predicate::SET(EnumValue::new(
-                            &EnumVariable::new(
-                                &format!("at-robby_{}", room),
-                                &domain,
-                                "boolean",
-                                // Some(&r_param),
-                                None,
-                                &Kind::Command,
-                            ),
-                            "true",
-                            None,
-                        )),
-                    ]),
-                    &ParamPredicate::new(&vec![
-                        Predicate::SET(EnumValue::new(
-                            &EnumVariable::new(
-                                &format!("at_{}_{}", ball, room),
-                                &domain,
-                                "boolean",
-                                // Some(&b_param),
-                                None,
-                                &Kind::Command,
-                            ),
-                            "true",
-                            None,
-                        )),
-                        Predicate::SET(EnumValue::new(
-                            &EnumVariable::new(
-                                &format!("free_{}", gripper),
-                                &domain,
-                                "boolean",
-                                // Some(&g_param),
-                                None,
-                                &Kind::Command,
-                            ),
-                            "true",
-                            None,
-                        )),
-                        Predicate::SET(EnumValue::new(
-                            &EnumVariable::new(
-                                &format!("{}_carry_{}", gripper, ball),
-                                &domain,
-                                "boolean",
-                                // Some(&b_param),
-                                None,
-                                &Kind::Command,
-                            ),
-                            "false",
-                            None,
-                        )),
-                    ]),
-                ))
+                pick_transitions.push(
+                    ptrans!(
+                        &format!("pick_{}_in_{}_with_{}_gripper", ball, room, gripper),
+                        &ppred!(
+                            &pass!(&new_enum_assign_c!(&format!("at_{}_{}", ball, room), "boolean", &domain, "true")),
+                            &pass!(&new_enum_assign_c!(&format!("at-robby_{}", room), "boolean", &domain, "true")),
+                            &pass!(&new_enum_assign_c!(&format!("free_{}", gripper), "boolean", &domain, "true"))
+
+                        ),
+                        &ppred!(
+                            &pass!(&new_enum_assign_c!(&format!("at_{}_{}", ball, room), "boolean", &domain, "false")),
+                            &pass!(&new_enum_assign_c!(&format!("{}_carry_{}", gripper, ball), "boolean", &domain, "true")),
+                            &pass!(&new_enum_assign_c!(&format!("free_{}", gripper), "boolean", &domain, "false"))
+                        )
+                    )
+                )
+            }
+        }
+    }
+
+    for room in rooms {
+        for gripper in grippers {
+            for ball in balls {
+                pick_transitions.push(
+                    ptrans!(
+                        &format!("drop_{}_to_{}_from_{}_gripper", ball, room, gripper),
+                        &ppred!(
+                            &pass!(&new_enum_assign_c!(&format!("{}_carry_{}", gripper, ball), "boolean", &domain, "true")),
+                            &pass!(&new_enum_assign_c!(&format!("at-robby_{}", room), "boolean", &domain, "true"))
+
+                        ),
+                        &ppred!(
+                            &pass!(&new_enum_assign_c!(&format!("at_{}_{}", ball, room), "boolean", &domain, "true")),
+                            &pass!(&new_enum_assign_c!(&format!("{}_carry_{}", gripper, ball), "boolean", &domain, "false")),
+                            &pass!(&new_enum_assign_c!(&format!("free_{}", gripper), "boolean", &domain, "true"))
+                        )
+                    )
+                )
             }
         }
     }

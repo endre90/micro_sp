@@ -70,7 +70,7 @@ pub fn parser(name: &str) -> PlanningProblem {
         .map(|z| (z[1], z[2]))
         .collect::<Vec<(&str, &str)>>();
 
-    let model = domain::blocksworld_model_enumerated_booleans(&blocks);
+    let model = domain::blocksworld_model_enumerated_booleans_invariants(&blocks);
 
     println!("blocks: {:?}", blocks);
     println!("clear_init: {:?}", clear_vec);
@@ -146,4 +146,10 @@ pub fn parser(name: &str) -> PlanningProblem {
 
     problem
     
+}
+
+#[test]
+fn test_parser() {
+    let result = incremental(&parser("probBLOCKS-7-0"), 1200);
+    pprint_result_trans_only(&result)
 }

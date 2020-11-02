@@ -6,83 +6,77 @@ use z3_v2::*;
 
 
 
-// /// This helps with adding and removing predicates to a conjunction
-// /// before sending the problem to the incremental algorithm.
-// #[derive(Debug, PartialEq, Clone, PartialOrd, Eq, Ord)]
-// pub struct ParamPredicate {
-//     pub preds: Vec<Predicate>,
-// }
+/// This helps with adding and removing predicates to a conjunction
+/// before sending the problem to the incremental algorithm.
+#[derive(Debug, PartialEq, Clone, PartialOrd, Eq, Ord)]
+pub struct ParamPredicate {
+    pub preds: Vec<Predicate>,
+}
 
-// impl ParamPredicate {
-//     /// Make a new parameterized predicate that is basically a vector of
-//     /// predicates that are marked with parameters. These parameters will
-//     /// turn the predicate on/off when it is generated for the incremental
-//     /// algorithm based on the value of the parameter in the current level.
-//     pub fn new(preds: &Vec<Predicate>) -> ParamPredicate {
-//         ParamPredicate {
-//             preds: preds.iter().map(|x| x.to_owned()).collect(),
-//         }
-//     }
-// }
+impl ParamPredicate {
+    /// Make a new parameterized predicate that is basically a vector of
+    /// predicates that are marked with parameters. These parameters will
+    /// turn the predicate on/off when it is generated for the incremental
+    /// algorithm based on the value of the parameter in the current level.
+    pub fn new(preds: &Vec<Predicate>) -> ParamPredicate {
+        ParamPredicate {
+            preds: preds.iter().map(|x| x.to_owned()).collect(),
+        }
+    }
+}
 
-// /// A parameterized transition is basically a collection of guard and
-// /// update predicates, which are turned on/off when the actual transition
-// /// is being generated for the incremental algorithm.
-// #[derive(Debug, PartialEq, Clone, PartialOrd, Eq, Ord)]
-// pub struct ParamTransition {
-//     pub name: String,
-//     pub guard: ParamPredicate,
-//     pub update: ParamPredicate,
-// }
+/// A parameterized transition is basically a collection of guard and
+/// update predicates, which are turned on/off when the actual transition
+/// is being generated for the incremental algorithm.
+#[derive(Debug, PartialEq, Clone, PartialOrd, Eq, Ord)]
+pub struct ParamTransition {
+    pub name: String,
+    pub guard: ParamPredicate,
+    pub update: ParamPredicate,
+}
 
-// impl ParamTransition {
-//     pub fn new(name: &str, guard: &ParamPredicate, update: &ParamPredicate) -> ParamTransition {
-//         ParamTransition {
-//             name: name.to_string(),
-//             guard: guard.to_owned(),
-//             update: update.to_owned(),
-//         }
-//     }
-// }
+impl ParamTransition {
+    pub fn new(name: &str, guard: &ParamPredicate, update: &ParamPredicate) -> ParamTransition {
+        ParamTransition {
+            name: name.to_string(),
+            guard: guard.to_owned(),
+            update: update.to_owned(),
+        }
+    }
+}
 
-// /// A parameterized planning problem that allows turning on/off certain
-// /// parts before generating the real problem and sending it to the
-// /// incremental algorithm.
-// #[derive(Debug, PartialEq, Clone, PartialOrd, Eq, Ord)]
-// pub struct ParamPlanningProblem {
-//     pub name: String,
-//     pub init: ParamPredicate,
-//     pub goal: ParamPredicate,
-//     pub trans: Vec<ParamTransition>,
-//     pub invars: ParamPredicate, // should this be parameterized?
-//     pub max_steps: u32,
-//     // pub params: Vec<Parameter>,
-//     // pub paradigm: Paradigm,
-// }
+/// A parameterized planning problem that allows turning on/off certain
+/// parts before generating the real problem and sending it to the
+/// incremental algorithm.
+#[derive(Debug, PartialEq, Clone, PartialOrd, Eq, Ord)]
+pub struct ParamPlanningProblem {
+    pub name: String,
+    pub init: ParamPredicate,
+    pub goal: ParamPredicate,
+    pub trans: Vec<ParamTransition>,
+    pub invars: ParamPredicate,
+    pub max_steps: u32
+}
 
-// impl ParamPlanningProblem {
-//     pub fn new(
-//         name: &str,
-//         init: &ParamPredicate,
-//         goal: &ParamPredicate,
-//         trans: &Vec<ParamTransition>,
-//         invars: &ParamPredicate,
-//         max_steps: &u32,
-//         // params: &Vec<Parameter>,
-//         // paradigm: &Paradigm,
-//     ) -> ParamPlanningProblem {
-//         ParamPlanningProblem {
-//             name: name.to_string(),
-//             init: init.to_owned(),
-//             goal: goal.to_owned(),
-//             trans: trans.to_owned(),
-//             invars: invars.to_owned(),
-//             max_steps: max_steps.to_owned(),
-//             // params: params.iter().map(|x| x.clone()).collect(),
-//             // paradigm: paradigm.to_owned(),
-//         }
-//     }
-// }
+impl ParamPlanningProblem {
+    pub fn new(
+        name: &str,
+        init: &ParamPredicate,
+        goal: &ParamPredicate,
+        trans: &Vec<ParamTransition>,
+        invars: &ParamPredicate,
+        max_steps: &u32
+    ) -> ParamPlanningProblem {
+        ParamPlanningProblem {
+            name: name.to_string(),
+            init: init.to_owned(),
+            goal: goal.to_owned(),
+            trans: trans.to_owned(),
+            invars: invars.to_owned(),
+            max_steps: max_steps.to_owned()
+        }
+    }
+}
 
 // /// An extention on the orogonal PlanningResult that allows tracking
 // /// of where the problem is in the composition. Level tracks the depth
@@ -94,61 +88,57 @@ use z3_v2::*;
 //     // pub concat: u32,
 // }
 
-// /// Given a parameterized predicate and the vector of activation parameters,
-// /// generate a predicate as a conjunction of predicates that are activated.
-// pub fn generate_predicate(ppred: &ParamPredicate, params: &Vec<Parameter>) -> Predicate {
-//     let activated: Vec<Parameter> = params
-//         .iter()
-//         .filter(|x| x.value)
-//         .map(|x| x.to_owned())
-//         .collect();
-//     Predicate::AND(
-//         ppred
-//             .preds
-//             .iter()
-//             .filter(|x| {
-//                 get_predicate_vars(&x)
-//                     .iter()
-//                     .any(|y| activated.contains(&y.param))
-//             })
-//             .map(|x| x.to_owned())
-//             .collect(),
-//     )
-// }
+/// Given a parameterized predicate and the vector of activation parameters,
+/// generate a predicate as a conjunction of predicates that are activated.
+pub fn generate_predicate(ppred: &ParamPredicate, params: &Vec<Parameter>) -> Predicate {
+    let activated: Vec<Parameter> = params
+        .iter()
+        .filter(|x| x.value)
+        .map(|x| x.to_owned())
+        .collect();
+    Predicate::AND(
+        ppred
+            .preds
+            .iter()
+            .filter(|x| {
+                get_predicate_vars(&x)
+                    .iter()
+                    .any(|y| activated.contains(&y.param))
+            })
+            .map(|x| x.to_owned())
+            .collect(),
+    )
+}
 
-// /// Given a parameterized trtansition and the vector of activation parameters,
-// /// generate the transition guard and update as a conjunction of predicates in
-// /// the parameterized transition that are activated.
-// pub fn generate_transition(ptrans: &ParamTransition, params: &Vec<Parameter>) -> Transition {
-//     Transition::new(
-//         &ptrans.name,
-//         &generate_predicate(&ptrans.guard, &params),
-//         &generate_predicate(&ptrans.update, &params),
-//     )
-// }
+/// Given a parameterized trtansition and the vector of activation parameters,
+/// generate the transition guard and update as a conjunction of predicates in
+/// the parameterized transition that are activated.
+pub fn generate_transition(ptrans: &ParamTransition, params: &Vec<Parameter>) -> Transition {
+    Transition::new(
+        &ptrans.name,
+        &generate_predicate(&ptrans.guard, &params),
+        &generate_predicate(&ptrans.update, &params),
+    )
+}
 
-// /// Generates the problem from a parameterized problem and solves it with the incremental algorithm.
-// pub fn parameterized(
-//     prob: &ParamPlanningProblem,
-//     params: &Vec<Parameter>
-//     // level: &u32,
-//     // concat: &u32,
-// ) -> ParamPlanningResult {
-//     ParamPlanningResult {
-//         result: incremental(&PlanningProblem::new(
-//             &prob.name,
-//             &generate_predicate(&prob.init, &params),
-//             &generate_predicate(&prob.goal, &params),
-//             &prob
-//                 .trans
-//                 .iter()
-//                 .map(|x| generate_transition(x, &params))
-//                 .collect(),
-//             &generate_predicate(&prob.invars, &params),
-//             &prob.max_steps,
-//             &Paradigm::Raar,
-//         )),
-//         // level: *level,
-//         // concat: *concat,
-//     }
-// }
+/// Generates the problem from a parameterized problem and solves it with the incremental algorithm.
+pub fn parameterized(
+    prob: &ParamPlanningProblem,
+    params: &Vec<Parameter>,
+    timeout: u64
+) -> PlanningResult {
+        incremental(&PlanningProblem::new(
+            &prob.name,
+            &generate_predicate(&prob.init, &params),
+            &generate_predicate(&prob.goal, &params),
+            &prob
+                .trans
+                .iter()
+                .map(|x| generate_transition(x, &params))
+                .collect(),
+            &generate_predicate(&prob.invars, &params),
+            &prob.max_steps,
+        ),
+        timeout
+    )
+}
