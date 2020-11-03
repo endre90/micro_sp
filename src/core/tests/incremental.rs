@@ -27,14 +27,14 @@ fn ripen(fruit: &str) -> Transition {
             "fruit",
             vec!("green", "ripe", "spoiled"),
             "green",
-            ("p1", &true)
+            "p1"
         )),
         &Predicate::ASS(new_enum_assign_c!(
             fruit,
             "fruit",
             vec!("green", "ripe", "spoiled"),
             "ripe",
-            ("p1", &true)
+            "p1"
         )),
     )
 }
@@ -67,8 +67,8 @@ fn test_keep_variable_values() {
     let keep = keep_variable_values(
         &ctx,
         &vec![
-            enum_c!("banana", "fruit", vec!("green", "ripe", "spoiled"), ("p1", &true)),
-            enum_c!("peach", "fruit", vec!("green", "ripe", "spoiled"), ("p1", &true)),
+            enum_c!("banana", "fruit", vec!("green", "ripe", "spoiled"), "p1"),
+            enum_c!("peach", "fruit", vec!("green", "ripe", "spoiled"), "p1"),
         ],
         &ripen("banana"),
         &5,
