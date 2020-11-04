@@ -3,23 +3,23 @@ use super::*;
 pub fn model() -> PlanningProblem {
     let act_pos = enum_m!(
         "act_pos",
-        "pos",
-        vec!("left", "right", "unknown", "dummy_value")
+        vec!("left", "right", "unknown", "dummy_value"),
+        "pos"
     );
     let act_stat = enum_m!(
         "act_stat",
-        "stat",
-        vec!("idle", "active", "unknown", "dummy_value")
+        vec!("idle", "active", "unknown", "dummy_value"),
+        "stat"
     );
     let ref_pos = enum_c!(
         "ref_pos",
-        "pos",
-        vec!("left", "right", "unknown", "dummy_value")
+        vec!("left", "right", "unknown", "dummy_value"),
+        "pos"
     );
     let ref_stat = enum_m!(
         "ref_stat",
-        "stat",
-        vec!("idle", "active", "unknown", "dummy_value")
+        vec!("idle", "active", "unknown", "dummy_value"),
+        "stat"
     );
 
     let act_pos_dummy = Predicate::ASS(enum_assign!(act_pos, "dummy_value"));
