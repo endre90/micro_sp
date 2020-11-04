@@ -62,14 +62,14 @@ fn test_pfalse_macro() {
 
 #[test]
 fn test_pass_macro() {
-    let ripe_banana = new_enum_assign_c!("banana", "fruit", vec!("ripe", "green", "spoiled"), "ripe");
+    let ripe_banana = new_enum_assign_c!("banana", vec!("ripe", "green", "spoiled"), "ripe", "fruit");
     let pass = pass!(&ripe_banana);
     assert_eq!(pass, Predicate::ASS(ripe_banana))
 }
 
 #[test]
 fn test_pnot_macro() {
-    let ripe_banana = new_enum_assign_c!("banana", "fruit", vec!("ripe", "green", "spoiled"), "ripe");
+    let ripe_banana = new_enum_assign_c!("banana", vec!("ripe", "green", "spoiled"), "ripe", "fruit");
     let pass = pass!(&ripe_banana);
     let pnot = pnot!(&pass);
     assert_eq!(pnot, Predicate::NOT(Box::new(Predicate::ASS(ripe_banana))))
@@ -77,8 +77,8 @@ fn test_pnot_macro() {
 
 #[test]
 fn test_pand_macro() {
-    let ripe_banana = new_enum_assign_c!("banana", "fruit", vec!("ripe", "green", "spoiled"), "ripe");
-    let spoiled_peach = new_enum_assign_c!("peach", "fruit", vec!("ripe", "green", "spoiled"), "spoiled");
+    let ripe_banana = new_enum_assign_c!("banana", vec!("ripe", "green", "spoiled"), "ripe", "fruit");
+    let spoiled_peach = new_enum_assign_c!("peach", vec!("ripe", "green", "spoiled"), "spoiled", "fruit");
     let pass_b = pass!(&ripe_banana);
     let pass_c = pass!(&spoiled_peach);
     let pand = pand!(&pass_b, &pass_c);
@@ -87,8 +87,8 @@ fn test_pand_macro() {
 
 #[test]
 fn test_por_macro() {
-    let ripe_banana = new_enum_assign_c!("banana", "fruit", vec!("ripe", "green", "spoiled"), "ripe");
-    let spoiled_peach = new_enum_assign_c!("peach", "fruit", vec!("ripe", "green", "spoiled"), "spoiled");
+    let ripe_banana = new_enum_assign_c!("banana", vec!("ripe", "green", "spoiled"), "ripe", "fruit");
+    let spoiled_peach = new_enum_assign_c!("peach", vec!("ripe", "green", "spoiled"), "spoiled", "fruit");
     let pass_b = pass!(&ripe_banana);
     let pass_c = pass!(&spoiled_peach);
     let por = por!(&pass_b, &pass_c);
@@ -97,9 +97,9 @@ fn test_por_macro() {
 
 #[test]
 fn test_ppbeq_macro() {
-    let ripe_banana = new_enum_assign_c!("banana", "fruit", vec!("ripe", "green", "spoiled"), "ripe");
-    let spoiled_peach = new_enum_assign_c!("peach", "fruit", vec!("ripe", "green", "spoiled"), "spoiled");
-    let green_pear = new_enum_assign_c!("pear", "fruit", vec!("ripe", "green", "spoiled"), "green");
+    let ripe_banana = new_enum_assign_c!("banana", vec!("ripe", "green", "spoiled"), "ripe", "fruit");
+    let spoiled_peach = new_enum_assign_c!("peach", vec!("ripe", "green", "spoiled"), "spoiled", "fruit");
+    let green_pear = new_enum_assign_c!("pear", vec!("ripe", "green", "spoiled"), "green", "fruit");
     let pass_b = pass!(&ripe_banana);
     let pass_c = pass!(&spoiled_peach);
     let pass_g = pass!(&green_pear);

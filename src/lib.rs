@@ -5,7 +5,7 @@ pub mod models;
 pub use models::*;
 
 pub mod core;
-// pub use crate::core::compositional::*;
+pub use crate::core::compositional::*;
 pub use crate::core::incremental::*;
 pub use crate::core::items::*;
 pub use crate::core::parameterized::*;

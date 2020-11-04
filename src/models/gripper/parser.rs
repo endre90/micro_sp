@@ -6,10 +6,10 @@ use std::io::prelude::*;
 
 #[test]
 fn test_parser_model_pure_booleans() {
-    let model = parser_model_pure_booleans("instance-1");
+    let model = parser_model_pure_booleans("instance-2");
 
-    let g_param = Parameter::new("g", &true);
-    let r_param = Parameter::new("r", &true);
+    let g_param = Parameter::new("g", &false);
+    let r_param = Parameter::new("r", &false);
     let b_param = Parameter::new("b", &true);
     let none = Parameter::new("NONE", &true); 
 

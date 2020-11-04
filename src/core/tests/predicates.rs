@@ -21,7 +21,7 @@ fn test_false_predicate() {
 
 #[test]
 fn test_not_predicate() {
-    let x = enum_c!("x", "letters", vec!("a", "b", "c", "d"));
+    let x = enum_c!("x", vec!("a", "b", "c", "d"), "letters");
     let cfg = ConfigZ3::new();
     let ctx = ContextZ3::new(&cfg);
     let n = Predicate::NOT(Box::new(Predicate::ASS(enum_assign!(x, "b"))));
@@ -31,9 +31,9 @@ fn test_not_predicate() {
 
 #[test]
 fn test_and_predicate() {
-    let x = enum_e!("x", "letters", vec!("a", "b", "c", "d"));
-    let y = enum_e!("y", "letters", vec!("a", "b", "c", "d"));
-    let z = enum_e!("z", "letters", vec!("a", "b", "c", "d"));
+    let x = enum_e!("x", vec!("a", "b", "c", "d"), "letters");
+    let y = enum_e!("y", vec!("a", "b", "c", "d"), "letters");
+    let z = enum_e!("z", vec!("a", "b", "c", "d"), "letters");
 
     let cfg = ConfigZ3::new();
     let ctx = ContextZ3::new(&cfg);
@@ -51,9 +51,9 @@ fn test_and_predicate() {
 
 #[test]
 fn test_or_predicate() {
-    let x = enum_e!("x", "letters", vec!("a", "b", "c", "d"));
-    let y = enum_e!("y", "letters", vec!("a", "b", "c", "d"));
-    let z = enum_e!("z", "letters", vec!("a", "b", "c", "d"));
+    let x = enum_e!("x", vec!("a", "b", "c", "d"), "letters");
+    let y = enum_e!("y", vec!("a", "b", "c", "d"), "letters");
+    let z = enum_e!("z", vec!("a", "b", "c", "d"), "letters");
 
     let cfg = ConfigZ3::new();
     let ctx = ContextZ3::new(&cfg);
@@ -71,7 +71,7 @@ fn test_or_predicate() {
 
 #[test]
 fn test_ass_predicate(){
-    let x = enum_e!("x", "letters", vec!("a", "b", "c", "d"));
+    let x = enum_e!("x", vec!("a", "b", "c", "d"), "letters");
 
     let cfg = ConfigZ3::new();
     let ctx = ContextZ3::new(&cfg);
@@ -84,7 +84,7 @@ fn test_ass_predicate(){
 #[should_panic]
 fn test_set_predicate_panic(){
 
-    let x = enum_e!("x", "letters", vec!("a", "b", "c", "d"));
+    let x = enum_e!("x", vec!("a", "b", "c", "d"), "letters");
 
     let cfg = ConfigZ3::new();
     let ctx = ContextZ3::new(&cfg);
@@ -96,9 +96,9 @@ fn test_set_predicate_panic(){
 #[test]
 fn test_pbeq_predicate(){
 
-    let x = enum_e!("x", "letters", vec!("a", "b", "c", "d"));
-    let y = enum_e!("y", "letters", vec!("a", "b", "c", "d"));
-    let z = enum_e!("z", "letters", vec!("a", "b", "c", "d"));
+    let x = enum_e!("x", vec!("a", "b", "c", "d"), "letters");
+    let y = enum_e!("y", vec!("a", "b", "c", "d"), "letters");
+    let z = enum_e!("z", vec!("a", "b", "c", "d"), "letters");
     
     let cfg = ConfigZ3::new();
     let ctx = ContextZ3::new(&cfg);

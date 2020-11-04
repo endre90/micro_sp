@@ -212,7 +212,7 @@ fn test_new_bool_assign_e_macro_3() {
 
 #[test]
 fn test_new_enum_c_macro_1() {
-    let banana = enum_c!("banana", "fruit", vec!("green", "ripe", "spoiled"));
+    let banana = enum_c!("banana", vec!("green", "ripe", "spoiled"), "fruit");
     assert_eq!(
         banana,
         is_enum_fruit(
@@ -227,7 +227,7 @@ fn test_new_enum_c_macro_1() {
 
 #[test]
 fn test_new_enum_c_macro_2() {
-    let banana = enum_c!("banana", "fruit", vec!("green", "ripe", "spoiled"), "p1");
+    let banana = enum_c!("banana", vec!("green", "ripe", "spoiled"), "fruit", "p1");
     assert_eq!(
         banana,
         is_enum_fruit(
@@ -242,7 +242,7 @@ fn test_new_enum_c_macro_2() {
 
 #[test]
 fn test_new_enum_m_macro_1() {
-    let banana = enum_m!("banana", "fruit", vec!("green", "ripe", "spoiled"));
+    let banana = enum_m!("banana", vec!("green", "ripe", "spoiled"), "fruit");
     assert_eq!(
         banana,
         is_enum_fruit(
@@ -257,7 +257,7 @@ fn test_new_enum_m_macro_1() {
 
 #[test]
 fn test_new_enum_m_macro_2() {
-    let banana = enum_m!("banana", "fruit", vec!("green", "ripe", "spoiled"), "p1");
+    let banana = enum_m!("banana", vec!("green", "ripe", "spoiled"), "fruit", "p1");
     assert_eq!(
         banana,
         is_enum_fruit(
@@ -272,7 +272,7 @@ fn test_new_enum_m_macro_2() {
 
 #[test]
 fn test_new_enum_e_macro_1() {
-    let banana = enum_e!("banana", "fruit", vec!("green", "ripe", "spoiled"));
+    let banana = enum_e!("banana", vec!("green", "ripe", "spoiled"), "fruit");
     assert_eq!(
         banana,
         is_enum_fruit(
@@ -287,7 +287,7 @@ fn test_new_enum_e_macro_1() {
 
 #[test]
 fn test_new_enum_e_macro_2() {
-    let banana = enum_e!("banana", "fruit", vec!("green", "ripe", "spoiled"), "p1");
+    let banana = enum_e!("banana", vec!("green", "ripe", "spoiled"), "fruit", "p1");
     assert_eq!(
         banana,
         is_enum_fruit(
@@ -302,7 +302,7 @@ fn test_new_enum_e_macro_2() {
 
 #[test]
 fn test_enum_assign_macro_1() {
-    let banana = enum_c!("banana", "fruit", vec!("green", "ripe", "spoiled"));
+    let banana = enum_c!("banana", vec!("green", "ripe", "spoiled"), "fruit");
     let ripe_banana = enum_assign!(banana, "ripe");
     assert_eq!(
         ripe_banana,
@@ -320,7 +320,7 @@ fn test_enum_assign_macro_1() {
 
 #[test]
 fn test_enum_assign_macro_2() {
-    let banana = enum_c!("banana", "fruit", vec!("green", "ripe", "spoiled"));
+    let banana = enum_c!("banana", vec!("green", "ripe", "spoiled"), "fruit");
     let ripe_banana = enum_assign!(banana, "ripe", Duration::from_millis(1234));
     assert_eq!(
         ripe_banana,
@@ -357,7 +357,7 @@ fn test_new_enum_assign_c_macro_0() {
 #[test]
 fn test_new_enum_assign_c_macro_1() {
     let true_banana =
-        new_enum_assign_c!("banana", "fruit", vec!("green", "ripe", "spoiled"), "ripe");
+        new_enum_assign_c!("banana", vec!("green", "ripe", "spoiled"), "ripe", "fruit");
     assert_eq!(
         true_banana,
         is_enum_fruit_something(
@@ -376,9 +376,9 @@ fn test_new_enum_assign_c_macro_1() {
 fn test_new_enum_assign_c_macro_2() {
     let true_banana = new_enum_assign_c!(
         "banana",
-        "fruit",
         vec!("green", "ripe", "spoiled"),
         "ripe",
+        "fruit",
         "p1"
     );
     assert_eq!(
@@ -399,9 +399,9 @@ fn test_new_enum_assign_c_macro_2() {
 fn test_new_enum_assign_c_macro_3() {
     let true_banana = new_enum_assign_c!(
         "banana",
-        "fruit",
         vec!("green", "ripe", "spoiled"),
         "ripe",
+        "fruit",
         "p1",
         Duration::from_millis(1234)
     );
@@ -440,7 +440,7 @@ fn test_new_enum_assign_m_macro_0() {
 #[test]
 fn test_new_enum_assign_m_macro_1() {
     let true_banana =
-        new_enum_assign_m!("banana", "fruit", vec!("green", "ripe", "spoiled"), "ripe");
+        new_enum_assign_m!("banana", vec!("green", "ripe", "spoiled"), "ripe", "fruit");
     assert_eq!(
         true_banana,
         is_enum_fruit_something(
@@ -459,9 +459,9 @@ fn test_new_enum_assign_m_macro_1() {
 fn test_new_enum_assign_m_macro_2() {
     let true_banana = new_enum_assign_m!(
         "banana",
-        "fruit",
         vec!("green", "ripe", "spoiled"),
         "ripe",
+        "fruit",
         "p1"
     );
     assert_eq!(
@@ -482,9 +482,9 @@ fn test_new_enum_assign_m_macro_2() {
 fn test_new_enum_assign_m_macro_3() {
     let true_banana = new_enum_assign_m!(
         "banana",
-        "fruit",
         vec!("green", "ripe", "spoiled"),
         "ripe",
+        "fruit",
         "p1",
         Duration::from_millis(1234)
     );
@@ -523,7 +523,7 @@ fn test_new_enum_assign_e_macro_0() {
 #[test]
 fn test_new_enum_assign_e_macro_1() {
     let true_banana =
-        new_enum_assign_e!("banana", "fruit", vec!("green", "ripe", "spoiled"), "ripe");
+        new_enum_assign_e!("banana", vec!("green", "ripe", "spoiled"), "ripe", "fruit");
     assert_eq!(
         true_banana,
         is_enum_fruit_something(
@@ -542,9 +542,9 @@ fn test_new_enum_assign_e_macro_1() {
 fn test_new_enum_assign_e_macro_2() {
     let true_banana = new_enum_assign_e!(
         "banana",
-        "fruit",
         vec!("green", "ripe", "spoiled"),
         "ripe",
+        "fruit",
         "p1"
     );
     assert_eq!(
@@ -565,9 +565,9 @@ fn test_new_enum_assign_e_macro_2() {
 fn test_new_enum_assign_e_macro_3() {
     let true_banana = new_enum_assign_e!(
         "banana",
-        "fruit",
         vec!("green", "ripe", "spoiled"),
         "ripe",
+        "fruit",
         "p1",
         Duration::from_millis(1234)
     );

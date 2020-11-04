@@ -1,88 +1,88 @@
-// use super::*;
-// use std::time::Instant;
-// use z3_sys::*;
-// use z3_v2::*;
+use super::*;
+use std::time::Instant;
+use z3_sys::*;
+use z3_v2::*;
 
-// pub enum Case {
-//     First,
-//     Central,
-//     Last,
-// }
+pub enum Case {
+    First,
+    Central,
+    Last,
+}
 
-// /// Given a parameter list, return it with the next value activated.
-// pub fn activate_next(params: &Vec<Parameter>) -> Vec<Parameter> {
-//     let mut one_activated = false;
-//     params
-//         .iter()
-//         .map(|x| {
-//             if !x.value && !one_activated {
-//                 one_activated = true;
-//                 Parameter::new(x.name.as_str(), &true)
-//             } else {
-//                 x.to_owned().to_owned()
-//             }
-//         })
-//         .collect()
-// }
+/// Given a parameter list, return it with the next value activated.
+pub fn activate_next(params: &Vec<Parameter>) -> Vec<Parameter> {
+    let mut one_activated = false;
+    params
+        .iter()
+        .map(|x| {
+            if !x.value && !one_activated {
+                one_activated = true;
+                Parameter::new(x.name.as_str(), &true)
+            } else {
+                x.to_owned().to_owned()
+            }
+        })
+        .collect()
+}
 
-// /// Given a parameter list, return it with all values deactivated.
-// pub fn deactivate_all(params: &Vec<Parameter>) -> Vec<Parameter> {
-//     params
-//         .iter()
-//         .map(|x| Parameter::new(&x.name, &false))
-//         .collect()
-// }
+/// Given a parameter list, return it with all values deactivated.
+pub fn deactivate_all(params: &Vec<Parameter>) -> Vec<Parameter> {
+    params
+        .iter()
+        .map(|x| Parameter::new(&x.name, &false))
+        .collect()
+}
 
-// /// Given a parameterized planning problem, return it with the next value activated.
-// pub fn activate_next_in_problem(prob: &ParamPlanningProblem) -> ParamPlanningProblem {
-//     ParamPlanningProblem {
-//         name: prob.name.to_owned(),
-//         init: prob.init.to_owned(),
-//         goal: prob.goal.to_owned(),
-//         trans: prob.trans.to_owned(),
-//         invars: prob.invars.to_owned(),
-//         max_steps: prob.max_steps.to_owned(),
-//         // params: activate_next(&prob.params),
-//     }
-// }
+/// Given a parameterized planning problem, return it with the next value activated.
+pub fn activate_next_in_problem(prob: &ParamPlanningProblem) -> ParamPlanningProblem {
+    ParamPlanningProblem {
+        name: prob.name.to_owned(),
+        init: prob.init.to_owned(),
+        goal: prob.goal.to_owned(),
+        trans: prob.trans.to_owned(),
+        invars: prob.invars.to_owned(),
+        max_steps: prob.max_steps.to_owned(),
+        // params: activate_next(&prob.params),
+    }
+}
 
-// /// Given a parameterized planning problem, return it with the next value activated.
-// pub fn deactivate_all_in_problem(prob: &ParamPlanningProblem) -> ParamPlanningProblem {
-//     ParamPlanningProblem {
-//         name: prob.name.to_owned(),
-//         init: prob.init.to_owned(),
-//         goal: prob.goal.to_owned(),
-//         trans: prob.trans.to_owned(),
-//         invars: prob.invars.to_owned(),
-//         max_steps: prob.max_steps.to_owned(),
-//         // params: prob
-//         //     .params
-//         //     .iter()
-//         //     .map(|x| Parameter {
-//         //         name: x.name.to_owned(),
-//         //         value: false,
-//         //     })
-//         //     .collect::<Vec<Parameter>>(),
-//     }
-// }
+/// Given a parameterized planning problem, return it with the next value activated.
+pub fn deactivate_all_in_problem(prob: &ParamPlanningProblem) -> ParamPlanningProblem {
+    ParamPlanningProblem {
+        name: prob.name.to_owned(),
+        init: prob.init.to_owned(),
+        goal: prob.goal.to_owned(),
+        trans: prob.trans.to_owned(),
+        invars: prob.invars.to_owned(),
+        max_steps: prob.max_steps.to_owned(),
+        // params: prob
+        //     .params
+        //     .iter()
+        //     .map(|x| Parameter {
+        //         name: x.name.to_owned(),
+        //         value: false,
+        //     })
+        //     .collect::<Vec<Parameter>>(),
+    }
+}
 
 // /// Generate and solve the concat-th problem of a result
 // pub fn generate_and_solve(
 //     case: &Case,
-//     inh: &CompleteState,
+//     inh: &State,
 //     prob: &ParamPlanningProblem,
-//     res: &ParamPlanningResult,
+//     res: &PlanningResult,
 //     params: &Vec<Parameter>,
 //     level: &u32,
 //     concat: &u32,
-// ) -> ParamPlanningResult {
-//     println!("GENANDSOLVE_PARAMS: {:?}", params);
+// ) -> PlanningResult {
+//     // println!("GENANDSOLVE_PARAMS: {:?}", params);
 //     let res = parameterized(
 //         &ParamPlanningProblem {
 //             name: format!("problem_l{:?}_c{:?}", level, concat),
 //             init: match case {
 //                 Case::First => prob.init.to_owned(),
-//                 Case::Central => complete_state_to_param_predicate(&inh),
+//                 Case::Central => state_to_param_predicate(&inh),
 //                 Case::Last => complete_state_to_param_predicate(&inh),
 //             },
 //             goal: match case {

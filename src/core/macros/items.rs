@@ -243,7 +243,7 @@ macro_rules! enum_c {
             Some(&Kind::Command),
         )
     };
-    ($name:expr, $r#type:expr, $domain:expr) => {
+    ($name:expr, $domain:expr, $r#type:expr) => {
         Variable::new(
             $name,
             &SPValueType::String,
@@ -256,7 +256,7 @@ macro_rules! enum_c {
             Some(&Kind::Command),
         )
     };
-    ($name:expr, $r#type:expr, $domain:expr, $param:expr) => {
+    ($name:expr, $domain:expr, $r#type:expr, $param:expr) => {
         Variable::new(
             $name,
             &SPValueType::String,
@@ -287,7 +287,7 @@ macro_rules! enum_m {
             Some(&Kind::Measured),
         )
     };
-    ($name:expr, $r#type:expr, $domain:expr) => {
+    ($name:expr, $domain:expr, $r#type:expr) => {
         Variable::new(
             $name,
             &SPValueType::String,
@@ -300,7 +300,7 @@ macro_rules! enum_m {
             Some(&Kind::Measured),
         )
     };
-    ($name:expr, $r#type:expr, $domain:expr, $param:expr) => {
+    ($name:expr, $domain:expr, $r#type:expr, $param:expr) => {
         Variable::new(
             $name,
             &SPValueType::String,
@@ -331,7 +331,7 @@ macro_rules! enum_e {
             Some(&Kind::Estimated),
         )
     };
-    ($name:expr, $r#type:expr, $domain:expr) => {
+    ($name:expr, $domain:expr, $r#type:expr) => {
         Variable::new(
             $name,
             &SPValueType::String,
@@ -344,7 +344,7 @@ macro_rules! enum_e {
             Some(&Kind::Estimated),
         )
     };
-    ($name:expr, $r#type:expr, $domain:expr, $param:expr) => {
+    ($name:expr, $domain:expr, $r#type:expr, $param:expr) => {
         Variable::new(
             $name,
             &SPValueType::String,
@@ -390,7 +390,7 @@ macro_rules! new_enum_assign_c {
             None,
         )
     };
-    ($name:expr, $r#type:expr, $domain:expr, $val:expr) => {
+    ($name:expr, $domain:expr, $val:expr, $r#type:expr) => {
         Assignment::new(
             &Variable::new(
                 $name,
@@ -407,7 +407,7 @@ macro_rules! new_enum_assign_c {
             None,
         )
     };
-    ($name:expr, $r#type:expr, $domain:expr, $val:expr, $param:expr) => {
+    ($name:expr, $domain:expr, $val:expr, $r#type:expr, $param:expr) => {
         Assignment::new(
             &Variable::new(
                 $name,
@@ -424,7 +424,7 @@ macro_rules! new_enum_assign_c {
             None,
         )
     };
-    ($name:expr, $r#type:expr, $domain:expr, $val:expr, $param:expr, $life:expr) => {
+    ($name:expr, $domain:expr, $val:expr, $r#type:expr, $param:expr, $life:expr) => {
         Assignment::new(
             &Variable::new(
                 $name,
@@ -463,7 +463,7 @@ macro_rules! new_enum_assign_m {
             None,
         )
     };
-    ($name:expr, $r#type:expr, $domain:expr, $val:expr) => {
+    ($name:expr, $domain:expr, $val:expr, $r#type:expr) => {
         Assignment::new(
             &Variable::new(
                 $name,
@@ -480,7 +480,7 @@ macro_rules! new_enum_assign_m {
             None,
         )
     };
-    ($name:expr, $r#type:expr, $domain:expr, $val:expr, $param:expr) => {
+    ($name:expr, $domain:expr, $val:expr, $r#type:expr, $param:expr) => {
         Assignment::new(
             &Variable::new(
                 $name,
@@ -497,7 +497,7 @@ macro_rules! new_enum_assign_m {
             None,
         )
     };
-    ($name:expr, $r#type:expr, $domain:expr, $val:expr, $param:expr, $life:expr) => {
+    ($name:expr, $domain:expr, $val:expr, $r#type:expr, $param:expr, $life:expr) => {
         Assignment::new(
             &Variable::new(
                 $name,
@@ -536,7 +536,7 @@ macro_rules! new_enum_assign_e {
             None,
         )
     };
-    ($name:expr, $r#type:expr, $domain:expr, $val:expr) => {
+    ($name:expr, $domain:expr, $val:expr, $r#type:expr) => {
         Assignment::new(
             &Variable::new(
                 $name,
@@ -553,7 +553,7 @@ macro_rules! new_enum_assign_e {
             None,
         )
     };
-    ($name:expr, $r#type:expr, $domain:expr, $val:expr, $param:expr) => {
+    ($name:expr, $domain:expr, $val:expr, $r#type:expr, $param:expr) => {
         Assignment::new(
             &Variable::new(
                 $name,
@@ -570,7 +570,7 @@ macro_rules! new_enum_assign_e {
             None,
         )
     };
-    ($name:expr, $r#type:expr, $domain:expr, $val:expr, $param:expr, $life:expr) => {
+    ($name:expr, $domain:expr, $val:expr, $r#type:expr, $param:expr, $life:expr) => {
         Assignment::new(
             &Variable::new(
                 $name,

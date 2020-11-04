@@ -24,11 +24,16 @@ fn test_none_parameter() {
 
 #[test]
 fn test_new_param_predicate() {
+    let pp = ppred!(
+        &pass!(&new_enum_assign_m!("var1_m", vec!("a", "b", "c"), "t1", "p1")
+    )
+
     let pp = ParamPredicate::new(&vec![
-        Predicate::SET(EnumValue::new(
-            &EnumVariable::new(
+        Predicate::ASS(Assignment::new(
+            &Variable::new(
                 "var1_m",
-                &vec!["a", "b", "c"],
+                &SPValueType::String,
+                &vec!["a".to_spvalue(), "b", "c"],
                 "t1",
                 Some(&Parameter::new("p1", &true)),
                 &Kind::Measured,
@@ -63,6 +68,7 @@ fn test_generate_predicate() {
     let var2_c = EnumVariable::new("var2_c", &d, "t2", Some(&p2), &Kind::Command);
 
     let pp = ParamPredicate::new(&vec![
+        pass!(&new_enum_assign_m!("var1_m", &d, )
         Predicate::SET(EnumValue::new(&var1_m, "a", None)),
         Predicate::SET(EnumValue::new(&var1_c, "b", None)),
         Predicate::SET(EnumValue::new(&var2_m, "c", None)),
