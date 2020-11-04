@@ -49,24 +49,24 @@ fn test_generate_predicate() {
     println!("generated {:?}", generate_predicate(&pp, &params));
 }
 
-// #[test]
-// fn test_parameterized() {
-//     let (problem, params) = models::dummy_robot::dummy_robot::parameterized_model();
+#[test]
+fn test_parameterized() {
+    let (problem, params) = models::dummy_robot::dummy_robot::param_model();
 
-//     let d = deactivate_all(&params);
-//     println!("prms: {:?}", d);
-//     let result1 = parameterized(&problem, &d);
-//     pprint_result(&result1.result);
+    let d = deactivate_all(&params);
+    println!("prms: {:?}", d);
+    let result1 = parameterized(&problem, &d, 1200);
+    pprint_result(&result1);
     
 
-//     let p1 = &activate_next(&d);
-//     println!("prms: {:?}", p1);
-//     let result2 = parameterized(&problem, &p1);
-//     pprint_result(&result2.result);
+    let p1 = &activate_next(&d);
+    println!("prms: {:?}", p1);
+    let result2 = parameterized(&problem, &p1, 1200);
+    pprint_result(&result2);
     
 
-//     let p2 = &activate_next(&p1);
-//     println!("prms: {:?}", p2);
-//     let result3 = parameterized(&problem, &p2);
-//     pprint_result(&result3.result);
-// }
+    let p2 = &activate_next(&p1);
+    println!("prms: {:?}", p2);
+    let result3 = parameterized(&problem, &p2, 1200);
+    pprint_result(&result3);
+}

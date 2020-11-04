@@ -50,7 +50,6 @@ pub fn predicate_to_ast(ctx: &ContextZ3, pred: &Predicate, step: &u32) -> Z3_ast
             }
         },
         Predicate::EQ(x, y) => {
-            println!("ASDFASDFASDF");
             match x.r#type == y.r#type && x.value_type == y.value_type {
                 true => {
                     match x.value_type {

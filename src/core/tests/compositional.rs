@@ -22,23 +22,23 @@ fn test_deactivate_all() {
 
 #[test]
 fn test_generate_and_solve_first_case() {
-    let (problem, params) = models::dummy_robot::dummy_robot::parameterized_model();
-    let result = parameterized(&problem, &params);
+    let (problem, params) = models::dummy_robot::dummy_robot::param_model();
+    let result = parameterized(&problem, &params, 1200);
     let new_result = generate_and_solve(
         &Case::First, 
-        &CompleteState::empty(), 
+        &State::empty(), 
         &problem, 
         &result, 
         &params,
         &0, 
         &0
     );
-    pprint_result(&new_result.result)
+    pprint_result(&new_result)
 }
 
 #[test]
 fn test_compositional() {
-    let (problem, params) = models::dummy_robot::dummy_robot::parameterized_model();
-    let result = compositional(&problem, &params);
+    let (problem, params) = models::dummy_robot::dummy_robot::param_model();
+    let result = compositional(&problem, &params, 1200);
     pprint_result(&result)
 }

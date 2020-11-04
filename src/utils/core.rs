@@ -1,7 +1,7 @@
 use super::*;
+use std::str::FromStr;
 use z3_sys::*;
 use z3_v2::*;
-use std::str::FromStr;
 
 /// Given a predicate, return a vector of variables that play a role in it.
 pub fn get_predicate_vars(pred: &Predicate) -> Vec<Variable> {
@@ -70,54 +70,43 @@ pub fn get_problem_vars(prob: &PlanningProblem) -> Vec<Variable> {
     s
 }
 
-// /// Collect the state as a vector of predicates.
-// pub fn state_to_predicate_vector(state: &State) -> Vec<Predicate> {
-//     state
-//         .vec
-//         .iter()
-//         .map(|x| {
-//             Predicate::SET(EnumValue::new(
-//                 &EnumVariable::new(
-//                     &x.var.name,
-//                     &x.var.domain.iter().map(|x| x.as_str()).collect(),
-//                     &x.var.r#type,
-//                     Some(&x.var.param),
-//                     &x.var.kind,
-//                 ),
-//                 &x.val,
-//                 Some(&x.lifetime),
-//             ))
-//         })
-//         .collect::<Vec<Predicate>>()
-// }
+/// Collect the state as a vector of predicates.
+pub fn assignment_vector_to_predicate_vector(vec: &Vec<Assignment>) -> Vec<Predicate> {
+    vec.iter()
+        .map(|x| {
+            Predicate::ASS(Assignment::new(
+                &Variable::new(
+                    &x.var.name,
+                    &x.var.value_type,
+                    &x.var.domain.iter().map(|x| x.to_owned()).collect(),
+                    Some(&x.var.param),
+                    Some(&x.var.r#type),
+                    Some(&x.var.kind),
+                ),
+                &x.val,
+                Some(&x.lifetime),
+            ))
+        })
+        .collect::<Vec<Predicate>>()
+}
 
-// /// Generate a predicate from a given state as a conjunction of values.
-// pub fn state_to_predicate(state: &State) -> Predicate {
-//     Predicate::AND(state_to_predicate_vector(&state))
-// }
+/// Generate a predicate from a given state as a conjunction of assignments.
+pub fn state_to_predicate(state: &State) -> Predicate {
+    let mut pred = vec!();
+    for i in vec!(&state.measured, &state.command, &state.estimated) {
+        pred.extend(assignment_vector_to_predicate_vector(&i))
+    }
+    Predicate::AND(pred)
+}
 
-// /// Generate a parameterized predicate from a given state.
-// pub fn state_to_param_predicate(state: &State) -> ParamPredicate {
-//     ParamPredicate::new(&state_to_predicate_vector(&state))
-// }
-
-// /// Generate a predicate from a complete state as a conjunction of values.
-// pub fn complete_state_to_predicate(state: &CompleteState) -> Predicate {
-//     Predicate::AND(vec![
-//         state_to_predicate(&state.measured),
-//         state_to_predicate(&state.command),
-//         state_to_predicate(&state.estimated),
-//     ])
-// }
-
-// /// Generate a parameterized predicate from a complete state.
-// pub fn complete_state_to_param_predicate(state: &CompleteState) -> ParamPredicate {
-//     ParamPredicate::new(&vec![
-//         state_to_predicate(&state.measured),
-//         state_to_predicate(&state.command),
-//         state_to_predicate(&state.estimated),
-//     ])
-// }
+/// Generate a parameterized predicate from a given state.
+pub fn state_to_param_predicate(state: &State) -> ParamPredicate {
+    let mut pred = vec!();
+    for i in vec!(&state.measured, &state.command, &state.estimated) {
+        pred.extend(assignment_vector_to_predicate_vector(&i))
+    }
+    ParamPredicate::new(&pred)
+}
 
 /// After the incremental algorithm has found a model it is unrolled into a plan.
 pub fn get_planning_result(
@@ -145,8 +134,10 @@ pub fn get_planning_result(
             .map(|x| (x[0].trim_end_matches(&format!("_s{}", i)), x[1], i))
             .map(|x| (vars.iter().find(|y| y.name == x.0).unwrap(), x.1))
             .map(|x| match x.0.value_type {
-                SPValueType::Bool => Assignment::new(&x.0, &bool::from_str(x.1).unwrap().to_spvalue(), None),
-                SPValueType::String => Assignment::new(&x.0, &String::from(x.1).to_spvalue(), None)
+                SPValueType::Bool => {
+                    Assignment::new(&x.0, &bool::from_str(x.1).unwrap().to_spvalue(), None)
+                }
+                SPValueType::String => Assignment::new(&x.0, &String::from(x.1).to_spvalue(), None),
             })
             .collect();
 
@@ -156,8 +147,10 @@ pub fn get_planning_result(
             .map(|x| (x[0].trim_end_matches(&format!("_s{}", i + 1)), x[1], i + 1))
             .map(|x| (vars.iter().find(|y| y.name == x.0).unwrap(), x.1))
             .map(|x| match x.0.value_type {
-                SPValueType::Bool => Assignment::new(&x.0, &bool::from_str(x.1).unwrap().to_spvalue(), None),
-                SPValueType::String => Assignment::new(&x.0, &String::from(x.1).to_spvalue(), None)
+                SPValueType::Bool => {
+                    Assignment::new(&x.0, &bool::from_str(x.1).unwrap().to_spvalue(), None)
+                }
+                SPValueType::String => Assignment::new(&x.0, &String::from(x.1).to_spvalue(), None),
             })
             .collect();
 
@@ -202,20 +195,20 @@ pub fn get_planning_result(
             .map(|z| z.0)
             .unwrap_or_default();
 
-        let mut source = vec!();
-        for i in vec!(measured_source, command_source, estimated_source) {
+        let mut source = vec![];
+        for i in vec![measured_source, command_source, estimated_source] {
             source.extend(i)
         }
 
-        let mut sink = vec!();
-        for i in vec!(measured_sink, command_sink, estimated_sink) {
+        let mut sink = vec![];
+        for i in vec![measured_sink, command_sink, estimated_sink] {
             sink.extend(i)
         }
 
         trace.push(PlanningFrame {
             source: State::from_vec(&source),
             trans: String::from(trans),
-            sink: State::from_vec(&sink)
+            sink: State::from_vec(&sink),
         });
     }
     match plan_found {
