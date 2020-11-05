@@ -83,12 +83,18 @@ fn test_compositional() {
 
     let g_param = Parameter::new("g", &false);
     let r_param = Parameter::new("r", &false);
-    let b_param = Parameter::new("b", &false); 
+    let b_param = Parameter::new("b", &false);
+    let b1 = Parameter::new("ball1", &false);
+    let b2 = Parameter::new("ball2", &false);
+    let b3 = Parameter::new("ball3", &false);
+    let b4 = Parameter::new("ball4", &false);
 
+    // let gripper_params = vec![b1, b2, b3, b4, g_param, r_param];
     let gripper_params = vec![g_param, b_param, r_param];
 
     // let (problem, _params) = models::dummy_robot::dummy_robot::param_model();
-    let (problem, _params) = models::gripper::parser::parser_model_enumerated_booleans("instance-2");
+    let problem = models::gripper::parser::parser_model_pure_booleans("instance-2");
+    // let problem = models::gripper::parser::parser_model_pure_booleans_2("instance-1");
     // let result = compositional(&problem, &dummy_params); //, 1200);
     let result = compositional(&problem, &gripper_params); //, 1200);
     pprint_result_trans_only(&result)
