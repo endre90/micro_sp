@@ -21,24 +21,75 @@ fn test_deactivate_all() {
 }
 
 #[test]
-fn test_generate_and_solve_first_case() {
+fn test_generate_solve_and_concatenate() {
     let (problem, params) = models::dummy_robot::dummy_robot::param_model();
     let result = parameterized(&problem, &params, 1200);
-    let new_result = generate_and_solve(
+    println!("FIRST CASE");
+    let first_case = generate_and_solve(
         &Case::First, 
         &State::empty(), 
         &problem, 
         &result, 
         &params,
         &0, 
-        &0
+        &0, 
+        1200
     );
-    pprint_result(&new_result)
+    println!("CENTRAL CASE 1");
+    let central_1 = generate_and_solve(
+        &Case::Central, 
+        &first_case.trace[0].sink, 
+        &problem, 
+        &result, 
+        &params,
+        &0, 
+        &1,
+        1200
+    );
+    println!("CENTRAL CASE 2");
+    let central_2 = generate_and_solve(
+        &Case::Central, 
+        &central_1.trace[0].sink, 
+        &problem, 
+        &result, 
+        &params,
+        &0, 
+        &2,
+        1200
+    );
+    println!("LAST CASE");
+    let last_case = generate_and_solve(
+        &Case::Last, 
+        &central_2.trace[0].sink, 
+        &problem, 
+        &result, 
+        &params,
+        &0, 
+        &2,
+        1200
+    );
+
+    let conc = concatenate(&vec!(first_case, central_1, central_2, last_case));
+    println!("CONCATENATED");
+    pprint_result(&conc)
 }
 
 #[test]
 fn test_compositional() {
-    let (problem, params) = models::dummy_robot::dummy_robot::param_model();
-    let result = compositional(&problem, &params, 1200);
-    pprint_result(&result)
+    
+    let p1 = Parameter::new("p1", &false);
+    let p2 = Parameter::new("p2", &false);
+    let dummy_params = vec!(p2, p1);
+
+    let g_param = Parameter::new("g", &false);
+    let r_param = Parameter::new("r", &false);
+    let b_param = Parameter::new("b", &false); 
+
+    let gripper_params = vec![g_param, b_param, r_param];
+
+    // let (problem, _params) = models::dummy_robot::dummy_robot::param_model();
+    let (problem, _params) = models::gripper::parser::parser_model_enumerated_booleans("instance-2");
+    // let result = compositional(&problem, &dummy_params); //, 1200);
+    let result = compositional(&problem, &gripper_params); //, 1200);
+    pprint_result_trans_only(&result)
 }

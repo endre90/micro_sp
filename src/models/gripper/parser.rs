@@ -28,13 +28,19 @@ fn test_parser_model_enumerated_booleans() {
     let b_param = Parameter::new("b", &true);
     let none = Parameter::new("NONE", &true); 
 
-    let params = vec![g_param, r_param, b_param, none];
+    let params = vec![b_param, r_param, g_param, none];
 
-    let result = parameterized(&model, &params, 1200);
+    let result = parameterized(&model.0, &params, 1200);
     pprint_result_trans_only(&result)
 }
 
-pub fn parser_model_enumerated_booleans(name: &str) -> ParamPlanningProblem {
+pub fn parser_model_enumerated_booleans(name: &str) -> (ParamPlanningProblem, Vec<Parameter>) {
+    let g_param = Parameter::new("g", &true);
+    let r_param = Parameter::new("r", &false);
+    let b_param = Parameter::new("b", &true);
+    // let none = Parameter::new("NONE", &true); 
+
+    let params = vec![b_param, g_param, r_param];
     let mut domain = File::open(&format!("src/models/gripper/instances/domain.pddl")).unwrap();
     let mut instance = File::open(&format!("src/models/gripper/instances/{}.pddl", name)).unwrap();
     let mut i_buffer = String::new();
@@ -182,7 +188,7 @@ pub fn parser_model_enumerated_booleans(name: &str) -> ParamPlanningProblem {
 
     let problem = ParamPlanningProblem::new("gripper", &init, &goal, &model.0, &model.1, &20);
 
-    problem
+    (problem, params)
 }
 
 pub fn parser_model_pure_booleans(name: &str) -> ParamPlanningProblem {

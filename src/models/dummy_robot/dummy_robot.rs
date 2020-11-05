@@ -172,25 +172,25 @@ pub fn param_model() -> (ParamPlanningProblem, Vec<Parameter>) {
         "act_pos",
         vec!("left", "right", "unknown", "dummy_value"),
         "pos",
-        "p1"
+        "p2"
     );
     let act_stat = enum_m!(
         "act_stat",
         vec!("idle", "active", "unknown", "dummy_value"),
         "stat",
-        "p2"
+        "p1"
     );
     let ref_pos = enum_c!(
         "ref_pos",
         vec!("left", "right", "unknown", "dummy_value"),
         "pos",
-        "p1"
+        "p2"
     );
     let ref_stat = enum_c!(
         "ref_stat",
         vec!("idle", "active", "unknown", "dummy_value"),
         "stat",
-        "p2"
+        "p1"
     );
 
     let p1 = Parameter::new("p1", &true);
@@ -223,61 +223,132 @@ pub fn param_model() -> (ParamPlanningProblem, Vec<Parameter>) {
 
     let t1 = ParamTransition::new(
         "start_activate",
-        &ParamPredicate::new(&vec![
-            not_act_active.clone(),
-            not_ref_active.clone(),
-            not_any_measured_dummy.clone(),
-            Predicate::EQ(act_pos.clone(), ref_pos.clone()),
-        ]),
-        &ParamPredicate::new(&vec![not_act_active.clone(), ref_active.clone()]),
+        &ParamPredicate::new(
+            &vec!(
+                not_act_active.clone(),
+                not_ref_active.clone()
+            )
+        ),
+        &ParamPredicate::new(
+            &vec!(
+                ref_active.clone()
+            )
+        )
     );
-        
+
+    // let t1 = ParamTransition::new(
+    //     "start_activate",
+    //     &ParamPredicate::new(&vec![
+    //         not_act_active.clone(),
+    //         not_ref_active.clone(),
+    //         not_any_measured_dummy.clone(),
+    //         Predicate::EQ(act_pos.clone(), ref_pos.clone()),
+    //     ]),
+    //     &ParamPredicate::new(&vec![not_act_active.clone(), ref_active.clone()]),
+    // );
+
     let t2 = ParamTransition::new(
         "finish_activate",
-        &ParamPredicate::new(&vec![
-            not_act_active.clone(),
-            ref_active.clone(),
-            not_any_measured_dummy.clone(),
-            Predicate::EQ(act_pos.clone(), ref_pos.clone()),
-        ]),
-        &ParamPredicate::new(&vec![act_active.clone(), ref_active.clone()]),
+        &ParamPredicate::new(
+            &vec!(
+                not_act_active.clone(),
+                ref_active.clone()
+            )
+        ),
+        &ParamPredicate::new(
+            &vec!(
+                act_active.clone()
+            )
+        )
     );
+        
+    // let t2 = ParamTransition::new(
+    //     "finish_activate",
+    //     &ParamPredicate::new(&vec![
+    //         not_act_active.clone(),
+    //         ref_active.clone(),
+    //         not_any_measured_dummy.clone(),
+    //         Predicate::EQ(act_pos.clone(), ref_pos.clone()),
+    //     ]),
+    //     &ParamPredicate::new(&vec![act_active.clone(), ref_active.clone()]),
+    // );
         
     let t3 = ParamTransition::new(
         "start_deactivate",
-        &ParamPredicate::new(&vec![
-            not_act_idle.clone(),
-            not_ref_idle.clone(),
-            not_any_measured_dummy.clone(),
-            Predicate::EQ(act_pos.clone(), ref_pos.clone()),
-        ]),
-        &ParamPredicate::new(&vec![ref_idle.clone(), ref_idle.clone()]),
+        &ParamPredicate::new(
+            &vec!(
+                not_act_idle.clone(),
+                not_ref_idle.clone()
+            )
+        ),
+        &ParamPredicate::new(
+            &vec!(
+                ref_idle.clone()
+            )
+        )
     );
-        
+
+    // let t3 = ParamTransition::new(
+    //     "start_deactivate",
+    //     &ParamPredicate::new(&vec![
+    //         not_act_idle.clone(),
+    //         not_ref_idle.clone(),
+    //         not_any_measured_dummy.clone(),
+    //         Predicate::EQ(act_pos.clone(), ref_pos.clone()),
+    //     ]),
+    //     &ParamPredicate::new(&vec![ref_idle.clone(), ref_idle.clone()]),
+    // );
+
     let t4 = ParamTransition::new(
         "finish_deactivate",
-        &ParamPredicate::new(&vec![
-            not_act_active.clone(),
-            ref_idle.clone(),
-            not_any_measured_dummy.clone(),
-            Predicate::EQ(act_pos.clone(), ref_pos.clone()),
-        ]),
-        &ParamPredicate::new(&vec![act_idle.clone(), ref_idle.clone()]),
+        &ParamPredicate::new(
+            &vec!(
+                not_act_idle.clone(),
+                ref_idle.clone()
+            )
+        ),
+        &ParamPredicate::new(
+            &vec!(
+                act_idle.clone()
+            )
+        )
     );
         
+    // let t4 = ParamTransition::new(
+    //     "finish_deactivate",
+    //     &ParamPredicate::new(&vec![
+    //         not_act_active.clone(),
+    //         ref_idle.clone(),
+    //         not_any_measured_dummy.clone(),
+    //         Predicate::EQ(act_pos.clone(), ref_pos.clone()),
+    //     ]),
+    //     &ParamPredicate::new(&vec![act_idle.clone(), ref_idle.clone()]),
+    // );
+
     let t5 = ParamTransition::new(
         "start_move_left",
         &ParamPredicate::new(&vec![
             not_act_left.clone(),
             not_ref_left.clone(),
             act_active.clone(),
-            ref_active.clone(),
-            Predicate::EQ(act_stat.clone(), ref_stat.clone()),
-            not_any_measured_dummy.clone(),
+            ref_active.clone()
         ]),
-        &ParamPredicate::new(&vec![ref_left.clone(), not_act_left.clone()]),
+        &ParamPredicate::new(&vec![ref_left.clone()]),
     );
         
+    // let t5 = ParamTransition::new(
+    //     "start_move_left",
+    //     &ParamPredicate::new(&vec![
+    //         not_act_left.clone(),
+    //         not_ref_left.clone(),
+    //         act_active.clone(),
+    //         ref_active.clone(),
+    //         Predicate::EQ(act_stat.clone(), ref_stat.clone()),
+    //         not_any_measured_dummy.clone(),
+    //     ]),
+    //     &ParamPredicate::new(&vec![ref_left.clone(), not_act_left.clone()]),
+    // );
+
     let t6 = ParamTransition::new(
         "finish_move_left",
         &ParamPredicate::new(&vec![
@@ -285,12 +356,23 @@ pub fn param_model() -> (ParamPlanningProblem, Vec<Parameter>) {
             ref_left.clone(),
             act_active.clone(),
             ref_active.clone(),
-            Predicate::EQ(act_stat.clone(), ref_stat.clone()),
-            not_any_measured_dummy.clone(),
         ]),
-        &ParamPredicate::new(&vec![act_left.clone(), ref_left.clone()]),
+        &ParamPredicate::new(&vec![act_left.clone()]),
     );
         
+    // let t6 = ParamTransition::new(
+    //     "finish_move_left",
+    //     &ParamPredicate::new(&vec![
+    //         not_act_left.clone(),
+    //         ref_left.clone(),
+    //         act_active.clone(),
+    //         ref_active.clone(),
+    //         Predicate::EQ(act_stat.clone(), ref_stat.clone()),
+    //         not_any_measured_dummy.clone(),
+    //     ]),
+    //     &ParamPredicate::new(&vec![act_left.clone(), ref_left.clone()]),
+    // );
+
     let t7 = ParamTransition::new(
         "start_move_right",
         &ParamPredicate::new(&vec![
@@ -298,12 +380,23 @@ pub fn param_model() -> (ParamPlanningProblem, Vec<Parameter>) {
             not_ref_right.clone(),
             act_active.clone(),
             ref_active.clone(),
-            Predicate::EQ(act_stat.clone(), ref_stat.clone()),
-            not_any_measured_dummy.clone(),
         ]),
-        &ParamPredicate::new(&vec![ref_right.clone(), not_act_right.clone()]),
+        &ParamPredicate::new(&vec![ref_right.clone()]),
     );
         
+    // let t7 = ParamTransition::new(
+    //     "start_move_right",
+    //     &ParamPredicate::new(&vec![
+    //         not_act_right.clone(),
+    //         not_ref_right.clone(),
+    //         act_active.clone(),
+    //         ref_active.clone(),
+    //         Predicate::EQ(act_stat.clone(), ref_stat.clone()),
+    //         not_any_measured_dummy.clone(),
+    //     ]),
+    //     &ParamPredicate::new(&vec![ref_right.clone(), not_act_right.clone()]),
+    // );
+
     let t8 = ParamTransition::new(
         "finish_move_right",
         &ParamPredicate::new(&vec![
@@ -311,17 +404,28 @@ pub fn param_model() -> (ParamPlanningProblem, Vec<Parameter>) {
             ref_right.clone(),
             act_active.clone(),
             ref_active.clone(),
-            Predicate::EQ(act_stat.clone(), ref_stat.clone()),
-            not_any_measured_dummy.clone(),
         ]),
-        &ParamPredicate::new(&vec![act_right.clone(), ref_right.clone()]),
+        &ParamPredicate::new(&vec![act_right.clone()]),
     );
+        
+    // let t8 = ParamTransition::new(
+    //     "finish_move_right",
+    //     &ParamPredicate::new(&vec![
+    //         not_act_right.clone(),
+    //         ref_right.clone(),
+    //         act_active.clone(),
+    //         ref_active.clone(),
+    //         Predicate::EQ(act_stat.clone(), ref_stat.clone()),
+    //         not_any_measured_dummy.clone(),
+    //     ]),
+    //     &ParamPredicate::new(&vec![act_right.clone(), ref_right.clone()]),
+    // );
         
     let problem = ParamPlanningProblem::new(
         "prob1",
         &ParamPredicate::new(&vec![
-            not_act_active.clone(),
-            not_ref_active.clone(),
+            act_idle.clone(),
+            ref_idle.clone(),
             act_left.clone(),
             ref_left.clone(),
         ]),
@@ -335,5 +439,5 @@ pub fn param_model() -> (ParamPlanningProblem, Vec<Parameter>) {
         &ParamPredicate::new(&vec!(Predicate::TRUE)),
         &12
     );
-    (problem, vec!(p1, p2))   
+    (problem, vec!(p2, p1))   
 }
