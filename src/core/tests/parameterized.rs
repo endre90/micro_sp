@@ -51,22 +51,22 @@ fn test_generate_predicate() {
 
 #[test]
 fn test_parameterized() {
-    let (problem, params) = models::dummy_robot::dummy_robot::param_model();
+    let problem = models::dummy_robot::model::model("instance_1");
 
-    let d = deactivate_all(&params);
+    let d = deactivate_all(&problem.params);
     println!("prms: {:?}", d);
-    let result1 = parameterized(&problem, &d, 1200);
+    let result1 = parameterized(&problem, &d, 1200, 30);
     pprint_result(&result1);
     
 
     let p1 = &activate_next(&d);
     println!("prms: {:?}", p1);
-    let result2 = parameterized(&problem, &p1, 1200);
+    let result2 = parameterized(&problem, &p1, 1200, 30);
     pprint_result(&result2);
     
 
     let p2 = &activate_next(&p1);
     println!("prms: {:?}", p2);
-    let result3 = parameterized(&problem, &p2, 1200);
+    let result3 = parameterized(&problem, &p2, 1200, 30);
     pprint_result(&result3);
 }

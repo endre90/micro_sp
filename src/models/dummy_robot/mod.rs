@@ -1,3 +1,4 @@
 use super::*;
 
-pub mod dummy_robot;
+pub mod model;
+pub mod instances;

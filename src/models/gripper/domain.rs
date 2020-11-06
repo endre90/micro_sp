@@ -375,11 +375,11 @@ pub fn gripper_model_pure_enumeration(
                         &ppred!(
                             &pass!(&new_enum_assign_c!(&format!("ball_{}_at", ball), &ball_pos_domain, room, "balls", "b")),
                             &pass!(&new_enum_assign_c!("robot_at", &robot_pos_domain, room, "rooms", "r")),
-                            &pass!(&new_enum_assign_c!("gripper", &gripper_domain, "e", "grippers", "g"))
+                            &pass!(&new_enum_assign_c!(&format!("gripper_{}", gripper), &gripper_domain, "e", "grippers", "g"))
                         ),
                         &ppred!(
                             &pass!(&new_enum_assign_c!(&format!("ball_{}_at", ball), &ball_pos_domain, gripper, "balls", "b")),
-                            &pass!(&new_enum_assign_c!("gripper", &gripper_domain, "f", "grippers", "g"))
+                            &pass!(&new_enum_assign_c!(&format!("gripper_{}", gripper), &gripper_domain, "f", "grippers", "g"))
                         )
                     )
                 )
@@ -396,11 +396,11 @@ pub fn gripper_model_pure_enumeration(
                         &ppred!(
                             &pass!(&new_enum_assign_c!(&format!("ball_{}_at", ball), &ball_pos_domain, gripper, "balls", "b")),
                             &pass!(&new_enum_assign_c!("robot_at", &robot_pos_domain, room, "rooms", "r")),
-                            &pass!(&new_enum_assign_c!("gripper", &gripper_domain, "f", "grippers", "g"))
+                            &pass!(&new_enum_assign_c!(&format!("gripper_{}", gripper), &gripper_domain, "f", "grippers", "g"))
                         ),
                         &ppred!(
                             &pass!(&new_enum_assign_c!(&format!("ball_{}_at", ball), &ball_pos_domain, room, "balls", "b")),
-                            &pass!(&new_enum_assign_c!("gripper", &gripper_domain, "e", "grippers", "g"))
+                            &pass!(&new_enum_assign_c!(&format!("gripper_{}", gripper), &gripper_domain, "e", "grippers", "g"))
                         )
                     )
                 )
@@ -415,52 +415,4 @@ pub fn gripper_model_pure_enumeration(
 
     // (transitions, Predicate::AND(invariants))
     transitions
-}
-
-#[test]
-fn test_gripper() {
-    let g_param = Parameter::new("g", &false);
-    let r_param = Parameter::new("r", &false);
-    let b_param = Parameter::new("b", &false);
-
-    let ball_pos_domain = vec!("rooma", "roomb", "left", "right");
-    let robot_pos_domain = vec!("rooma", "roomb");
-
-    // let b1 = Parameter::new("ball1", &false);
-    // let b2 = Parameter::new("ball2", &false);
-    // let b3 = Parameter::new("ball3", &false);
-    // let b4 = Parameter::new("ball4", &false);
-
-    // let gripper_params = vec![b1, b2, b3, b4, g_param, r_param];
-    let gripper_params = vec![g_param, b_param, r_param];
-    let mut init_pred = vec!();
-    let mut goal_pred = vec!();
-    let balls = vec!["ball1", "ball2", "ball3", "ball4", "ball5", "ball6", "ball7", "ball8"];
-    for b in &balls {
-        init_pred.push(
-            pass!(&new_enum_assign_c!(&format!("ball_{}_at", b), &ball_pos_domain, "rooma", "balls", "b"))
-        );
-        goal_pred.push(
-            pass!(&new_enum_assign_c!(&format!("ball_{}_at", b), &ball_pos_domain, "roomb", "balls", "b"))
-        );
-    }
-
-    let problem = ParamPlanningProblem::new(
-        "prob1", 
-        &ParamPredicate::new(
-            &vec!(
-                Predicate::AND(init_pred)
-            )
-        ), 
-        &ParamPredicate::new(
-            &vec!(
-                Predicate::AND(goal_pred)
-            )
-        ),
-        &gripper_model_pure_enumeration(&balls),
-        &ParamPredicate::new(&vec!(Predicate::TRUE)),
-        &50);
-
-    let result = compositional(&problem, &gripper_params); //, 1200);
-    pprint_result_trans_only(&result)
 }

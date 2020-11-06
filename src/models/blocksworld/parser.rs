@@ -140,8 +140,7 @@ pub fn parser(name: &str) -> PlanningProblem {
         &initial,
         &goal,
         &model.0,
-        &model.1,
-        &50,
+        &model.1
     );
 
     problem
@@ -150,6 +149,6 @@ pub fn parser(name: &str) -> PlanningProblem {
 
 #[test]
 fn test_parser() {
-    let result = incremental(&parser("probBLOCKS-7-0"), 1200);
+    let result = incremental(&parser("probBLOCKS-7-0"), 1200, 50);
     pprint_result_trans_only(&result)
 }

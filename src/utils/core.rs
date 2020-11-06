@@ -113,7 +113,7 @@ pub fn get_planning_result(
     ctx: &ContextZ3,
     prob: &PlanningProblem,
     model: Z3_model,
-    nr_steps: u32,
+    nr_steps: u64,
     planning_time: std::time::Duration,
     plan_found: bool,
 ) -> PlanningResult {

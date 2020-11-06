@@ -20,7 +20,7 @@ pub enum Predicate {
 }
 
 /// Transforms a Predicate to an object that z3 can handle.
-pub fn predicate_to_ast(ctx: &ContextZ3, pred: &Predicate, step: &u32) -> Z3_ast {
+pub fn predicate_to_ast(ctx: &ContextZ3, pred: &Predicate, step: u64) -> Z3_ast {
     match pred {
         Predicate::TRUE => BoolZ3::new(&ctx, true),
         Predicate::FALSE => BoolZ3::new(&ctx, false),

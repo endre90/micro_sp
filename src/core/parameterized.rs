@@ -55,7 +55,7 @@ pub struct ParamPlanningProblem {
     pub goal: ParamPredicate,
     pub trans: Vec<ParamTransition>,
     pub invars: ParamPredicate,
-    pub max_steps: u32
+    pub params: Vec<Parameter>
 }
 
 impl ParamPlanningProblem {
@@ -65,7 +65,7 @@ impl ParamPlanningProblem {
         goal: &ParamPredicate,
         trans: &Vec<ParamTransition>,
         invars: &ParamPredicate,
-        max_steps: &u32
+        params: &Vec<Parameter>
     ) -> ParamPlanningProblem {
         ParamPlanningProblem {
             name: name.to_string(),
@@ -73,20 +73,10 @@ impl ParamPlanningProblem {
             goal: goal.to_owned(),
             trans: trans.to_owned(),
             invars: invars.to_owned(),
-            max_steps: max_steps.to_owned()
+            params: params.to_owned()
         }
     }
 }
-
-// /// An extention on the orogonal PlanningResult that allows tracking
-// /// of where the problem is in the composition. Level tracks the depth
-// /// and concat tracks the step in the current level.
-// #[derive(Debug, PartialEq, Clone, PartialOrd, Eq, Ord)]
-// pub struct ParamPlanningResult {
-//     pub result: PlanningResult,
-//     // pub level: u32,
-//     // pub concat: u32,
-// }
 
 /// Given a parameterized predicate and the vector of activation parameters,
 /// generate a predicate as a conjunction of predicates that are activated.
@@ -125,7 +115,8 @@ pub fn generate_transition(ptrans: &ParamTransition, params: &Vec<Parameter>) ->
 pub fn parameterized(
     prob: &ParamPlanningProblem,
     params: &Vec<Parameter>,
-    timeout: u64
+    timeout: u64,
+    max_steps: u64
 ) -> PlanningResult {
         incremental(&PlanningProblem::new(
             &prob.name,
@@ -136,9 +127,9 @@ pub fn parameterized(
                 .iter()
                 .map(|x| generate_transition(x, &params))
                 .collect(),
-            &generate_predicate(&prob.invars, &params),
-            &prob.max_steps,
+            &generate_predicate(&prob.invars, &params)
         ),
-        timeout
+        timeout,
+        max_steps
     )
 }

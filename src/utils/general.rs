@@ -7,6 +7,9 @@ pub struct ArgsCLI {
     /// Online planning and acting
     #[structopt(long, short = "r", parse(try_from_str), default_value = "false")]
     pub run: bool,
+    // Compositional planning algorithm
+    #[structopt(long, short = "c", parse(try_from_str), default_value = "false")]
+    pub comp: bool,
     /// Generate dummy driver (inverse micro_sp)
     #[structopt(long, short = "d", parse(try_from_str), default_value = "false")]
     pub dummy: bool,
@@ -21,27 +24,29 @@ pub struct ArgsCLI {
     pub instance: String,
 }
 
-// pub struct Args {
-//     pub run: bool,
-//     pub print: bool,
-//     pub dummy: bool,
-//     pub problem: PlanningProblem,
-// }
+pub struct Args {
+    pub run: bool,
+    pub print: bool,
+    pub comp: bool,
+    pub dummy: bool,
+    pub problem: ParamPlanningProblem,
+}
 
-// pub fn handle_args() -> Args {
-//     let args = ArgsCLI::from_args();
-//     Args {
-//         run: args.run,
-//         print: args.print,
-//         dummy: args.dummy,
-//         problem: match args.model.as_str() {
-//             "dummy_robot" => models::dummy_robot::dummy_robot::raar_model(),
-//             "blocksworld" => blocksworld::parser::parser(args.instance.as_str()),
-//             // "gripper" => gripper::parser::parser(args.instance.as_str()),
-//             _ => panic!("unknown problem")
-//         },
-//     }
-// }
+pub fn handle_args() -> Args {
+    let args = ArgsCLI::from_args();
+    Args {
+        run: args.run,
+        print: args.print,
+        comp: args.comp,
+        dummy: args.dummy,
+        problem: match args.model.as_str() {
+            "dummy_robot" => dummy_robot::model::model(args.instance.as_str()),
+            // "blocksworld" => blocksworld::parser::parser(args.instance.as_str()),
+            //"gripper" => gripper::parser::parser(args.instance.as_str()),
+            _ => panic!("unknown problem")
+        },
+    }
+}
 
 pub trait IterOps<T, I>: IntoIterator<Item = T>
 where

@@ -71,12 +71,12 @@ fn test_keep_variable_values() {
             enum_c!("peach", vec!("green", "ripe", "spoiled"), "fruit", "p1"),
         ],
         &ripen("banana"),
-        &5,
+        5,
     );
     assert_eq!("(and (= peach_s5 peach_s4))", ast_to_string_z3!(&ctx, keep));
 }
 
-#[test]
-fn test_incremental() {
-    pprint_result(&incremental(&models::dummy_robot::dummy_robot::model(), 1200));
-} 
+// #[test]
+// fn test_incremental() {
+//     pprint_result(&incremental(&models::dummy_robot::model::model("instance_1"), 1200, 30));
+// } 

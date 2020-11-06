@@ -42,15 +42,14 @@ pub struct PlanningProblem {
     pub init: Predicate,
     pub goal: Predicate,
     pub trans: Vec<Transition>,
-    pub invars: Predicate,
-    pub max_steps: u32,
+    pub invars: Predicate
 }
 
 /// A result is generated when the planner finds a satisfiable model.
 #[derive(PartialEq, Eq, Clone, Debug, PartialOrd, Ord)]
 pub struct PlanningResult {
     pub plan_found: bool,
-    pub plan_length: u32,
+    pub plan_length: u64,
     pub trace: Vec<PlanningFrame>,
     pub time_to_solve: std::time::Duration,
 }
@@ -62,16 +61,14 @@ impl PlanningProblem {
         init: &Predicate,
         goal: &Predicate,
         trans: &Vec<Transition>,
-        invars: &Predicate,
-        max_steps: &u32,
+        invars: &Predicate
     ) -> PlanningProblem {
         PlanningProblem {
             name: name.to_string(),
             init: init.to_owned(),
             goal: goal.to_owned(),
             trans: trans.to_owned(),
-            invars: invars.to_owned(),
-            max_steps: max_steps.to_owned(),
+            invars: invars.to_owned()
         }
     }
 }
@@ -82,7 +79,7 @@ pub fn keep_variable_values(
     ctx: &ContextZ3,
     vars: &Vec<Variable>,
     trans: &Transition,
-    step: &u32,
+    step: u64,
 ) -> Z3_ast {
     let changed = get_predicate_vars(&trans.update);
     let unchanged = IterOps::difference(vars, &changed);
@@ -144,22 +141,22 @@ pub fn keep_variable_values(
 /// The incremental algorithm that calls z3 to find a plan.
 ///
 /// Based on Gocht and Balyo's algorithm from 2017.
-pub fn incremental(prob: &PlanningProblem, timeout: u64) -> PlanningResult {
+pub fn incremental(prob: &PlanningProblem, timeout: u64, max_steps: u64) -> PlanningResult {
     let cfg = ConfigZ3::new();
     let ctx = ContextZ3::new(&cfg);
     let slv = SolverZ3::new(&ctx);
 
-    SlvAssertZ3::new(&ctx, &slv, predicate_to_ast(&ctx, &prob.init, &0));
-    SlvAssertZ3::new(&ctx, &slv, predicate_to_ast(&ctx, &prob.invars, &0));
+    SlvAssertZ3::new(&ctx, &slv, predicate_to_ast(&ctx, &prob.init, 0));
+    SlvAssertZ3::new(&ctx, &slv, predicate_to_ast(&ctx, &prob.invars, 0));
 
     SlvPushZ3::new(&ctx, &slv); // create backtracking point
-    SlvAssertZ3::new(&ctx, &slv, predicate_to_ast(&ctx, &prob.goal, &0));
+    SlvAssertZ3::new(&ctx, &slv, predicate_to_ast(&ctx, &prob.goal, 0));
 
     let now = Instant::now();
     let mut plan_found: bool = false;
-    let mut step: u32 = 0;
+    let mut step: u64 = 0;
 
-    while now.elapsed() < Duration::from_secs(timeout) {
+    while now.elapsed() < Duration::from_secs(timeout) && step < max_steps {
         println!("elapsed: {:?}", now.elapsed());
         step = step + 1;
         match SlvCheckZ3::new(&ctx, &slv) == 1 {
@@ -185,13 +182,13 @@ pub fn incremental(prob: &PlanningProblem, timeout: u64) -> PlanningResult {
                                             ),
                                             BoolZ3::new(&ctx, true),
                                         ),
-                                        predicate_to_ast(&ctx, &x.guard, &(step - 1)),
-                                        predicate_to_ast(&ctx, &x.update, &(step)),
+                                        predicate_to_ast(&ctx, &x.guard, step - 1),
+                                        predicate_to_ast(&ctx, &x.update, step),
                                         keep_variable_values(
                                             &ctx,
                                             &get_problem_vars(&prob),
                                             &x,
-                                            &step,
+                                            step,
                                         ),
                                     ],
                                 )
@@ -200,9 +197,9 @@ pub fn incremental(prob: &PlanningProblem, timeout: u64) -> PlanningResult {
                     ),
                 );
 
-                SlvAssertZ3::new(&ctx, &slv, predicate_to_ast(&ctx, &prob.invars, &step));
+                SlvAssertZ3::new(&ctx, &slv, predicate_to_ast(&ctx, &prob.invars, step));
                 SlvPushZ3::new(&ctx, &slv);
-                SlvAssertZ3::new(&ctx, &slv, predicate_to_ast(&ctx, &prob.goal, &step));
+                SlvAssertZ3::new(&ctx, &slv, predicate_to_ast(&ctx, &prob.goal, step));
 
                 // let asserts = SlvGetAssertsZ3::new(&ctx, &slv);
                 // let asrtvec = Z3AstVectorToVectorAstZ3::new(&ctx, asserts);

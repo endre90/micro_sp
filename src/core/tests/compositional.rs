@@ -22,8 +22,11 @@ fn test_deactivate_all() {
 
 #[test]
 fn test_generate_solve_and_concatenate() {
-    let (problem, params) = models::dummy_robot::dummy_robot::param_model();
-    let result = parameterized(&problem, &params, 1200);
+    let problem = models::dummy_robot::model::model("instance_1");
+    let p1 = Parameter::new("p1", &true);
+    let p2 = Parameter::new("p2", &true);
+    let params = vec!(p1, p2);
+    let result = parameterized(&problem, &params, 1200, 30);
     println!("FIRST CASE");
     let first_case = generate_and_solve(
         &Case::First, 
@@ -31,9 +34,10 @@ fn test_generate_solve_and_concatenate() {
         &problem, 
         &result, 
         &params,
-        &0, 
-        &0, 
-        1200
+        0, 
+        0, 
+        1200,
+        30
     );
     println!("CENTRAL CASE 1");
     let central_1 = generate_and_solve(
@@ -42,9 +46,10 @@ fn test_generate_solve_and_concatenate() {
         &problem, 
         &result, 
         &params,
-        &0, 
-        &1,
-        1200
+        0, 
+        1,
+        1200,
+        30
     );
     println!("CENTRAL CASE 2");
     let central_2 = generate_and_solve(
@@ -53,9 +58,10 @@ fn test_generate_solve_and_concatenate() {
         &problem, 
         &result, 
         &params,
-        &0, 
-        &2,
-        1200
+        0, 
+        2,
+        1200,
+        30
     );
     println!("LAST CASE");
     let last_case = generate_and_solve(
@@ -64,9 +70,10 @@ fn test_generate_solve_and_concatenate() {
         &problem, 
         &result, 
         &params,
-        &0, 
-        &2,
-        1200
+        0, 
+        2,
+        1200,
+        30
     );
 
     let conc = concatenate(&vec!(first_case, central_1, central_2, last_case));
@@ -74,28 +81,28 @@ fn test_generate_solve_and_concatenate() {
     pprint_result(&conc)
 }
 
-#[test]
-fn test_compositional() {
+// #[test]
+// fn test_compositional_() {
     
-    let p1 = Parameter::new("p1", &false);
-    let p2 = Parameter::new("p2", &false);
-    let dummy_params = vec!(p2, p1);
+//     let p1 = Parameter::new("p1", &false);
+//     let p2 = Parameter::new("p2", &false);
+//     let dummy_params = vec!(p2, p1);
 
-    let g_param = Parameter::new("g", &false);
-    let r_param = Parameter::new("r", &false);
-    let b_param = Parameter::new("b", &false);
-    let b1 = Parameter::new("ball1", &false);
-    let b2 = Parameter::new("ball2", &false);
-    let b3 = Parameter::new("ball3", &false);
-    let b4 = Parameter::new("ball4", &false);
+//     let g_param = Parameter::new("g", &false);
+//     let r_param = Parameter::new("r", &false);
+//     let b_param = Parameter::new("b", &false);
+//     let b1 = Parameter::new("ball1", &false);
+//     let b2 = Parameter::new("ball2", &false);
+//     let b3 = Parameter::new("ball3", &false);
+//     let b4 = Parameter::new("ball4", &false);
 
-    // let gripper_params = vec![b1, b2, b3, b4, g_param, r_param];
-    let gripper_params = vec![g_param, b_param, r_param];
+//     // let gripper_params = vec![b1, b2, b3, b4, g_param, r_param];
+//     let gripper_params = vec![g_param, b_param, r_param];
 
-    // let (problem, _params) = models::dummy_robot::dummy_robot::param_model();
-    let problem = models::gripper::parser::parser_model_pure_booleans("instance-2");
-    // let problem = models::gripper::parser::parser_model_pure_booleans_2("instance-1");
-    // let result = compositional(&problem, &dummy_params); //, 1200);
-    let result = compositional(&problem, &gripper_params); //, 1200);
-    pprint_result_trans_only(&result)
-}
+//     // let (problem, _params) = models::dummy_robot::dummy_robot::param_model();
+//     let problem = models::gripper::parser::parser_model_pure_booleans("instance-2");
+//     // let problem = models::gripper::parser::parser_model_pure_booleans_2("instance-1");
+//     // let result = compositional(&problem, &dummy_params); //, 1200);
+//     let result = compositional(&problem, &gripper_params, 1200, 30); //, 1200);
+//     pprint_result_trans_only(&result)
+// }
