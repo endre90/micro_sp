@@ -7,26 +7,26 @@ use r2r::*;
 #[tokio::main]
 async fn main() -> io::Result<()> {
 
-    // let timeout = 1200;
-    // let max_steps = 50;
+    let timeout = 1200;
+    let max_steps = 50;
 
-    // let ha = handle_args();
-    // match ha.comp {
-    //     true => {
-    //         let result = compositional(&ha.problem, timeout, max_steps);
-    //         match ha.print {
-    //             true => pprint_result(&result),
-    //             false => pprint_result_trans_only(&result)
-    //         }
-    //     },
-    //     false => {
-    //         let result = parameterized(&activate_all_in_problem(&ha.problem), timeout, max_steps);
-    //         match ha.print {
-    //             true => pprint_result(&result),
-    //             false => pprint_result_trans_only(&result)
-    //         }
-    //     }
-    // }
+    let ha = handle_args();
+    match ha.comp {
+        true => {
+            let result = compositional(&ha.problem, timeout, max_steps);
+            match ha.print {
+                true => pprint_result(&result),
+                false => pprint_result_trans_only(&result)
+            }
+        },
+        false => {
+            let result = parameterized(&activate_all_in_problem(&ha.problem), timeout, max_steps);
+            match ha.print {
+                true => pprint_result(&result),
+                false => pprint_result_trans_only(&result)
+            }
+        }
+    }
     Ok(())
 }
 
