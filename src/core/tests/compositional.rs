@@ -20,66 +20,66 @@ fn test_deactivate_all() {
         "[Parameter { name: \"A\", value: false }, Parameter { name: \"B\", value: false }, Parameter { name: \"C\", value: false }]");
 }
 
-#[test]
-fn test_generate_solve_and_concatenate() {
-    let problem = models::dummy_robot::model::model("instance_1");
-    let p1 = Parameter::new("p1", &true);
-    let p2 = Parameter::new("p2", &true);
-    let params = vec!(p1, p2);
-    let result = parameterized(&problem, &params, 1200, 30);
-    println!("FIRST CASE");
-    let first_case = generate_and_solve(
-        &Case::First, 
-        &State::empty(), 
-        &problem, 
-        &result, 
-        &params,
-        0, 
-        0, 
-        1200,
-        30
-    );
-    println!("CENTRAL CASE 1");
-    let central_1 = generate_and_solve(
-        &Case::Central, 
-        &first_case.trace[0].sink, 
-        &problem, 
-        &result, 
-        &params,
-        0, 
-        1,
-        1200,
-        30
-    );
-    println!("CENTRAL CASE 2");
-    let central_2 = generate_and_solve(
-        &Case::Central, 
-        &central_1.trace[0].sink, 
-        &problem, 
-        &result, 
-        &params,
-        0, 
-        2,
-        1200,
-        30
-    );
-    println!("LAST CASE");
-    let last_case = generate_and_solve(
-        &Case::Last, 
-        &central_2.trace[0].sink, 
-        &problem, 
-        &result, 
-        &params,
-        0, 
-        2,
-        1200,
-        30
-    );
+// #[test]
+// fn test_generate_solve_and_concatenate() {
+//     let problem = models::dummy_robot::model::model("instance_1");
+//     let p1 = Parameter::new("p1", &true);
+//     let p2 = Parameter::new("p2", &true);
+//     let params = vec!(p1, p2);
+//     let result = parameterized(&problem, &params, 1200, 30);
+//     println!("FIRST CASE");
+//     let first_case = generate_and_solve(
+//         &Case::First, 
+//         &State::empty(), 
+//         &problem, 
+//         &result, 
+//         &params,
+//         0, 
+//         0, 
+//         1200,
+//         30
+//     );
+//     println!("CENTRAL CASE 1");
+//     let central_1 = generate_and_solve(
+//         &Case::Central, 
+//         &first_case.trace[0].sink, 
+//         &problem, 
+//         &result, 
+//         &params,
+//         0, 
+//         1,
+//         1200,
+//         30
+//     );
+//     println!("CENTRAL CASE 2");
+//     let central_2 = generate_and_solve(
+//         &Case::Central, 
+//         &central_1.trace[0].sink, 
+//         &problem, 
+//         &result, 
+//         &params,
+//         0, 
+//         2,
+//         1200,
+//         30
+//     );
+//     println!("LAST CASE");
+//     let last_case = generate_and_solve(
+//         &Case::Last, 
+//         &central_2.trace[0].sink, 
+//         &problem, 
+//         &result, 
+//         &params,
+//         0, 
+//         2,
+//         1200,
+//         30
+//     );
 
-    let conc = concatenate(&vec!(first_case, central_1, central_2, last_case));
-    println!("CONCATENATED");
-    pprint_result(&conc)
-}
+//     let conc = concatenate(&vec!(first_case, central_1, central_2, last_case));
+//     println!("CONCATENATED");
+//     pprint_result(&conc)
+// }
 
 // #[test]
 // fn test_compositional_() {

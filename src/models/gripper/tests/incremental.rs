@@ -47,6 +47,6 @@ fn test_gripper() {
         &gripper_params);
 
     // let result = compositional(&problem, &gripper_params); //, 1200);
-    let result = parameterized(&problem, &gripper_params, 1200, 30);
+    let result = parameterized(&problem, 1200, 30);
     pprint_result_trans_only(&result)
 }

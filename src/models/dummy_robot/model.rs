@@ -27,9 +27,6 @@ pub fn model(instance: &str) -> ParamPlanningProblem {
         "p1"
     );
 
-    let p1 = Parameter::new("p1", &true);
-    let p2 = Parameter::new("p2", &true);
-
     let act_pos_dummy = pass!(&enum_assign!(act_pos, "dummy_value"));
     let act_stat_dummy = pass!(&enum_assign!(act_stat, "dummy_value"));
 
@@ -126,16 +123,28 @@ pub fn model(instance: &str) -> ParamPlanningProblem {
     let transitions = vec![t1, t2, t3, t4, t5, t6, t7, t8];
     let invariants = ParamPredicate::new(&vec!(Predicate::TRUE));
  
+    let p1 = Parameter::new("p1", &true);
+    let p2 = Parameter::new("p2", &true);
+
     match instance {
         "instance_1" => {
-            let inst = instances::instance_1::instance();
             ParamPlanningProblem::new(
                 instance, 
-                &inst.init,
-                &inst.goal,
+                &ParamPredicate::new(&vec![
+                    act_idle.clone(),
+                    ref_idle.clone(),
+                    act_left.clone(),
+                    ref_left.clone(),
+                ]),
+                &ParamPredicate::new(&vec![
+                    act_active.clone(),
+                    ref_active.clone(),
+                    act_right.clone(),
+                    ref_right.clone(),
+                ]),
                 &transitions,
                 &invariants,
-                &inst.params
+                &vec!(p1, p2)
             )
         },
         _ => panic!("No such instance")

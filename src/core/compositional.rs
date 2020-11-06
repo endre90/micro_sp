@@ -109,7 +109,6 @@ pub fn generate_and_solve(
             invars: prob.invars.to_owned(),
             params: params.to_owned()
         },
-        &params,
         timeout,
         max_steps
     );
@@ -252,18 +251,11 @@ pub fn concatenate(results: &Vec<PlanningResult>) -> PlanningResult {
 //     return_result
 // }
 
-pub fn compositional(prob: &ParamPlanningProblem, params: &Vec<Parameter>, timeout: u64, max_steps: u64) -> PlanningResult {
-    let return_result = match params.iter().all(|x| !x.value) {
-        true => {
-            let first_params = activate_next(params);
-            let first_result = parameterized(&prob, &first_params, timeout, max_steps);
-            recursive_subfn(&first_result, &prob, &params, 0, timeout, max_steps)
-        }
-        false => {
-            let first_result = parameterized(&prob, &params, timeout, max_steps);
-            recursive_subfn(&first_result, &prob, &params, 0, timeout, max_steps)
-        }
-    };
+pub fn compositional(prob: &ParamPlanningProblem, timeout: u64, max_steps: u64) -> PlanningResult {
+    let deactivated = deactivate_all_in_problem(&prob);
+    let first_activated = activate_next_in_problem(&deactivated);
+    let first_result = parameterized(&first_activated, timeout, max_steps);
+    let return_result = recursive_subfn(&first_result, &first_activated, &first_activated.params, 0, timeout, max_steps);
 
     fn recursive_subfn(
         result: &PlanningResult,
@@ -290,9 +282,9 @@ pub fn compositional(prob: &ParamPlanningProblem, params: &Vec<Parameter>, timeo
                                 &state_to_param_predicate(&result.trace[i + 1].source),
                                 &prob.trans,
                                 &prob.invars,
-                                &prob.params
+                                &activated_params
                             );
-                            let next_result = parameterized(&next_prob, &activated_params, timeout, max_steps);
+                            let next_result = parameterized(&next_prob, timeout, max_steps);
                             if next_result.plan_found {
                                 level_subresults.push(next_result.to_owned());
                                 match next_result.trace.last() {
@@ -310,9 +302,9 @@ pub fn compositional(prob: &ParamPlanningProblem, params: &Vec<Parameter>, timeo
                                 &prob.goal,
                                 &prob.trans,
                                 &prob.invars,
-                                &prob.params
+                                &activated_params
                             );
-                            let next_result = parameterized(&next_prob, &activated_params, timeout, max_steps);
+                            let next_result = parameterized(&next_prob, timeout, max_steps);
                             if next_result.plan_found {
                                 level_subresults.push(next_result.clone());
                             } else {
@@ -326,9 +318,9 @@ pub fn compositional(prob: &ParamPlanningProblem, params: &Vec<Parameter>, timeo
                                 &state_to_param_predicate(&result.trace[i + 1].source),
                                 &prob.trans,
                                 &prob.invars,
-                                &prob.params
+                                &activated_params
                             );
-                            let next_result = parameterized(&next_prob, &activated_params, timeout, max_steps);
+                            let next_result = parameterized(&next_prob,  timeout, max_steps);
                             if next_result.plan_found {
                                 level_subresults.push(next_result.to_owned());
                                 match next_result.trace.last() {
@@ -350,9 +342,9 @@ pub fn compositional(prob: &ParamPlanningProblem, params: &Vec<Parameter>, timeo
                         &prob.goal,
                         &prob.trans,
                         &prob.invars,
-                        &prob.params
+                        &activated_params
                     );
-                    let next_result = parameterized(&next_prob, &activated_params, timeout, max_steps);
+                    let next_result = parameterized(&next_prob, timeout, max_steps);
                     if next_result.plan_found {
                         level_subresults.push(next_result.to_owned());
                     } else {

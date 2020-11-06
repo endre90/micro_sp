@@ -114,22 +114,44 @@ pub fn generate_transition(ptrans: &ParamTransition, params: &Vec<Parameter>) ->
 /// Generates the problem from a parameterized problem and solves it with the incremental algorithm.
 pub fn parameterized(
     prob: &ParamPlanningProblem,
-    params: &Vec<Parameter>,
     timeout: u64,
     max_steps: u64
 ) -> PlanningResult {
         incremental(&PlanningProblem::new(
             &prob.name,
-            &generate_predicate(&prob.init, &params),
-            &generate_predicate(&prob.goal, &params),
+            &generate_predicate(&prob.init, &prob.params),
+            &generate_predicate(&prob.goal, &prob.params),
             &prob
                 .trans
                 .iter()
-                .map(|x| generate_transition(x, &params))
+                .map(|x| generate_transition(x, &prob.params))
                 .collect(),
-            &generate_predicate(&prob.invars, &params)
+            &generate_predicate(&prob.invars, &prob.params)
         ),
         timeout,
         max_steps
     )
 }
+
+// /// Generates the problem from a parameterized problem and solves it with the incremental algorithm.
+// pub fn parameterized(
+//     prob: &ParamPlanningProblem,
+//     params: &Vec<Parameter>,
+//     timeout: u64,
+//     max_steps: u64
+// ) -> PlanningResult {
+//         incremental(&PlanningProblem::new(
+//             &prob.name,
+//             &generate_predicate(&prob.init, &params),
+//             &generate_predicate(&prob.goal, &params),
+//             &prob
+//                 .trans
+//                 .iter()
+//                 .map(|x| generate_transition(x, &params))
+//                 .collect(),
+//             &generate_predicate(&prob.invars, &params)
+//         ),
+//         timeout,
+//         max_steps
+//     )
+// }
