@@ -1,4 +1,4 @@
-use crate::models::blocksworld::models::parser::parser;
+use crate::models::blocksworld::models::enum_bool_invariants_parser::parser;
 use super::*;
 
 // macro_rules! new_enum_assign_c {
@@ -191,20 +191,20 @@ pub fn model(name: &str) -> ParamPlanningProblem {
     }
 
     // Invariant 6: if b1 is on b2, b2 is not clear
-    // for b1 in &blocks {
-    //     for b2 in &blocks {
-    //         if b1 != b2 {
-    //             invariants.push(
-    //                 pnot!(
-    //                     &pand!(
-    //                         &pass!(&new_enum_assign_c!(&format!("{}_on_{}", b1, b2), &domain, "true", "bool", "on")),
-    //                         &pass!(&new_enum_assign_c!(&format!("clear_{}", b2), &domain, "true", "bool", "clear"))
-    //                     )
-    //                 )
-    //             )
-    //         }
-    //     }
-    // }
+    for b1 in &blocks {
+        for b2 in &blocks {
+            if b1 != b2 {
+                invariants.push(
+                    pnot!(
+                        &pand!(
+                            &pass!(&new_enum_assign_c!(&format!("{}_on_{}", b1, b2), &domain, "true", "bool", "on")),
+                            &pass!(&new_enum_assign_c!(&format!("clear_{}", b2), &domain, "true", "bool", "clear"))
+                        )
+                    )
+                )
+            }
+        }
+    }
 
     let on = Parameter::new("on", &true);
     let clear = Parameter::new("clear", &true);
@@ -221,9 +221,6 @@ pub fn model(name: &str) -> ParamPlanningProblem {
         &Predicate::AND(invariants),
         &vec!(on, clear, ontable, hand, holding)
     );
-
-    println!("1234_INIT {:?}", problem.init);
-    println!("1234_GOAL {:?}", problem.goal);
 
     problem
 }

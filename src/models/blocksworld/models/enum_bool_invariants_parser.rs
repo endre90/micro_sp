@@ -9,7 +9,7 @@ pub fn parser(name: &str) -> (ParamPlanningProblem, Vec<String>) {
     let mut buffer = String::new();
 
     f.read_to_string(&mut buffer).unwrap();
-    println!("{:?}", buffer);
+    // println!("{:?}", buffer);
     let mut lines = buffer.lines();
 
     lines.next();
@@ -72,17 +72,17 @@ pub fn parser(name: &str) -> (ParamPlanningProblem, Vec<String>) {
 
     // let model = domain::blocksworld_model_enumerated_booleans_invariants(&blocks);
 
-    println!("blocks: {:?}", blocks);
-    println!("clear_init: {:?}", clear_vec);
-    println!("ontable_init: {:?}", ontable_vec);
-    println!("on_init: {:?}", on_init);
-    println!("on_goal: {:?}", on_goal);
+    // println!("blocks: {:?}", blocks);
+    // println!("clear_init: {:?}", clear_vec);
+    // println!("ontable_init: {:?}", ontable_vec);
+    // println!("on_init: {:?}", on_init);
+    // println!("on_goal: {:?}", on_goal);
 
     // explicitly have to say that others are not clear?
     let mut clear_predicates = vec![];
     let domain = vec!["true", "false"];
 
-    let unclear_vec = IterOps::difference(blocks.clone(), clear_vec.clone());
+    // let unclear_vec = IterOps::difference(blocks.clone(), clear_vec.clone());
 
     for x in clear_vec {
         clear_predicates.push(
@@ -92,13 +92,13 @@ pub fn parser(name: &str) -> (ParamPlanningProblem, Vec<String>) {
         )
     }
 
-    for x in unclear_vec {
-        clear_predicates.push(
-            pand!(
-                &pass!(&new_enum_assign_c!(&format!("clear_{}", x), &domain, "false", "bool", "clear"))
-            )
-        )
-    }
+    // for x in unclear_vec {
+    //     clear_predicates.push(
+    //         pand!(
+    //             &pass!(&new_enum_assign_c!(&format!("clear_{}", x), &domain, "false", "bool", "clear"))
+    //         )
+    //     )
+    // }
 
     let mut ontable_predicates = vec![];
     for x in ontable_vec {

@@ -146,20 +146,17 @@ pub fn incremental(prob: &PlanningProblem, timeout: u64, max_steps: u64) -> Plan
     let ctx = ContextZ3::new(&cfg);
     let slv = SolverZ3::new(&ctx);
 
-    println!("ASDFASDF_INIT: {:?}", prob.init);
-    println!("ASDFASDF_GOAL: {:?}", prob.goal);
-
     SlvAssertZ3::new(&ctx, &slv, predicate_to_ast(&ctx, &prob.init, 0));
     SlvAssertZ3::new(&ctx, &slv, predicate_to_ast(&ctx, &prob.invars, 0));
 
     SlvPushZ3::new(&ctx, &slv); // create backtracking point
     SlvAssertZ3::new(&ctx, &slv, predicate_to_ast(&ctx, &prob.goal, 0));
 
-    let asserts = SlvGetAssertsZ3::new(&ctx, &slv);
-    let asrtvec = Z3AstVectorToVectorAstZ3::new(&ctx, asserts);
-    for asrt in asrtvec {
-        println!("{}", AstToStringZ3::new(&ctx, asrt));
-    }
+    // let asserts = SlvGetAssertsZ3::new(&ctx, &slv);
+    // let asrtvec = Z3AstVectorToVectorAstZ3::new(&ctx, asserts);
+    // for asrt in asrtvec {
+    //     println!("{}", AstToStringZ3::new(&ctx, asrt));
+    // }
 
     let now = Instant::now();
     let mut plan_found: bool = false;
