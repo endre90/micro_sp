@@ -54,7 +54,7 @@ pub struct ParamPlanningProblem {
     pub init: ParamPredicate,
     pub goal: ParamPredicate,
     pub trans: Vec<ParamTransition>,
-    pub invars: ParamPredicate,
+    pub invars: Predicate,
     pub params: Vec<Parameter>
 }
 
@@ -64,7 +64,7 @@ impl ParamPlanningProblem {
         init: &ParamPredicate,
         goal: &ParamPredicate,
         trans: &Vec<ParamTransition>,
-        invars: &ParamPredicate,
+        invars: &Predicate,
         params: &Vec<Parameter>
     ) -> ParamPlanningProblem {
         ParamPlanningProblem {
@@ -126,7 +126,8 @@ pub fn parameterized(
                 .iter()
                 .map(|x| generate_transition(x, &prob.params))
                 .collect(),
-            &generate_predicate(&prob.invars, &prob.params)
+            &prob.invars,
+            // &generate_predicate(&prob.invars, &prob.params)
         ),
         timeout,
         max_steps

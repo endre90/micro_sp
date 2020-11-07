@@ -4,7 +4,7 @@ use std::fs::File;
 use std::io;
 use std::io::prelude::*;
 
-pub fn parser(name: &str) -> PlanningProblem {
+pub fn parser(name: &str) -> (ParamPlanningProblem, Vec<String>) {
     let mut f = File::open(&format!("src/models/blocksworld/instances/{}.pddl", name)).unwrap();
     let mut buffer = String::new();
 
@@ -70,7 +70,7 @@ pub fn parser(name: &str) -> PlanningProblem {
         .map(|z| (z[1], z[2]))
         .collect::<Vec<(&str, &str)>>();
 
-    let model = domain::blocksworld_model_enumerated_booleans_invariants(&blocks);
+    // let model = domain::blocksworld_model_enumerated_booleans_invariants(&blocks);
 
     println!("blocks: {:?}", blocks);
     println!("clear_init: {:?}", clear_vec);
@@ -87,7 +87,7 @@ pub fn parser(name: &str) -> PlanningProblem {
     for x in clear_vec {
         clear_predicates.push(
             pand!(
-                &pass!(&new_enum_assign_c!(&format!("clear_{}", x), &domain, "true"))
+                &pass!(&new_enum_assign_c!(&format!("clear_{}", x), &domain, "true", "bool", "clear"))
             )
         )
     }
@@ -95,7 +95,7 @@ pub fn parser(name: &str) -> PlanningProblem {
     for x in unclear_vec {
         clear_predicates.push(
             pand!(
-                &pass!(&new_enum_assign_c!(&format!("clear_{}", x), &domain, "false"))
+                &pass!(&new_enum_assign_c!(&format!("clear_{}", x), &domain, "false", "bool", "clear"))
             )
         )
     }
@@ -104,7 +104,7 @@ pub fn parser(name: &str) -> PlanningProblem {
     for x in ontable_vec {
         ontable_predicates.push(
             pand!(
-                &pass!(&new_enum_assign_c!(&format!("ontable_{}", x), &domain, "true"))
+                &pass!(&new_enum_assign_c!(&format!("ontable_{}", x), &domain, "true", "bool", "ontable"))
             )
         )
     }
@@ -113,42 +113,35 @@ pub fn parser(name: &str) -> PlanningProblem {
     for (b1, b2) in on_init {
         on_predicates.push(
             pand!(
-                &pass!(&new_enum_assign_c!(&format!("{}_on_{}", b1, b2), &domain, "true"))
+                &pass!(&new_enum_assign_c!(&format!("{}_on_{}", b1, b2), &domain, "true", "bool", "on"))
             )
         )
     }
 
-    let initial = Predicate::AND(vec![
+    let initial = ParamPredicate::new(&vec![
         Predicate::AND(clear_predicates),
         Predicate::AND(ontable_predicates),
         Predicate::AND(on_predicates),
-        pass!(&new_enum_assign_c!(&format!("hand_empty"), &domain, "true"))
+        pass!(&new_enum_assign_c!(&format!("hand_empty"), &domain, "true", "bool", "hand"))
     ]);
 
     let mut goal_on_predicates = vec![];
     for (b1, b2) in on_goal {
         goal_on_predicates.push(
-            pand!(
-                &pass!(&new_enum_assign_c!(&format!("{}_on_{}", b1, b2), &domain, "true"))
-            )
+            pass!(&new_enum_assign_c!(&format!("{}_on_{}", b1, b2), &domain, "true", "bool", "on"))
         )
     }
 
-    let goal = Predicate::AND(goal_on_predicates);
-    let problem = PlanningProblem::new(
-        "blocks_world",
-        &initial,
-        &goal,
-        &model.0,
-        &model.1
+    let goal = ParamPredicate::new(&goal_on_predicates);
+    let problem = ParamPlanningProblem::new(
+        name, 
+        &initial, 
+        &goal, 
+        &vec!(), 
+        &Predicate::TRUE,
+        &vec!()
     );
 
-    problem
+    (problem, blocks.iter().map(|x| x.to_string()).collect())
     
-}
-
-#[test]
-fn test_parser() {
-    let result = incremental(&parser("probBLOCKS-7-0"), 1200, 50);
-    pprint_result_trans_only(&result)
 }

@@ -16,9 +16,12 @@ pub struct ArgsCLI {
     /// Print the states in the frames
     #[structopt(long, short = "p", parse(try_from_str), default_value = "false")]
     pub print: bool,
-    /// The name of the problem to run
+    /// The name of the model to run
     #[structopt(long, short = "m")]
     pub model: String,
+    /// The variant of the model to run
+    #[structopt(long, short = "v")]
+    pub variant: String,
     /// The name of the instance to run
     #[structopt(long, short = "i")]
     pub instance: String,
@@ -29,7 +32,7 @@ pub struct Args {
     pub print: bool,
     pub comp: bool,
     pub dummy: bool,
-    pub problem: ParamPlanningProblem,
+    pub model: ParamPlanningProblem
 }
 
 pub fn handle_args() -> Args {
@@ -39,9 +42,12 @@ pub fn handle_args() -> Args {
         print: args.print,
         comp: args.comp,
         dummy: args.dummy,
-        problem: match args.model.as_str() {
+        model: match args.model.as_str() {
             "dummy_robot" => dummy_robot::model::model(args.instance.as_str()),
-            // "blocksworld" => blocksworld::parser::parser(args.instance.as_str()),
+            "blocksworld" => match args.variant.as_str() {
+                "enum_bool_invariants" => blocksworld::models::enum_bool_invariants::model(args.instance.as_str()),
+                _ => panic!("unknown problem")
+            }
             //"gripper" => gripper::parser::parser(args.instance.as_str()),
             _ => panic!("unknown problem")
         },

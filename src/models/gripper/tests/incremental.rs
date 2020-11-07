@@ -43,7 +43,7 @@ fn test_gripper() {
             )
         ),
         &models::gripper::domain::gripper_model_pure_enumeration(&balls),
-        &ParamPredicate::new(&vec!(Predicate::TRUE)),
+        &Predicate::TRUE,
         &gripper_params);
 
     // let result = compositional(&problem, &gripper_params); //, 1200);

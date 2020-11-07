@@ -13,14 +13,14 @@ async fn main() -> io::Result<()> {
     let ha = handle_args();
     match ha.comp {
         true => {
-            let result = compositional(&ha.problem, timeout, max_steps);
+            let result = compositional(&ha.model, timeout, max_steps);
             match ha.print {
                 true => pprint_result(&result),
                 false => pprint_result_trans_only(&result)
             }
         },
         false => {
-            let result = parameterized(&activate_all_in_problem(&ha.problem), timeout, max_steps);
+            let result = parameterized(&activate_all_in_problem(&ha.model), timeout, max_steps);
             match ha.print {
                 true => pprint_result(&result),
                 false => pprint_result_trans_only(&result)

@@ -124,7 +124,7 @@ pub fn get_planning_result(
         .collect();
     let vars = get_problem_vars(&prob);
 
-    // println!("{:#?}", model_vec);
+    println!("{:?}", model_vec);
 
     let mut trace: Vec<PlanningFrame> = vec![];
     for i in 0..nr_steps - 1 {

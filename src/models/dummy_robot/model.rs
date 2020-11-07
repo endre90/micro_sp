@@ -121,7 +121,6 @@ pub fn model(instance: &str) -> ParamPlanningProblem {
     );
 
     let transitions = vec![t1, t2, t3, t4, t5, t6, t7, t8];
-    let invariants = ParamPredicate::new(&vec!(Predicate::TRUE));
  
     let p1 = Parameter::new("p1", &true);
     let p2 = Parameter::new("p2", &true);
@@ -143,7 +142,7 @@ pub fn model(instance: &str) -> ParamPlanningProblem {
                     ref_right.clone(),
                 ]),
                 &transitions,
-                &invariants,
+                &Predicate::TRUE,
                 &vec!(p1, p2)
             )
         },
