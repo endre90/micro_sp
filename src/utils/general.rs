@@ -7,7 +7,7 @@ pub struct ArgsCLI {
     /// Online planning and acting
     #[structopt(long, short = "r", parse(try_from_str), default_value = "false")]
     pub run: bool,
-    // Compositional planning algorithm
+    /// Compositional planning algorithm
     #[structopt(long, short = "c", parse(try_from_str), default_value = "false")]
     pub comp: bool,
     /// Generate dummy driver (inverse micro_sp)
@@ -47,6 +47,7 @@ pub fn handle_args() -> Args {
             "blocksworld" => match args.variant.as_str() {
                 "enum_bool_invariants" => blocksworld::models::enum_bool_invariants::model(args.instance.as_str()),
                 "bool_invariants" => blocksworld::models::bool_invariants::model(args.instance.as_str()),
+                "enum_invariants" => blocksworld::models::enum_invariants::model(args.instance.as_str()),
                 _ => panic!("unknown problem")
             }
             //"gripper" => gripper::parser::parser(args.instance.as_str()),
