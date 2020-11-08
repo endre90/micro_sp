@@ -72,11 +72,11 @@ pub fn parser(name: &str) -> (ParamPlanningProblem, Vec<String>) {
 
     // let model = domain::blocksworld_model_enumerated_booleans_invariants(&blocks);
 
-    // println!("blocks: {:?}", blocks);
-    // println!("clear_init: {:?}", clear_vec);
-    // println!("ontable_init: {:?}", ontable_vec);
-    // println!("on_init: {:?}", on_init);
-    // println!("on_goal: {:?}", on_goal);
+    println!("blocks: {:?}", blocks);
+    println!("clear_init: {:?}", clear_vec);
+    println!("ontable_init: {:?}", ontable_vec);
+    println!("on_init: {:?}", on_init);
+    println!("on_goal: {:?}", on_goal);
 
     // explicitly have to say that others are not clear?
     let mut clear_predicates = vec![];
