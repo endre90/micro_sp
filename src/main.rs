@@ -8,7 +8,7 @@ use r2r::*;
 async fn main() -> io::Result<()> {
 
     let timeout = 1200;
-    let max_steps = 50;
+    let max_steps = 100;
 
     let ha = handle_args();
     match ha.comp {

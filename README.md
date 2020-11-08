@@ -23,12 +23,12 @@ A dummy driver (inverse of a micro_sp node) can be launched providing the argume
 ### high prioriry 
 1.  [x] error handling, probably not done
 2.  [x] move params into paramproblem
-3.  [ ] figure out why do tests run twice?
-4.  [ ] should invariants be parameterized?
+3.  [x] figure out why do tests run twice
+4.  [x] invariants shouldn't be parameterized
 5.  [x] don't complicate, have parameterized
 6.  [x] layered (comp(param(inc)))
 7.  [x] publish complete state
-8.  [ ] write some macros finally
+8.  [x] write some macros finally
 9.  [x] no completestate just state that holds all
 10. [ ] implemment fmt
 11. [x] remove enum and bool and have only variable
@@ -38,7 +38,7 @@ A dummy driver (inverse of a micro_sp node) can be launched providing the argume
 15. [ ] think about how to parameterize modelling like the pddl people do
 16. [x] update command vars to match measured values on refresh (raar)
 17. [x] raar: act, ref and act_ref have to have the same domain and same r#type
-18. [ ] where is the state? who owns the state?
+18. [ ] runner: where is the state? who owns the state?
 19. [x] proper command line arguments
 20. [ ] need new "start/stop running" and "set goal" topics to communicate with the runner
 21. [ ] the "start/stop running" should actually set the reference values     ?       
@@ -50,7 +50,7 @@ A dummy driver (inverse of a micro_sp node) can be launched providing the argume
 27. [ ] other command paradigm or are we done?
 28. [ ] testing
 29. [x] structure and modules
-30. [ ] generate dummy driver from the model
+30. [x] generate dummy driver from the model
 31. [x] documentation, probably not done
 32. [ ] dummy_value should be deeply integrated
 33. [ ] proper readme
@@ -82,19 +82,20 @@ A dummy driver (inverse of a micro_sp node) can be launched providing the argume
 49. [x] look into parsing pddls: conclusion: won't work
 50. [ ] fix command lifetime
 51. [x] match published data to sink when fresh timeouts
-52. [ ] compositional algorithm
-53. [ ] when to call the planner
-54. [ ] handle estimated
-55. [x] move model to models
-56. [x] check if measured value is in domain
-57. [ ] flow graph to readme
-58. [ ] maybe try to write a cdcl solver?
-59. [ ] some theories? hmm...
+52. [x] compositional algorithm
+53. [ ] test compositional algorithm
+54. [ ] when to call the planner
+55. [ ] handle estimated
+56. [x] move model to models
+57. [x] check if measured value is in domain
+58. [ ] flow graph to readme
+59. [ ] maybe try to write a cdcl solver?
+60. [ ] some theories? hmm...
 
 ### low priority
 1. [ ] improve Qol
 2. [ ] solver agnostic, yes, but...
-3. [ ] could micro_sp also be planner agnostic? try with dfs/bfs
+3. [ ] could micro_sp also be planner agnostic? try with simple dfs/bfs
 4. [ ] notion of costs, add optimization support?
 5. [ ] nondeterminism
 6. [ ] multiple goals
