@@ -45,10 +45,10 @@ pub fn handle_args() -> Args {
         model: match args.model.as_str() {
             "dummy_robot" => dummy_robot::model::model(args.instance.as_str()),
             "blocksworld" => match args.variant.as_str() {
-                "enum_bool_invariants" => blocksworld::models::enum_bool_invariants::model(args.instance.as_str()),
+                "enum_bool_invariant" => blocksworld::models::enum_bool_invariants::model(args.instance.as_str()),
                 "bool_explicit" => blocksworld::models::bool_explicit::model(args.instance.as_str()),
-                "bool_invariants" => blocksworld::models::bool_invariants::model(args.instance.as_str()),
-                "enum_invariants" => blocksworld::models::enum_invariants::model(args.instance.as_str()),
+                "bool_invariant" => blocksworld::models::bool_invariants::model(args.instance.as_str()),
+                "enum_invariant" => blocksworld::models::enum_invariants::model(args.instance.as_str()),
                 _ => panic!("unknown problem")
             }
             //"gripper" => gripper::parser::parser(args.instance.as_str()),

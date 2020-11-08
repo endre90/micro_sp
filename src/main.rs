@@ -7,7 +7,7 @@ use r2r::*;
 #[tokio::main]
 async fn main() -> io::Result<()> {
 
-    let timeout = 1200;
+    let timeout = 300;
     let max_steps = 100;
 
     let ha = handle_args();
