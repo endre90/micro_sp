@@ -117,7 +117,7 @@ pub fn model(name: &str) -> ParamPlanningProblem {
     let holding = Parameter::new("holding", &true);
 
     let problem = ParamPlanningProblem::new(
-        parsed.name.as_str(), 
+        &format!("blocksworld_bool_explicit_{}", parsed.name.as_str()), 
         &parsed.init,
         &parsed.goal,
         &transitions,

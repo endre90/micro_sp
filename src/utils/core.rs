@@ -213,12 +213,14 @@ pub fn get_planning_result(
     }
     match plan_found {
         true => PlanningResult {
+            name: prob.name.clone(),
             plan_found: plan_found,
             plan_length: nr_steps - 1,
             trace: trace,
             time_to_solve: planning_time,
         },
         false => PlanningResult {
+            name: prob.name.clone(),
             plan_found: plan_found,
             plan_length: 0,
             trace: vec![],

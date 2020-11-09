@@ -48,6 +48,7 @@ pub struct PlanningProblem {
 /// A result is generated when the planner finds a satisfiable model.
 #[derive(PartialEq, Eq, Clone, Debug, PartialOrd, Ord)]
 pub struct PlanningResult {
+    pub name: String,
     pub plan_found: bool,
     pub plan_length: u64,
     pub trace: Vec<PlanningFrame>,

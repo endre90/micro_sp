@@ -126,6 +126,7 @@ pub fn generate_and_solve(
 /// Concatenate all results in a level.
 pub fn concatenate(results: &Vec<PlanningResult>) -> PlanningResult {
     PlanningResult {
+        name: String::from("compositional"), //fix this
         plan_found: results.iter().all(|x| x.plan_found),
         plan_length: results.iter().map(|x| x.plan_length).sum(),
         trace: results
