@@ -50,7 +50,7 @@ pub fn activate_next_in_problem(prob: &ParamPlanningProblem) -> ParamPlanningPro
         goal: prob.goal.to_owned(),
         trans: prob.trans.to_owned(),
         invars: prob.invars.to_owned(),
-        params: activate_next(&prob.params)
+        params: activate_next(&prob.params),
     }
 }
 
@@ -62,7 +62,7 @@ pub fn activate_all_in_problem(prob: &ParamPlanningProblem) -> ParamPlanningProb
         goal: prob.goal.to_owned(),
         trans: prob.trans.to_owned(),
         invars: prob.invars.to_owned(),
-        params: activate_all(&prob.params)
+        params: activate_all(&prob.params),
     }
 }
 
@@ -74,7 +74,7 @@ pub fn deactivate_all_in_problem(prob: &ParamPlanningProblem) -> ParamPlanningPr
         goal: prob.goal.to_owned(),
         trans: prob.trans.to_owned(),
         invars: prob.invars.to_owned(),
-        params: deactivate_all(&prob.params)
+        params: deactivate_all(&prob.params),
     }
 }
 
@@ -100,17 +100,21 @@ pub fn generate_and_solve(
                 Case::Zerolength => prob.init.to_owned(),
             },
             goal: match case {
-                Case::First => state_to_param_predicate(&res.trace[concat.to_owned() as usize + 1].source),
-                Case::Central => state_to_param_predicate(&res.trace[concat.to_owned() as usize + 1].source),
+                Case::First => {
+                    state_to_param_predicate(&res.trace[concat.to_owned() as usize + 1].source)
+                }
+                Case::Central => {
+                    state_to_param_predicate(&res.trace[concat.to_owned() as usize + 1].source)
+                }
                 Case::Last => prob.goal.to_owned(),
                 Case::Zerolength => prob.goal.to_owned(),
             },
             trans: prob.trans.to_owned(),
             invars: prob.invars.to_owned(),
-            params: params.to_owned()
+            params: params.to_owned(),
         },
         timeout,
-        max_steps
+        max_steps,
     );
     match res.plan_found {
         true => {
@@ -126,7 +130,7 @@ pub fn generate_and_solve(
 /// Concatenate all results in a level.
 pub fn concatenate(results: &Vec<PlanningResult>) -> PlanningResult {
     PlanningResult {
-        name: String::from("compositional"), //fix this
+        name: results[0].name.clone(),
         plan_found: results.iter().all(|x| x.plan_found),
         plan_length: results.iter().map(|x| x.plan_length).sum(),
         trace: results
@@ -252,11 +256,118 @@ pub fn concatenate(results: &Vec<PlanningResult>) -> PlanningResult {
 //     return_result
 // }
 
+// investigate if manual could be better or faster? probably yes if we provide order of subgoals?
+pub fn auto_subgoaling(prob: &ParamPlanningProblem, timeout: u64, max_steps: u64) -> () {
+    //PlanningResult {
+    // for subgoal in &prob.goal.preds {
+    //     pr
+    //     // parameterized(
+    //     //     ParamPlanningProblem::new(
+    //     //         prob.name,
+    //     //         prob.init,
+    //     //         subgoal,
+    //     //         prob.trans,
+    //     //         prob.invars,
+    //     //         prob.params
+    //     //     ),
+    //     //     timeout,
+    //     //     max_steps
+    //     // )
+    // }
+}
+
+pub fn heuristics_subgoaling(
+    prob: &ParamPlanningProblem,
+    timeout: u64,
+    max_steps: u64,
+) -> PlanningResult {
+    let first_result = parameterized(
+        &ParamPlanningProblem::new(
+            &prob.name,
+            &prob.init,
+            &ParamPredicate::new(&vec![prob.goal.preds[0].clone()]),
+            &prob.trans,
+            &prob.invars,
+            &prob.params,
+        ),
+        timeout,
+        max_steps,
+    );
+
+    let mut subresults = vec![first_result.clone()];
+    let return_result =
+        recursive_subfn(&first_result, &prob, 0, timeout, max_steps, &mut subresults);
+
+    fn recursive_subfn(
+        result: &PlanningResult,
+        prob: &ParamPlanningProblem,
+        i: u64,
+        timeout: u64,
+        max_steps: u64,
+        subresults: &mut Vec<PlanningResult>,
+    ) -> PlanningResult {
+        if i < prob.goal.preds.len() as u64 - 1 {
+            let i = i + 1;
+            let mut goals = vec![];
+            for j in 0..i + 1 {
+                goals.push(prob.goal.preds[j as usize].clone())
+            }
+
+            if result.trace.len() !=0 {
+
+            }
+
+            let init = match result.trace.len() == 0 {
+                false => match &result.trace.last() {
+                    Some(x) => {
+                        state_to_param_predicate(&x.sink)
+                        // let sink = x.sink.clone();
+                        // let asdd = state_to_param_predicate(&sink);
+                        // asdd
+                    },
+                    None => panic!("no tail in the plan"),
+                },
+                true => prob.init.clone(),
+            };
+
+            let new_result = parameterized(
+                &ParamPlanningProblem::new(
+                    &prob.name,
+                    &init,
+                    &ParamPredicate::new(&goals),
+                    &prob.trans,
+                    &prob.invars,
+                    &prob.params,
+                ),
+                timeout,
+                max_steps,
+            );
+            subresults.push(new_result.clone());
+            println!("{:?}", subresults.len());
+            recursive_subfn(&new_result, &prob, i, timeout, max_steps, subresults)
+        } else {
+            concatenate(&subresults)
+        }
+    }
+    return_result
+}
+
 pub fn compositional(prob: &ParamPlanningProblem, timeout: u64, max_steps: u64) -> PlanningResult {
     let deactivated = deactivate_all_in_problem(&prob);
     let first_activated = activate_next_in_problem(&deactivated);
     let first_result = parameterized(&first_activated, timeout, max_steps);
-    let return_result = recursive_subfn(&first_result, &first_activated, &first_activated.params, 0, timeout, max_steps);
+
+    println!("PARAMETERS: {:?}", first_activated.params);
+    pprint_result(&first_result);
+
+    let return_result = recursive_subfn(
+        &first_result,
+        &first_activated,
+        &first_activated.params,
+        0,
+        timeout,
+        max_steps,
+    );
 
     fn recursive_subfn(
         result: &PlanningResult,
@@ -264,10 +375,11 @@ pub fn compositional(prob: &ParamPlanningProblem, timeout: u64, max_steps: u64) 
         params: &Vec<Parameter>,
         level: u64,
         timeout: u64,
-        max_steps: u64
+        max_steps: u64,
     ) -> PlanningResult {
         let level = level + 1;
         let mut final_result: PlanningResult = result.to_owned();
+        println!("PARAMETERS: {:?}", params);
         if !params.iter().all(|x| x.value) {
             if result.plan_found {
                 let mut inheritance = State::empty();
@@ -277,13 +389,14 @@ pub fn compositional(prob: &ParamPlanningProblem, timeout: u64, max_steps: u64) 
                 if result.plan_length != 0 {
                     for i in 0..=result.trace.len() - 1 {
                         if i == 0 {
+                            println!("FIRST CASE");
                             let next_prob = ParamPlanningProblem::new(
                                 &format!("problem_l{:?}_c{:?}", level, concat),
                                 &prob.init,
                                 &state_to_param_predicate(&result.trace[i + 1].source),
                                 &prob.trans,
                                 &prob.invars,
-                                &activated_params
+                                &activated_params,
                             );
                             let next_result = parameterized(&next_prob, timeout, max_steps);
                             if next_result.plan_found {
@@ -297,13 +410,14 @@ pub fn compositional(prob: &ParamPlanningProblem, timeout: u64, max_steps: u64) 
                             }
                             concat = concat + 1;
                         } else if i == result.trace.len() - 1 {
+                            println!("LAST CASE");
                             let next_prob = ParamPlanningProblem::new(
                                 &format!("problem_l{:?}_c{:?}", level, concat),
                                 &state_to_param_predicate(&inheritance),
                                 &prob.goal,
                                 &prob.trans,
                                 &prob.invars,
-                                &activated_params
+                                &activated_params,
                             );
                             let next_result = parameterized(&next_prob, timeout, max_steps);
                             if next_result.plan_found {
@@ -313,15 +427,16 @@ pub fn compositional(prob: &ParamPlanningProblem, timeout: u64, max_steps: u64) 
                             }
                             concat = concat + 1;
                         } else {
+                            println!("CENTRAL CASE");
                             let next_prob = ParamPlanningProblem::new(
                                 &format!("problem_l{:?}_c{:?}", level, concat),
                                 &state_to_param_predicate(&inheritance),
                                 &state_to_param_predicate(&result.trace[i + 1].source),
                                 &prob.trans,
                                 &prob.invars,
-                                &activated_params
+                                &activated_params,
                             );
-                            let next_result = parameterized(&next_prob,  timeout, max_steps);
+                            let next_result = parameterized(&next_prob, timeout, max_steps);
                             if next_result.plan_found {
                                 level_subresults.push(next_result.to_owned());
                                 match next_result.trace.last() {
@@ -335,6 +450,7 @@ pub fn compositional(prob: &ParamPlanningProblem, timeout: u64, max_steps: u64) 
                         }
                     }
                 } else {
+                    println!("ZEROLENGTH CASE");
                     // have to investigate this step more... now it feels like a hack
                     let activated_params = activate_next(&params);
                     let next_prob = ParamPlanningProblem::new(
@@ -343,7 +459,7 @@ pub fn compositional(prob: &ParamPlanningProblem, timeout: u64, max_steps: u64) 
                         &prob.goal,
                         &prob.trans,
                         &prob.invars,
-                        &activated_params
+                        &activated_params,
                     );
                     let next_result = parameterized(&next_prob, timeout, max_steps);
                     if next_result.plan_found {
@@ -353,7 +469,14 @@ pub fn compositional(prob: &ParamPlanningProblem, timeout: u64, max_steps: u64) 
                     }
                 }
                 let level_result = concatenate(&level_subresults);
-                final_result = recursive_subfn(&level_result, &prob, &activated_params, level, timeout, max_steps);
+                final_result = recursive_subfn(
+                    &level_result,
+                    &prob,
+                    &activated_params,
+                    level,
+                    timeout,
+                    max_steps,
+                );
             }
         }
         final_result

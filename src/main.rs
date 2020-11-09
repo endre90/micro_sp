@@ -12,8 +12,11 @@ async fn main() -> io::Result<()> {
 
     let ha = handle_args();
 
+    // auto_subgoaling(&ha.model, timeout, max_steps);
+
     let result = match ha.comp {
-        true => compositional(&ha.model, timeout, max_steps),
+        // true => compositional(&ha.model, timeout, max_steps),
+        true => heuristics_subgoaling(&ha.model, timeout, max_steps),
         false => parameterized(&activate_all_in_problem(&ha.model), timeout, max_steps)
     };
 

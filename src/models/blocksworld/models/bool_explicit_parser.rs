@@ -87,7 +87,7 @@ pub fn parser(name: &str) -> (ParamPlanningProblem, Vec<String>) {
     for x in clear_vec {
         clear_predicates.push(
             pand!(
-                &pass!(&new_bool_assign_c!(&format!("clear_{}", x), true, "clear"))
+                &pass!(&new_bool_assign_c!(&format!("clear_{}", x), true, "block"))
             )
         )
     }
@@ -95,7 +95,7 @@ pub fn parser(name: &str) -> (ParamPlanningProblem, Vec<String>) {
     for x in unclear_vec {
         clear_predicates.push(
             pand!(
-                &pass!(&new_bool_assign_c!(&format!("clear_{}", x), false, "clear"))
+                &pass!(&new_bool_assign_c!(&format!("clear_{}", x), false, "block"))
             )
         )
     }
@@ -104,7 +104,7 @@ pub fn parser(name: &str) -> (ParamPlanningProblem, Vec<String>) {
     for x in ontable_vec {
         ontable_predicates.push(
             pand!(
-                &pass!(&new_bool_assign_c!(&format!("ontable_{}", x), true, "ontable"))
+                &pass!(&new_bool_assign_c!(&format!("ontable_{}", x), true, "block"))
             )
         )
     }
@@ -112,7 +112,7 @@ pub fn parser(name: &str) -> (ParamPlanningProblem, Vec<String>) {
     for x in no_ontable_vec {
         ontable_predicates.push(
             pand!(
-                &pass!(&new_bool_assign_c!(&format!("ontable_{}", x), false, "ontable"))
+                &pass!(&new_bool_assign_c!(&format!("ontable_{}", x), false, "block"))
             )
         )
     }
@@ -121,7 +121,7 @@ pub fn parser(name: &str) -> (ParamPlanningProblem, Vec<String>) {
     for (b1, b2) in &on_init {
         on_predicates.push(
             pand!(
-                &pass!(&new_bool_assign_c!(&format!("{}_on_{}", b1, b2), true, "on"))
+                &pass!(&new_bool_assign_c!(&format!("{}_on_{}", b1, b2), true, "block"))
             )
         )
     }
@@ -132,7 +132,7 @@ pub fn parser(name: &str) -> (ParamPlanningProblem, Vec<String>) {
                 if !on_init.contains(&(*b1, *b2)) {
                     on_predicates.push(
                         pand!(
-                            &pass!(&new_bool_assign_c!(&format!("{}_on_{}", b1, b2), false, "on"))
+                            &pass!(&new_bool_assign_c!(&format!("{}_on_{}", b1, b2), false, "block"))
                         )
                     )
                 }
@@ -144,7 +144,7 @@ pub fn parser(name: &str) -> (ParamPlanningProblem, Vec<String>) {
     for x in &blocks {
         holding_predicates.push(
             pand!(
-                &pass!(&new_bool_assign_c!(&format!("holding_{}", x), false, "holding"))
+                &pass!(&new_bool_assign_c!(&format!("holding_{}", x), false, "hand"))
             )
         )
     }
@@ -160,7 +160,7 @@ pub fn parser(name: &str) -> (ParamPlanningProblem, Vec<String>) {
     let mut goal_on_predicates = vec![];
     for (b1, b2) in on_goal {
         goal_on_predicates.push(
-            pass!(&new_bool_assign_c!(&format!("{}_on_{}", b1, b2), true, "on"))
+            pass!(&new_bool_assign_c!(&format!("{}_on_{}", b1, b2), true, "block"))
         )
     }
 
