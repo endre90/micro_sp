@@ -55,12 +55,6 @@ pub fn handle_args() -> Args {
         model: match args.model.as_str() {
             "dummy_robot" => dummy_robot::model::model(args.instance.as_str()),
             "blocksworld" => match args.variant.as_str() {
-                "enum_bool_explicit" => {
-                    blocksworld::models::enum_bool_explicit::model(args.instance.as_str())
-                }
-                "enum_bool_invariant" => {
-                    blocksworld::models::enum_bool_invariants::model(args.instance.as_str())
-                }
                 "bool_explicit" => {
                     blocksworld::models::bool_explicit::model(args.instance.as_str())
                 }
