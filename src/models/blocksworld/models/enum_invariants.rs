@@ -136,12 +136,8 @@ pub fn model(name: &str) -> ParamPlanningProblem {
         }
     }
 
-
     let on = Parameter::new("on", &true);
     let clear = Parameter::new("clear", &true);
-    let ontable = Parameter::new("ontable", &true);
-    let hand = Parameter::new("hand", &true);
-    let holding = Parameter::new("holding", &true);
 
     let problem = ParamPlanningProblem::new(
         &format!("blocksworld_enum_invariants_{}", parsed.name.as_str()), 
@@ -149,7 +145,7 @@ pub fn model(name: &str) -> ParamPlanningProblem {
         &parsed.goal,
         &transitions,
         &Predicate::AND(invariants),
-        &vec!(on, clear, ontable, hand, holding)
+        &vec!(on, clear)
     );
 
     problem

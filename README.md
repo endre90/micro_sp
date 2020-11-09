@@ -24,7 +24,7 @@ A dummy driver (inverse of a micro_sp node) can be launched providing the argume
 1.  [x] error handling, probably not done
 2.  [x] move params into paramproblem
 3.  [x] figure out why do tests run twice
-4.  [x] invariants shouldn't be parameterized
+4.  [ ] actually, invariants should be parameterized
 5.  [x] don't complicate, have parameterized
 6.  [x] layered (comp(param(inc)))
 7.  [x] publish complete state

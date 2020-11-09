@@ -127,32 +127,73 @@ pub fn get_planning_result(
     // println!("{:?}", model_vec);
 
     let mut trace: Vec<PlanningFrame> = vec![];
+    
+    // println!("VARS {:?}", vars);
+    
     for i in 0..nr_steps - 1 {
-        let enum_vals_source: Vec<Assignment> = model_vec
-            .iter()
-            .filter(|x| x[0].ends_with(&format!("_s{}", i)))
-            .map(|x| (x[0].trim_end_matches(&format!("_s{}", i)), x[1], i))
-            .map(|x| (vars.iter().find(|y| y.name == x.0).unwrap(), x.1))
-            .map(|x| match x.0.value_type {
-                SPValueType::Bool => {
-                    Assignment::new(&x.0, &bool::from_str(x.1).unwrap().to_spvalue(), None)
+        let mut enum_vals_source = vec![];
+        for v in &vars {
+            for m in &model_vec {
+                if m[0].ends_with(&format!("_s{}", i)) {
+                    let trimmed = m[0].trim_end_matches(&format!("_s{}", i));
+                    if v.name == trimmed {
+                        match v.value_type {
+                            SPValueType::Bool => {
+                                enum_vals_source.push(Assignment::new(&v, &bool::from_str(m[1]).unwrap().to_spvalue(), None))
+                            }
+                            SPValueType::String => enum_vals_source.push(Assignment::new(&v, &String::from(m[1]).to_spvalue(), None))
+                        }
+                    }
                 }
-                SPValueType::String => Assignment::new(&x.0, &String::from(x.1).to_spvalue(), None),
-            })
-            .collect();
+            }
+        }
 
-        let enum_vals_sink: Vec<Assignment> = model_vec
-            .iter()
-            .filter(|x| x[0].ends_with(&format!("_s{}", i + 1)))
-            .map(|x| (x[0].trim_end_matches(&format!("_s{}", i + 1)), x[1], i + 1))
-            .map(|x| (vars.iter().find(|y| y.name == x.0).unwrap(), x.1))
-            .map(|x| match x.0.value_type {
-                SPValueType::Bool => {
-                    Assignment::new(&x.0, &bool::from_str(x.1).unwrap().to_spvalue(), None)
+        // let enum_vals_source: Vec<Assignment> = vars.iter().map(|y| Assignment::new(&y, 
+        //     model_vec.iter().filter(|x| x[0].ends_with(&format!("_s{}", i))).map(|x| (x[0].trim_end_matches(&format!("_s{}", i)), x[1], i))
+        //     , None))
+
+        // let enum_vals_source: Vec<Assignment> = model_vec
+        //     .iter()
+        //     .filter(|x| x[0].ends_with(&format!("_s{}", i)))
+        //     .map(|x| (x[0].trim_end_matches(&format!("_s{}", i)), x[1], i))
+        //     .map(|x| (vars.iter().find(|y| y.name == x.0).unwrap(), x.1))
+        //     .map(|x| match x.0.value_type {
+        //         SPValueType::Bool => {
+        //             Assignment::new(&x.0, &bool::from_str(x.1).unwrap().to_spvalue(), None)
+        //         }
+        //         SPValueType::String => Assignment::new(&x.0, &String::from(x.1).to_spvalue(), None),
+        //     })
+        //     .collect();
+
+        // let enum_vals_sink: Vec<Assignment> = model_vec
+        //     .iter()
+        //     .filter(|x| x[0].ends_with(&format!("_s{}", i + 1)))
+        //     .map(|x| (x[0].trim_end_matches(&format!("_s{}", i + 1)), x[1], i + 1))
+        //     .map(|x| (vars.iter().find(|y| y.name == x.0).unwrap(), x.1))
+        //     .map(|x| match x.0.value_type {
+        //         SPValueType::Bool => {
+        //             Assignment::new(&x.0, &bool::from_str(x.1).unwrap().to_spvalue(), None)
+        //         }
+        //         SPValueType::String => Assignment::new(&x.0, &String::from(x.1).to_spvalue(), None),
+        //     })
+        //     .collect();
+
+        let mut enum_vals_sink = vec![];
+        for v in &vars {
+            for m in &model_vec {
+                if m[0].ends_with(&format!("_s{}", i + 1)) {
+                    let trimmed = m[0].trim_end_matches(&format!("_s{}", i + 1));
+                    if v.name == trimmed {
+                        match v.value_type {
+                            SPValueType::Bool => {
+                                enum_vals_sink.push(Assignment::new(&v, &bool::from_str(m[1]).unwrap().to_spvalue(), None))
+                            }
+                            SPValueType::String => enum_vals_sink.push(Assignment::new(&v, &String::from(m[1]).to_spvalue(), None))
+                        }
+                    }
                 }
-                SPValueType::String => Assignment::new(&x.0, &String::from(x.1).to_spvalue(), None),
-            })
-            .collect();
+            }
+        }
 
         let measured_source: Vec<Assignment> = enum_vals_source
             .iter()
