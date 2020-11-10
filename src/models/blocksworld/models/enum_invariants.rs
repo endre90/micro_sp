@@ -27,10 +27,10 @@ pub fn model(name: &str) -> ParamPlanningProblem {
             ParamTransition::new(
                 &format!("pick_up_{}", block),
                 &ppred!(
-                    &pass!(&new_bool_assign_c!(&format!("clear_{}", block), true, "clear"))
+                    &pass!(&new_bool_assign_c!(&format!("clear_{}", block), true, "on"))
                 ),
                 &ppred!(
-                    &pass!(&new_bool_assign_c!(&format!("clear_{}", block), false, "clear")),
+                    &pass!(&new_bool_assign_c!(&format!("clear_{}", block), false, "on")),
                     &pass!(&new_enum_assign_c!(&format!("{}_on", block), &on_domain, "GRIP", "on", "on"))
                 )
             )
@@ -46,7 +46,7 @@ pub fn model(name: &str) -> ParamPlanningProblem {
                 ),
                 &ppred!(
                     &pass!(&new_enum_assign_c!(&format!("{}_on", block), &on_domain, "TABLE", "on", "on")),
-                    &pass!(&new_bool_assign_c!(&format!("clear_{}", block), true, "clear"))
+                    &pass!(&new_bool_assign_c!(&format!("clear_{}", block), true, "on"))
                 )
             )
         )
@@ -59,12 +59,12 @@ pub fn model(name: &str) -> ParamPlanningProblem {
                     ParamTransition::new(
                         &format!("stack_{}_on_{}", b1, b2),
                         &ppred!(
-                            &pass!(&new_bool_assign_c!(&format!("clear_{}", b2), true, "clear")),
+                            &pass!(&new_bool_assign_c!(&format!("clear_{}", b2), true, "on")),
                             &pass!(&new_enum_assign_c!(&format!("{}_on", b1), &on_domain, "GRIP", "on", "on"))
                         ),
                         &ppred!(
-                            &pass!(&new_bool_assign_c!(&format!("clear_{}", b2), false, "clear")),
-                            &pass!(&new_bool_assign_c!(&format!("clear_{}", b1), true, "clear")),
+                            &pass!(&new_bool_assign_c!(&format!("clear_{}", b2), false, "on")),
+                            &pass!(&new_bool_assign_c!(&format!("clear_{}", b1), true, "on")),
                             &pass!(&new_enum_assign_c!(&format!("{}_on", b1), &on_domain, &format!("{}", b2), "on", "on"))
                         )
                     )
@@ -80,12 +80,12 @@ pub fn model(name: &str) -> ParamPlanningProblem {
                     ParamTransition::new(
                         &format!("unstack_{}_from_{}", b1, b2),
                         &ppred!(
-                            &pass!(&new_bool_assign_c!(&format!("clear_{}", b1), true, "clear")),
+                            &pass!(&new_bool_assign_c!(&format!("clear_{}", b1), true, "on")),
                             &pass!(&new_enum_assign_c!(&format!("{}_on", b1), &on_domain, &format!("{}", b2), "on", "on"))
                         ),
                         &ppred!(
-                            &pass!(&new_bool_assign_c!(&format!("clear_{}", b2), true, "clear")),
-                            &pass!(&new_bool_assign_c!(&format!("clear_{}", b1), false, "clear")),
+                            &pass!(&new_bool_assign_c!(&format!("clear_{}", b2), true, "on")),
+                            &pass!(&new_bool_assign_c!(&format!("clear_{}", b1), false, "on")),
                             &pass!(&new_enum_assign_c!(&format!("{}_on", b1), &on_domain, "GRIP", "on", "on"))
                         )
                     )
@@ -128,7 +128,7 @@ pub fn model(name: &str) -> ParamPlanningProblem {
                     pnot!(
                         &pand!(
                             &pass!(&new_enum_assign_c!(&format!("{}_on", b1), &on_domain, &format!("{}", b2), "on", "on")),
-                            &pass!(&new_bool_assign_c!(&format!("clear_{}", b2), true, "clear"))
+                            &pass!(&new_bool_assign_c!(&format!("clear_{}", b2), true, "on"))
                         )
                     )
                 )
@@ -145,7 +145,7 @@ pub fn model(name: &str) -> ParamPlanningProblem {
         &parsed.goal,
         &transitions,
         &Predicate::AND(invariants),
-        &vec!(on, clear)
+        &vec!(on)
     );
 
     problem

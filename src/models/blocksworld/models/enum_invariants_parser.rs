@@ -82,7 +82,7 @@ pub fn parser(name: &str) -> (ParamPlanningProblem, Vec<String>) {
         clear_predicates.push(pand!(&pass!(&new_bool_assign_c!(
             &format!("clear_{}", x),
             true,
-            "clear"
+            "on"
         ))))
     }
 
@@ -154,7 +154,10 @@ pub fn parser(name: &str) -> (ParamPlanningProblem, Vec<String>) {
     //     )
     // );
 
-    let goal = ParamPredicate::new(&goal_on_predicates);
+    let reversed_goal_for_heuristics = goal_on_predicates.iter().rev().cloned().collect();
+    let goal = ParamPredicate::new(&reversed_goal_for_heuristics);
+
+    // let goal = ParamPredicate::new(&goal_on_predicates);
     let problem =
         ParamPlanningProblem::new(name, &initial, &goal, &vec![], &Predicate::TRUE, &vec![]);
 

@@ -295,6 +295,8 @@ pub fn heuristics_subgoaling(
     );
 
     let mut subresults = vec![first_result.clone()];
+    pprint_result_trans_only(&first_result);
+    println!("{:?}", subresults.len());
     let return_result =
         recursive_subfn(&first_result, &prob, 0, timeout, max_steps, &mut subresults);
 
@@ -311,10 +313,6 @@ pub fn heuristics_subgoaling(
             let mut goals = vec![];
             for j in 0..i + 1 {
                 goals.push(prob.goal.preds[j as usize].clone())
-            }
-
-            if result.trace.len() !=0 {
-
             }
 
             let init = match result.trace.len() == 0 {
@@ -342,6 +340,7 @@ pub fn heuristics_subgoaling(
                 timeout,
                 max_steps,
             );
+            pprint_result_trans_only(&new_result);
             subresults.push(new_result.clone());
             println!("{:?}", subresults.len());
             recursive_subfn(&new_result, &prob, i, timeout, max_steps, subresults)
