@@ -27,7 +27,8 @@ pub fn model(name: &str) -> ParamPlanningProblem {
             ParamTransition::new(
                 &format!("pick_up_{}", block),
                 &ppred!(
-                    &pass!(&new_bool_assign_c!(&format!("clear_{}", block), true, "on"))
+                    &pass!(&new_bool_assign_c!(&format!("clear_{}", block), true, "on")),
+                    &pass!(&new_enum_assign_c!(&format!("{}_on", block), &on_domain, "TABLE", "on", "on"))
                 ),
                 &ppred!(
                     &pass!(&new_bool_assign_c!(&format!("clear_{}", block), false, "on")),

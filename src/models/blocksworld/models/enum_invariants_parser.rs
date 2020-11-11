@@ -115,14 +115,27 @@ pub fn parser(name: &str) -> (ParamPlanningProblem, Vec<String>) {
     ]);
 
     let mut goal_on_predicates = vec![];
-    for (b1, b2) in on_goal {
+    for (b1, b2) in &on_goal {
         goal_on_predicates.push(pass!(&new_enum_assign_c!(
             &format!("{}_on", b1),
             &on_domain,
             &format!("{}", b2),
             "on",
             "on"
-        )))
+        )));
+    }
+
+    // goal refinement for faster "goal decopmosition" planning
+    let on_vector = on_goal.iter().map(|x| x.0).collect();
+    let goal_ontable_blocks = blocks.clone().difference(on_vector);
+    for otb in &goal_ontable_blocks{
+        goal_on_predicates.push(pass!(&new_enum_assign_c!(
+            &format!("{}_on", otb),
+            &on_domain,
+            "TABLE",
+            "on",
+            "on"
+        )));
     }
 
     // let init = ParamPredicate::new(

@@ -281,6 +281,11 @@ pub fn heuristics_subgoaling(
     timeout: u64,
     max_steps: u64,
 ) -> PlanningResult {
+    println!("GOAL {:?}", prob.goal.preds[0]);
+    for j in &prob.init.preds {
+        println!("INITIAL {:?}", j);
+    }
+
     let first_result = parameterized(
         &ParamPlanningProblem::new(
             &prob.name,
@@ -295,7 +300,7 @@ pub fn heuristics_subgoaling(
     );
 
     let mut subresults = vec![first_result.clone()];
-    pprint_result_trans_only(&first_result);
+    pprint_result(&first_result);
     println!("{:?}", subresults.len());
     let return_result =
         recursive_subfn(&first_result, &prob, 0, timeout, max_steps, &mut subresults);
@@ -311,9 +316,13 @@ pub fn heuristics_subgoaling(
         if i < prob.goal.preds.len() as u64 - 1 {
             let i = i + 1;
             let mut goals = vec![];
-            for j in 0..i + 1 {
+            for j in 0..i + 1{
                 goals.push(prob.goal.preds[j as usize].clone())
             }
+            for g in &goals {
+                println!("GOAL {:?}", g);
+            }
+            
 
             let init = match result.trace.len() == 0 {
                 false => match &result.trace.last() {
@@ -328,6 +337,10 @@ pub fn heuristics_subgoaling(
                 true => prob.init.clone(),
             };
 
+            for j in &init.preds {
+                println!("INITIAL {:?}", j);
+            }
+            
             let new_result = parameterized(
                 &ParamPlanningProblem::new(
                     &prob.name,
@@ -340,7 +353,7 @@ pub fn heuristics_subgoaling(
                 timeout,
                 max_steps,
             );
-            pprint_result_trans_only(&new_result);
+            pprint_result(&new_result);
             subresults.push(new_result.clone());
             println!("{:?}", subresults.len());
             recursive_subfn(&new_result, &prob, i, timeout, max_steps, subresults)
