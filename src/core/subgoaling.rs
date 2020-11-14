@@ -7,7 +7,7 @@ pub fn subgoaling(
     prob: &ParamPlanningProblem,
     alg: &str,
     timeout: u64,
-    max_steps: u64,
+    tries: u64,
 ) -> PlanningResult {
     let first_subgoal = ParamPlanningProblem::new(
         &prob.name,
@@ -19,8 +19,8 @@ pub fn subgoaling(
     );
 
     let first_result = match alg {
-        "seq" => sequential(&unparam(&first_subgoal), timeout, max_steps),
-        "inc" => incremental(&unparam(&first_subgoal), timeout, max_steps),
+        "seq" => sequential(&unparam(&first_subgoal), timeout, tries),
+        "inc" => incremental(&unparam(&first_subgoal), timeout, tries),
         "comp" => unimplemented!(),
         _ => panic!("impossible")
     };
@@ -29,14 +29,14 @@ pub fn subgoaling(
     pprint_result(&first_result);
     println!("{:?}", subresults.len());
     let return_result =
-        recursive_subfn(&first_result, &prob, 0, timeout, max_steps, &mut subresults);
+        recursive_subfn(&first_result, &prob, 0, timeout, tries, &mut subresults);
 
     fn recursive_subfn(
         result: &PlanningResult,
         prob: &ParamPlanningProblem,
         i: u64,
         timeout: u64,
-        max_steps: u64,
+        tries: u64,
         subresults: &mut Vec<PlanningResult>,
     ) -> PlanningResult {
         if i < prob.goal.preds.len() as u64 - 1 {
@@ -77,12 +77,12 @@ pub fn subgoaling(
                     &prob.params,
                 ),
                 timeout,
-                max_steps,
+                tries,
             );
             pprint_result(&new_result);
             subresults.push(new_result.clone());
             // println!("{:?}", subresults.len());
-            recursive_subfn(&new_result, &prob, i, timeout, max_steps, subresults)
+            recursive_subfn(&new_result, &prob, i, timeout, tries, subresults)
         } else {
             concatenate(&subresults)
         }

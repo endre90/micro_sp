@@ -5,20 +5,21 @@ use z3_sys::*;
 use z3_v2::*;
 
 /// The basic sequential planning algorithm.
-pub fn sequential(prob: &PlanningProblem, timeout: u64, max_steps: u64) -> PlanningResult {
+pub fn sequential(prob: &PlanningProblem, timeout: u64, tries: u64) -> PlanningResult {
     let now = Instant::now();
     let mut plan_found: bool = false;
     let mut step: u64 = 0;
 
     let mut result = PlanningResult {
         name: prob.name.to_owned(),
+        alg: String::from("sequential"),
         plan_found : false,
         plan_length: 0,
         trace: vec!(),
         time_to_solve: Duration::from_secs(0)
     };
 
-    while now.elapsed() < Duration::from_secs(timeout) && step < max_steps {
+    while now.elapsed() < Duration::from_secs(timeout) && step < tries {
         println!("elapsed: {:?}", now.elapsed());
         let cfg = ConfigZ3::new();
         let ctx = ContextZ3::new(&cfg);
@@ -78,6 +79,7 @@ pub fn sequential(prob: &PlanningProblem, timeout: u64, max_steps: u64) -> Plann
                     &ctx,
                     &prob,
                     SlvGetModelZ3::new(&ctx, &slv),
+                    "sequential",
                     step,
                     now.elapsed(),
                     plan_found,

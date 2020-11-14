@@ -12,6 +12,7 @@ pub use crate::core::incremental::*;
 pub use crate::core::items::*;
 pub use crate::core::parameterized::*;
 pub use crate::core::predicates::*;
+pub use crate::core::exponential::*;
 
 pub mod runner;
 // pub use crate::runner::publisher::*;

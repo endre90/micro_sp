@@ -11,6 +11,8 @@ async fn main() -> io::Result<()> {
     let result = match ha.alg.as_str() {
         "seq" => sequential(&unparam(&ha.model), ha.timeout, ha.max_steps),
         "inc" => incremental(&unparam(&ha.model), ha.timeout, ha.max_steps),
+        "seqexp" => seqexponential(&unparam(&ha.model), ha.timeout, ha.max_steps),
+        "incexp" => incexponential(&unparam(&ha.model), ha.timeout, ha.max_steps),
         "comp" => unimplemented!(),
         "seqsub" => subgoaling(&ha.model, "seq", ha.timeout, ha.max_steps),
         "incsub" => subgoaling(&ha.model, "inc", ha.timeout, ha.max_steps),

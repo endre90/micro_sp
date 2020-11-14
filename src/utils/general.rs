@@ -49,7 +49,7 @@ pub struct ArgsCLI {
     #[structopt(long, short = "t", parse(try_from_str), default_value = "300")]
     pub timeout: u64,
     /// Limit the number of steps
-    #[structopt(long, short = "s", parse(try_from_str), default_value = "100")]
+    #[structopt(long, short = "s", parse(try_from_str), default_value = "1000")]
     pub max_steps: u64,
 }
 

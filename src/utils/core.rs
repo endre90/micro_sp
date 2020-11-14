@@ -129,6 +129,7 @@ pub fn get_planning_result(
     ctx: &ContextZ3,
     prob: &PlanningProblem,
     model: Z3_model,
+    alg: &str,
     nr_steps: u64,
     planning_time: std::time::Duration,
     plan_found: bool,
@@ -255,6 +256,7 @@ pub fn get_planning_result(
     match plan_found {
         true => PlanningResult {
             name: prob.name.clone(),
+            alg: alg.to_owned(),
             plan_found: plan_found,
             plan_length: nr_steps - 1,
             trace: trace,
@@ -263,6 +265,7 @@ pub fn get_planning_result(
         false => PlanningResult {
             name: prob.name.clone(),
             plan_found: plan_found,
+            alg: alg.to_owned(),
             plan_length: 0,
             trace: vec![],
             time_to_solve: planning_time,

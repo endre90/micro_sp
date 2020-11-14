@@ -195,3 +195,74 @@ impl State {
         }
     }
 }
+
+/// A transition that updates the state according to the guard and update predicates.
+/// When incremental planning, the guard and update predicates
+/// are concjunctions of predicated from the guard and update vector. During
+/// compositional planning, the guard and update predicates are a conjunction
+/// of activated predicates from the vectors.
+#[derive(Debug, PartialEq, Ord, PartialOrd, Clone, Eq)]
+pub struct Transition {
+    pub name: String,
+    pub guard: Predicate,
+    pub update: Predicate,
+}
+
+impl Transition {
+    /// Make a new named transition from guard and update predicates.
+    pub fn new(name: &str, guard: &Predicate, update: &Predicate) -> Transition {
+        Transition {
+            name: name.to_string(),
+            guard: guard.to_owned(),
+            update: update.to_owned(),
+        }
+    }
+}
+
+/// A frame holds states about what happens in a step.
+#[derive(PartialEq, Eq, Clone, Debug, PartialOrd, Ord)]
+pub struct PlanningFrame {
+    pub source: State,
+    pub sink: State,
+    pub trans: String,
+}
+
+/// A planning problem that is given to the incremental solver.
+#[derive(Debug, PartialEq, Clone, PartialOrd, Eq, Ord)]
+pub struct PlanningProblem {
+    pub name: String,
+    pub init: Predicate,
+    pub goal: Predicate,
+    pub trans: Vec<Transition>,
+    pub invars: Predicate
+}
+
+/// A result is generated when the planner finds a satisfiable model.
+#[derive(PartialEq, Eq, Clone, Debug, PartialOrd, Ord)]
+pub struct PlanningResult {
+    pub name: String,
+    pub alg: String,
+    pub plan_found: bool,
+    pub plan_length: u64,
+    pub trace: Vec<PlanningFrame>,
+    pub time_to_solve: std::time::Duration,
+}
+
+impl PlanningProblem {
+    /// Make a new planning problem from defined componenets.
+    pub fn new(
+        name: &str,
+        init: &Predicate,
+        goal: &Predicate,
+        trans: &Vec<Transition>,
+        invars: &Predicate
+    ) -> PlanningProblem {
+        PlanningProblem {
+            name: name.to_string(),
+            init: init.to_owned(),
+            goal: goal.to_owned(),
+            trans: trans.to_owned(),
+            invars: invars.to_owned()
+        }
+    }
+}

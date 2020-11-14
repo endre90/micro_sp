@@ -88,7 +88,7 @@ pub fn generate_and_solve(
     level: u64,
     concat: u64,
     timeout: u64,
-    max_steps: u64,
+    tries: u64,
 ) -> PlanningResult {
     let res = parameterized(
         &ParamPlanningProblem {
@@ -114,7 +114,7 @@ pub fn generate_and_solve(
             params: params.to_owned(),
         },
         timeout,
-        max_steps,
+        tries,
     );
     match res.plan_found {
         true => {
@@ -130,7 +130,8 @@ pub fn generate_and_solve(
 /// Concatenate all results in a level.
 pub fn concatenate(results: &Vec<PlanningResult>) -> PlanningResult {
     PlanningResult {
-        name: results[0].name.clone(),
+        name: results[0].name.clone(), //fix this
+        alg: String::from("comp_or_subgoal?"),
         plan_found: results.iter().all(|x| x.plan_found),
         plan_length: results.iter().map(|x| x.plan_length).sum(),
         trace: results
@@ -142,10 +143,10 @@ pub fn concatenate(results: &Vec<PlanningResult>) -> PlanningResult {
     }
 }
 
-pub fn compositional(prob: &ParamPlanningProblem, timeout: u64, max_steps: u64) -> PlanningResult {
+pub fn compositional(prob: &ParamPlanningProblem, timeout: u64, tries: u64) -> PlanningResult {
     let deactivated = deactivate_all_in_problem(&prob);
     let first_activated = activate_next_in_problem(&deactivated);
-    let first_result = parameterized(&first_activated, timeout, max_steps);
+    let first_result = parameterized(&first_activated, timeout, tries);
 
     // println!("PARAMETERS: {:?}", first_activated.params);
     pprint_result(&first_result);
@@ -156,7 +157,7 @@ pub fn compositional(prob: &ParamPlanningProblem, timeout: u64, max_steps: u64) 
         &first_activated.params,
         0,
         timeout,
-        max_steps,
+        tries,
     );
 
     fn recursive_subfn(
@@ -165,7 +166,7 @@ pub fn compositional(prob: &ParamPlanningProblem, timeout: u64, max_steps: u64) 
         params: &Vec<Parameter>,
         level: u64,
         timeout: u64,
-        max_steps: u64,
+        tries: u64,
     ) -> PlanningResult {
         let level = level + 1;
         let mut final_result: PlanningResult = result.to_owned();
@@ -188,7 +189,7 @@ pub fn compositional(prob: &ParamPlanningProblem, timeout: u64, max_steps: u64) 
                                 &prob.invars,
                                 &activated_params,
                             );
-                            let next_result = parameterized(&next_prob, timeout, max_steps);
+                            let next_result = parameterized(&next_prob, timeout, tries);
                             if next_result.plan_found {
                                 level_subresults.push(next_result.to_owned());
                                 match next_result.trace.last() {
@@ -209,7 +210,7 @@ pub fn compositional(prob: &ParamPlanningProblem, timeout: u64, max_steps: u64) 
                                 &prob.invars,
                                 &activated_params,
                             );
-                            let next_result = parameterized(&next_prob, timeout, max_steps);
+                            let next_result = parameterized(&next_prob, timeout, tries);
                             if next_result.plan_found {
                                 level_subresults.push(next_result.clone());
                             } else {
@@ -226,7 +227,7 @@ pub fn compositional(prob: &ParamPlanningProblem, timeout: u64, max_steps: u64) 
                                 &prob.invars,
                                 &activated_params,
                             );
-                            let next_result = parameterized(&next_prob, timeout, max_steps);
+                            let next_result = parameterized(&next_prob, timeout, tries);
                             if next_result.plan_found {
                                 level_subresults.push(next_result.to_owned());
                                 match next_result.trace.last() {
@@ -251,7 +252,7 @@ pub fn compositional(prob: &ParamPlanningProblem, timeout: u64, max_steps: u64) 
                         &prob.invars,
                         &activated_params,
                     );
-                    let next_result = parameterized(&next_prob, timeout, max_steps);
+                    let next_result = parameterized(&next_prob, timeout, tries);
                     if next_result.plan_found {
                         level_subresults.push(next_result.to_owned());
                     } else {
@@ -265,7 +266,7 @@ pub fn compositional(prob: &ParamPlanningProblem, timeout: u64, max_steps: u64) 
                     &activated_params,
                     level,
                     timeout,
-                    max_steps,
+                    tries,
                 );
             }
         }

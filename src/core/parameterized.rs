@@ -115,7 +115,7 @@ pub fn generate_transition(ptrans: &ParamTransition, params: &Vec<Parameter>) ->
 pub fn parameterized(
     prob: &ParamPlanningProblem,
     timeout: u64,
-    max_steps: u64
+    tries: u64
 ) -> PlanningResult {
         incremental(&PlanningProblem::new(
             &prob.name,
@@ -130,7 +130,7 @@ pub fn parameterized(
             // &generate_predicate(&prob.invars, &prob.params)
         ),
         timeout,
-        max_steps
+        tries
     )
 }
 
@@ -139,7 +139,7 @@ pub fn parameterized(
 //     prob: &ParamPlanningProblem,
 //     params: &Vec<Parameter>,
 //     timeout: u64,
-//     max_steps: u64
+//     tries: u64
 // ) -> PlanningResult {
 //         incremental(&PlanningProblem::new(
 //             &prob.name,
@@ -153,6 +153,6 @@ pub fn parameterized(
 //             &generate_predicate(&prob.invars, &params)
 //         ),
 //         timeout,
-//         max_steps
+//         tries
 //     )
 // }
