@@ -3,7 +3,7 @@ use std::io;
 mod models;
 mod runner;
 use r2r::*;
-use tokio::time::{Duration, delay_for, Instant, timeout};
+use tokio::time::{Duration, delay_for, Instant, timeout_at};
 
 #[tokio::main]
 async fn main() -> io::Result<()> {
@@ -11,10 +11,15 @@ async fn main() -> io::Result<()> {
 
     // "async" => async_incremental(&unparam(&ha.model), ha.timeout, ha.max_steps),
 
-    let result = timeout(Duration::from_secs(ha.timeout), async_incremental(&unparam(&ha.model), ha.timeout, ha.max_steps)).await.ok();
+    // let result = timeout(Duration::from_secs(ha.timeout), async_incremental(&unparam(&ha.model))).await.ok();
+    
+    if let Err(_) = timeout_at(Instant::now() + Duration::from_millis(2000), async_incremental(&unparam(&ha.model))).await {
+        println!("did not receive value within 10 ms");
+    }
 
+    // println!("{}", ha.timeout);
     // let mut result = String::from("initial");
-    // if let Ok(async_res) = timeout(Duration::from_secs(1), async_incremental(&unparam(&ha.model), ha.timeout, ha.max_steps)).await {
+    // if let Ok(async_res) = timeout_at(Instant::now() + Duration::from_secs(ha.timeout), async_incremental(&unparam(&ha.model))).await {
     //     result = async_res.name.clone();
     // } else {
     //     result = String::from("timeout");
@@ -34,15 +39,15 @@ async fn main() -> io::Result<()> {
     //     _ => panic!("nonexistent algorithm"),
     // };
 
-    match result {
-        Some(x) => {
-            match ha.print {
-                true => pprint_result(&x),
-                false => pprint_result_trans_only(&x),
-            }
-        },
-        None => panic!("future failed!")
-    }
+    // match result {
+    //     Some(x) => {
+    //         match ha.print {
+    //             true => pprint_result(&x),
+    //             false => pprint_result_trans_only(&x),
+    //         }
+    //     },
+    //     None => panic!("future failed!")
+    // }
     
 
     // match ha.filesave {

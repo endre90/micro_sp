@@ -5,10 +5,9 @@ use std::sync::Mutex;
 use z3_sys::*;
 use z3_v2::*;
 use tokio::time::{Duration, delay_for, Instant, timeout};
-use futures::future::{Abortable, AbortHandle, Aborted};
 
 /// async wrap to work with a real timer
-pub async fn async_incremental(prob: &PlanningProblem, timeout: u64, tries: u64) -> PlanningResult {
+pub async fn async_incremental(prob: &PlanningProblem) -> PlanningResult {
     let cfg = ConfigZ3::new();
     let ctx = ContextZ3::new(&cfg);
     let slv = SolverZ3::new(&ctx);
@@ -29,7 +28,7 @@ pub async fn async_incremental(prob: &PlanningProblem, timeout: u64, tries: u64)
     let mut plan_found: bool = false;
     let mut step: u64 = 0;
 
-    while now.elapsed() < Duration::from_secs(timeout) && step < tries {
+    loop {
         println!("elapsed: {:?}", now.elapsed());
         step = step + 1;
         match SlvCheckZ3::new(&ctx, &slv) == 1 {

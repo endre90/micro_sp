@@ -5,7 +5,7 @@ use z3_sys::*;
 use z3_v2::*;
 
 /// Rintanens exponential on top of sequential.
-pub fn seqexponential(prob: &PlanningProblem, timeout: u64, tries: u64) -> PlanningResult {
+pub async fn seqexponential(prob: &PlanningProblem, timeout: u64, tries: u64) -> PlanningResult {
     let now = Instant::now();
     let mut plan_found: bool = false;
     let mut step: u64 = 0;
