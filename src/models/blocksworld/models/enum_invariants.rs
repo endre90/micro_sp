@@ -21,6 +21,25 @@ pub fn model(name: &str) -> ParamPlanningProblem {
     let mut put_down_transitions = vec![];
     let mut stack_transitions = vec![];
     let mut unstack_transitions = vec![];
+    // let mut do_nothing_transition = vec![];
+
+    // for block in &blocks {
+    //     do_nothing_transition.push(
+    //         ParamTransition::new(
+    //             "do_nothing", 
+    //             &ppred!(
+    //                 &pass!(&new_bool_assign_c!(&format!("clear_{}", block), true, "on")),
+    //                 &pass!(&new_enum_assign_c!(&format!("{}_on", block), &on_domain, "TABLE", "on", "on"))
+    //             ),
+    //             &ppred!(
+    //                 &pass!(&new_bool_assign_c!(&format!("clear_{}", block), false, "on")),
+    //                 &pass!(&new_enum_assign_c!(&format!("{}_on", block), &on_domain, "GRIP", "on", "on"))
+    //             )
+    //             // &ppred!(&Predicate::TRUE), 
+    //             // &ppred!(&Predicate::TRUE)
+    //         )
+    //     )
+    // }
 
     for block in &blocks {
         pick_up_transitions.push(

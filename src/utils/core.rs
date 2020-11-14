@@ -141,11 +141,11 @@ pub fn get_planning_result(
         .collect();
     let vars = get_problem_vars(&prob);
 
-    for m in &model_vec {
-        if m[1] == "true"{
-            println!("{:?}", m);
-        }
-    }
+    // for m in &model_vec {
+    //     if m[1] == "true"{
+    //         println!("{:?}", m);
+    //     }
+    // }
     
 
     let mut trace: Vec<PlanningFrame> = vec![];

@@ -12,19 +12,7 @@ pub struct ArgsCLI {
     /// Online planning and acting
     #[structopt(long, short = "r", parse(try_from_str), default_value = "false")]
     pub run: bool,
-    /// Planning algorithm:
-    /// 
-    /// seq: basic sequential
-    /// 
-    /// inc: incremental
-    /// 
-    /// comp: compositional
-    /// 
-    /// seqsub: sequential with subgoaling
-    /// 
-    /// incsub: incremental with subgoaling
-    /// 
-    /// compsub: compositional with subgoaling
+    /// Planning algorithm
     #[structopt(long, short = "a", default_value = "inc")]
     pub alg: String,
     /// Generate dummy driver (inverse micro_sp)
@@ -264,6 +252,7 @@ pub fn pprint_result_trans_only(result: &PlanningResult) -> () {
     println!("                   PLANNING RESULT                    ");
     println!("======================================================");
     println!("name: {:?}", result.name);
+    println!("algo: {:?}", result.alg);
     println!("found: {:?}", result.plan_found);
     println!("lenght: {:?}", result.plan_length);
     // println!("time: {:?}", result.time_to_solve);
@@ -279,7 +268,7 @@ pub fn pprint_result_trans_only(result: &PlanningResult) -> () {
 
 // /// Pretty print a planning result to a file.
 pub fn pprint_result_to_file(result: &PlanningResult) -> () {
-    let filename = format!("{}.txt", result.name);
+    let filename = format!("{}_{}.txt", result.name, result.alg);
     let path = Path::new(&filename);
     let display = path.display();
     // Open a file in write-only mode, returns `io::Result<File>`
@@ -291,6 +280,7 @@ pub fn pprint_result_to_file(result: &PlanningResult) -> () {
     file.write("                   PLANNING RESULT                    \n".as_bytes()).ok();
     file.write("======================================================\n".as_bytes()).ok();
     file.write(&format!("name: {:?}\n", result.name).as_bytes()).ok();
+    file.write(&format!("algo: {:?}\n", result.alg).as_bytes()).ok();
     file.write(&format!("found: {:?}\n", result.plan_found).as_bytes()).ok();
     file.write(&format!("lenght: {:?}\n", result.plan_length).as_bytes()).ok();
     // file.write(&format!("time: {:?}\n", result.time_to_solve).as_bytes()).ok();

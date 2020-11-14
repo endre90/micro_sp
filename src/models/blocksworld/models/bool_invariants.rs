@@ -24,6 +24,7 @@ pub fn model(name: &str) -> ParamPlanningProblem {
     let mut put_down_transitions = vec![];
     let mut stack_transitions = vec![];
     let mut unstack_transitions = vec![];
+    
 
     for block in &blocks {
         pick_up_transitions.push(
@@ -112,7 +113,7 @@ pub fn model(name: &str) -> ParamPlanningProblem {
         pick_up_transitions,
         put_down_transitions,
         stack_transitions,
-        unstack_transitions,
+        unstack_transitions
     ] {
         transitions.extend(t)
     }
