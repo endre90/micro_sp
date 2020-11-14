@@ -281,9 +281,9 @@ pub fn heuristics_subgoaling(
     timeout: u64,
     max_steps: u64,
 ) -> PlanningResult {
-    println!("GOAL {:?}", prob.goal.preds[0]);
+    // println!("GOAL {:?}", prob.goal.preds[0]);
     for j in &prob.init.preds {
-        println!("INITIAL {:?}", j);
+        // println!("INITIAL {:?}", j);
     }
 
     let first_result = parameterized(
@@ -319,9 +319,9 @@ pub fn heuristics_subgoaling(
             for j in 0..i + 1{
                 goals.push(prob.goal.preds[j as usize].clone())
             }
-            for g in &goals {
-                println!("GOAL {:?}", g);
-            }
+            // for g in &goals {
+            //     println!("GOAL {:?}", g);
+            // }
             
 
             let init = match result.trace.len() == 0 {
@@ -337,9 +337,9 @@ pub fn heuristics_subgoaling(
                 true => prob.init.clone(),
             };
 
-            for j in &init.preds {
-                println!("INITIAL {:?}", j);
-            }
+            // for j in &init.preds {
+            //     println!("INITIAL {:?}", j);
+            // }
             
             let new_result = parameterized(
                 &ParamPlanningProblem::new(
@@ -355,7 +355,7 @@ pub fn heuristics_subgoaling(
             );
             pprint_result(&new_result);
             subresults.push(new_result.clone());
-            println!("{:?}", subresults.len());
+            // println!("{:?}", subresults.len());
             recursive_subfn(&new_result, &prob, i, timeout, max_steps, subresults)
         } else {
             concatenate(&subresults)
@@ -369,7 +369,7 @@ pub fn compositional(prob: &ParamPlanningProblem, timeout: u64, max_steps: u64) 
     let first_activated = activate_next_in_problem(&deactivated);
     let first_result = parameterized(&first_activated, timeout, max_steps);
 
-    println!("PARAMETERS: {:?}", first_activated.params);
+    // println!("PARAMETERS: {:?}", first_activated.params);
     pprint_result(&first_result);
 
     let return_result = recursive_subfn(

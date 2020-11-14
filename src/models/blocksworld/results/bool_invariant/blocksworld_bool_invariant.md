@@ -1,0 +1,44 @@
+| Command | Mean [ms] | Min [ms] | Max [ms] | Relative |
+|:---|---:|---:|---:|---:|
+| `cargo run --release -- -m blocksworld -v bool_invariant -i instance_1 -f true` | 131.1 ± 0.1 | 131.0 | 131.2 | 1.00 |
+| `cargo run --release -- -m blocksworld -v bool_invariant -i instance_2 -f true` | 179.5 ± 2.2 | 178.0 | 181.0 | 1.37 ± 0.02 |
+| `cargo run --release -- -m blocksworld -v bool_invariant -i instance_3 -f true` | 137.0 ± 5.6 | 133.0 | 141.0 | 1.05 ± 0.04 |
+| `cargo run --release -- -m blocksworld -v bool_invariant -i instance_4 -f true` | 391.3 ± 6.9 | 386.4 | 396.1 | 2.98 ± 0.05 |
+| `cargo run --release -- -m blocksworld -v bool_invariant -i instance_5 -f true` | 337.3 ± 0.2 | 337.1 | 337.4 | 2.57 ± 0.00 |
+| `cargo run --release -- -m blocksworld -v bool_invariant -i instance_6 -f true` | 679.7 ± 6.3 | 675.3 | 684.2 | 5.18 ± 0.05 |
+| `cargo run --release -- -m blocksworld -v bool_invariant -i instance_7 -f true` | 714.4 ± 12.3 | 705.7 | 723.2 | 5.45 ± 0.09 |
+| `cargo run --release -- -m blocksworld -v bool_invariant -i instance_8 -f true` | 554.6 ± 0.5 | 554.2 | 555.0 | 4.23 ± 0.00 |
+| `cargo run --release -- -m blocksworld -v bool_invariant -i instance_9 -f true` | 3602.9 ± 13.9 | 3593.0 | 3612.7 | 27.48 ± 0.11 |
+| `cargo run --release -- -m blocksworld -v bool_invariant -i instance_10 -f true` | 3735.5 ± 95.9 | 3667.7 | 3803.4 | 28.49 ± 0.73 |
+| `cargo run --release -- -m blocksworld -v bool_invariant -i instance_11 -f true` | 9758.6 ± 15.5 | 9747.7 | 9769.6 | 74.44 ± 0.13 |
+| `cargo run --release -- -m blocksworld -v bool_invariant -i instance_12 -f true` | 5905.9 ± 201.3 | 5763.5 | 6048.3 | 45.05 ± 1.54 |
+| `cargo run --release -- -m blocksworld -v bool_invariant -i instance_13 -f true` | 7322.0 ± 87.6 | 7260.1 | 7383.9 | 55.85 ± 0.67 |
+| `cargo run --release -- -m blocksworld -v bool_invariant -i instance_14 -f true` | 11166.0 ± 407.7 | 10877.7 | 11454.2 | 85.17 ± 3.11 |
+| `cargo run --release -- -m blocksworld -v bool_invariant -i instance_15 -f true` | 4925.5 ± 320.2 | 4699.1 | 5151.8 | 37.57 ± 2.44 |
+| `cargo run --release -- -m blocksworld -v bool_invariant -i instance_16 -f true` | 76459.0 ± 12801.5 | 67406.9 | 85511.0 | 583.20 ± 97.65 |
+| `cargo run --release -- -m blocksworld -v bool_invariant -i instance_17 -f true` | 38367.6 ± 1539.9 | 37278.7 | 39456.4 | 292.65 ± 11.75 |
+| `cargo run --release -- -m blocksworld -v bool_invariant -i instance_18 -f true` | 28126.3 ± 937.8 | 27463.2 | 28789.5 | 214.54 ± 7.15 |
+| `cargo run --release -- -m blocksworld -v bool_invariant -i instance_19 -f true` | 114367.2 ± 117.1 | 114284.4 | 114450.0 | 872.35 ± 1.05 |
+| `cargo run --release -- -m blocksworld -v bool_invariant -i instance_20 -f true` | 129730.5 ± 3015.3 | 127598.4 | 131862.6 | 989.54 ± 23.01 |
+| `cargo run --release -- -m blocksworld -v bool_invariant -i instance_21 -f true` | 166690.8 ± 2834.7 | 164686.3 | 168695.3 | 1271.46 ± 21.64 |
+| `cargo run --release -- -m blocksworld -v bool_invariant -i instance_22 -f true` | 144180.2 ± 823.5 | 143597.9 | 144762.5 | 1099.76 ± 6.32 |
+| `cargo run --release -- -m blocksworld -v bool_invariant -i instance_23 -f true` | 197488.2 ± 1393.8 | 196502.6 | 198473.7 | 1506.37 ± 10.67 |
+| `cargo run --release -- -m blocksworld -v bool_invariant -i instance_24 -f true` | 232554.6 ± 585.6 | 232140.5 | 232968.7 | 1773.84 ± 4.61 |
+| `cargo run --release -- -m blocksworld -v bool_invariant -i instance_25 -f true` | 317699.0 ± 3174.0 | 315454.6 | 319943.3 | 2423.29 ± 24.26 |
+| `cargo run --release -- -m blocksworld -v bool_invariant -i instance_26 -f true` | 384441.2 ± 4532.1 | 381236.5 | 387645.9 | 2932.38 ± 34.62 |
+| `cargo run --release -- -m blocksworld -v bool_invariant -i instance_27 -f true` | 327023.0 ± 12152.7 | 318429.8 | 335616.2 | 2494.41 ± 92.71 |
+| `cargo run --release -- -m blocksworld -v bool_invariant -i instance_28 -f true` | 308740.4 ± 11554.2 | 300570.4 | 316910.5 | 2354.96 ± 88.14 |
+| `cargo run --release -- -m blocksworld -v bool_invariant -i instance_29 -f true` | 314739.3 ± 1601.5 | 313606.9 | 315871.7 | 2400.72 ± 12.31 |
+| `cargo run --release -- -m blocksworld -v bool_invariant -i instance_30 -f true` | 323684.8 ± 2346.3 | 322025.7 | 325343.8 | 2468.95 ± 17.96 |
+| `cargo run --release -- -m blocksworld -v bool_invariant -i instance_31 -f true` | 317590.6 ± 938.1 | 316927.3 | 318253.9 | 2422.47 ± 7.32 |
+| `cargo run --release -- -m blocksworld -v bool_invariant -i instance_32 -f true` | 375370.9 ± 3745.6 | 372722.3 | 378019.4 | 2863.19 ± 28.63 |
+| `cargo run --release -- -m blocksworld -v bool_invariant -i instance_33 -f true` | 409843.9 ± 6406.0 | 405314.1 | 414373.6 | 3126.14 ± 48.90 |
+| `cargo run --release -- -m blocksworld -v bool_invariant -i instance_34 -f true` | 479593.2 ± 5015.9 | 476046.5 | 483140.0 | 3658.17 ± 38.33 |
+| `cargo run --release -- -m blocksworld -v bool_invariant -i instance_35 -f true` | 329336.6 ± 6109.2 | 325016.8 | 333656.5 | 2512.06 ± 46.63 |
+| `cargo run --release -- -m blocksworld -v bool_invariant -i instance_36 -f true` | 346222.1 ± 1271.4 | 345323.1 | 347121.1 | 2640.86 ± 9.84 |
+| `cargo run --release -- -m blocksworld -v bool_invariant -i instance_37 -f true` | 323552.2 ± 3001.5 | 321429.8 | 325674.5 | 2467.94 ± 22.95 |
+| `cargo run --release -- -m blocksworld -v bool_invariant -i instance_38 -f true` | 304975.3 ± 5134.9 | 301344.5 | 308606.2 | 2326.24 ± 39.19 |
+| `cargo run --release -- -m blocksworld -v bool_invariant -i instance_39 -f true` | 371556.8 ± 88.6 | 371494.2 | 371619.5 | 2834.10 ± 1.92 |
+| `cargo run --release -- -m blocksworld -v bool_invariant -i instance_40 -f true` | 342406.6 ± 57470.4 | 301769.0 | 383044.3 | 2611.76 ± 438.37 |
+| `cargo run --release -- -m blocksworld -v bool_invariant -i instance_41 -f true` | 321273.8 ± 1503.3 | 320210.8 | 322336.8 | 2450.56 ± 11.57 |
+| `cargo run --release -- -m blocksworld -v bool_invariant -i instance_42 -f true` | 324484.6 ± 2955.8 | 322394.5 | 326574.7 | 2475.05 ± 22.60 |

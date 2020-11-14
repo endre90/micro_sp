@@ -1,0 +1,44 @@
+| Command | Mean [ms] | Min [ms] | Max [ms] | Relative |
+|:---|---:|---:|---:|---:|
+| `cargo run --release -- -m blocksworld -v bool_explicit -i instance_1 -f true` | 131.4 ± 3.9 | 128.6 | 134.1 | 1.00 |
+| `cargo run --release -- -m blocksworld -v bool_explicit -i instance_2 -f true` | 189.5 ± 2.1 | 188.0 | 191.1 | 1.44 ± 0.05 |
+| `cargo run --release -- -m blocksworld -v bool_explicit -i instance_3 -f true` | 133.8 ± 2.4 | 132.1 | 135.5 | 1.02 ± 0.04 |
+| `cargo run --release -- -m blocksworld -v bool_explicit -i instance_4 -f true` | 636.6 ± 5.1 | 632.9 | 640.2 | 4.85 ± 0.15 |
+| `cargo run --release -- -m blocksworld -v bool_explicit -i instance_5 -f true` | 507.5 ± 8.6 | 501.4 | 513.6 | 3.86 ± 0.13 |
+| `cargo run --release -- -m blocksworld -v bool_explicit -i instance_6 -f true` | 1500.0 ± 0.2 | 1499.8 | 1500.1 | 11.42 ± 0.34 |
+| `cargo run --release -- -m blocksworld -v bool_explicit -i instance_7 -f true` | 1318.4 ± 16.8 | 1306.5 | 1330.3 | 10.04 ± 0.32 |
+| `cargo run --release -- -m blocksworld -v bool_explicit -i instance_8 -f true` | 1051.4 ± 18.6 | 1038.3 | 1064.5 | 8.00 ± 0.28 |
+| `cargo run --release -- -m blocksworld -v bool_explicit -i instance_9 -f true` | 9224.1 ± 92.1 | 9158.9 | 9289.2 | 70.21 ± 2.20 |
+| `cargo run --release -- -m blocksworld -v bool_explicit -i instance_10 -f true` | 12599.7 ± 81.9 | 12541.8 | 12657.6 | 95.91 ± 2.92 |
+| `cargo run --release -- -m blocksworld -v bool_explicit -i instance_11 -f true` | 67204.9 ± 11590.6 | 59009.1 | 75400.7 | 511.57 ± 89.53 |
+| `cargo run --release -- -m blocksworld -v bool_explicit -i instance_12 -f true` | 46094.9 ± 763.9 | 45554.7 | 46635.0 | 350.88 ± 11.93 |
+| `cargo run --release -- -m blocksworld -v bool_explicit -i instance_13 -f true` | 47772.8 ± 258.2 | 47590.2 | 47955.4 | 363.65 ± 10.98 |
+| `cargo run --release -- -m blocksworld -v bool_explicit -i instance_14 -f true` | 135761.8 ± 1582.4 | 134642.9 | 136880.8 | 1033.44 ± 32.97 |
+| `cargo run --release -- -m blocksworld -v bool_explicit -i instance_15 -f true` | 25289.7 ± 516.3 | 24924.6 | 25654.8 | 192.51 ± 6.94 |
+| `cargo run --release -- -m blocksworld -v bool_explicit -i instance_16 -f true` | 372836.1 ± 1834.3 | 371539.0 | 374133.1 | 2838.08 ± 85.44 |
+| `cargo run --release -- -m blocksworld -v bool_explicit -i instance_17 -f true` | 263879.2 ± 2876.3 | 261845.3 | 265913.1 | 2008.68 ± 63.55 |
+| `cargo run --release -- -m blocksworld -v bool_explicit -i instance_18 -f true` | 233258.1 ± 8226.4 | 227441.2 | 239075.1 | 1775.59 ± 81.87 |
+| `cargo run --release -- -m blocksworld -v bool_explicit -i instance_19 -f true` | 383771.0 ± 4205.7 | 380797.1 | 386744.9 | 2921.32 ± 92.49 |
+| `cargo run --release -- -m blocksworld -v bool_explicit -i instance_20 -f true` | 307006.1 ± 1115.7 | 306217.2 | 307795.1 | 2336.97 ± 69.93 |
+| `cargo run --release -- -m blocksworld -v bool_explicit -i instance_21 -f true` | 344020.4 ± 15362.1 | 333157.7 | 354883.1 | 2618.73 ± 140.44 |
+| `cargo run --release -- -m blocksworld -v bool_explicit -i instance_22 -f true` | 388993.3 ± 884.7 | 388367.7 | 389618.9 | 2961.07 ± 88.21 |
+| `cargo run --release -- -m blocksworld -v bool_explicit -i instance_23 -f true` | 321115.8 ± 25260.5 | 303254.0 | 338977.7 | 2444.38 ± 205.54 |
+| `cargo run --release -- -m blocksworld -v bool_explicit -i instance_24 -f true` | 323970.5 ± 15707.3 | 312863.8 | 335077.2 | 2466.11 ± 140.22 |
+| `cargo run --release -- -m blocksworld -v bool_explicit -i instance_25 -f true` | 322150.5 ± 9814.7 | 315210.5 | 329090.5 | 2452.25 ± 104.34 |
+| `cargo run --release -- -m blocksworld -v bool_explicit -i instance_26 -f true` | 354317.2 ± 25967.8 | 335955.1 | 372679.2 | 2697.11 ± 213.29 |
+| `cargo run --release -- -m blocksworld -v bool_explicit -i instance_27 -f true` | 338614.1 ± 48255.0 | 304492.7 | 372735.5 | 2577.58 ± 375.22 |
+| `cargo run --release -- -m blocksworld -v bool_explicit -i instance_28 -f true` | 366480.4 ± 72.7 | 366428.9 | 366531.8 | 2789.70 ± 82.86 |
+| `cargo run --release -- -m blocksworld -v bool_explicit -i instance_29 -f true` | 387092.0 ± 32592.9 | 364045.3 | 410138.7 | 2946.60 ± 263.09 |
+| `cargo run --release -- -m blocksworld -v bool_explicit -i instance_30 -f true` | 434506.1 ± 877.3 | 433885.8 | 435126.5 | 3307.52 ± 98.47 |
+| `cargo run --release -- -m blocksworld -v bool_explicit -i instance_31 -f true` | 380899.8 ± 4142.0 | 377970.9 | 383828.7 | 2899.46 ± 91.71 |
+| `cargo run --release -- -m blocksworld -v bool_explicit -i instance_32 -f true` | 337664.3 ± 1354.1 | 336706.8 | 338621.7 | 2570.35 ± 77.04 |
+| `cargo run --release -- -m blocksworld -v bool_explicit -i instance_33 -f true` | 378662.4 ± 338.1 | 378423.3 | 378901.5 | 2882.43 ± 85.65 |
+| `cargo run --release -- -m blocksworld -v bool_explicit -i instance_34 -f true` | 367921.4 ± 6851.0 | 363077.0 | 372765.8 | 2800.67 ± 98.18 |
+| `cargo run --release -- -m blocksworld -v bool_explicit -i instance_35 -f true` | 309034.6 ± 6711.0 | 304289.2 | 313780.0 | 2352.41 ± 86.55 |
+| `cargo run --release -- -m blocksworld -v bool_explicit -i instance_36 -f true` | 425369.5 ± 1203.2 | 424518.7 | 426220.3 | 3237.97 ± 96.61 |
+| `cargo run --release -- -m blocksworld -v bool_explicit -i instance_37 -f true` | 456671.7 ± 201482.5 | 314202.0 | 599141.3 | 3476.25 ± 1537.18 |
+| `cargo run --release -- -m blocksworld -v bool_explicit -i instance_38 -f true` | 384693.2 ± 601.8 | 384267.7 | 385118.8 | 2928.34 ± 87.10 |
+| `cargo run --release -- -m blocksworld -v bool_explicit -i instance_39 -f true` | 307336.7 ± 2175.9 | 305798.1 | 308875.3 | 2339.49 ± 71.43 |
+| `cargo run --release -- -m blocksworld -v bool_explicit -i instance_40 -f true` | 424429.5 ± 12217.6 | 415790.3 | 433068.7 | 3230.81 ± 133.63 |
+| `cargo run --release -- -m blocksworld -v bool_explicit -i instance_41 -f true` | 334288.2 ± 7292.5 | 329131.6 | 339444.8 | 2544.65 ± 93.78 |
+| `cargo run --release -- -m blocksworld -v bool_explicit -i instance_42 -f true` | 437292.4 ± 4614.3 | 434029.6 | 440555.2 | 3328.73 ± 104.92 |
