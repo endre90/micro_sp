@@ -92,8 +92,8 @@ pub fn assignment_vector_to_predicate_vector(vec: &Vec<Assignment>) -> Vec<Predi
 
 /// Generate a predicate from a given state as a conjunction of assignments.
 pub fn state_to_predicate(state: &State) -> Predicate {
-    let mut pred = vec!();
-    for i in vec!(&state.measured, &state.command, &state.estimated) {
+    let mut pred = vec![];
+    for i in vec![&state.measured, &state.command, &state.estimated] {
         pred.extend(assignment_vector_to_predicate_vector(&i))
     }
     Predicate::AND(pred)
@@ -101,11 +101,27 @@ pub fn state_to_predicate(state: &State) -> Predicate {
 
 /// Generate a parameterized predicate from a given state.
 pub fn state_to_param_predicate(state: &State) -> ParamPredicate {
-    let mut pred = vec!();
-    for i in vec!(&state.measured, &state.command, &state.estimated) {
+    let mut pred = vec![];
+    for i in vec![&state.measured, &state.command, &state.estimated] {
         pred.extend(assignment_vector_to_predicate_vector(&i))
     }
     ParamPredicate::new(&pred)
+}
+
+/// Convert a parameterized planning problem to a regular planning problem.
+pub fn unparam(prob: &ParamPlanningProblem) -> PlanningProblem {
+    let activated = activate_all_in_problem(&prob);
+    PlanningProblem::new(
+        &activated.name,
+        &generate_predicate(&activated.init, &activated.params),
+        &generate_predicate(&activated.goal, &activated.params),
+        &activated
+            .trans
+            .iter()
+            .map(|x| generate_transition(x, &activated.params))
+            .collect(),
+        &activated.invars,
+    )
 }
 
 /// After the incremental algorithm has found a model it is unrolled into a plan.
@@ -124,12 +140,14 @@ pub fn get_planning_result(
         .collect();
     let vars = get_problem_vars(&prob);
 
-    // println!("{:?}", model_vec);
+    for m in &model_vec {
+        if m[1] == "true"{
+            println!("{:?}", m);
+        }
+    }
+    
 
     let mut trace: Vec<PlanningFrame> = vec![];
-    
-    // println!("VARS {:?}", vars);
-    
     for i in 0..nr_steps - 1 {
         let mut enum_vals_source = vec![];
         for v in &vars {
@@ -138,45 +156,21 @@ pub fn get_planning_result(
                     let trimmed = m[0].trim_end_matches(&format!("_s{}", i));
                     if v.name == trimmed {
                         match v.value_type {
-                            SPValueType::Bool => {
-                                enum_vals_source.push(Assignment::new(&v, &bool::from_str(m[1]).unwrap().to_spvalue(), None))
-                            }
-                            SPValueType::String => enum_vals_source.push(Assignment::new(&v, &String::from(m[1]).to_spvalue(), None))
+                            SPValueType::Bool => enum_vals_source.push(Assignment::new(
+                                &v,
+                                &bool::from_str(m[1]).unwrap().to_spvalue(),
+                                None,
+                            )),
+                            SPValueType::String => enum_vals_source.push(Assignment::new(
+                                &v,
+                                &String::from(m[1]).to_spvalue(),
+                                None,
+                            )),
                         }
                     }
                 }
             }
         }
-
-        // let enum_vals_source: Vec<Assignment> = vars.iter().map(|y| Assignment::new(&y, 
-        //     model_vec.iter().filter(|x| x[0].ends_with(&format!("_s{}", i))).map(|x| (x[0].trim_end_matches(&format!("_s{}", i)), x[1], i))
-        //     , None))
-
-        // let enum_vals_source: Vec<Assignment> = model_vec
-        //     .iter()
-        //     .filter(|x| x[0].ends_with(&format!("_s{}", i)))
-        //     .map(|x| (x[0].trim_end_matches(&format!("_s{}", i)), x[1], i))
-        //     .map(|x| (vars.iter().find(|y| y.name == x.0).unwrap(), x.1))
-        //     .map(|x| match x.0.value_type {
-        //         SPValueType::Bool => {
-        //             Assignment::new(&x.0, &bool::from_str(x.1).unwrap().to_spvalue(), None)
-        //         }
-        //         SPValueType::String => Assignment::new(&x.0, &String::from(x.1).to_spvalue(), None),
-        //     })
-        //     .collect();
-
-        // let enum_vals_sink: Vec<Assignment> = model_vec
-        //     .iter()
-        //     .filter(|x| x[0].ends_with(&format!("_s{}", i + 1)))
-        //     .map(|x| (x[0].trim_end_matches(&format!("_s{}", i + 1)), x[1], i + 1))
-        //     .map(|x| (vars.iter().find(|y| y.name == x.0).unwrap(), x.1))
-        //     .map(|x| match x.0.value_type {
-        //         SPValueType::Bool => {
-        //             Assignment::new(&x.0, &bool::from_str(x.1).unwrap().to_spvalue(), None)
-        //         }
-        //         SPValueType::String => Assignment::new(&x.0, &String::from(x.1).to_spvalue(), None),
-        //     })
-        //     .collect();
 
         let mut enum_vals_sink = vec![];
         for v in &vars {
@@ -185,10 +179,16 @@ pub fn get_planning_result(
                     let trimmed = m[0].trim_end_matches(&format!("_s{}", i + 1));
                     if v.name == trimmed {
                         match v.value_type {
-                            SPValueType::Bool => {
-                                enum_vals_sink.push(Assignment::new(&v, &bool::from_str(m[1]).unwrap().to_spvalue(), None))
-                            }
-                            SPValueType::String => enum_vals_sink.push(Assignment::new(&v, &String::from(m[1]).to_spvalue(), None))
+                            SPValueType::Bool => enum_vals_sink.push(Assignment::new(
+                                &v,
+                                &bool::from_str(m[1]).unwrap().to_spvalue(),
+                                None,
+                            )),
+                            SPValueType::String => enum_vals_sink.push(Assignment::new(
+                                &v,
+                                &String::from(m[1]).to_spvalue(),
+                                None,
+                            )),
                         }
                     }
                 }

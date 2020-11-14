@@ -6,33 +6,30 @@ use r2r::*;
 
 #[tokio::main]
 async fn main() -> io::Result<()> {
-
-    let timeout = 300;
-    let max_steps = 100;
-
     let ha = handle_args();
 
-    // auto_subgoaling(&ha.model, timeout, max_steps);
-
-    let result = match ha.comp {
-        // true => compositional(&ha.model, timeout, max_steps),
-        true => heuristics_subgoaling(&ha.model, timeout, max_steps),
-        false => parameterized(&activate_all_in_problem(&ha.model), timeout, max_steps)
+    let result = match ha.alg.as_str() {
+        "seq" => sequential(&unparam(&ha.model), ha.timeout, ha.max_steps),
+        "inc" => incremental(&unparam(&ha.model), ha.timeout, ha.max_steps),
+        "comp" => unimplemented!(),
+        "seqsub" => subgoaling(&ha.model, "seq", ha.timeout, ha.max_steps),
+        "incsub" => subgoaling(&ha.model, "inc", ha.timeout, ha.max_steps),
+        "compsub" => unimplemented!(),
+        _ => panic!("nonexistent algorithm"),
     };
 
     match ha.print {
         true => pprint_result(&result),
-        false => pprint_result_trans_only(&result)
+        false => pprint_result_trans_only(&result),
     }
 
     match ha.filesave {
         true => pprint_result_to_file(&result),
-        false => ()
+        false => (),
     }
 
     Ok(())
 }
-
 
 // #[tokio::main]
 // async fn main() -> io::Result<()> {

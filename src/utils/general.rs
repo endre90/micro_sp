@@ -12,9 +12,21 @@ pub struct ArgsCLI {
     /// Online planning and acting
     #[structopt(long, short = "r", parse(try_from_str), default_value = "false")]
     pub run: bool,
-    /// Compositional planning algorithm
-    #[structopt(long, short = "c", parse(try_from_str), default_value = "false")]
-    pub comp: bool,
+    /// Planning algorithm:
+    /// 
+    /// seq: basic sequential
+    /// 
+    /// inc: incremental
+    /// 
+    /// comp: compositional
+    /// 
+    /// seqsub: sequential with subgoaling
+    /// 
+    /// incsub: incremental with subgoaling
+    /// 
+    /// compsub: compositional with subgoaling
+    #[structopt(long, short = "a", default_value = "inc")]
+    pub alg: String,
     /// Generate dummy driver (inverse micro_sp)
     #[structopt(long, short = "d", parse(try_from_str), default_value = "false")]
     pub dummy: bool,
@@ -33,15 +45,23 @@ pub struct ArgsCLI {
     /// The name of the instance to run
     #[structopt(long, short = "i")]
     pub instance: String,
+    /// Timeout in seconds
+    #[structopt(long, short = "t", parse(try_from_str), default_value = "300")]
+    pub timeout: u64,
+    /// Limit the number of steps
+    #[structopt(long, short = "s", parse(try_from_str), default_value = "100")]
+    pub max_steps: u64,
 }
 
 pub struct Args {
     pub run: bool,
     pub print: bool,
     pub filesave: bool,
-    pub comp: bool,
+    pub alg: String,
     pub dummy: bool,
     pub model: ParamPlanningProblem,
+    pub timeout: u64,
+    pub max_steps: u64
 }
 
 pub fn handle_args() -> Args {
@@ -50,7 +70,7 @@ pub fn handle_args() -> Args {
         run: args.run,
         print: args.print,
         filesave: args.filesave,
-        comp: args.comp,
+        alg: args.alg,
         dummy: args.dummy,
         model: match args.model.as_str() {
             "dummy_robot" => dummy_robot::model::model(args.instance.as_str()),
@@ -69,6 +89,8 @@ pub fn handle_args() -> Args {
             //"gripper" => gripper::parser::parser(args.instance.as_str()),
             _ => panic!("unknown problem"),
         },
+        timeout: args.timeout,
+        max_steps: args.max_steps
     }
 }
 
