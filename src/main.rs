@@ -3,32 +3,52 @@ use std::io;
 mod models;
 mod runner;
 use r2r::*;
+use tokio::time::{Duration, delay_for, Instant, timeout};
 
 #[tokio::main]
 async fn main() -> io::Result<()> {
     let ha = handle_args();
 
-    let result = match ha.alg.as_str() {
-        "seq" => sequential(&unparam(&ha.model), ha.timeout, ha.max_steps),
-        "inc" => incremental(&unparam(&ha.model), ha.timeout, ha.max_steps),
-        "seqexp" => seqexponential(&unparam(&ha.model), ha.timeout, ha.max_steps),
-        "incexp" => incexponential(&unparam(&ha.model), ha.timeout, ha.max_steps),
-        "comp" => unimplemented!(),
-        "seqsub" => subgoaling(&ha.model, "seq", ha.timeout, ha.max_steps),
-        "incsub" => subgoaling(&ha.model, "inc", ha.timeout, ha.max_steps),
-        "compsub" => unimplemented!(),
-        _ => panic!("nonexistent algorithm"),
-    };
+    // "async" => async_incremental(&unparam(&ha.model), ha.timeout, ha.max_steps),
 
-    match ha.print {
-        true => pprint_result(&result),
-        false => pprint_result_trans_only(&result),
-    }
+    let result = timeout(Duration::from_secs(ha.timeout), async_incremental(&unparam(&ha.model), ha.timeout, ha.max_steps)).await.ok();
 
-    match ha.filesave {
-        true => pprint_result_to_file(&result),
-        false => (),
+    // let mut result = String::from("initial");
+    // if let Ok(async_res) = timeout(Duration::from_secs(1), async_incremental(&unparam(&ha.model), ha.timeout, ha.max_steps)).await {
+    //     result = async_res.name.clone();
+    // } else {
+    //     result = String::from("timeout");
+    // }
+
+    // println!("{}", result);
+
+    // let result = match ha.alg.as_str() {
+    //     "seq" => sequential(&unparam(&ha.model), ha.timeout, ha.max_steps),
+    //     "inc" => incremental(&unparam(&ha.model), ha.timeout, ha.max_steps),
+    //     "seqexp" => seqexponential(&unparam(&ha.model), ha.timeout, ha.max_steps),
+    //     "incexp" => incexponential(&unparam(&ha.model), ha.timeout, ha.max_steps),
+    //     "comp" => unimplemented!(),
+    //     "seqsub" => subgoaling(&ha.model, "seq", ha.timeout, ha.max_steps),
+    //     "incsub" => subgoaling(&ha.model, "inc", ha.timeout, ha.max_steps),
+    //     "compsub" => unimplemented!(),
+    //     _ => panic!("nonexistent algorithm"),
+    // };
+
+    match result {
+        Some(x) => {
+            match ha.print {
+                true => pprint_result(&x),
+                false => pprint_result_trans_only(&x),
+            }
+        },
+        None => panic!("future failed!")
     }
+    
+
+    // match ha.filesave {
+    //     true => pprint_result_to_file(&result),
+    //     false => (),
+    // }
 
     Ok(())
 }
