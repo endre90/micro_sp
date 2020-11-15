@@ -4,14 +4,15 @@ use std::sync::Arc;
 use std::sync::Mutex;
 use z3_sys::*;
 use z3_v2::*;
-use tokio::time::{Duration, delay_for, Instant, timeout};
+use tokio::time::{Duration, Instant, timeout};
 
 /// async wrap to work with a real timer
-pub async fn async_incremental(prob: &PlanningProblem) -> PlanningResult {
+pub async fn async_incremental(problem: Arc<Mutex<PlanningProblem>>) -> io::Result<PlanningResult> {
     let cfg = ConfigZ3::new();
     let ctx = ContextZ3::new(&cfg);
     let slv = SolverZ3::new(&ctx);
-
+    let prob = &*problem.lock().unwrap();
+    
     SlvAssertZ3::new(&ctx, &slv, predicate_to_ast(&ctx, &prob.init, 0));
     SlvAssertZ3::new(&ctx, &slv, predicate_to_ast(&ctx, &prob.invars, 0));
 
@@ -89,7 +90,7 @@ pub async fn async_incremental(prob: &PlanningProblem) -> PlanningResult {
     let planning_time = now.elapsed();
 
     match plan_found {
-        true => get_planning_result(
+        true => Ok(get_planning_result(
             &ctx,
             &prob,
             SlvGetModelZ3::new(&ctx, &slv),
@@ -97,8 +98,8 @@ pub async fn async_incremental(prob: &PlanningProblem) -> PlanningResult {
             step,
             planning_time,
             plan_found,
-        ),
-        false => get_planning_result(
+        )),
+        false => Ok(get_planning_result(
             &ctx,
             &prob,
             FreshModelZ3::new(&ctx),
@@ -106,6 +107,6 @@ pub async fn async_incremental(prob: &PlanningProblem) -> PlanningResult {
             step,
             planning_time,
             plan_found,
-        ),
+        )),
     }
 }

@@ -9,7 +9,7 @@ edition = "2018"
 [dependencies]
 z3-sys = { git = "https://github.com/endre90/z3_sys_v2" }
 z3_v2 = { git = "https://github.com/endre90/z3_v2" }
-tokio = { version = "0.2", features = ["full"] }
+tokio = { version = "0.3.3", features = ["full"] }
 tokio-util = { version = "0.3.1", features = ["codec"] }
 r2r = { git = "https://github.com/sequenceplanner/r2r" }
 serde = { version = "1.0", features = ["derive"] }

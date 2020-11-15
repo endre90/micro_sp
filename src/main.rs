@@ -1,21 +1,68 @@
 use lib::*;
 use std::io;
 mod models;
+use std::sync::Arc;
+use std::sync::Mutex;
 mod runner;
 use r2r::*;
-use tokio::time::{Duration, delay_for, Instant, timeout_at};
+use tokio::time::{Duration, Instant, timeout_at};
+use tokio::runtime;
+use tokio_timer::Timeout;
+use futures::Future;
+use std::process;
+use tokio::prelude::*;
+
 
 #[tokio::main]
 async fn main() -> io::Result<()> {
     let ha = handle_args();
+    let mut runtime = runtime::Runtime::new().expect("failed to start new Runtime");
 
-    // "async" => async_incremental(&unparam(&ha.model), ha.timeout, ha.max_steps),
+    let modclone = Arc::new(Mutex::new(unparam(&ha.model)));
+    let modclone_clone = modclone.clone();
+    let model_clone = ha.model.clone();
+    let timeout_clone = ha.timeout.clone();
+    let max_steps_clone = ha.max_steps.clone();
+    let _res = runtime.spawn_blocking(move ||{
+        incremental(&unparam(&model_clone), timeout_clone, max_steps_clone)
+        // async_incremental(modclone_clone)
+    });
+    // let handle = tokio::task::spawn(async {
+    //     let du = async_incremental(modclone_clone);
+    //     let _res = tokio::try_join!(du);
+    // });
 
-    // let result = timeout(Duration::from_secs(ha.timeout), async_incremental(&unparam(&ha.model))).await.ok();
-    
-    if let Err(_) = timeout_at(Instant::now() + Duration::from_millis(2000), async_incremental(&unparam(&ha.model))).await {
-        println!("did not receive value within 10 ms");
+    let now = Instant::now();
+
+    loop {
+        println!("elapsed {:?}", now.elapsed());
+        // println!("timeout {:?}", Duration::from_secs(ha.timeout));
+        if now.elapsed() > Duration::from_secs(ha.timeout) {
+            break;
+            // handle.join();
+            // drop(handle);
+            // break;
+            // // assert!(handle.await.unwrap_err().is_cancelled());
+        }
+        // assert!(handle.await.unwrap_err().is_cancelled());
     }
+    runtime.shutdown_timeout(Duration::from_millis(100));
+
+    // // let unparam = unparam(&copmod);
+    // tokio::task::spawn(async {
+    //     let copmod = ha.model.clone();
+    //     let unparam = unparam(&copmod);
+    //     let du = async_incremental(&unparam);
+    //     let _res = tokio::try_join!(du);
+    // });
+
+    // Wrap the future with a `Timeout` set to expire in 10 milliseconds.
+    // let prob = async_incremental(&unparam(&ha.model));
+    // let timeout = Timeout::new(async_incremental(unparam(&ha.model)), Duration::from_secs(ha.timeout));
+
+    // if let Err(_) = timeout_at(Instant::now() + Duration::from_millis(2000), async_incremental(&unparam(&ha.model))).await {
+    //     println!("did not receive value within 10 ms");
+    // }
 
     // println!("{}", ha.timeout);
     // let mut result = String::from("initial");
