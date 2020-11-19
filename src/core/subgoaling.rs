@@ -1,5 +1,6 @@
 use super::*;
 use std::time::Instant;
+use std::time::Duration;
 use z3_sys::*;
 use z3_v2::*;
 
@@ -25,16 +26,19 @@ pub fn subgoaling(
         _ => panic!("impossible")
     };
 
+    let now = Instant::now();
+
     let mut subresults = vec![first_result.clone()];
-    pprint_result(&first_result);
-    println!("{:?}", subresults.len());
+    // pprint_result(&first_result);
+    // println!("{:?}", subresults.len());
     let return_result =
-        recursive_subfn(&first_result, &prob, 0, timeout, tries, &mut subresults);
+        recursive_subfn(&first_result, &prob, 0, alg, timeout, tries, &mut subresults);
 
     fn recursive_subfn(
         result: &PlanningResult,
         prob: &ParamPlanningProblem,
         i: u64,
+        alg: &str,
         timeout: u64,
         tries: u64,
         subresults: &mut Vec<PlanningResult>,
@@ -79,12 +83,22 @@ pub fn subgoaling(
                 timeout,
                 tries,
             );
-            pprint_result(&new_result);
+            // pprint_result(&new_result);
             subresults.push(new_result.clone());
             // println!("{:?}", subresults.len());
-            recursive_subfn(&new_result, &prob, i, timeout, tries, subresults)
+            // if now.elapsed() > Duration::from_secs(timeout) {
+                // break;
+            // } else {
+            recursive_subfn(&new_result, &prob, i, alg, timeout, tries, subresults)
+            // }
+            
         } else {
-            concatenate(&subresults)
+            match alg {
+                "seq" => concatenate(&prob.name, "subgoaling_on_sequential", &subresults),
+                "inc" => concatenate(&prob.name, "subgoaling_on_incremental", &subresults),
+                _ => panic!("unimplemented")
+            }
+            
         }
     }
     return_result

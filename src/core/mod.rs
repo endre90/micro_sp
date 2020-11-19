@@ -1,6 +1,6 @@
 use super::*;
 
-pub mod async_incremental;
+// pub mod async_incremental;
 pub mod compositional;
 pub mod exponential;
 pub mod incremental;
@@ -8,7 +8,7 @@ pub mod items;
 pub mod parameterized;
 pub mod predicates;
 pub mod sequential;
-// pub mod subgoaling;
+pub mod subgoaling;
 
 pub mod macros;
 

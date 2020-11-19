@@ -22,13 +22,14 @@ pub fn sequential(prob: &PlanningProblem, timeout: u64, tries: u64) -> PlanningR
     while now.elapsed() < Duration::from_secs(timeout) && step < tries {
         println!("elapsed: {:?}", now.elapsed());
         let cfg = ConfigZ3::new();
+        SetParamZ3::new(&cfg, "timeout", "300000");
         let ctx = ContextZ3::new(&cfg);
         let slv = SolverZ3::new(&ctx);
         SlvAssertZ3::new(&ctx, &slv, predicate_to_ast(&ctx, &prob.init, 0));
         SlvAssertZ3::new(&ctx, &slv, predicate_to_ast(&ctx, &prob.invars, 0));
         SlvAssertZ3::new(&ctx, &slv, predicate_to_ast(&ctx, &prob.goal, step));
         for s in 0..step {
-            println!("s: {:?}", s);
+            // println!("s: {:?}", s);
             SlvAssertZ3::new(&ctx, &slv, predicate_to_ast(&ctx, &prob.invars, s + 1));
             SlvAssertZ3::new(
                 &ctx,

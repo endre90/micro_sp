@@ -12,41 +12,45 @@ use futures::Future;
 use std::process;
 use tokio::prelude::*;
 
+// use std::process;
+
+// process::exit(0x0100);
+
 
 #[tokio::main]
 async fn main() -> io::Result<()> {
     let ha = handle_args();
-    let mut runtime = runtime::Runtime::new().expect("failed to start new Runtime");
+    // let mut runtime = runtime::Runtime::new().expect("failed to start new Runtime");
 
-    let modclone = Arc::new(Mutex::new(unparam(&ha.model)));
-    let modclone_clone = modclone.clone();
-    let model_clone = ha.model.clone();
-    let timeout_clone = ha.timeout.clone();
-    let max_steps_clone = ha.max_steps.clone();
-    let _res = runtime.spawn_blocking(move ||{
-        incremental(&unparam(&model_clone), timeout_clone, max_steps_clone)
-        // async_incremental(modclone_clone)
-    });
-    // let handle = tokio::task::spawn(async {
-    //     let du = async_incremental(modclone_clone);
-    //     let _res = tokio::try_join!(du);
+    // let modclone = Arc::new(Mutex::new(unparam(&ha.model)));
+    // let modclone_clone = modclone.clone();
+    // let model_clone = ha.model.clone();
+    // let timeout_clone = ha.timeout.clone();
+    // let max_steps_clone = ha.max_steps.clone();
+    // let _res = runtime.spawn_blocking(move ||{
+    //     incremental(&unparam(&model_clone), timeout_clone, max_steps_clone)
+    //     // async_incremental(modclone_clone)
     // });
+    // // let handle = tokio::task::spawn(async {
+    // //     let du = async_incremental(modclone_clone);
+    // //     let _res = tokio::try_join!(du);
+    // // });
 
-    let now = Instant::now();
+    // let now = Instant::now();
 
-    loop {
-        println!("elapsed {:?}", now.elapsed());
-        // println!("timeout {:?}", Duration::from_secs(ha.timeout));
-        if now.elapsed() > Duration::from_secs(ha.timeout) {
-            break;
-            // handle.join();
-            // drop(handle);
-            // break;
-            // // assert!(handle.await.unwrap_err().is_cancelled());
-        }
-        // assert!(handle.await.unwrap_err().is_cancelled());
-    }
-    runtime.shutdown_timeout(Duration::from_millis(100));
+    // loop {
+    //     println!("elapsed {:?}", now.elapsed());
+    //     // println!("timeout {:?}", Duration::from_secs(ha.timeout));
+    //     if now.elapsed() > Duration::from_secs(ha.timeout) {
+    //         break;
+    //         // handle.join();
+    //         // drop(handle);
+    //         // break;
+    //         // // assert!(handle.await.unwrap_err().is_cancelled());
+    //     }
+    //     // assert!(handle.await.unwrap_err().is_cancelled());
+    // }
+    // runtime.shutdown_timeout(Duration::from_millis(100));
 
     // // let unparam = unparam(&copmod);
     // tokio::task::spawn(async {
@@ -74,33 +78,27 @@ async fn main() -> io::Result<()> {
 
     // println!("{}", result);
 
-    // let result = match ha.alg.as_str() {
-    //     "seq" => sequential(&unparam(&ha.model), ha.timeout, ha.max_steps),
-    //     "inc" => incremental(&unparam(&ha.model), ha.timeout, ha.max_steps),
-    //     "seqexp" => seqexponential(&unparam(&ha.model), ha.timeout, ha.max_steps),
-    //     "incexp" => incexponential(&unparam(&ha.model), ha.timeout, ha.max_steps),
-    //     "comp" => unimplemented!(),
-    //     "seqsub" => subgoaling(&ha.model, "seq", ha.timeout, ha.max_steps),
-    //     "incsub" => subgoaling(&ha.model, "inc", ha.timeout, ha.max_steps),
-    //     "compsub" => unimplemented!(),
-    //     _ => panic!("nonexistent algorithm"),
-    // };
+    let result = match ha.alg.as_str() {
+        "seq" => sequential(&unparam(&ha.model), ha.timeout, ha.max_steps),
+        "inc" => incremental(&unparam(&ha.model), ha.timeout, ha.max_steps),
+        "seqexp" => seqexponential(&unparam(&ha.model), ha.timeout, ha.max_steps),
+        "incexp" => incexponential(&unparam(&ha.model), ha.timeout, ha.max_steps),
+        "comp" => compositional(&ha.model, ha.timeout, ha.max_steps),
+        "seqsub" => subgoaling(&ha.model, "seq", ha.timeout, ha.max_steps),
+        "incsub" => subgoaling(&ha.model, "inc", ha.timeout, ha.max_steps),
+        "compsub" => unimplemented!(),
+        _ => panic!("nonexistent algorithm"),
+    };
 
-    // match result {
-    //     Some(x) => {
-    //         match ha.print {
-    //             true => pprint_result(&x),
-    //             false => pprint_result_trans_only(&x),
-    //         }
-    //     },
-    //     None => panic!("future failed!")
-    // }
+    match ha.print {
+        true => pprint_result(&result),
+        false => pprint_result_trans_only(&result),
+    }
     
-
-    // match ha.filesave {
-    //     true => pprint_result_to_file(&result),
-    //     false => (),
-    // }
+    match ha.filesave {
+        true => pprint_result_to_file(&result),
+        false => (),
+    }
 
     Ok(())
 }
