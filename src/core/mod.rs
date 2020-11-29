@@ -8,6 +8,7 @@ pub mod items;
 pub mod parameterized;
 pub mod predicates;
 pub mod sequential;
+pub mod uniparallel;
 // pub mod subgoaling;
 
 pub mod macros;

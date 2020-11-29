@@ -24,6 +24,24 @@ pub fn get_predicate_vars(pred: &Predicate) -> Vec<Variable> {
     s
 }
 
+/// Given a predicate, return a vector of assignments in the predicate.
+pub fn get_predicate_assigns(pred: &Predicate) -> Vec<Assignment> {
+    let mut s = Vec::new();
+    match pred {
+        Predicate::TRUE => {}
+        Predicate::FALSE => {}
+        Predicate::AND(x) => s.extend(x.iter().flat_map(|p| get_predicate_assigns(p))),
+        Predicate::OR(x) => s.extend(x.iter().flat_map(|p| get_predicate_assigns(p))),
+        Predicate::NOT(x) => s.extend(get_predicate_assigns(x)),
+        Predicate::ASS(x) => s.push(x.clone()),
+        Predicate::EQ(x, y) => (),
+        Predicate::PBEQ(x, _) => s.extend(x.iter().flat_map(|p| get_predicate_assigns(p))),
+    }
+    s.sort();
+    s.dedup();
+    s
+}
+
 /// Given a parameterized predicate, return a vector of variables that play a role in it.
 pub fn get_param_predicate_vars(ppred: &ParamPredicate) -> Vec<Variable> {
     ppred

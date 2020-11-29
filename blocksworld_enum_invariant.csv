@@ -1,0 +1,11 @@
+encoding,enum_invariant,bool_explicit
+cargo run --release -- -m blocksworld -v enum_invariant -i instance_1,0.162710042635,0.132871937
+cargo run --release -- -m blocksworld -v enum_invariant -i instance_2,0.21169637663500002,0.21137515150000002
+cargo run --release -- -m blocksworld -v enum_invariant -i instance_3,0.207182966135,0.177662288
+cargo run --release -- -m blocksworld -v enum_invariant -i instance_4,0.45968974913500005,0.6585561305000001
+cargo run --release -- -m blocksworld -v enum_invariant -i instance_5,0.289835462135,0.596155222
+cargo run --release -- -m blocksworld -v enum_invariant -i instance_6,0.496717352135,1.778723301
+cargo run --release -- -m blocksworld -v enum_invariant -i instance_7,0.6481022736350001,1.4978993630000002
+cargo run --release -- -m blocksworld -v enum_invariant -i instance_8,0.5211191856349999,1.2190611654999999
+cargo run --release -- -m blocksworld -v enum_invariant -i instance_9,1.663666476135,11.3953203575
+cargo run --release -- -m blocksworld -v enum_invariant -i instance_10,2.325244729135,14.6166218455

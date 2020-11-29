@@ -13,6 +13,7 @@ pub use crate::core::items::*;
 pub use crate::core::parameterized::*;
 pub use crate::core::predicates::*;
 pub use crate::core::exponential::*;
+pub use crate::core::uniparallel::*;
 pub use crate::core::async_incremental::*;
 
 pub mod runner;

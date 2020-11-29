@@ -61,7 +61,11 @@ pub fn handle_args() -> Args {
         alg: args.alg,
         dummy: args.dummy,
         model: match args.model.as_str() {
-            "dummy_robot" => dummy_robot::model::model(args.instance.as_str()),
+            "dummy_robot" => match args.variant.as_str() {
+                "model1" => dummy_robot::model::model1(args.instance.as_str()),
+                "model2" => dummy_robot::model::model2(args.instance.as_str()),
+                _ => panic!("unknown problem"),
+            }
             "blocksworld" => match args.variant.as_str() {
                 "bool_explicit" => {
                     blocksworld::models::bool_explicit::model(args.instance.as_str())

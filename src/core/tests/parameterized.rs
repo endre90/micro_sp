@@ -51,7 +51,7 @@ fn test_generate_predicate() {
 
 #[test]
 fn test_parameterized() {
-    let problem = models::dummy_robot::model::model("instance_1");
+    let problem = models::dummy_robot::model::model1("instance_1");
 
     let d1 = &deactivate_all_in_problem(&problem);
     println!("prms: {:?}", d1.params);
