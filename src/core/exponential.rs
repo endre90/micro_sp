@@ -5,7 +5,7 @@ use z3_sys::*;
 use z3_v2::*;
 
 /// Rintanens exponential on top of sequential.
-pub async fn seqexponential(prob: &PlanningProblem, timeout: u64, tries: u64) -> PlanningResult {
+pub fn seqexponential(prob: &PlanningProblem, timeout: u64, tries: u64) -> PlanningResult {
     let now = Instant::now();
     let mut plan_found: bool = false;
     let mut step: u64 = 0;
@@ -28,6 +28,10 @@ pub async fn seqexponential(prob: &PlanningProblem, timeout: u64, tries: u64) ->
         SlvAssertZ3::new(&ctx, &slv, predicate_to_ast(&ctx, &prob.invars, 0));
         SlvAssertZ3::new(&ctx, &slv, predicate_to_ast(&ctx, &prob.goal, step));
         for s in 0..step {
+            // quick fix
+            if now.elapsed() > Duration::from_secs(timeout) {
+                break;
+            }
             println!("s: {:?}", s);
             SlvAssertZ3::new(&ctx, &slv, predicate_to_ast(&ctx, &prob.invars, s + 1));
             SlvAssertZ3::new(
@@ -126,6 +130,10 @@ pub fn incexponential(prob: &PlanningProblem, timeout: u64, tries: u64) -> Plann
             false => {
                 SlvPopZ3::new(&ctx, &slv, 1);
                 for s in (step/2)+ 1..=step {
+                    // quick fix
+                    if now.elapsed() > Duration::from_secs(timeout) {
+                        break;
+                    }
                     println!("s: {:?}", s);
                     SlvAssertZ3::new(
                         &ctx,
@@ -195,7 +203,7 @@ pub fn incexponential(prob: &PlanningProblem, timeout: u64, tries: u64) -> Plann
             &ctx,
             &prob,
             FreshModelZ3::new(&ctx),
-            "exponential on incremental",
+            "exponential_on_incremental",
             step/2 + 1,
             planning_time,
             plan_found,

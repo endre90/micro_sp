@@ -6,15 +6,14 @@ pub use models::*;
 
 pub mod core;
 pub use crate::core::compositional::*;
-// pub use crate::core::subgoaling::*;
+pub use crate::core::subgoaling::*;
 pub use crate::core::sequential::*;
 pub use crate::core::incremental::*;
 pub use crate::core::items::*;
 pub use crate::core::parameterized::*;
 pub use crate::core::predicates::*;
 pub use crate::core::exponential::*;
-pub use crate::core::uniparallel::*;
-pub use crate::core::async_incremental::*;
+// pub use crate::core::async_incremental::*;
 
 pub mod runner;
 // pub use crate::runner::publisher::*;

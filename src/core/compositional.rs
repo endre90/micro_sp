@@ -128,10 +128,10 @@ pub fn generate_and_solve(
 }
 
 /// Concatenate all results in a level.
-pub fn concatenate(results: &Vec<PlanningResult>) -> PlanningResult {
+pub fn concatenate(name: &str, alg: &str, results: &Vec<PlanningResult>) -> PlanningResult {
     PlanningResult {
-        name: results[0].name.clone(), //fix this
-        alg: String::from("comp_or_subgoal?"),
+        name: name.to_owned(),
+        alg: alg.to_owned(),
         plan_found: results.iter().all(|x| x.plan_found),
         plan_length: results.iter().map(|x| x.plan_length).sum(),
         trace: results
@@ -259,7 +259,7 @@ pub fn compositional(prob: &ParamPlanningProblem, timeout: u64, tries: u64) -> P
                         panic!("Error 6e797cad-58f4-423d-8837-10521a986cfb: No plan found.")
                     }
                 }
-                let level_result = concatenate(&level_subresults);
+                let level_result = concatenate("name", "comp", &level_subresults); // fix this
                 final_result = recursive_subfn(
                     &level_result,
                     &prob,

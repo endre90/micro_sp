@@ -12,6 +12,10 @@ use futures::Future;
 use std::process;
 use tokio::prelude::*;
 
+// use std::process;
+
+// process::exit(0x0100);
+
 
 #[tokio::main]
 async fn main() -> io::Result<()> {
@@ -79,7 +83,7 @@ async fn main() -> io::Result<()> {
         "inc" => incremental(&unparam(&ha.model), ha.timeout, ha.max_steps),
         // "seqexp" => seqexponential(&unparam(&ha.model), ha.timeout, ha.max_steps),
         "incexp" => incexponential(&unparam(&ha.model), ha.timeout, ha.max_steps),
-        "unipar" => uniparallel(&unparam(&ha.model), ha.timeout, ha.max_steps),
+        // "unipar" => uniparallel(&unparam(&ha.model), ha.timeout, ha.max_steps),
         "comp" => unimplemented!(),
         // "seqsub" => subgoaling(&ha.model, "seq", ha.timeout, ha.max_steps),
         // "incsub" => subgoaling(&ha.model, "inc", ha.timeout, ha.max_steps),

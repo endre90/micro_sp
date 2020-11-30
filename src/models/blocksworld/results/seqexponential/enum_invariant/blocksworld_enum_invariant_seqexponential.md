@@ -1,0 +1,44 @@
+| Command | Mean [s] | Min [s] | Max [s] | Relative |
+|:---|---:|---:|---:|---:|
+| `cargo run --release -- -m blocksworld -v enum_invariant -i instance_1 -f true -a seqexp` | 2.830 ± 3.477 | 0.371 | 5.288 | 6.40 ± 7.91 |
+| `cargo run --release -- -m blocksworld -v enum_invariant -i instance_2 -f true -a seqexp` | 0.529 ± 0.018 | 0.516 | 0.542 | 1.20 ± 0.17 |
+| `cargo run --release -- -m blocksworld -v enum_invariant -i instance_3 -f true -a seqexp` | 0.442 ± 0.059 | 0.400 | 0.484 | 1.00 |
+| `cargo run --release -- -m blocksworld -v enum_invariant -i instance_4 -f true -a seqexp` | 0.841 ± 0.043 | 0.811 | 0.872 | 1.90 ± 0.27 |
+| `cargo run --release -- -m blocksworld -v enum_invariant -i instance_5 -f true -a seqexp` | 0.819 ± 0.161 | 0.705 | 0.933 | 1.85 ± 0.44 |
+| `cargo run --release -- -m blocksworld -v enum_invariant -i instance_6 -f true -a seqexp` | 0.831 ± 0.144 | 0.729 | 0.932 | 1.88 ± 0.41 |
+| `cargo run --release -- -m blocksworld -v enum_invariant -i instance_7 -f true -a seqexp` | 1.513 ± 0.164 | 1.397 | 1.629 | 3.42 ± 0.59 |
+| `cargo run --release -- -m blocksworld -v enum_invariant -i instance_8 -f true -a seqexp` | 1.651 ± 0.053 | 1.613 | 1.688 | 3.73 ± 0.51 |
+| `cargo run --release -- -m blocksworld -v enum_invariant -i instance_9 -f true -a seqexp` | 4.247 ± 0.092 | 4.182 | 4.312 | 9.61 ± 1.30 |
+| `cargo run --release -- -m blocksworld -v enum_invariant -i instance_10 -f true -a seqexp` | 6.312 ± 0.305 | 6.096 | 6.527 | 14.27 ± 2.03 |
+| `cargo run --release -- -m blocksworld -v enum_invariant -i instance_11 -f true -a seqexp` | 5.996 ± 0.709 | 5.494 | 6.497 | 13.56 ± 2.42 |
+| `cargo run --release -- -m blocksworld -v enum_invariant -i instance_12 -f true -a seqexp` | 5.472 ± 0.221 | 5.316 | 5.628 | 12.38 ± 1.73 |
+| `cargo run --release -- -m blocksworld -v enum_invariant -i instance_13 -f true -a seqexp` | 12.965 ± 0.985 | 12.268 | 13.662 | 29.32 ± 4.52 |
+| `cargo run --release -- -m blocksworld -v enum_invariant -i instance_14 -f true -a seqexp` | 10.798 ± 1.101 | 10.019 | 11.576 | 24.42 ± 4.11 |
+| `cargo run --release -- -m blocksworld -v enum_invariant -i instance_15 -f true -a seqexp` | 5.181 ± 0.267 | 4.992 | 5.369 | 11.72 ± 1.68 |
+| `cargo run --release -- -m blocksworld -v enum_invariant -i instance_16 -f true -a seqexp` | 17.803 ± 3.945 | 15.014 | 20.593 | 40.26 ± 10.43 |
+| `cargo run --release -- -m blocksworld -v enum_invariant -i instance_17 -f true -a seqexp` | 17.240 ± 2.329 | 15.594 | 18.887 | 38.99 ± 7.42 |
+| `cargo run --release -- -m blocksworld -v enum_invariant -i instance_18 -f true -a seqexp` | 15.184 ± 4.598 | 11.932 | 18.435 | 34.34 ± 11.37 |
+| `cargo run --release -- -m blocksworld -v enum_invariant -i instance_19 -f true -a seqexp` | 101.261 ± 12.208 | 92.629 | 109.893 | 229.02 ± 41.30 |
+| `cargo run --release -- -m blocksworld -v enum_invariant -i instance_20 -f true -a seqexp` | 35.742 ± 0.164 | 35.626 | 35.859 | 80.84 ± 10.85 |
+| `cargo run --release -- -m blocksworld -v enum_invariant -i instance_21 -f true -a seqexp` | 156.970 ± 38.060 | 130.057 | 183.882 | 355.01 ± 98.36 |
+| `cargo run --release -- -m blocksworld -v enum_invariant -i instance_22 -f true -a seqexp` | 54.562 ± 1.688 | 53.368 | 55.755 | 123.40 ± 16.98 |
+| `cargo run --release -- -m blocksworld -v enum_invariant -i instance_23 -f true -a seqexp` | 47.032 ± 2.406 | 45.331 | 48.734 | 106.37 ± 15.27 |
+| `cargo run --release -- -m blocksworld -v enum_invariant -i instance_24 -f true -a seqexp` | 227.367 ± 26.719 | 208.475 | 246.260 | 514.22 ± 91.68 |
+| `cargo run --release -- -m blocksworld -v enum_invariant -i instance_25 -f true -a seqexp` | 493.907 ± 71.677 | 443.224 | 544.590 | 1117.04 ± 220.71 |
+| `cargo run --release -- -m blocksworld -v enum_invariant -i instance_26 -f true -a seqexp` | 359.663 ± 63.899 | 314.480 | 404.847 | 813.43 ± 181.06 |
+| `cargo run --release -- -m blocksworld -v enum_invariant -i instance_27 -f true -a seqexp` | 687.559 ± 50.941 | 651.538 | 723.580 | 1555.02 ± 238.22 |
+| `cargo run --release -- -m blocksworld -v enum_invariant -i instance_28 -f true -a seqexp` | 513.741 ± 93.694 | 447.490 | 579.993 | 1161.90 ± 263.01 |
+| `cargo run --release -- -m blocksworld -v enum_invariant -i instance_29 -f true -a seqexp` | 1226.086 ± 211.713 | 1076.382 | 1375.789 | 2772.97 ± 606.23 |
+| `cargo run --release -- -m blocksworld -v enum_invariant -i instance_30 -f true -a seqexp` | 1863.647 ± 195.795 | 1725.199 | 2002.095 | 4214.91 ± 717.99 |
+| `cargo run --release -- -m blocksworld -v enum_invariant -i instance_31 -f true -a seqexp` | 321.364 ± 5.689 | 317.341 | 325.387 | 726.81 ± 98.30 |
+| `cargo run --release -- -m blocksworld -v enum_invariant -i instance_32 -f true -a seqexp` | 445.641 ± 75.993 | 391.906 | 499.377 | 1007.88 ± 218.64 |
+| `cargo run --release -- -m blocksworld -v enum_invariant -i instance_33 -f true -a seqexp` | 367.331 ± 85.866 | 306.614 | 428.047 | 830.77 ± 223.88 |
+| `cargo run --release -- -m blocksworld -v enum_invariant -i instance_34 -f true -a seqexp` | 306.425 ± 3.904 | 303.665 | 309.186 | 693.03 ± 93.34 |
+| `cargo run --release -- -m blocksworld -v enum_invariant -i instance_35 -f true -a seqexp` | 318.884 ± 21.560 | 303.638 | 334.129 | 721.20 ± 108.30 |
+| `cargo run --release -- -m blocksworld -v enum_invariant -i instance_36 -f true -a seqexp` | 345.471 ± 10.218 | 338.246 | 352.696 | 781.33 ± 107.29 |
+| `cargo run --release -- -m blocksworld -v enum_invariant -i instance_37 -f true -a seqexp` | 310.696 ± 10.174 | 303.502 | 317.890 | 702.68 ± 96.99 |
+| `cargo run --release -- -m blocksworld -v enum_invariant -i instance_38 -f true -a seqexp` | 316.324 ± 1.832 | 315.029 | 317.619 | 715.41 ± 96.02 |
+| `cargo run --release -- -m blocksworld -v enum_invariant -i instance_39 -f true -a seqexp` | 333.604 ± 15.879 | 322.376 | 344.832 | 754.49 ± 107.35 |
+| `cargo run --release -- -m blocksworld -v enum_invariant -i instance_40 -f true -a seqexp` | 306.446 ± 1.231 | 305.576 | 307.316 | 693.07 ± 92.97 |
+| `cargo run --release -- -m blocksworld -v enum_invariant -i instance_41 -f true -a seqexp` | 314.868 ± 1.046 | 314.129 | 315.608 | 712.12 ± 95.52 |
+| `cargo run --release -- -m blocksworld -v enum_invariant -i instance_42 -f true -a seqexp` | 308.156 ± 8.041 | 302.470 | 313.842 | 696.94 ± 95.20 |

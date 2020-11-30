@@ -78,7 +78,12 @@ pub fn handle_args() -> Args {
                 }
                 _ => panic!("unknown problem"),
             },
-            //"gripper" => gripper::parser::parser(args.instance.as_str()),
+            "gripper" => match args.variant.as_str() {
+                "bool_explicit" => {
+                    gripper::models::bool_explicit::model(args.instance.as_str())
+                },
+                _ => panic!("unknown problem"),
+            },
             _ => panic!("unknown problem"),
         },
         timeout: args.timeout,
