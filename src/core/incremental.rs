@@ -73,6 +73,7 @@ pub fn keep_variable_values(
 ///
 /// Based on Gocht and Balyo's algorithm from 2017.
 pub fn incremental(prob: &PlanningProblem, timeout: u64, tries: u64) -> PlanningResult {
+    let timeout = 5;
     let cfg = ConfigZ3::new();
     // SetParamZ3::new(&cfg, "solver2_timeout", "2000");
     // SetParamZ3::new(&cfg, "ignore_solver1", "true");
@@ -80,6 +81,8 @@ pub fn incremental(prob: &PlanningProblem, timeout: u64, tries: u64) -> Planning
     let params = ParamsZ3::new(&ctx);
     let slv = SolverZ3::new(&ctx);
     AddUIntParamToParamsZ3::new(&ctx, params, "timeout", (timeout*1000) as u32);
+    // AddUIntParamToParamsZ3::new(&ctx, params, "lazy", 100 as u32);
+    AddBoolParamToParamsZ3::new(&ctx, params, "propagate_eq", true);
     // AddBoolParamToParamsZ3::new(&ctx, params, "ignore_solver2", true);
     SolverSetParamsZ3::new(&ctx, &slv, params);
 
@@ -168,6 +171,7 @@ pub fn incremental(prob: &PlanningProblem, timeout: u64, tries: u64) -> Planning
             step,
             planning_time,
             plan_found,
+            ModelSizeZ3::new()
         ),
         false => get_planning_result(
             &ctx,
@@ -177,6 +181,7 @@ pub fn incremental(prob: &PlanningProblem, timeout: u64, tries: u64) -> Planning
             step,
             planning_time,
             plan_found,
+            ModelSizeZ3::new()
         ),
     }
 }

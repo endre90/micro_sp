@@ -246,6 +246,7 @@ pub struct PlanningResult {
     pub plan_length: u64,
     pub trace: Vec<PlanningFrame>,
     pub time_to_solve: std::time::Duration,
+    pub model_size: u64
 }
 
 impl PlanningProblem {

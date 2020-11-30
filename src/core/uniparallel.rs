@@ -144,6 +144,7 @@ pub fn uniparallel(prob: &PlanningProblem, timeout: u64, tries: u64) -> Planning
             step,
             planning_time,
             plan_found,
+            ModelSizeZ3::new()
         ),
         false => get_planning_result(
             &ctx,
@@ -153,6 +154,7 @@ pub fn uniparallel(prob: &PlanningProblem, timeout: u64, tries: u64) -> Planning
             step,
             planning_time,
             plan_found,
+            ModelSizeZ3::new()
         ),
     }
 }

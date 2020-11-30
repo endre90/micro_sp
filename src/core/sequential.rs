@@ -16,7 +16,8 @@ pub fn sequential(prob: &PlanningProblem, timeout: u64, tries: u64) -> PlanningR
         plan_found : false,
         plan_length: 0,
         trace: vec!(),
-        time_to_solve: Duration::from_secs(0)
+        time_to_solve: Duration::from_secs(0),
+        model_size: 123456789 as u64
     };
 
     while now.elapsed() < Duration::from_secs(timeout) && step < tries {
@@ -84,6 +85,7 @@ pub fn sequential(prob: &PlanningProblem, timeout: u64, tries: u64) -> PlanningR
                     step,
                     now.elapsed(),
                     plan_found,
+                    ModelSizeZ3::new()
                 );
                 break;
             }

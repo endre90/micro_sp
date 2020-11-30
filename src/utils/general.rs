@@ -144,9 +144,10 @@ pub fn pprint_result(result: &PlanningResult) -> () {
     println!("                   PLANNING RESULT                    ");
     println!("======================================================");
     println!("name: {:?}", result.name);
-    println!("plan_found: {:?}", result.plan_found);
-    println!("plan_lenght: {:?}", result.plan_length);
-    println!("time_to_solve: {:?}", result.time_to_solve);
+    println!("found: {:?}", result.plan_found);
+    println!("lenght: {:?}", result.plan_length);
+    println!("time: {:?}", result.time_to_solve);
+    println!("size: {:?} MB", result.model_size / 1000000);
     println!("======================================================");
     for t in 0..result.trace.len() {
         println!("frame: {:?}", t);
@@ -264,7 +265,8 @@ pub fn pprint_result_trans_only(result: &PlanningResult) -> () {
     println!("algo: {:?}", result.alg);
     println!("found: {:?}", result.plan_found);
     println!("lenght: {:?}", result.plan_length);
-    // println!("time: {:?}", result.time_to_solve);
+    println!("time: {:?}", result.time_to_solve);
+    println!("size: {:?} MB", result.model_size / 1000000);
     println!("======================================================");
     for t in 0..result.trace.len() {
         // println!("frame: {:?}", t);
@@ -292,7 +294,8 @@ pub fn pprint_result_to_file(result: &PlanningResult) -> () {
     file.write(&format!("algo: {:?}\n", result.alg).as_bytes()).ok();
     file.write(&format!("found: {:?}\n", result.plan_found).as_bytes()).ok();
     file.write(&format!("lenght: {:?}\n", result.plan_length).as_bytes()).ok();
-    // file.write(&format!("time: {:?}\n", result.time_to_solve).as_bytes()).ok();
+    file.write(&format!("time: {:?}\n", result.time_to_solve).as_bytes()).ok();
+    file.write(&format!("size: {:?} MB", result.model_size / 1000000).as_bytes()).ok();
     file.write("======================================================\n".as_bytes()).ok();
     for t in 0..result.trace.len() {
         // file.write(&format!("frame: {:?}\n", t).as_bytes()).ok();

@@ -140,6 +140,7 @@ pub fn concatenate(name: &str, alg: &str, results: &Vec<PlanningResult>) -> Plan
             .flatten()
             .collect(),
         time_to_solve: results.iter().map(|x| x.time_to_solve).sum(),
+        model_size: 12345689 as u64
     }
 }
 

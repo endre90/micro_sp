@@ -151,6 +151,7 @@ pub fn get_planning_result(
     nr_steps: u64,
     planning_time: std::time::Duration,
     plan_found: bool,
+    model_size: u64
 ) -> PlanningResult {
     let model_str = ModelToStringZ3::new(&ctx, model);
     let model_vec: Vec<Vec<&str>> = model_str
@@ -279,6 +280,7 @@ pub fn get_planning_result(
             plan_length: nr_steps - 1,
             trace: trace,
             time_to_solve: planning_time,
+            model_size: model_size
         },
         false => PlanningResult {
             name: prob.name.clone(),
@@ -287,6 +289,7 @@ pub fn get_planning_result(
             plan_length: 0,
             trace: vec![],
             time_to_solve: planning_time,
+            model_size: model_size
         },
     }
 }
