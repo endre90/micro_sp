@@ -3,6 +3,64 @@ use std::str::FromStr;
 use z3_sys::*;
 use z3_v2::*;
 
+/// Given a planning result, remove sections that lead back to an already visited state.
+/// Actually, have to do this iterativelly since removing a loop might remove part of another one.
+/// So, just keep finding and removing the biggest loop until there are no loops.
+pub fn remove_loops(result: &PlanningResult) -> PlanningResult {
+    let mut mut_result = result.clone();
+    let mut duplicates: Vec<(State, usize, usize)> = vec!();
+    let mut cleaned_trace: Vec<PlanningFrame> = vec!();
+
+    // find the first and the last occurence of every duplicated state in a trace
+    for tr in &result.trace {
+        let start = match result.trace.iter().position(|x| x.source == tr.source) {
+            Some(y) => y as usize,
+            None => 12345
+        };
+        let finish = match result.trace.iter().rposition(|x| x.source == tr.source) {
+            Some(y) => y as usize,
+            None => 12345
+        };
+        if start != finish && start != 12345 && finish != 12345 {
+            if !duplicates.iter().any(|x| x.0 == tr.source) {
+                duplicates.push((tr.source.to_owned(), start, finish))
+            }   
+        }
+    }
+
+    duplicates.sort();
+    duplicates.dedup();
+
+    // if there is a loop, find the biggest one and remove it
+    if duplicates.len() != 0 {
+        let mut biggest_loop: (State, usize, usize) = duplicates[0].clone();
+        for d in &duplicates {
+            if d.2 - d.1 >= biggest_loop.2 - biggest_loop.1 {
+                biggest_loop = d.to_owned();
+                cleaned_trace = result.trace.iter().clone().map(|x| x.to_owned()).collect();
+            }
+        }
+        
+        println!("{:?}", duplicates.iter().map(|x| (x.1, x.2)).collect::<Vec<(usize, usize)>>());
+        println!("{:?}", (biggest_loop.1..biggest_loop.2));
+        cleaned_trace.drain(biggest_loop.1..biggest_loop.2).for_each(drop);  
+        duplicates.clear();
+
+        mut_result = remove_loops(
+            &PlanningResult {
+                name: result.name.to_owned(),
+                alg: result.alg.to_owned(),
+                plan_found: result.plan_found,
+                plan_length: cleaned_trace.len() as u64,
+                trace: cleaned_trace,
+                time_to_solve: result.time_to_solve,
+                model_size: result.model_size
+            }
+        );
+    } 
+    mut_result.to_owned()
+}
+
 /// Given a predicate, return a vector of variables that play a role in it.
 pub fn get_predicate_vars(pred: &Predicate) -> Vec<Variable> {
     let mut s = Vec::new();

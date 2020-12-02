@@ -80,8 +80,8 @@ pub fn incremental(prob: &PlanningProblem, timeout: u64, tries: u64) -> Planning
     // SetParamZ3::new(&cfg, "parallel.threads.max", "4");
     let ctx = ContextZ3::new(&cfg);
     let params = ParamsZ3::new(&ctx);
-    let slv = SolverForLogicZ3::new(&ctx, "QF_UF");
-    // let slv = SolverZ3::new(&ctx);
+    // let slv = SolverForLogicZ3::new(&ctx, "QF_UF");
+    let slv = SolverZ3::new(&ctx);
     AddUIntParamToParamsZ3::new(&ctx, params, "timeout", (timeout*1000) as u32);
     // AddBoolParamToParamsZ3::new(&ctx, params, "parallel.enable", true);
     // AddUIntParamToParamsZ3::new(&ctx, params, "parallel.threads.max", 4 as u32);

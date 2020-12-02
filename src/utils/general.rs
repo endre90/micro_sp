@@ -2,6 +2,9 @@ use super::*;
 use itertools::sorted;
 use structopt::StructOpt;
 
+use std::time::Duration;
+use std::time::Instant;
+
 use std::fs::File;
 use std::io::prelude::*;
 use std::path::Path;
@@ -254,6 +257,7 @@ pub fn pprint_result(result: &PlanningResult) -> () {
     }
     println!("                    END OF RESULT                     ");
     println!("======================================================");
+    let delooped = remove_loops(&result);
 }
 
 /// Pretty print a planning result.
@@ -275,7 +279,32 @@ pub fn pprint_result_trans_only(result: &PlanningResult) -> () {
     }
     println!("                    END OF RESULT                     ");
     println!("======================================================");
+
+    let now = Instant::now();
+    let delooped = remove_loops(&result);
+
+    println!("======================================================");
+    println!("              DELOOPED PLANNING RESULT                ");
+    println!("======================================================");
+    println!("name: {:?}", delooped.name);
+    println!("algo: {:?}", delooped.alg);
+    println!("found: {:?}", delooped.plan_found);
+    println!("lenght: {:?}", delooped.plan_length);
+    println!("time: {:?}", delooped.time_to_solve);
+    println!("delooping_time: {:?}", now.elapsed());
+    println!("size: {:?} MB", delooped.model_size / 1000000);
+    println!("======================================================");
+    for t in 0..delooped.trace.len() {
+        // println!("frame: {:?}", t);
+        println!("{:?}: {:?}", t, delooped.trace[t].trans);
+        println!("------------------------------------------------------");
+    }
+    println!("                    END OF RESULT                     ");
+    println!("======================================================");
+
 }
+
+
 
 // /// Pretty print a planning result to a file.
 pub fn pprint_result_to_file(result: &PlanningResult) -> () {
