@@ -80,9 +80,10 @@ pub fn incremental(prob: &PlanningProblem, timeout: u64, tries: u64) -> Planning
     // SetParamZ3::new(&cfg, "parallel.threads.max", "4");
     let ctx = ContextZ3::new(&cfg);
     let params = ParamsZ3::new(&ctx);
-    // let slv = SolverForLogicZ3::new(&ctx, "QF_UF");
-    let slv = SolverZ3::new(&ctx);
-    AddUIntParamToParamsZ3::new(&ctx, params, "timeout", (timeout*1000) as u32);
+    // AddUIntParamToParamsZ3::new(&ctx, params, "timeout", (timeout*1000) as u32);
+    let slv = SolverForLogicZ3::new(&ctx, "QF_UF");
+    // let slv = SolverZ3::new(&ctx);
+    
     // AddBoolParamToParamsZ3::new(&ctx, params, "parallel.enable", true);
     // AddUIntParamToParamsZ3::new(&ctx, params, "parallel.threads.max", 4 as u32);
     // AddUIntParamToParamsZ3::new(&ctx, params, "lazy", 100 as u32);
@@ -132,6 +133,20 @@ pub fn incremental(prob: &PlanningProblem, timeout: u64, tries: u64) -> Planning
                                             ),
                                             BoolZ3::new(&ctx, true),
                                         ),
+                                        // predicate_to_ast(
+                                        //     &ctx, 
+                                        //     &Predicate::ASS(
+                                        //         Assignment::new(
+                                        //             &enum_c!(
+                                        //                 format!("{}_t{}", &x.name, step).as_str(),
+                                        //                 vec!("true", "false")
+                                        //             ),
+                                        //             &SPValue::String("true".to_string()),
+                                        //             None
+                                        //         )                                                 
+                                        //     ), 
+                                        //     step
+                                        // ),               
                                         predicate_to_ast(&ctx, &x.guard, step - 1),
                                         predicate_to_ast(&ctx, &x.update, step),
                                         keep_variable_values(
