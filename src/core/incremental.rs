@@ -1,6 +1,6 @@
 use super::*;
-use std::time::Instant;
 use std::time::Duration;
+use std::time::Instant;
 use z3_sys::*;
 use z3_v2::*;
 
@@ -72,23 +72,19 @@ pub fn keep_variable_values(
 /// The incremental algorithm that calls z3 to find a plan.
 ///
 /// Based on Gocht and Balyo's algorithm from 2017.
-pub fn incremental(prob: &PlanningProblem, timeout: u64, tries: u64) -> PlanningResult {
-    // let timeout = 5;
-    
+pub fn incremental(prob: &PlanningProblem, logic: &str, timeout: u64, tries: u64) -> PlanningResult {
     let cfg = ConfigZ3::new();
-    // SetParamZ3::new(&cfg, "parallel.enable", "true");
-    // SetParamZ3::new(&cfg, "parallel.threads.max", "4");
     let ctx = ContextZ3::new(&cfg);
     let params = ParamsZ3::new(&ctx);
-    // AddUIntParamToParamsZ3::new(&ctx, params, "timeout", (timeout*1000) as u32);
-    let slv = SolverForLogicZ3::new(&ctx, "QF_UF");
-    // let slv = SolverZ3::new(&ctx);
-    
-    // AddBoolParamToParamsZ3::new(&ctx, params, "parallel.enable", true);
-    // AddUIntParamToParamsZ3::new(&ctx, params, "parallel.threads.max", 4 as u32);
-    // AddUIntParamToParamsZ3::new(&ctx, params, "lazy", 100 as u32);
-    // AddBoolParamToParamsZ3::new(&ctx, params, "propagate_eq", true);
-    // AddBoolParamToParamsZ3::new(&ctx, params, "ignore_solver2", true);
+    let slv = match logic {
+        "default" => SolverZ3::new(&ctx),
+        // "smt" => SolverFromTacticZ3::new(&ctx, "smt"),
+        "QF_UF" => SolverForLogicZ3::new(&ctx, "QF_UF"),
+        "QF_FD" => SolverForLogicZ3::new(&ctx, "QF_FD"),
+        // "QF_BV" => SolverForLogicZ3::new(&ctx, "QF_BV"),
+        _ => panic!("unknown logic!")
+    };
+    AddUIntParamToParamsZ3::new(&ctx, params, "timeout", (timeout*1000) as u32);
     SolverSetParamsZ3::new(&ctx, &slv, params);
 
     SlvAssertZ3::new(&ctx, &slv, predicate_to_ast(&ctx, &prob.init, 0));
@@ -113,6 +109,19 @@ pub fn incremental(prob: &PlanningProblem, timeout: u64, tries: u64) -> Planning
         match SlvCheckZ3::new(&ctx, &slv) == 1 {
             false => {
                 SlvPopZ3::new(&ctx, &slv, 1);
+
+                // make a list of assignments to track transitions
+                let trans_name_assignments: Vec<Predicate> = prob
+                    .trans
+                    .iter()
+                    .map(|x| {
+                        pass!(&new_bool_assign_e!(
+                            format!("{}_t{}", &x.name, step).as_str(),
+                            true
+                        ))
+                    })
+                    .collect();
+
                 SlvAssertZ3::new(
                     &ctx,
                     &slv,
@@ -129,24 +138,15 @@ pub fn incremental(prob: &PlanningProblem, timeout: u64, tries: u64) -> Planning
                                             BoolVarZ3::new(
                                                 &ctx,
                                                 &BoolSortZ3::new(&ctx),
-                                                format!("{}_t{}", &x.name, step).as_str(),
+                                                format!("{}_t{}_s{}", &x.name, step, step).as_str(),
                                             ),
                                             BoolZ3::new(&ctx, true),
                                         ),
-                                        // predicate_to_ast(
-                                        //     &ctx, 
-                                        //     &Predicate::ASS(
-                                        //         Assignment::new(
-                                        //             &enum_c!(
-                                        //                 format!("{}_t{}", &x.name, step).as_str(),
-                                        //                 vec!("true", "false")
-                                        //             ),
-                                        //             &SPValue::String("true".to_string()),
-                                        //             None
-                                        //         )                                                 
-                                        //     ), 
-                                        //     step
-                                        // ),               
+                                        predicate_to_ast(
+                                            &ctx,
+                                            &Predicate::PBEQ(trans_name_assignments.clone(), 1),
+                                            step,
+                                        ),
                                         predicate_to_ast(&ctx, &x.guard, step - 1),
                                         predicate_to_ast(&ctx, &x.update, step),
                                         keep_variable_values(
@@ -190,7 +190,7 @@ pub fn incremental(prob: &PlanningProblem, timeout: u64, tries: u64) -> Planning
             step,
             planning_time,
             plan_found,
-            ModelSizeZ3::new()
+            ModelSizeZ3::new(),
         ),
         false => get_planning_result(
             &ctx,
@@ -200,7 +200,7 @@ pub fn incremental(prob: &PlanningProblem, timeout: u64, tries: u64) -> Planning
             step,
             planning_time,
             plan_found,
-            ModelSizeZ3::new()
+            ModelSizeZ3::new(),
         ),
     }
 }

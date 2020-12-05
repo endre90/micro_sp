@@ -5,7 +5,7 @@ use z3_sys::*;
 use z3_v2::*;
 
 /// The basic sequential planning algorithm.
-pub fn sequential(prob: &PlanningProblem, timeout: u64, tries: u64) -> PlanningResult {
+pub fn sequential(prob: &PlanningProblem, logic: &str, timeout: u64, tries: u64) -> PlanningResult {
     let now = Instant::now();
     let mut plan_found: bool = false;
     let mut step: u64 = 0;
@@ -23,15 +23,39 @@ pub fn sequential(prob: &PlanningProblem, timeout: u64, tries: u64) -> PlanningR
     while now.elapsed() < Duration::from_secs(timeout) && step < tries {
         println!("elapsed: {:?}", now.elapsed());
         let cfg = ConfigZ3::new();
-        SetParamZ3::new(&cfg, "timeout", "300000");
         let ctx = ContextZ3::new(&cfg);
-        let slv = SolverZ3::new(&ctx);
+        // let slv = SolverZ3::new(&ctx);
+        let params = ParamsZ3::new(&ctx);
+        let slv = match logic {
+            "default" => SolverZ3::new(&ctx),
+            // "smt" => SolverFromTacticZ3::new(&ctx, "smt"),
+            "QF_UF" => SolverForLogicZ3::new(&ctx, "QF_UF"),
+            "QF_FD" => SolverForLogicZ3::new(&ctx, "QF_FD"),
+            // "QF_BV" => SolverForLogicZ3::new(&ctx, "QF_BV"),
+            _ => panic!("unknown logic!")
+        };
+        
+        AddUIntParamToParamsZ3::new(&ctx, params, "timeout", (timeout*1000) as u32);
+
         SlvAssertZ3::new(&ctx, &slv, predicate_to_ast(&ctx, &prob.init, 0));
         SlvAssertZ3::new(&ctx, &slv, predicate_to_ast(&ctx, &prob.invars, 0));
         SlvAssertZ3::new(&ctx, &slv, predicate_to_ast(&ctx, &prob.goal, step));
         for s in 0..step {
             // println!("s: {:?}", s);
             SlvAssertZ3::new(&ctx, &slv, predicate_to_ast(&ctx, &prob.invars, s + 1));
+
+            // make a list of assignments to track transitions
+            let trans_name_assignments: Vec<Predicate> = prob
+            .trans
+            .iter()
+            .map(|x| {
+                pass!(&new_bool_assign_e!(
+                    format!("{}_t{}", &x.name, step).as_str(),
+                    true
+                ))
+            })
+            .collect();
+
             SlvAssertZ3::new(
                 &ctx,
                 &slv,
@@ -48,17 +72,22 @@ pub fn sequential(prob: &PlanningProblem, timeout: u64, tries: u64) -> PlanningR
                                         BoolVarZ3::new(
                                             &ctx,
                                             &BoolSortZ3::new(&ctx),
-                                            format!("{}_t{}", &x.name, s + 1).as_str(),
+                                            format!("{}_t{}_s{}", &x.name, step, step).as_str(),
                                         ),
                                         BoolZ3::new(&ctx, true),
                                     ),
-                                    predicate_to_ast(&ctx, &x.guard, s),
-                                    predicate_to_ast(&ctx, &x.update, s + 1),
+                                    // predicate_to_ast(
+                                    //     &ctx,
+                                    //     &Predicate::PBEQ(trans_name_assignments.clone(), 1),
+                                    //     step,
+                                    // ),
+                                    predicate_to_ast(&ctx, &x.guard, step - 1),
+                                    predicate_to_ast(&ctx, &x.update, step),
                                     keep_variable_values(
                                         &ctx,
                                         &get_problem_vars(&prob),
                                         &x,
-                                        s + 1,
+                                        step,
                                     ),
                                 ],
                             )

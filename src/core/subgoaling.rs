@@ -6,6 +6,7 @@ use z3_v2::*;
 
 pub fn subgoaling(
     prob: &ParamPlanningProblem,
+    logic: &str,
     alg: &str,
     timeout: u64,
     tries: u64,
@@ -20,8 +21,8 @@ pub fn subgoaling(
     );
 
     let first_result = match alg {
-        "seq" => sequential(&unparam(&first_subgoal), timeout, tries),
-        "inc" => incremental(&unparam(&first_subgoal), timeout, tries),
+        "seq" => sequential(&unparam(&first_subgoal), logic, timeout, tries),
+        "inc" => incremental(&unparam(&first_subgoal), logic, timeout, tries),
         "comp" => unimplemented!(),
         _ => panic!("impossible")
     };
@@ -32,12 +33,13 @@ pub fn subgoaling(
     // pprint_result(&first_result);
     // println!("{:?}", subresults.len());
     let return_result =
-        recursive_subfn(&first_result, &prob, 0, alg, timeout, tries, &mut subresults);
+        recursive_subfn(&first_result, &prob, 0, logic, alg, timeout, tries, &mut subresults);
 
     fn recursive_subfn(
         result: &PlanningResult,
         prob: &ParamPlanningProblem,
         i: u64,
+        logic: &str,
         alg: &str,
         timeout: u64,
         tries: u64,
@@ -80,6 +82,7 @@ pub fn subgoaling(
                     &prob.invars,
                     &prob.params,
                 ),
+                &logic,
                 timeout,
                 tries,
             );
@@ -89,7 +92,7 @@ pub fn subgoaling(
             // if now.elapsed() > Duration::from_secs(timeout) {
                 // break;
             // } else {
-            recursive_subfn(&new_result, &prob, i, alg, timeout, tries, subresults)
+            recursive_subfn(&new_result, &prob, i, logic, alg, timeout, tries, subresults)
             // }
             
         } else {

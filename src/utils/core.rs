@@ -308,8 +308,8 @@ pub fn get_planning_result(
 
         let trans = model_vec
             .iter()
-            .filter(|x| x[0].ends_with(&format!("_t{}", i + 1)))
-            .map(|x| (x[0].trim_end_matches(&format!("_t{}", i + 1)), x[1], i + 1))
+            .filter(|x| x[0].ends_with(&format!("_t{}_s{}", i + 1, i + 1)))
+            .map(|x| (x[0].trim_end_matches(&format!("_t{}_s{}", i + 1, i + 1)), x[1], i + 1))
             .find(|x| x.1 == "true")
             .map(|z| z.0)
             .unwrap_or_default();

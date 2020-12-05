@@ -55,18 +55,18 @@ fn test_parameterized() {
 
     let d1 = &deactivate_all_in_problem(&problem);
     println!("prms: {:?}", d1.params);
-    let result1 = parameterized(&d1, 1200, 30);
+    let result1 = parameterized(&d1, "default", 1200, 30);
     pprint_result(&result1);
     
 
     let d2 = &activate_next_in_problem(&d1);
     println!("prms: {:?}", d2.params);
-    let result2 = parameterized(&d2, 1200, 30);
+    let result2 = parameterized(&d2, "default", 1200, 30);
     pprint_result(&result2);
     
 
     let d3 = &activate_next_in_problem(&d2);
     println!("prms: {:?}", d3.params);
-    let result3 = parameterized(&d3, 1200, 30);
+    let result3 = parameterized(&d3, "default", 1200, 30);
     pprint_result(&result3);
 }

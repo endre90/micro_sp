@@ -42,6 +42,9 @@ pub struct ArgsCLI {
     /// Limit the number of steps
     #[structopt(long, short = "s", parse(try_from_str), default_value = "1000")]
     pub max_steps: u64,
+    /// Specialize the solver
+    #[structopt(long, short = "l", parse(try_from_str), default_value = "default")]
+    pub logic: String,
 }
 
 pub struct Args {
@@ -52,7 +55,8 @@ pub struct Args {
     pub dummy: bool,
     pub model: ParamPlanningProblem,
     pub timeout: u64,
-    pub max_steps: u64
+    pub max_steps: u64,
+    pub logic: String
 }
 
 pub fn handle_args() -> Args {
@@ -90,7 +94,8 @@ pub fn handle_args() -> Args {
             _ => panic!("unknown problem"),
         },
         timeout: args.timeout,
-        max_steps: args.max_steps
+        max_steps: args.max_steps,
+        logic: args.logic
     }
 }
 

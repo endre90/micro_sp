@@ -114,6 +114,7 @@ pub fn generate_transition(ptrans: &ParamTransition, params: &Vec<Parameter>) ->
 /// Generates the problem from a parameterized problem and solves it with the incremental algorithm.
 pub fn parameterized(
     prob: &ParamPlanningProblem,
+    logic: &str,
     timeout: u64,
     tries: u64
 ) -> PlanningResult {
@@ -129,6 +130,7 @@ pub fn parameterized(
             &prob.invars,
             // &generate_predicate(&prob.invars, &prob.params)
         ),
+        logic,
         timeout,
         tries
     )

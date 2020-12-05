@@ -39,14 +39,21 @@ pub fn predicate_to_ast(ctx: &ContextZ3, pred: &Predicate, step: u64) -> Z3_ast 
                     EQZ3::new(&ctx, EnumVarZ3::new(&ctx, sort.r, format!("{}_s{}", x.var.name.to_string(), step).as_str()), elems[index])
                 },
                 SPValueType::Bool => match x.val {
-                    SPValue::Bool(false) => EQZ3::new(&ctx, 
-                        BoolVarZ3::new(&ctx, &BoolSortZ3::new(&ctx), &format!("{}_s{}", x.var.name.to_string(), step)), 
-                        BoolZ3::new(&ctx, false)),
-                    SPValue::Bool(true) => EQZ3::new(&ctx, 
-                        BoolVarZ3::new(&ctx, &BoolSortZ3::new(&ctx), &format!("{}_s{}", x.var.name.to_string(), step)), 
-                        BoolZ3::new(&ctx, true)),
+                    SPValue::Bool(false) => NOTZ3::new(&ctx, 
+                        BoolVarZ3::new(&ctx, &BoolSortZ3::new(&ctx), &format!("{}_s{}", x.var.name.to_string(), step))),
+                    SPValue::Bool(true) =>  
+                        BoolVarZ3::new(&ctx, &BoolSortZ3::new(&ctx), &format!("{}_s{}", x.var.name.to_string(), step)),
                     _ => panic!("Impossible"),
                 }
+                // SPValueType::Bool => match x.val {
+                //     SPValue::Bool(false) => EQZ3::new(&ctx, 
+                //         BoolVarZ3::new(&ctx, &BoolSortZ3::new(&ctx), &format!("{}_s{}", x.var.name.to_string(), step)), 
+                //         BoolZ3::new(&ctx, false)),
+                //     SPValue::Bool(true) => EQZ3::new(&ctx, 
+                //         BoolVarZ3::new(&ctx, &BoolSortZ3::new(&ctx), &format!("{}_s{}", x.var.name.to_string(), step)), 
+                //         BoolZ3::new(&ctx, true)),
+                //     _ => panic!("Impossible"),
+                // }
             }
         },
         Predicate::EQ(x, y) => {
