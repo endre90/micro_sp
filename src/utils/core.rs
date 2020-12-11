@@ -5,7 +5,7 @@ use z3_v2::*;
 
 /// Given a planning result, remove sections that lead back to an already visited state.
 /// Actually, have to do this iterativelly since removing a loop might remove part of another one.
-/// So, just keep finding and removing the biggest loop until there are no loops.
+/// So, recursively just keep finding and removing the biggest loop until there are no loops.
 pub fn remove_loops(result: &PlanningResult) -> PlanningResult {
     let mut mut_result = result.clone();
     let mut duplicates: Vec<(State, usize, usize)> = vec!();
@@ -31,7 +31,7 @@ pub fn remove_loops(result: &PlanningResult) -> PlanningResult {
     duplicates.sort();
     duplicates.dedup();
 
-    // if there is a loop, find the biggest one and remove it
+    // if there are loops, find the biggest one and remove it
     if duplicates.len() != 0 {
         let mut biggest_loop: (State, usize, usize) = duplicates[0].clone();
         for d in &duplicates {
@@ -218,11 +218,11 @@ pub fn get_planning_result(
         .collect();
     let vars = get_problem_vars(&prob);
 
-    // for m in &model_vec {
-    //     if m[1] == "true"{
-    //         println!("{:?}", m);
-    //     }
-    // }
+    for m in &model_vec {
+        if m[1] == "true"{
+            println!("{:?}", m);
+        }
+    }
     
 
     let mut trace: Vec<PlanningFrame> = vec![];
