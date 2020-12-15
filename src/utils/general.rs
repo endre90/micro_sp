@@ -91,6 +91,10 @@ pub fn handle_args() -> Args {
                 },
                 _ => panic!("unknown problem"),
             },
+            "rovers" => match args.variant.as_str() {
+                "model1" => rovers::models::bool_explicit::model(args.instance.as_str()),
+                _ => panic!("unknown problem"),
+            }
             _ => panic!("unknown problem"),
         },
         timeout: args.timeout,
