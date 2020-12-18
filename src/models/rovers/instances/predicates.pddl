@@ -1,0 +1,25 @@
+at rover waypoint 
+at_lander lander waypoint
+can_traverse rover waypoint waypoint
+equipped_for_soil_analysis rover
+equipped_for_rock_analysis rover
+equipped_for_imaging rover
+empty store
+have_rock_analysis rover waypoint
+have_soil_analysis rover waypoint
+full store
+calibrated camera rover 
+supports camera mode
+available rover
+visible waypoint waypoint
+have_image rover objective mode
+communicated_soil_data waypoint
+communicated_rock_data waypoint
+communicated_image_data objective mode
+at_soil_sample waypoint
+at_rock_sample waypoint
+visible_from objective waypoint
+store_of store rover
+calibration_target camera objective
+on_board camera rover
+channel_free lander
