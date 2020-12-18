@@ -69,6 +69,10 @@ pub fn parser(name: &str) -> (ParamPlanningProblem, HashMap<String, Vec<String>>
     objects.insert("store".to_string(), stores);
     objects.insert("waypoint".to_string(), waypoints);
 
+    for o in &objects {
+        println!("{:?}", o)
+    }
+
     let init_data: Vec<Vec<String>> = init_strings
         .iter()
         .map(|x| x.split(|c| c == ' ')
@@ -99,6 +103,10 @@ pub fn parser(name: &str) -> (ParamPlanningProblem, HashMap<String, Vec<String>>
         .map(|y| y.to_owned()).collect())
         .collect();
 
+    for o in &predicate_data {
+        println!("{:?}", o)
+    }
+
     fn from_template(data: &Vec<String>, val: bool) -> Predicate {
         match data.len() {
             2 =>  pass!(&new_bool_assign_c!(&format!("{}_{}", data[0], data[1]), val, "c")),
@@ -115,7 +123,7 @@ pub fn parser(name: &str) -> (ParamPlanningProblem, HashMap<String, Vec<String>>
         initial_assert.push(from_template(elem, true))
     }
 
-    // generate negatives
+    // generate negatives (misses some negative predicate generation!)
     for elem in &predicate_data {
         match elem.len() {
             2 => {

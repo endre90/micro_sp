@@ -344,7 +344,7 @@ pub fn model(name: &str) -> ParamPlanningProblem {
         }
     }
 
-    // missing free_channel transitions?
+    // missing free_channel transitions? or add to effects like they do...?
     for rover in &rovers {
         for lander in &landers {
             free_channel_transitions.push(
@@ -380,10 +380,6 @@ pub fn model(name: &str) -> ParamPlanningProblem {
     }
 
     let c = Parameter::new("c", &true);
-    // let clear = Parameter::new("clear", &true);
-    // let ontable = Parameter::new("ontable", &true);
-    // let hand = Parameter::new("hand", &true);
-    // let holding = Parameter::new("holding", &true);
 
     let problem = ParamPlanningProblem::new(
         &format!("blocksworld_bool_explicit_{}", parsed.name.as_str()), 

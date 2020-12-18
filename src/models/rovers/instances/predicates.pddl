@@ -1,4 +1,4 @@
-at rover waypoint 
+at rover waypoint
 at_lander lander waypoint
 can_traverse rover waypoint waypoint
 equipped_for_soil_analysis rover
@@ -8,7 +8,7 @@ empty store
 have_rock_analysis rover waypoint
 have_soil_analysis rover waypoint
 full store
-calibrated camera rover 
+calibrated camera rover
 supports camera mode
 available rover
 visible waypoint waypoint
