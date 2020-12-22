@@ -78,7 +78,8 @@ pub fn incremental(prob: &PlanningProblem, logic: &str, timeout: u64, tries: u64
     let params = ParamsZ3::new(&ctx);
     let slv = match logic {
         "default" => SolverZ3::new(&ctx),
-        "smt" => {
+        "sat" => SolverFromTacticZ3::new(&ctx, "sat"),
+        "simple_smt" => {
             let solver = SimpleSolverZ3::new(&ctx);
             AddBoolParamToParamsZ3::new(&ctx, params, "smt.auto_config", false);
             AddBoolParamToParamsZ3::new(&ctx, params, "smt.mbqi", false);

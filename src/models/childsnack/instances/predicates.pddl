@@ -1,0 +1,13 @@
+at_kitchen_bread bread-portion
+at_kitchen_content content-portion
+at_kitchen_sandwich sandwich
+no_gluten_bread bread-portion
+no_gluten_content content-portion
+ontray sandwich tray
+no_gluten_sandwich sandwich
+allergic_gluten child
+not_allergic_gluten child
+served child
+waiting child place
+at tray place
+notexist sandwich

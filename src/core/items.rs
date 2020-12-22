@@ -227,6 +227,18 @@ pub struct PlanningFrame {
     pub trans: String,
 }
 
+/// Define strategy to use when planning.
+#[derive(PartialEq, Eq, Clone, Debug, PartialOrd, Ord)]
+pub struct PlanningStrategy {
+    pub model: String, // part of Model?
+    pub logic: String, // part of Model?
+    pub base: String,
+    pub encoding: String,
+    pub rate: String,
+    pub subgoaling: String,
+    pub decompose: String,
+    pub parallelism: String,
+}
 /// A planning problem that is given to the incremental solver.
 #[derive(Debug, PartialEq, Clone, PartialOrd, Eq, Ord)]
 pub struct PlanningProblem {
