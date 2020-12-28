@@ -224,7 +224,7 @@ impl Transition {
 pub struct PlanningFrame {
     pub source: State,
     pub sink: State,
-    pub trans: String,
+    pub trans: Vec<String>,
 }
 
 /// Define strategy to use when planning.

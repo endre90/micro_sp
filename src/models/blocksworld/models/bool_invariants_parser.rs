@@ -81,38 +81,70 @@ pub fn parser(name: &str) -> (ParamPlanningProblem, Vec<String>) {
     // explicitly have to say that others are not clear?
     let mut clear_predicates = vec![];
 
-    // let unclear_vec = IterOps::difference(blocks.clone(), clear_vec.clone());
+    let unclear_vec = IterOps::difference(blocks.clone(), clear_vec.clone());
+    let no_ontable_vec = IterOps::difference(blocks.clone(), ontable_vec.clone());
 
     for x in clear_vec {
         clear_predicates.push(
             pand!(
-                &pass!(&new_bool_assign_c!(&format!("clear_{}", x), true, "clear"))
+                &pass!(&new_bool_assign_c!(&format!("clear_{}", x), true, "block"))
             )
         )
     }
 
-    // for x in unclear_vec {
-    //     clear_predicates.push(
-    //         pand!(
-    //             &pass!(&new_bool_assign_c!(&format!("clear_{}", x), &domain, "false", "bool", "clear"))
-    //         )
-    //     )
-    // }
+    for x in unclear_vec {
+        clear_predicates.push(
+            pand!(
+                &pass!(&new_bool_assign_c!(&format!("clear_{}", x), false, "block"))
+            )
+        )
+    }
 
     let mut ontable_predicates = vec![];
     for x in ontable_vec {
         ontable_predicates.push(
             pand!(
-                &pass!(&new_bool_assign_c!(&format!("ontable_{}", x), true, "ontable"))
+                &pass!(&new_bool_assign_c!(&format!("ontable_{}", x), true, "block"))
+            )
+        )
+    }
+
+    for x in no_ontable_vec {
+        ontable_predicates.push(
+            pand!(
+                &pass!(&new_bool_assign_c!(&format!("ontable_{}", x), false, "block"))
             )
         )
     }
 
     let mut on_predicates = vec![];
-    for (b1, b2) in on_init {
+    for (b1, b2) in &on_init {
         on_predicates.push(
             pand!(
-                &pass!(&new_bool_assign_c!(&format!("{}_on_{}", b1, b2), true, "on"))
+                &pass!(&new_bool_assign_c!(&format!("{}_on_{}", b1, b2), true, "block"))
+            )
+        )
+    }
+
+    for b1 in &blocks {
+        for b2 in &blocks {
+            if b1 != b2 {
+                if !on_init.contains(&(*b1, *b2)) {
+                    on_predicates.push(
+                        pand!(
+                            &pass!(&new_bool_assign_c!(&format!("{}_on_{}", b1, b2), false, "block"))
+                        )
+                    )
+                }
+            }
+        }
+    }
+
+    let mut holding_predicates = vec![];
+    for x in &blocks {
+        holding_predicates.push(
+            pand!(
+                &pass!(&new_bool_assign_c!(&format!("holding_{}", x), false, "hand"))
             )
         )
     }
@@ -121,17 +153,27 @@ pub fn parser(name: &str) -> (ParamPlanningProblem, Vec<String>) {
         Predicate::AND(clear_predicates),
         Predicate::AND(ontable_predicates),
         Predicate::AND(on_predicates),
+        Predicate::AND(holding_predicates),
         pass!(&new_bool_assign_c!(&format!("hand_empty"), true, "hand"))
     ]);
+
+
 
     let mut goal_on_predicates = vec![];
     for (b1, b2) in on_goal {
         goal_on_predicates.push(
-            pass!(&new_bool_assign_c!(&format!("{}_on_{}", b1, b2), true, "on"))
+            pass!(&new_bool_assign_c!(&format!("{}_on_{}", b1, b2), true, "block"))
         )
     }
 
-    let goal = ParamPredicate::new(&goal_on_predicates);
+    // adjusted for goal decomposition
+    let reversed_goal_for_heuristics = goal_on_predicates.iter().rev().cloned().collect();
+    let goal = ParamPredicate::new(&reversed_goal_for_heuristics);
+
+    // let goal = ParamPredicate::new(&goal_on_predicates);
+
+
+    // let goal = ParamPredicate::new(&goal_on_predicates);
     let problem = ParamPlanningProblem::new(
         name, 
         &initial, 

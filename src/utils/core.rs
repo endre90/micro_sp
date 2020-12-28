@@ -306,13 +306,21 @@ pub fn get_planning_result(
             .map(|y| y.clone())
             .collect();
 
+        // let trans = model_vec
+        //     .iter()
+        //     .filter(|x| x[0].ends_with(&format!("_t{}_s{}", i + 1, i + 1)))
+        //     .map(|x| (x[0].trim_end_matches(&format!("_t{}_s{}", i + 1, i + 1)), x[1], i + 1))
+        //     .find(|x| x.1 == "true")
+        //     .map(|z| z.0)
+        //     .unwrap_or_default();
+
         let trans = model_vec
             .iter()
             .filter(|x| x[0].ends_with(&format!("_t{}_s{}", i + 1, i + 1)))
             .map(|x| (x[0].trim_end_matches(&format!("_t{}_s{}", i + 1, i + 1)), x[1], i + 1))
-            .find(|x| x.1 == "true")
-            .map(|z| z.0)
-            .unwrap_or_default();
+            .filter(|x| x.1 == "true")
+            .map(|z| z.0.to_string())
+            .collect();
 
         let mut source = vec![];
         for i in vec![measured_source, command_source, estimated_source] {
@@ -326,7 +334,7 @@ pub fn get_planning_result(
 
         trace.push(PlanningFrame {
             source: State::from_vec(&source),
-            trans: String::from(trans),
+            trans: trans,
             sink: State::from_vec(&sink),
         });
     }
