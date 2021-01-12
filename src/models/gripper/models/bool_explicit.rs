@@ -58,6 +58,37 @@ pub fn model(name: &str) -> ParamPlanningProblem {
         }
     }
 
+    // ok this works, but how to get this from other transitions?
+    // for room in &rooms {
+    //     for ball1 in &balls {
+    //         for ball2 in &balls {
+    //             if ball1 != ball2 {
+    //                 pick_transitions.push(
+    //                     ptrans!(
+    //                         &format!("pick_{}_in_{}_with_right_gripper_AND_pick_{}_in_{}_with_left_gripper", ball1, room, ball2, room),
+    //                         &ppred!(
+    //                             &pass!(&new_bool_assign_c!(&format!("at_{}_{}", ball1, room), true, String::from(ball1))),
+    //                             &pass!(&new_bool_assign_c!(&format!("at_{}_{}", ball2, room), true, String::from(ball2))),
+    //                             &pass!(&new_bool_assign_c!(&format!("at-robby_{}", room), true, "r")),
+    //                             &pass!(&new_bool_assign_c!(&format!("free_left"), true, "g")),
+    //                             &pass!(&new_bool_assign_c!(&format!("free_right"), true, "g"))
+    //                         ),
+    //                         &ppred!(
+    //                             &pass!(&new_bool_assign_c!(&format!("at_{}_{}", ball1, room), false, String::from(ball1))),
+    //                             &pass!(&new_bool_assign_c!(&format!("at_{}_{}", ball2, room), false, String::from(ball2))),
+    //                             &pass!(&new_bool_assign_c!(&format!("at-robby_{}", room), true, "r")),
+    //                             &pass!(&new_bool_assign_c!(&format!("right_carry_{}", ball1), true, "g")),
+    //                             &pass!(&new_bool_assign_c!(&format!("left_carry_{}", ball2), true, "g")),
+    //                             &pass!(&new_bool_assign_c!(&format!("free_right"), false, "g")),
+    //                             &pass!(&new_bool_assign_c!(&format!("free_left"), false, "g"))
+    //                         )
+    //                     )
+    //                 )
+    //             }
+    //         }
+    //     }
+    // }
+
     for room in &rooms {
         for gripper in &grippers {
             for ball in &balls {

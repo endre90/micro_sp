@@ -100,6 +100,11 @@ pub fn handle_args() -> Args {
                 "bool_explicit" => childsnack::models::bool_explicit::model(args.instance.as_str()),
                 // "bool_invariants" => rovers::models::bool_invariants::model(args.instance.as_str()),
                 _ => panic!("unknown problem"),
+            },
+            "barman" => match args.variant.as_str() {
+                "bool_explicit" => barman::models::bool_explicit::model(args.instance.as_str()),
+                // "bool_invariants" => rovers::models::bool_invariants::model(args.instance.as_str()),
+                _ => panic!("unknown problem"),
             }
             _ => panic!("unknown problem"),
         },

@@ -110,6 +110,16 @@ pub fn model(name: &str) -> ParamPlanningProblem {
         transitions.extend(t)
     }
 
+    // let mut invariants = vec![];
+    // for t in &transitions {
+    //     invariants.push(
+    //         pnot!(&pand!(
+    //             &pass!(&new_bool_assign_c!(&t.name, true, "hand")),
+    //             &Predicate::AND(t.update.preds.to_owned())
+    //         ))
+    //     )
+    // }
+
     let block = Parameter::new("block", &true);
     // let clear = Parameter::new("clear", &true);
     // let ontable = Parameter::new("ontable", &true);
@@ -121,6 +131,7 @@ pub fn model(name: &str) -> ParamPlanningProblem {
         &parsed.init,
         &parsed.goal,
         &transitions,
+        // &Predicate::AND(invariants),
         &Predicate::TRUE,
         &vec!(hand, block)
     );
