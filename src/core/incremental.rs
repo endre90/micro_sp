@@ -193,17 +193,7 @@ pub fn incremental(
     let params = ParamsZ3::new(&ctx);
     let slv = match logic {
         "default" => SolverZ3::new(&ctx),
-        "sat" => SolverFromTacticZ3::new(&ctx, "sat"),
-        "simple_smt" => {
-            let solver = SimpleSolverZ3::new(&ctx);
-            AddBoolParamToParamsZ3::new(&ctx, params, "smt.auto_config", false);
-            AddBoolParamToParamsZ3::new(&ctx, params, "smt.mbqi", false);
-            AddBoolParamToParamsZ3::new(&ctx, params, "smt.ematching", false);
-            solver
-        },
-        "QF_UF" => SolverForLogicZ3::new(&ctx, "QF_UF"),
-        "QF_FD" => SolverForLogicZ3::new(&ctx, "QF_FD"),
-        "QF_BV" => SolverForLogicZ3::new(&ctx, "QF_BV"),
+        "qffd" => SolverForLogicZ3::new(&ctx, "QF_FD"),
         _ => panic!("unknown logic!"),
     };
     AddUIntParamToParamsZ3::new(&ctx, params, "timeout", (timeout * 1000) as u32);

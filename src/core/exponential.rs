@@ -1,7 +1,7 @@
 use super::*;
 use std::time::Duration;
 use std::time::Instant;
-use z3_sys::*;
+// use z3_sys::*;
 use z3_v2::*;
 
 /// Rintanens exponential on top of sequential.

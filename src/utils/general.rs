@@ -86,24 +86,23 @@ pub fn handle_args() -> Args {
                 _ => panic!("unknown problem"),
             },
             "gripper" => match args.variant.as_str() {
-                "bool_explicit" => {
-                    gripper::models::bool_explicit::model(args.instance.as_str())
-                },
+                "prop_explicit" => gripper::models::prop_explicit_model::model(args.instance.as_str()),
+                "prop_invariant" => gripper::models::prop_invariant_model::model(args.instance.as_str()),
                 _ => panic!("unknown problem"),
             },
             "rovers" => match args.variant.as_str() {
-                "bool_explicit" => rovers::models::bool_explicit::model(args.instance.as_str()),
-                "bool_invariants" => rovers::models::bool_invariants::model(args.instance.as_str()),
+                "prop_explicit" => rovers::models::prop_explicit_model::model(args.instance.as_str()),
+                "prop_invariant" => rovers::models::prop_invariant_model::model(args.instance.as_str()),
                 _ => panic!("unknown problem"),
             },
             "childsnack" => match args.variant.as_str() {
-                "bool_explicit" => childsnack::models::bool_explicit::model(args.instance.as_str()),
-                // "bool_invariants" => rovers::models::bool_invariants::model(args.instance.as_str()),
+                "prop_explicit" => childsnack::models::prop_explicit_model::model(args.instance.as_str()),
+                "prop_invariant" => childsnack::models::prop_invariant_model::model(args.instance.as_str()),
                 _ => panic!("unknown problem"),
             },
             "barman" => match args.variant.as_str() {
-                "bool_explicit" => barman::models::bool_explicit::model(args.instance.as_str()),
-                // "bool_invariants" => rovers::models::bool_invariants::model(args.instance.as_str()),
+                "prop_explicit" => barman::models::prop_explicit_model::model(args.instance.as_str()),
+                "prop_invariant" => barman::models::prop_invariant_model::model(args.instance.as_str()),
                 _ => panic!("unknown problem"),
             }
             _ => panic!("unknown problem"),

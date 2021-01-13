@@ -1,7 +1,7 @@
 use super::*;
-use std::time::Instant;
-use z3_sys::*;
-use z3_v2::*;
+// use std::time::Instant;
+// use z3_sys::*;
+// use z3_v2::*;
 
 pub enum Case {
     First,

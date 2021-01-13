@@ -1,5 +1,5 @@
 use super::*;
-use std::time::Instant;
+// use std::time::Instant;
 use z3_sys::*;
 use z3_v2::*;
 

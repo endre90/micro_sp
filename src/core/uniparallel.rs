@@ -1,7 +1,7 @@
 use super::*;
 use std::time::Instant;
 use std::time::Duration;
-use z3_sys::*;
+// use z3_sys::*;
 use z3_v2::*;
 
 /// merge non-interfering transitions and append them to the transition list

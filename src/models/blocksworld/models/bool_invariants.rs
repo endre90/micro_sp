@@ -8,14 +8,6 @@ use super::*;
 //     ($name:expr, $domain:expr, $val:expr, $r#type:expr, $param:expr, $life:expr) => { ... };
 // }
 
-/// Instead of explicitly generating negative predicates from diff(ojb/init),
-/// the problem here is modelled with help of additional invariants:
-/// 1. block can't be on another block if that block is on the first block
-/// 2. if holding any block, the gripper can't be empty
-/// 3. at most one block can be held
-/// 4. a block can't simultaneously be on several different blocks
-/// 5. if block is on table, it is not on a block
-/// 6. if b1 is on b2, b2 is not clear
 pub fn model(name: &str) -> ParamPlanningProblem {
 
     let (parsed, blocks) = parser(name);
@@ -119,6 +111,14 @@ pub fn model(name: &str) -> ParamPlanningProblem {
 
     let mut invariants = vec![];
 
+    // The problem here is modelled with help of additional invariants:
+    // 1. block can't be on another block if that block is on the first block
+    // 2. if holding any block, the gripper can't be empty
+    // 3. at most one block can be held
+    // 4. a block can't simultaneously be on several different blocks
+    // 5. if block is on table, it is not on a block
+    // 6. if b1 is on b2, b2 is not clear
+
     // Invariant 1: block can't be on another block if that block is on the first block
     for b1 in &blocks {
         for b2 in &blocks {
@@ -204,18 +204,6 @@ pub fn model(name: &str) -> ParamPlanningProblem {
             }
         }
     }
-
-    // // Generate some basic invariants
-    // for t in &transitions {
-    //     invariants.push(
-    //         pnot!(
-    //             &pand!(
-    //                 &pand!(t.update.preds),
-                    
-    //             )
-    //         )
-    //     )
-    // }
 
     let block = Parameter::new("block", &true);
     // let clear = Parameter::new("clear", &true);

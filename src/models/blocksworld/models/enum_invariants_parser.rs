@@ -1,7 +1,6 @@
 use super::*;
 
 use std::fs::File;
-use std::io;
 use std::io::prelude::*;
 
 pub fn parser(name: &str) -> (ParamPlanningProblem, Vec<String>) {
