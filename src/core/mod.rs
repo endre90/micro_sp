@@ -10,6 +10,7 @@ pub mod predicates;
 pub mod sequential;
 pub mod uniparallel;
 pub mod subgoaling;
+pub mod skipping;
 
 pub mod macros;
 

@@ -21,21 +21,6 @@ pub fn model(name: &str) -> ParamPlanningProblem {
     let places = objects.get("place").unwrap_or(&vec!()).to_vec();
     let sandwiches = objects.get("sandwich").unwrap_or(&vec!()).to_vec();
 
-    //     (:action make_sandwich_no_gluten 
-    //         :parameters (?s - sandwich ?b - bread-portion ?c - content-portion)
-    //         :precondition (and (at_kitchen_bread ?b)
-    //                    (at_kitchen_content ?c)
-    //                    (no_gluten_bread ?b)
-    //                    (no_gluten_content ?c)
-    //                    (notexist ?s))
-    //         :effect (and
-    //               (not (at_kitchen_bread ?b))
-    //               (not (at_kitchen_content ?c))
-    //               (at_kitchen_sandwich ?s)
-    //               (no_gluten_sandwich ?s)
-    //                       (not (notexist ?s))
-    //               )) 
-
     for sandwich in &sandwiches {
         for bread_portion in &bread_portions {
             for content_portion in &content_portions {

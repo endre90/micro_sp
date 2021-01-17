@@ -1,8 +1,8 @@
 use super::*;
 
-pub mod bool_explicit;
-pub mod bool_explicit_parser;
-pub mod bool_invariants;
-pub mod bool_invariants_parser;
-pub mod enum_invariants;
-pub mod enum_invariants_parser;
+pub mod prop_explicit_model;
+pub mod prop_explicit_parser;
+pub mod prop_invariant_model;
+pub mod prop_invariant_parser;
+pub mod eq_invariant_model;
+pub mod eq_invariant_parser;

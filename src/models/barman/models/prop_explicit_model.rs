@@ -483,15 +483,15 @@ for beverage in &beverages {
                                     &pass!(&new_bool_assign_c!(&format!("empty_{}", shot), true, "c")),
                                     &pass!(&new_bool_assign_c!(&format!("clean_{}", shot), true, "c")),
                                     &pass!(&new_bool_assign_c!(&format!("contains_{}_{}", shaker, beverage), true, "c")),
-                                    &pass!(&new_bool_assign_c!(&format!("saker_level_{}_{}", shaker, level1), true, "c")),
-                                    &pass!(&new_bool_assign_c!(&format!("next_{}_{}", level1, level2), true, "c"))
+                                    &pass!(&new_bool_assign_c!(&format!("shaker_level_{}_{}", shaker, level1), true, "c")),
+                                    &pass!(&new_bool_assign_c!(&format!("next_{}_{}", level2, level1), true, "c"))
                                 ),
                                 &ppred!(
                                     &pass!(&new_bool_assign_c!(&format!("empty_{}", shot), false, "c")),
                                     &pass!(&new_bool_assign_c!(&format!("clean_{}", shot), false, "c")),
                                     &pass!(&new_bool_assign_c!(&format!("contains_{}_{}", shot, beverage), true, "c")),
-                                    &pass!(&new_bool_assign_c!(&format!("saker_level_{}_{}", shaker, level1), false, "c")),
-                                    &pass!(&new_bool_assign_c!(&format!("saker_level_{}_{}", shaker, level2), true, "c"))
+                                    &pass!(&new_bool_assign_c!(&format!("shaker_level_{}_{}", shaker, level1), false, "c")),
+                                    &pass!(&new_bool_assign_c!(&format!("shaker_level_{}_{}", shaker, level2), true, "c"))
                                 )
                             )
                         )

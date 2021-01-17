@@ -9,6 +9,7 @@ pub use crate::core::compositional::*;
 pub use crate::core::subgoaling::*;
 pub use crate::core::sequential::*;
 pub use crate::core::incremental::*;
+pub use crate::core::skipping::*;
 pub use crate::core::items::*;
 pub use crate::core::parameterized::*;
 pub use crate::core::predicates::*;

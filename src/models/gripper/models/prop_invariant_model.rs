@@ -100,13 +100,9 @@ pub fn model(name: &str) -> ParamPlanningProblem {
     let mut invariants = vec!();    
 
     // 1. if a gripper carries a ball, it is not free
-    // 2. if the robot is in one room, it is not in the other room
-    // 3. if a gripper carries a ball, the ball is in neither room
-    // 4. the ball can't be in two rooms simultaneously
 
     for gripper in &grippers {    
         for ball in &balls {
-
             // 1. if a gripper carries a ball, it is not free
             invariants.push(
                 pnot!(
@@ -116,62 +112,13 @@ pub fn model(name: &str) -> ParamPlanningProblem {
                     )
                 )
             );
-
-            // unnecessary invariant? - discuss in the paper.
-            // for room_a in &rooms {
-            //     for room_b in &rooms {
-            //         if room_a != room_b {
-            //             // 3. if a gripper carries a ball, the ball is in neither room
-            //             invariants.push(
-            //                 pnot!(
-            //                     &pand!(
-            //                         &pass!(&new_bool_assign_c!(&format!("carry_{}_{}", ball, gripper), true, "c")),
-            //                         &por!(
-            //                             &pass!(&new_bool_assign_c!(&format!("at_{}_{}", ball, room_a), true, "c")),
-            //                             &pass!(&new_bool_assign_c!(&format!("at_{}_{}", ball, room_b), true, "c"))
-            //                         )
-            //                     )
-            //                 )
-            //             );
-            //         }   
-            //     }
-            // }
-        }
-    }
-
-    for room_a in &rooms {
-        for room_b in &rooms {
-            if room_a != room_b {
-
-                // this one also slows down planning? discuss
-                // 2. if the robot is in one room, it is not in the other room
-                // invariants.push(
-                //     pnot!(
-                //         &pand!(
-                //             &pass!(&new_bool_assign_c!(&format!("at-robby_{}", room_a), true, "c")),
-                //             &pass!(&new_bool_assign_c!(&format!("at-robby_{}", room_b), true, "c"))
-                //         )
-                //     )
-                // );
-                for ball in &balls {
-                    // 4. the ball can't be in two rooms simultaneously
-                    invariants.push(
-                        pnot!(
-                            &pand!(
-                                &pass!(&new_bool_assign_c!(&format!("at_{}_{}", ball, room_a), true, "c")),
-                                &pass!(&new_bool_assign_c!(&format!("at_{}_{}", ball, room_b), true, "c"))
-                            )
-                        )
-                    );
-                }
-            } 
         }
     }
 
     let c = Parameter::new("c", &true);
 
     let problem = ParamPlanningProblem::new(
-        &format!("gripper_bool_explicit_{}", parsed.name.as_str()), 
+        &format!("gripper_prop_invariant_{}", parsed.name.as_str()), 
         &parsed.init,
         &parsed.goal,
         &transitions,

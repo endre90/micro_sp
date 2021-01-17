@@ -1,16 +1,16 @@
 use lib::*;
 use std::io;
 mod models;
-use std::sync::Arc;
-use std::sync::Mutex;
+// use std::sync::Arc;
+// use std::sync::Mutex;
 mod runner;
-use r2r::*;
-use tokio::time::{Duration, Instant, timeout_at};
-use tokio::runtime;
-use tokio_timer::Timeout;
-use futures::Future;
-use std::process;
-use tokio::prelude::*;
+// use r2r::*;
+// use tokio::time::{Duration, Instant, timeout_at};
+// use tokio::runtime;
+// use tokio_timer::Timeout;
+// use futures::Future;
+// use std::process;
+// use tokio::prelude::*;
 
 // use std::process;
 
@@ -24,6 +24,8 @@ async fn main() -> io::Result<()> {
     let result = match ha.alg.as_str() {
         "seq" => sequential(&unparam(&ha.model), ha.logic.as_str(), ha.timeout, ha.max_steps),
         "inc" => incremental(&unparam(&ha.model), ha.logic.as_str(), ha.timeout, ha.max_steps),
+        "sub" => subgoaling(&ha.model, ha.logic.as_str(), ha.timeout, ha.max_steps),
+        "skp" => skipping(&unparam(&ha.model), ha.logic.as_str(), ha.timeout, ha.max_steps),
         // "seqexp" => seqexponential(&unparam(&ha.model), ha.timeout, ha.max_steps),
         "incexp" => incexponential(&unparam(&ha.model), ha.timeout, ha.max_steps),
         // "unipar" => uniparallel(&unparam(&ha.model), ha.timeout, ha.max_steps),

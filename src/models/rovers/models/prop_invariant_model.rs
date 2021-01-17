@@ -8,12 +8,6 @@ use super::*;
 //     ($name:expr, $domain:expr, $val:expr, $r#type:expr, $param:expr, $life:expr) => { ... };
 // }
 
-/// Some additional invariants added in hope to reduce the search space:
-/// 1. one rover can only be at one waypoint at a time
-/// 2. one lander can only be at one waypoint at a time
-/// 3. one store can only be full or empty at one time
-/// 4. robot is not available while communicating (rock, soil, image) data
-/// 5. lander communication channel is not free while some robot is communicating (rock, soil, image) data
 pub fn model(name: &str) -> ParamPlanningProblem {
 
     let (parsed, objects) = parser(name);
@@ -26,16 +20,7 @@ pub fn model(name: &str) -> ParamPlanningProblem {
     let waypoints = objects.get("waypoint").unwrap_or(&vec!()).to_vec();
     let modes = objects.get("mode").unwrap_or(&vec!()).to_vec();
 
-    let mut navigate_transitions = vec![];
-    let mut sample_soil_transitions = vec![];
-    let mut sample_rock_transitions = vec![];
-    let mut drop_transitions = vec![];
-    let mut calibrate_transitions = vec![];
-    let mut take_image_transitions = vec![];
-    let mut communicate_soil_data_transitions = vec![];
-    let mut communicate_rock_data_transitions = vec![];
-    let mut communicate_image_data_transitions = vec![];
-    let mut free_channel_transitions = vec![];
+    let mut transitions = vec!();
 
     // (:action navigate
     // :parameters (?x - rover ?y - waypoint ?z - waypoint) 
@@ -50,7 +35,7 @@ pub fn model(name: &str) -> ParamPlanningProblem {
         for wp1 in &waypoints {
             for wp2 in &waypoints {
                 if wp1 != wp2 {
-                    navigate_transitions.push(
+                    transitions.push(
                         ParamTransition::new(
                             &format!("navigate_{}_{}_{}", rover, wp1, wp2),
                             &ppred!(
@@ -81,7 +66,7 @@ pub fn model(name: &str) -> ParamPlanningProblem {
     for rover in &rovers {
         for store in &stores {
             for waypoint in &waypoints {
-                sample_soil_transitions.push(
+                transitions.push(
                     ParamTransition::new(
                         &format!("sample_soil_{}_{}_{}", rover, store, waypoint),
                         &ppred!(
@@ -114,7 +99,7 @@ pub fn model(name: &str) -> ParamPlanningProblem {
     for rover in &rovers {
         for store in &stores {
             for waypoint in &waypoints {
-                sample_rock_transitions.push(
+                transitions.push(
                     ParamTransition::new(
                         &format!("sample_rock_{}_{}_{}", rover, store, waypoint),
                         &ppred!(
@@ -146,7 +131,7 @@ pub fn model(name: &str) -> ParamPlanningProblem {
 
     for rover in &rovers {
         for store in &stores {
-            drop_transitions.push(
+            transitions.push(
                 ParamTransition::new(
                     &format!("drop_storage_{}_{}", rover, store),
                     &ppred!(
@@ -173,7 +158,7 @@ pub fn model(name: &str) -> ParamPlanningProblem {
         for camera in &cameras {
             for objective in &objectives {
                 for waypoint in &waypoints {
-                    calibrate_transitions.push(
+                    transitions.push(
                         ParamTransition::new(
                             &format!("calibrate_{}_{}_{}_{}", rover, camera, objective, waypoint),
                             &ppred!(
@@ -211,7 +196,7 @@ pub fn model(name: &str) -> ParamPlanningProblem {
             for objective in &objectives {
                 for camera in &cameras {
                     for mode in &modes {
-                        take_image_transitions.push(
+                        transitions.push(
                             ParamTransition::new(
                                 &format!("take_image_{}_{}_{}_{}_{}", rover, waypoint, objective, camera, mode),
                                 &ppred!(
@@ -249,7 +234,7 @@ pub fn model(name: &str) -> ParamPlanningProblem {
             for rovwp in &waypoints {
                 for lanwp in &waypoints {
                     for soilwp in &waypoints {
-                        communicate_soil_data_transitions.push(
+                        transitions.push(
                             ParamTransition::new(
                                 &format!("communicate_soil_data_{}_{}_{}_{}_{}", rover, lander, rovwp, lanwp, soilwp),
                                 &ppred!(
@@ -287,7 +272,7 @@ pub fn model(name: &str) -> ParamPlanningProblem {
             for rovwp in &waypoints {
                 for lanwp in &waypoints {
                     for rockwp in &waypoints {
-                        communicate_rock_data_transitions.push(
+                        transitions.push(
                             ParamTransition::new(
                                 &format!("communicate_rock_data_{}_{}_{}_{}_{}", rover, lander, rovwp, lanwp, rockwp),
                                 &ppred!(
@@ -325,7 +310,7 @@ pub fn model(name: &str) -> ParamPlanningProblem {
                 for mode in &modes {
                     for rovwp in &waypoints {
                         for lanwp in &waypoints {
-                            communicate_image_data_transitions.push(
+                            transitions.push(
                                 ParamTransition::new(
                                     &format!("communicate_image_data_{}_{}_{}_{}_{}_{}", rover, lander, objective, mode, rovwp, lanwp),
                                     &ppred!(
@@ -353,7 +338,7 @@ pub fn model(name: &str) -> ParamPlanningProblem {
     // missing free_channel transitions? or add to effects like they do...?
     for rover in &rovers {
         for lander in &landers {
-            free_channel_transitions.push(
+            transitions.push(
                 ParamTransition::new(
                     &format!("free_channel_{}_{}", rover, lander),
                     &ppred!(
@@ -369,68 +354,89 @@ pub fn model(name: &str) -> ParamPlanningProblem {
         }
     }
 
-    
-    
-    // 5. lander communication channel is not free while some robot is communicating (rock, soil, image) data 
+    // Some additional invariants added in hope to reduce the search space:
+    // 1. can not traverse wp1 wp2 if not visible wp1 wp2 - doesn't help
+    // 2. a rover can only be at one wp at a certain time 
+    // 3. store can't be full and empty at the same time
+    // 4. rover can't be unequipped for imaging and have image
+    // 5. rover can't be unequipped for imaging and be calibrated
+    // 6. rover can't be unequipped for imaging and have an onboard camera
 
     let mut invariants = vec!();
 
-    // 1. one rover can only be at one waypoint at a time
+    for rover in &rovers {
+        for wp1 in &waypoints {
+            for wp2 in &waypoints {
+                if wp1 != wp2 {
+                    invariants.push(
+                        pnot!(
+                            &pand!(
+                                &pass!(&new_bool_assign_c!(&format!("can_traverse_{}_{}_{}", rover, wp1, wp2), true, "c")),
+                                &pass!(&new_bool_assign_c!(&format!("visible_{}_{}", wp1, wp2), false, "c"))
+                            )
+                        )
+                    );  
+                }
+            }
+        }
+    }
+
     for rover in &rovers {
         let mut local_vec = vec!();
-        for waypoint in &waypoints {
-            local_vec.push(pass!(&new_bool_assign_c!(&format!("at_{}_{}", rover, waypoint), true, "c")))
+        for wp in &waypoints {
+            local_vec.push(pass!(&new_bool_assign_c!(&format!("at_{}_{}", rover, wp), true, "c")),)
         }
         invariants.push(Predicate::PBEQ(local_vec, 1))
-    }
+    };  
 
-    // 2. one lander can only be at one waypoint at a time
-    for lander in &landers {
-        let mut local_vec = vec!();
-        for waypoint in &waypoints {
-            local_vec.push(pass!(&new_bool_assign_c!(&format!("at_lander_{}_{}", lander, waypoint), true, "c")))
+    for rover in &rovers {
+        for camera in &cameras{
+            invariants.push(
+                pnot!(
+                    &pand!(
+                        &pass!(&new_bool_assign_c!(&format!("equipped_for_imaging_{}", rover), false, "c")),
+                        &pass!(&new_bool_assign_c!(&format!("on_board_{}_{}", camera, rover), true, "c"))
+                    )
+                )
+            );  
+            invariants.push(
+                pnot!(
+                    &pand!(
+                        &pass!(&new_bool_assign_c!(&format!("equipped_for_imaging_{}", rover), false, "c")),
+                        &pass!(&new_bool_assign_c!(&format!("calibrated_{}_{}", camera, rover), true, "c"))
+                    )
+                )
+            )
         }
-        invariants.push(Predicate::PBEQ(local_vec, 1))
+        for objective in &objectives {
+            for mode in &modes {
+                invariants.push(
+                    pnot!(
+                        &pand!(
+                            &pass!(&new_bool_assign_c!(&format!("equipped_for_imaging_{}", rover), false, "c")),
+                            &pass!(&new_bool_assign_c!(&format!("have_image_{}_{}_{}", rover, objective, mode), true, "c"))
+                        )
+                    )
+                );  
+            }
+        }
     }
 
-    // 3. one store can only be full or empty at one time
     for store in &stores {
-        let full = pass!(&new_bool_assign_c!(&format!("empty_{}", store), true, "c"));
-        let empty = pass!(&new_bool_assign_c!(&format!("full_{}", store), true, "c"));
-        invariants.push(pand!(&por!(&full, &empty), &pnot!(&pand!(&full, &empty))));
-    }
-
-    // 4. lander communication channel is not free while some robot is communicating (rock, soil, image) data (not available)
-    for lander in &landers {
-        let mut local_vec = vec!();
-        for rover in &rovers {
-            local_vec.push(pass!(&new_bool_assign_c!(&format!("available_{}", rover), false, "c")));
-        }
-        invariants.push(pnot!(&pand!(&Predicate::OR(local_vec), &pass!(&new_bool_assign_c!(&format!("channel_free_{}", lander), true, "c")))));
-
-    }
-    
-
-    let mut transitions = vec![];
-    for t in vec![
-        navigate_transitions,
-        sample_soil_transitions,
-        sample_rock_transitions,
-        drop_transitions,
-        calibrate_transitions,
-        take_image_transitions,
-        communicate_soil_data_transitions,
-        communicate_rock_data_transitions,
-        communicate_image_data_transitions,
-        free_channel_transitions,
-    ] {
-        transitions.extend(t)
-    }
+        invariants.push(
+            pnot!(
+                &pand!(
+                    &pass!(&new_bool_assign_c!(&format!("empty_{}", store), true, "c")),
+                    &pass!(&new_bool_assign_c!(&format!("full_{}", store), true, "c"))
+                )
+            )
+        )
+    };
 
     let c = Parameter::new("c", &true);
 
     let problem = ParamPlanningProblem::new(
-        &format!("blocksworld_bool_explicit_{}", parsed.name.as_str()), 
+        &format!("rovers_prop_invariant_{}", parsed.name.as_str()), 
         &parsed.init,
         &parsed.goal,
         &transitions,
