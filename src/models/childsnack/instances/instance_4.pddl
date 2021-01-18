@@ -3,7 +3,7 @@
 :objects content1 content2 content3 content4 - content-portion
 :objects tray1 tray2 tray3 - tray
 :objects table1 table2 table3 kitchen - place
-:objects sandw1 sandw2 sandw3 sandw4 - sandwich
+:objects sandwich1 sandwich2 sandwich3 sandwich4 - sandwich
 
 :init at tray1 kitchen
 :init at tray2 kitchen
@@ -28,10 +28,10 @@
 :init waiting child2 table1
 :init waiting child3 table1
 :init waiting child4 table2
-:init notexist sandw1
-:init notexist sandw2
-:init notexist sandw3
-:init notexist sandw4
+:init notexist sandwich1
+:init notexist sandwich2
+:init notexist sandwich3
+:init notexist sandwich4
 
 :goal served child1
 :goal served child2
