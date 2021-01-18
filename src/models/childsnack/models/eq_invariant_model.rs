@@ -1,12 +1,5 @@
-use crate::models::childsnack::models::prop_explicit_parser::parser;
+use crate::models::childsnack::models::eq_invariant_parser::parser;
 use super::*;
-
-// macro_rules! new_bool_assign_c {
-//     ($name:expr, $domain:expr, $val:expr) => { ... };
-//     ($name:expr, $domain:expr, $val:expr, $r#type:expr) => { ... };
-//     ($name:expr, $domain:expr, $val:expr, $r#type:expr, $param:expr) => { ... };
-//     ($name:expr, $domain:expr, $val:expr, $r#type:expr, $param:expr, $life:expr) => { ... };
-// }
 
 pub fn model(name: &str) -> ParamPlanningProblem {
 
@@ -21,6 +14,37 @@ pub fn model(name: &str) -> ParamPlanningProblem {
     let places = objects.get("place").unwrap_or(&vec!()).to_vec();
     let sandwiches = objects.get("sandwich").unwrap_or(&vec!()).to_vec();
 
+    let sandwich_domain = objects.get("sandwich_domain").unwrap_or(&vec!()).to_vec();
+    let tray_domain = objects.get("tray_domain").unwrap_or(&vec!()).to_vec();
+    let child_domain = objects.get("child_domain").unwrap_or(&vec!()).to_vec();
+    let tf_domain = objects.get("tf_domain").unwrap_or(&vec!()).to_vec();
+
+    // for sandwich in &sandwiches {
+    //     for bread_portion in &bread_portions {
+    //         for content_portion in &content_portions {
+    //             transitions.push(
+    //                 ParamTransition::new(
+    //                     &format!("make_sandwich_no_gluten_{}_{}_{}", sandwich, bread_portion, content_portion),
+    //                     &ppred!(
+    //                         &pass!(&new_bool_assign_c!(&format!("at_kitchen_bread_{}", bread_portion), true, "c")),
+    //                         &pass!(&new_bool_assign_c!(&format!("at_kitchen_content_{}", content_portion), true, "c")),
+    //                         &pass!(&new_bool_assign_c!(&format!("no_gluten_bread_{}", bread_portion), true, "c")),
+    //                         &pass!(&new_bool_assign_c!(&format!("no_gluten_content_{}", content_portion), true, "c")),
+    //                         &pass!(&new_bool_assign_c!(&format!("notexist_{}", sandwich), true, "c"))
+    //                     ),
+    //                     &ppred!(
+    //                         &pass!(&new_bool_assign_c!(&format!("at_kitchen_bread_{}", bread_portion), false, "c")),
+    //                         &pass!(&new_bool_assign_c!(&format!("at_kitchen_content_{}", content_portion), false, "c")),
+    //                         &pass!(&new_bool_assign_c!(&format!("at_kitchen_sandwich_{}", sandwich), true, "c")),
+    //                         &pass!(&new_bool_assign_c!(&format!("no_gluten_sandwich_{}", sandwich), true, "c")),
+    //                         &pass!(&new_bool_assign_c!(&format!("notexist_{}", sandwich), false, "c"))
+    //                     )
+    //                 )
+    //             )
+    //         }
+    //     }
+    // }
+
     for sandwich in &sandwiches {
         for bread_portion in &bread_portions {
             for content_portion in &content_portions {
@@ -28,38 +52,24 @@ pub fn model(name: &str) -> ParamPlanningProblem {
                     ParamTransition::new(
                         &format!("make_sandwich_no_gluten_{}_{}_{}", sandwich, bread_portion, content_portion),
                         &ppred!(
-                            &pass!(&new_bool_assign_c!(&format!("at_kitchen_bread_{}", bread_portion), true, "c")),
-                            &pass!(&new_bool_assign_c!(&format!("at_kitchen_content_{}", content_portion), true, "c")),
-                            &pass!(&new_bool_assign_c!(&format!("no_gluten_bread_{}", bread_portion), true, "c")),
-                            &pass!(&new_bool_assign_c!(&format!("no_gluten_content_{}", content_portion), true, "c")),
-                            &pass!(&new_bool_assign_c!(&format!("notexist_{}", sandwich), true, "c"))
+                            &pass!(&new_enum_assign_c!(&format!("at_kitchen_bread_{}", bread_portion), &tf_domain, "true", "tf", "c")),
+                            &pass!(&new_enum_assign_c!(&format!("at_kitchen_content_{}", content_portion), &tf_domain, "true", "tf", "c")),
+                            &pass!(&new_enum_assign_c!(&format!("no_gluten_bread_{}", bread_portion), &tf_domain, "true", "tf", "c")),
+                            &pass!(&new_enum_assign_c!(&format!("no_gluten_content_{}", content_portion), &tf_domain, "true", "tf", "c")),
+                            &pass!(&new_enum_assign_c!(&format!("{}", sandwich), &sandwich_domain, "notexist", "sandwich", "c"))
                         ),
                         &ppred!(
-                            &pass!(&new_bool_assign_c!(&format!("at_kitchen_bread_{}", bread_portion), false, "c")),
-                            &pass!(&new_bool_assign_c!(&format!("at_kitchen_content_{}", content_portion), false, "c")),
-                            &pass!(&new_bool_assign_c!(&format!("at_kitchen_sandwich_{}", sandwich), true, "c")),
-                            &pass!(&new_bool_assign_c!(&format!("no_gluten_sandwich_{}", sandwich), true, "c")),
-                            &pass!(&new_bool_assign_c!(&format!("notexist_{}", sandwich), false, "c"))
+                            &pass!(&new_enum_assign_c!(&format!("at_kitchen_bread_{}", bread_portion), &tf_domain, "false", "tf", "c")),
+                            &pass!(&new_enum_assign_c!(&format!("at_kitchen_content_{}", content_portion), &tf_domain, "false", "tf", "c")),
+                            &pass!(&new_enum_assign_c!(&format!("no_gluten_sandwich_{}", sandwich), &tf_domain, "true", "tf", "c")),
+                            &pass!(&new_enum_assign_c!(&format!("{}", sandwich), &sandwich_domain, "kitchen", "sandwich", "c"))
                         )
                     )
                 )
             }
         }
     }
-    
-    
-    //    (:action make_sandwich
-    //         :parameters (?s - sandwich ?b - bread-portion ?c - content-portion)
-    //         :precondition (and (at_kitchen_bread ?b)
-    //                    (at_kitchen_content ?c)
-    //                                (notexist ?s)
-    //                    )
-    //         :effect (and
-    //               (not (at_kitchen_bread ?b))
-    //               (not (at_kitchen_content ?c))
-    //               (at_kitchen_sandwich ?s)
-    //                       (not (notexist ?s))
-    //               )) 
+
 
     for sandwich in &sandwiches {
         for bread_portion in &bread_portions {
@@ -68,30 +78,20 @@ pub fn model(name: &str) -> ParamPlanningProblem {
                     ParamTransition::new(
                         &format!("make_sandwich_{}_{}_{}", sandwich, bread_portion, content_portion),
                         &ppred!(
-                            &pass!(&new_bool_assign_c!(&format!("at_kitchen_bread_{}", bread_portion), true, "c")),
-                            &pass!(&new_bool_assign_c!(&format!("at_kitchen_content_{}", content_portion), true, "c")),
-                            &pass!(&new_bool_assign_c!(&format!("notexist_{}", sandwich), true, "c"))
+                            &pass!(&new_enum_assign_c!(&format!("at_kitchen_bread_{}", bread_portion), &tf_domain, "true", "tf", "c")),
+                            &pass!(&new_enum_assign_c!(&format!("at_kitchen_content_{}", content_portion), &tf_domain, "true", "tf", "c")),
+                            &pass!(&new_enum_assign_c!(&format!("{}", sandwich), &sandwich_domain, "notexist", "sandwich", "c"))
                         ),
                         &ppred!(
-                            &pass!(&new_bool_assign_c!(&format!("at_kitchen_bread_{}", bread_portion), false, "c")),
-                            &pass!(&new_bool_assign_c!(&format!("at_kitchen_content_{}", content_portion), false, "c")),
-                            &pass!(&new_bool_assign_c!(&format!("at_kitchen_sandwich_{}", sandwich), true, "c")),
-                            &pass!(&new_bool_assign_c!(&format!("notexist_{}", sandwich), false, "c"))
+                            &pass!(&new_enum_assign_c!(&format!("at_kitchen_bread_{}", bread_portion), &tf_domain, "false", "tf", "c")),
+                            &pass!(&new_enum_assign_c!(&format!("at_kitchen_content_{}", content_portion), &tf_domain, "false", "tf", "c")),
+                            &pass!(&new_enum_assign_c!(&format!("{}", sandwich), &sandwich_domain, "kitchen", "sandwich", "c"))
                         )
                     )
                 )
             }
         }
     }
-    
-    
-    //    (:action put_on_tray
-    //         :parameters (?s - sandwich ?t - tray)
-    //         :precondition (and  (at_kitchen_sandwich ?s)
-    //                     (at ?t kitchen))
-    //         :effect (and
-    //               (not (at_kitchen_sandwich ?s))
-    //               (ontray ?s ?t)))   
 
     for sandwich in &sandwiches {
         for tray in &trays {
@@ -99,29 +99,16 @@ pub fn model(name: &str) -> ParamPlanningProblem {
                 ParamTransition::new(
                     &format!("put_on_tray_{}_{}", sandwich, tray),
                     &ppred!(
-                        &pass!(&new_bool_assign_c!(&format!("at_kitchen_sandwich_{}", sandwich), true, "c")),
-                        &pass!(&new_bool_assign_c!(&format!("at_{}_kitchen", tray), true, "c"))
+                        &pass!(&new_enum_assign_c!(&format!("{}", sandwich), &sandwich_domain, "kitchen", "sandwich", "c")),
+                        &pass!(&new_enum_assign_c!(&format!("{}", tray), &tray_domain, "kitchen", "tray", "c"))
                     ),
                     &ppred!(
-                        &pass!(&new_bool_assign_c!(&format!("at_kitchen_sandwich_{}", sandwich), false, "c")),
-                        &pass!(&new_bool_assign_c!(&format!("ontray_{}_{}", sandwich, tray), true, "c"))
+                        &pass!(&new_enum_assign_c!(&format!("{}", sandwich), &sandwich_domain, &format!("{}", tray), "sandwich", "c"))
                     )
                 )
             )
         }
-    }
-    
-    //    (:action serve_sandwich_no_gluten
-    //         :parameters (?s - sandwich ?c - child ?t - tray ?p - place)
-    //        :precondition (and
-    //                   (allergic_gluten ?c)
-    //                   (ontray ?s ?t)
-    //                   (waiting ?c ?p)
-    //                   (no_gluten_sandwich ?s)
-    //                           (at ?t ?p)
-    //                   )
-    //        :effect (and (not (ontray ?s ?t))
-    //                 (served ?c)))    
+    }  
 
     for sandwich in &sandwiches {
         for child in &children {
@@ -131,32 +118,22 @@ pub fn model(name: &str) -> ParamPlanningProblem {
                         ParamTransition::new(
                             &format!("serve_sandwich_no_gluten_{}_{}_{}_{}", sandwich, child, tray, place),
                             &ppred!(
-                                &pass!(&new_bool_assign_c!(&format!("allergic_gluten_{}", child), true, "c")),
-                                &pass!(&new_bool_assign_c!(&format!("ontray_{}_{}", sandwich, tray), true, "c")),
-                                &pass!(&new_bool_assign_c!(&format!("waiting_{}_{}", child, place), true, "c")),
-                                &pass!(&new_bool_assign_c!(&format!("no_gluten_sandwich_{}", sandwich), true, "c")),
-                                &pass!(&new_bool_assign_c!(&format!("at_{}_{}", tray, place), true, "c"))
+                                &pass!(&new_enum_assign_c!(&format!("allergic_gluten_{}", child), &tf_domain, "true", "tf", "c")),
+                                &pass!(&new_enum_assign_c!(&format!("{}", sandwich), &sandwich_domain, &format!("{}", tray), "sandwich", "c")),
+                                &pass!(&new_enum_assign_c!(&format!("{}", child), &child_domain, &format!("{}", place), "child", "c")),
+                                &pass!(&new_enum_assign_c!(&format!("no_gluten_sandwich_{}", sandwich), &tf_domain, "true", "tf", "c")),
+                                &pass!(&new_enum_assign_c!(&format!("{}", tray), &tray_domain, &format!("{}", place), "tray", "c"))
                             ),
                             &ppred!(
-                                &pass!(&new_bool_assign_c!(&format!("ontray_{}_{}", sandwich, tray), false, "c")),
-                                &pass!(&new_bool_assign_c!(&format!("served_{}", child), true, "c")),
-                                &pass!(&new_bool_assign_c!(&format!("waiting_{}_{}", child, place), false, "c"))
+                                &pass!(&new_enum_assign_c!(&format!("{}", sandwich), &sandwich_domain, "served", "sandwich", "c")),
+                                &pass!(&new_enum_assign_c!(&format!("{}", child), &child_domain, "served", "child", "c"))
                             )
                         )
                     )
                 }
             }
         }
-    }
-    
-    //    (:action serve_sandwich
-    //        :parameters (?s - sandwich ?c - child ?t - tray ?p - place)
-    //        :precondition (and (not_allergic_gluten ?c)
-    //                           (waiting ?c ?p)
-    //                   (ontray ?s ?t)
-    //                   (at ?t ?p))
-    //        :effect (and (not (ontray ?s ?t))
-    //                 (served ?c)))    
+    }    
 
     for sandwich in &sandwiches {
         for child in &children {
@@ -166,28 +143,22 @@ pub fn model(name: &str) -> ParamPlanningProblem {
                         ParamTransition::new(
                             &format!("serve_sandwich_{}_{}_{}_{}", sandwich, child, tray, place),
                             &ppred!(
-                                &pass!(&new_bool_assign_c!(&format!("not_allergic_gluten_{}", child), true, "c")),
-                                &pass!(&new_bool_assign_c!(&format!("ontray_{}_{}", sandwich, tray), true, "c")),
-                                &pass!(&new_bool_assign_c!(&format!("waiting_{}_{}", child, place), true, "c")),
-                                &pass!(&new_bool_assign_c!(&format!("at_{}_{}", tray, place), true, "c"))
+
+                                &pass!(&new_enum_assign_c!(&format!("allergic_gluten_{}", child), &tf_domain, "false", "tf", "c")),
+                                &pass!(&new_enum_assign_c!(&format!("{}", sandwich), &sandwich_domain, &format!("{}", tray), "sandwich", "c")),
+                                &pass!(&new_enum_assign_c!(&format!("{}", child), &child_domain, &format!("{}", place), "child", "c")),
+                                &pass!(&new_enum_assign_c!(&format!("{}", tray), &tray_domain, &format!("{}", place), "tray", "c"))
                             ),
                             &ppred!(
-                                &pass!(&new_bool_assign_c!(&format!("ontray_{}_{}", sandwich, tray), false, "c")),
-                                &pass!(&new_bool_assign_c!(&format!("served_{}", child), true, "c")),
-                                &pass!(&new_bool_assign_c!(&format!("waiting_{}_{}", child, place), false, "c"))
+                                &pass!(&new_enum_assign_c!(&format!("{}", sandwich), &sandwich_domain, "served", "sandwich", "c")),
+                                &pass!(&new_enum_assign_c!(&format!("{}", child), &child_domain, "served", "child", "c"))
                             )
                         )
                     )
                 }
             }
         }
-    }
-    
-    //    (:action move_tray
-    //         :parameters (?t - tray ?p1 ?p2 - place)
-    //         :precondition (and (at ?t ?p1))
-    //         :effect (and (not (at ?t ?p1))
-    //                  (at ?t ?p2)))   
+    } 
 
     for tray in &trays {
         for place1 in &places {
@@ -197,11 +168,10 @@ pub fn model(name: &str) -> ParamPlanningProblem {
                         ParamTransition::new(
                             &format!("move_tray_{}_{}_{}", tray, place1, place2),
                             &ppred!(
-                                &pass!(&new_bool_assign_c!(&format!("at_{}_{}", tray, place1), true, "c"))
+                                &pass!(&new_enum_assign_c!(&format!("{}", tray), &tray_domain, &format!("{}", place1), "tray", "c"))
                             ),
                             &ppred!(
-                                &pass!(&new_bool_assign_c!(&format!("at_{}_{}", tray, place1), false, "c")),
-                                &pass!(&new_bool_assign_c!(&format!("at_{}_{}", tray, place2), true, "c"))
+                                &pass!(&new_enum_assign_c!(&format!("{}", tray), &tray_domain, &format!("{}", place2), "tray", "c"))
                             )
                         )
                     )
@@ -212,64 +182,65 @@ pub fn model(name: &str) -> ParamPlanningProblem {
 
     let mut invariants = vec!();    
 
-    // 1. a tray can only be at one place at a time
-    // 2. a child can't both be waiting and served
-    // 3. a sandwich can't both notexist and be on a tray
+    // // 1. a tray can only be at one place at a time
+    // // 2. a child can't both be waiting and served
+    // // 3. a sandwich can't both notexist and be on a tray
 
-    for tray in &trays {
-        for place1 in &places {
-            for place2 in &places {
-                if place1 != place2 {
-                    // 1. a tray can only be at one place at a time
-                    invariants.push(
-                        pnot!(
-                            &pand!(
-                                &pass!(&new_bool_assign_c!(&format!("at_{}_{}", tray, place1), true, "c")),
-                                &pass!(&new_bool_assign_c!(&format!("at_{}_{}", tray, place2), true, "c"))
-                            )
-                        )
-                    );
-                }   
-            }
-        }
-    }
-
-    for child in &children {
-        let mut local_vec = vec![];
-        for place in &places {
-            local_vec.push(pass!(&new_bool_assign_c!(&format!("waiting_{}_{}", child, place), true, "c")))
-        };
-        //2. a child can't both be waiting and served
-        invariants.push(
-            pnot!(
-                &pand!(
-                    &Predicate::OR(local_vec.clone()),
-                    &pass!(&new_bool_assign_c!(&format!("served_{}", child), true, "c"))
-                )
-            )
-        );
-    }
-
-    // for sandwich in &sandwiches {
-    //     for tray in &trays {
-    //         invariants.push(
-    //             pnot!(
-    //                 &pand!(
-    //                     &pass!(&new_bool_assign_c!(&format!("notexist_{}", sandwich), true, "c")),
-    //                     &pass!(&new_bool_assign_c!(&format!("ontray_{}_{}", sandwich, tray), true, "c"))
-    //                 )
-    //             )
-    //         );
+    // for tray in &trays {
+    //     for place1 in &places {
+    //         for place2 in &places {
+    //             if place1 != place2 {
+    //                 // 1. a tray can only be at one place at a time
+    //                 invariants.push(
+    //                     pnot!(
+    //                         &pand!(
+    //                             &pass!(&new_bool_assign_c!(&format!("at_{}_{}", tray, place1), true, "c")),
+    //                             &pass!(&new_bool_assign_c!(&format!("at_{}_{}", tray, place2), true, "c"))
+    //                         )
+    //                     )
+    //                 );
+    //             }   
+    //         }
     //     }
     // }
+
+    // for child in &children {
+    //     let mut local_vec = vec![];
+    //     for place in &places {
+    //         local_vec.push(pass!(&new_bool_assign_c!(&format!("waiting_{}_{}", child, place), true, "c")))
+    //     };
+    //     //2. a child can't both be waiting and served
+    //     invariants.push(
+    //         pnot!(
+    //             &pand!(
+    //                 &Predicate::OR(local_vec.clone()),
+    //                 &pass!(&new_bool_assign_c!(&format!("served_{}", child), true, "c"))
+    //             )
+    //         )
+    //     );
+    // }
+
+    for sandwich in &sandwiches {
+        for tray in &trays {
+            invariants.push(
+                pnot!(
+                    &pand!(
+                        &pass!(&new_enum_assign_c!(&format!("{}", sandwich), &sandwich_domain, "notexist", "sandwich", "c")),
+                        &pass!(&new_enum_assign_c!(&format!("{}", sandwich), &sandwich_domain, &format!("{}", tray), "sandwich", "c"))
+                    )
+                )
+            );
+        }
+    }
 
     let c = Parameter::new("c", &true);
 
     let problem = ParamPlanningProblem::new(
-        &format!("childsnack_prop_invariant_{}", parsed.name.as_str()), 
-        &parsed.init,
-        &parsed.goal,
+        &format!("childsnack_eq_invariant_instance1"), 
+        &parsed.init, 
+        &parsed.goal, 
         &transitions,
+        // &Predicate::TRUE,
         &Predicate::AND(invariants),
         &vec!(c)
     );

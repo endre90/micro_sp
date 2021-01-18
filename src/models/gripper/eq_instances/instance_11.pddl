@@ -1,10 +1,11 @@
 :objects rooma roomb - room
-:objects ball10 ball9 ball8 ball7 ball6 ball5 ball4 ball3 ball2 ball1 - ball
+:objects ball11 ball10 ball9 ball8 ball7 ball6 ball5 ball4 ball3 ball2 ball1 - ball
 :objects left right - gripper
 
 :init enum at-robby rooma
 :init bool free left
 :init bool free right
+:init enum at ball11 rooma
 :init enum at ball10 rooma
 :init enum at ball9 rooma
 :init enum at ball8 rooma
@@ -16,6 +17,7 @@
 :init enum at ball2 rooma
 :init enum at ball1 rooma
 
+:goal enum at ball11 roomb
 :goal enum at ball10 roomb
 :goal enum at ball9 roomb
 :goal enum at ball8 roomb

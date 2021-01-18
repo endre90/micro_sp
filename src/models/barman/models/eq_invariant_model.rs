@@ -333,105 +333,17 @@ pub fn model(name: &str) -> ParamPlanningProblem {
     
     // let mut invariants = vec!();    
 
-    // // 1. a hand is not empty if it is holding a container
-    // // 2. if a hand is holding a container, that container is not ontable
-    // // 3. the container can be clean only if it is empty
-    // // 4. if a container contains a beverage, it is neither clean or empty
-    // // 5. if a container is used, it is not clean
-    // // 6. if a shaker is shaked, it is not unshaked
-    // // 7. a shaker can't be shaked and empty
-
     // // WILL NEED invariant for ton more than one container in one hand
     // // one hand has to be emty when filling or refilling
     // // one hand has to be empty when cleaning a container
     // // one hand has to be empty when shaking a shaker
 
-    // for container in &containers {    
-    //     for hand in &hands {
 
-    //         // 1. a hand is not empty if it is holding a container
-    //         invariants.push(
-    //             pnot!(
-    //                 &pand!(
-    //                     &pass!(&new_bool_assign_c!(&format!("handempty_{}", hand), true, "c")),
-    //                     &pass!(&new_bool_assign_c!(&format!("holding_{}_{}", hand, container), true, "c"))
-    //                 )
-    //             )
-    //         );
-
-    //         // 2. if a hand is holding a container, that container is not ontable
-    //         invariants.push(
-    //             pnot!(
-    //                 &pand!(
-    //                     &pass!(&new_bool_assign_c!(&format!("ontable_{}", container), true, "c")),
-    //                     &pass!(&new_bool_assign_c!(&format!("holding_{}_{}", hand, container), true, "c"))
-    //                 )
-    //             )
-    //         );
-    //     }
-
-    //     // 3. the container can be clean only if it is empty
-    //     invariants.push(
-    //         pnot!(
-    //             &pand!(
-    //                 &pass!(&new_bool_assign_c!(&format!("clean_{}", container), true, "c")),
-    //                 &pass!(&new_bool_assign_c!(&format!("empty_{}", container), false, "c"))
-    //             )
-    //         )
-    //     );
-
-    //     for beverage in &beverages {
-    //         // 4. if a container contains a beverage, it is neither clean or empty
-    //         invariants.push(
-    //             pnot!(
-    //                 &pand!(
-    //                     &pass!(&new_bool_assign_c!(&format!("contains_{}_{}", container, beverage), true, "c")),
-    //                     &por!(
-    //                         &pass!(&new_bool_assign_c!(&format!("clean_{}", container), true, "c")),
-    //                         &pass!(&new_bool_assign_c!(&format!("empty_{}", container), true, "c"))
-    //                     )
-    //                 )
-    //             )
-    //         )
-    //     }
-
-    //     // 5. if a container is used, it is not clean
-    //     invariants.push(
-    //         pnot!(
-    //             &pand!(
-    //                 &pass!(&new_bool_assign_c!(&format!("clean_{}", container), true, "c")),
-    //                 &pass!(&new_bool_assign_c!(&format!("used_{}", container), true, "c"))
-    //             )
-    //         )
-    //     );
-    // }
-
-    // for shaker in &shakers {
-    //     // 6. if a shaker is shaked, it is not unshaked
-    //     invariants.push(
-    //         pnot!(
-    //             &pand!(
-    //                 &pass!(&new_bool_assign_c!(&format!("shaked_{}", shaker), true, "c")),
-    //                 &pass!(&new_bool_assign_c!(&format!("unshaked_{}", shaker), true, "c"))
-    //             )
-    //         )
-    //     );
-
-    //     // 7. a shaker can't be shaked and empty
-    //     invariants.push(
-    //         pnot!(
-    //             &pand!(
-    //                 &pass!(&new_bool_assign_c!(&format!("shaked_{}", shaker), true, "c")),
-    //                 &pass!(&new_bool_assign_c!(&format!("empty_{}", shaker), true, "c"))
-    //             )
-    //         )
-    //     );
-    // }
 
     let c = Parameter::new("c", &true);
 
     let problem = ParamPlanningProblem::new(
-        &format!("barman_prop_invariant_{}", parsed.name.as_str()), 
+        &format!("barman_eq_invariant_{}", parsed.name.as_str()), 
         &parsed.init,
         &parsed.goal,
         &transitions,

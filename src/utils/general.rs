@@ -94,6 +94,7 @@ pub fn handle_args() -> Args {
             "childsnack" => match args.variant.as_str() {
                 "prop_explicit" => childsnack::models::prop_explicit_model::model(args.instance.as_str()),
                 "prop_invariant" => childsnack::models::prop_invariant_model::model(args.instance.as_str()),
+                "eq_invariant" => childsnack::models::eq_invariant_model::model(args.instance.as_str()),
                 _ => panic!("unknown problem"),
             },
             "barman" => match args.variant.as_str() {

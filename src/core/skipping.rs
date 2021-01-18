@@ -10,6 +10,9 @@ pub fn skipping(
     timeout: u64,
     tries: u64,
 ) -> PlanningResult {
+
+    let n = 10;
+
     let cfg = ConfigZ3::new();
     let ctx = ContextZ3::new(&cfg);
     let params = ParamsZ3::new(&ctx);
@@ -33,7 +36,7 @@ pub fn skipping(
 
     while now.elapsed() < Duration::from_secs(timeout) && step < tries {
         println!("elapsed: {:?}", now.elapsed());
-        step = step + 5;
+        step = step + n;
         // step = match step {
         //     0 => step + 1,
         //     _ => step + 3
@@ -41,7 +44,7 @@ pub fn skipping(
         match SlvCheckZ3::new(&ctx, &slv) == 1 {
             false => {
                 SlvPopZ3::new(&ctx, &slv, 1);
-                for s in (step-5)+1..=step {
+                for s in (step-n)+1..=step {
                     if now.elapsed() > Duration::from_secs(timeout) {
                         break;
                     }
@@ -115,7 +118,7 @@ pub fn skipping(
             &prob,
             SlvGetModelZ3::new(&ctx, &slv),
             "skipping",
-            step - 4,
+            step - (n-1),
             planning_time,
             plan_found,
             ModelSizeZ3::new(),
@@ -125,7 +128,7 @@ pub fn skipping(
             &prob,
             FreshModelZ3::new(&ctx),
             "skipping",
-            step - 4,
+            step - (n-1),
             planning_time,
             plan_found,
             ModelSizeZ3::new(),
