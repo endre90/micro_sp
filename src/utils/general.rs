@@ -2,7 +2,7 @@ use super::*;
 use itertools::sorted;
 use structopt::StructOpt;
 
-use std::time::Duration;
+// use std::time::Duration;
 use std::time::Instant;
 
 use std::fs::File;
@@ -274,7 +274,7 @@ pub fn pprint_result(result: &PlanningResult) -> () {
     }
     println!("                    END OF RESULT                     ");
     println!("======================================================");
-    let delooped = remove_loops(&result);
+    // let delooped = remove_loops(&result);
 }
 
 /// Pretty print a planning result.

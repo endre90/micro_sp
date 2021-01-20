@@ -8,6 +8,7 @@ use super::*;
 //     ($name:expr, $domain:expr, $val:expr, $r#type:expr, $param:expr, $life:expr) => { ... };
 // }
 
+#[allow(dead_code)]
 pub fn model(name: &str) -> ParamPlanningProblem {
 
     let (parsed, objects) = parser(name);

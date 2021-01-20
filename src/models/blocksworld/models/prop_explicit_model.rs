@@ -8,7 +8,7 @@ use super::*;
 //     ($name:expr, $domain:expr, $val:expr, $r#type:expr, $param:expr, $life:expr) => { ... };
 // }
 
-/// Explicitly generating negative predicates from diff(ojb/init)
+#[allow(dead_code)]
 pub fn model(name: &str) -> ParamPlanningProblem {
 
     let (parsed, blocks) = parser(name);

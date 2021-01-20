@@ -2,7 +2,7 @@ use super::*;
 use std::time::Duration;
 use std::time::Instant;
 use z3_sys::*;
-use z3_v2::*;
+use micro_z3_rust::*;
 
 pub fn skipping(
     prob: &PlanningProblem,
@@ -11,43 +11,52 @@ pub fn skipping(
     tries: u64,
 ) -> PlanningResult {
 
-    let n = 10;
+    let n: u32 = 2;
 
-    let cfg = ConfigZ3::new();
-    let ctx = ContextZ3::new(&cfg);
-    let params = ParamsZ3::new(&ctx);
+    let cfg = new_config_z3();
+    let ctx = new_context_z3(&cfg);
+    let params = params_z3(&ctx);
     let slv = match logic {
-        "default" => SolverZ3::new(&ctx),
-        "qffd" => SolverForLogicZ3::new(&ctx, "QF_FD"),
+        "default" => new_solver_z3(&ctx),
+        "qffd" => new_solver_for_logic_z3(&ctx, "QF_FD"),
         _ => panic!("unknown logic!"),
     };
-    AddUIntParamToParamsZ3::new(&ctx, params, "timeout", (timeout * 1000) as u32);
-    SolverSetParamsZ3::new(&ctx, &slv, params);
+    add_uint_param_z3(&ctx, &params, "timeout", (timeout * 1000) as u32);
+    solver_set_params_z3(&ctx, &slv, &params);
 
-    SlvAssertZ3::new(&ctx, &slv, predicate_to_ast(&ctx, &prob.init, 0));
-    SlvAssertZ3::new(&ctx, &slv, predicate_to_ast(&ctx, &prob.invars, 0));
+    solver_assert_z3(&ctx, &slv, &predicate_to_ast(&ctx, &prob.init, 0));
+    solver_assert_z3(&ctx, &slv, &predicate_to_ast(&ctx, &prob.invars, 0));
 
-    SlvPushZ3::new(&ctx, &slv); // create backtracking point
-    SlvAssertZ3::new(&ctx, &slv, predicate_to_ast(&ctx, &prob.goal, 0));
+    solver_push_z3(&ctx, &slv); // create backtracking point
+    solver_assert_z3(&ctx, &slv, &predicate_to_ast(&ctx, &prob.goal, 0));
 
     let now = Instant::now();
     let mut plan_found: bool = false;
     let mut step: u64 = 0;
+    // let mut increment: u32 = 0; // quadratic
 
     while now.elapsed() < Duration::from_secs(timeout) && step < tries {
         println!("elapsed: {:?}", now.elapsed());
-        step = step + n;
-        // step = match step {
-        //     0 => step + 1,
-        //     _ => step + 3
-        // };
-        match SlvCheckZ3::new(&ctx, &slv) == 1 {
+
+        // step = step + n;         // const
+
+        step = match step {         // exponential
+            0 => step + 1,          // exponential
+            _ => step * n as u64    // exponential
+        };                          // exponential
+
+        // increment = increment + 1;       // quadratic
+        // step = increment.pow(n).into();  // quadratic
+
+        match solver_check_z3(&ctx, &slv) == 1 {
             false => {
-                SlvPopZ3::new(&ctx, &slv, 1);
-                for s in (step-n)+1..=step {
+                solver_pop_z3(&ctx, &slv, 1);
+                // for s in (increment-1).pow(n) as u64 + 1..=step {     // quadratic
+                    for s in (step/2) + 1..=step {                       // exponential
                     if now.elapsed() > Duration::from_secs(timeout) {
                         break;
                     }
+                    
                     println!("s: {:?}", s);
                     let mut trans_name_assignments: Vec<Z3_ast> = vec![];
 
@@ -55,21 +64,21 @@ pub fn skipping(
                         .trans
                         .iter()
                         .map(|x| {
-                            let trans_assign = EQZ3::new(
+                            let trans_assign = eq_z3(
                                 &ctx,
-                                BoolVarZ3::new(
+                                &new_var_z3(
                                     &ctx,
-                                    &BoolSortZ3::new(&ctx),
+                                    &new_bool_sort_z3(&ctx),
                                     format!("{}_t{}_s{}", &x.name, s, s).as_str(),
                                 ),
-                                BoolZ3::new(&ctx, true),
+                                &new_bool_value_z3(&ctx, true)
                             );
 
                             trans_name_assignments.push(trans_assign);
 
-                            ANDZ3::new(
+                            and_z3(
                                 &ctx,
-                                vec![
+                                &vec![
                                     trans_assign,
                                     predicate_to_ast(&ctx, &x.guard, s - 1),
                                     predicate_to_ast(&ctx, &x.update, s),
@@ -79,28 +88,22 @@ pub fn skipping(
                         })
                         .collect();
 
-                    SlvAssertZ3::new(
+                    solver_assert_z3(
                         &ctx,
                         &slv,
-                        ANDZ3::new(
+                        &and_z3(
                             &ctx,
-                            vec![
-                                ORZ3::new(&ctx, trans_assignments.clone()),
-                                PBEQZ3::new(&ctx, trans_name_assignments.clone(), 1),
+                            &vec![
+                                or_z3(&ctx, &trans_assignments.clone()),
+                                pbeq_z3(&ctx, &trans_name_assignments.clone(), 1),
                             ],
                         ),
                     );
 
-                    SlvAssertZ3::new(&ctx, &slv, predicate_to_ast(&ctx, &prob.invars, s));
+                    solver_assert_z3(&ctx, &slv, &predicate_to_ast(&ctx, &prob.invars, s));
                 }
-                SlvPushZ3::new(&ctx, &slv);
-                SlvAssertZ3::new(&ctx, &slv, predicate_to_ast(&ctx, &prob.goal, step));
-            
-                // let asserts = SlvGetAssertsZ3::new(&ctx, &slv);
-                // let asrtvec = Z3AstVectorToVectorAstZ3::new(&ctx, asserts);
-                // for asrt in asrtvec {
-                //     println!("{}", AstToStringZ3::new(&ctx, asrt));
-                // }
+                solver_push_z3(&ctx, &slv);
+                solver_assert_z3(&ctx, &slv, &predicate_to_ast(&ctx, &prob.goal, step));
             
             }
             true => {
@@ -116,22 +119,26 @@ pub fn skipping(
         true => get_planning_result(
             &ctx,
             &prob,
-            SlvGetModelZ3::new(&ctx, &slv),
+            &solver_get_model_z3(&ctx, &slv),
             "skipping",
-            step - (n-1),
+            // step - (n-1),                                                    // const
+            // step - ((increment).pow(n) - (increment-1).pow(n)) as u64 + 1,   // quadratic
+            step/2 + 1,                                                         // exponential
             planning_time,
             plan_found,
-            ModelSizeZ3::new(),
+            get_model_size_z3(),
         ),
         false => get_planning_result(
             &ctx,
             &prob,
-            FreshModelZ3::new(&ctx),
+            &new_fresh_model_z3(&ctx),
             "skipping",
-            step - (n-1),
+            // step - (n-1),                                                    // const
+            // step - ((increment).pow(n) - (increment-1).pow(n)) as u64 + 1,   // quadratic
+            step/2 + 1,                                                         // exponential
             planning_time,
             plan_found,
-            ModelSizeZ3::new(),
+            get_model_size_z3()
         ),
     }
 }

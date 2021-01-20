@@ -14,6 +14,7 @@ use super::*;
 /// 3. one store can only be full or empty at one time
 /// 4. robot is not available while communicating (rock, soil, image) data
 /// 5. lander communication channel is not free while some robot is communicating (rock, soil, image) data
+/// #[allow(dead_code)]
 pub fn model(name: &str) -> ParamPlanningProblem {
 
     let (parsed, objects) = parser(name);

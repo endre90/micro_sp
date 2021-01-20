@@ -1,5 +1,6 @@
 use super::*;
 
+#[allow(dead_code)]
 pub fn model1(instance: &str) -> ParamPlanningProblem {
 
     let act_pos = enum_m!(
@@ -30,7 +31,7 @@ pub fn model1(instance: &str) -> ParamPlanningProblem {
     let act_pos_dummy = pass!(&enum_assign!(act_pos, "dummy_value"));
     let act_stat_dummy = pass!(&enum_assign!(act_stat, "dummy_value"));
 
-    let not_any_measured_dummy = pnot!(&por!(&act_pos_dummy, &act_stat_dummy));
+    let _not_any_measured_dummy = pnot!(&por!(&act_pos_dummy, &act_stat_dummy));
 
     let act_left = pass!(&enum_assign!(act_pos, "left"));
     let not_act_left = pnot!(&act_left);
@@ -150,6 +151,7 @@ pub fn model1(instance: &str) -> ParamPlanningProblem {
     }
 }
 
+#[allow(dead_code)]
 pub fn model2(instance: &str) -> ParamPlanningProblem {
 
     let act_pos = enum_m!(
@@ -207,7 +209,7 @@ pub fn model2(instance: &str) -> ParamPlanningProblem {
     let act_grip_pos_dummy = pass!(&enum_assign!(act_grip_pos, "dummy_value"));
     let act_grip_stat_dummy = pass!(&enum_assign!(act_grip_stat, "dummy_value"));
 
-    let not_any_measured_dummy = pnot!(&por!(&act_pos_dummy, &act_stat_dummy, &act_grip_pos_dummy, &act_grip_stat_dummy));
+    let _not_any_measured_dummy = pnot!(&por!(&act_pos_dummy, &act_stat_dummy, &act_grip_pos_dummy, &act_grip_stat_dummy));
 
     // robot
     let act_left = pass!(&enum_assign!(act_pos, "left"));

@@ -4,6 +4,7 @@ use std::fs::File;
 use std::io::prelude::*;
 use std::collections::HashMap;
 
+#[allow(dead_code)]
 pub fn parser(name: &str) -> (ParamPlanningProblem, HashMap<String, Vec<String>>) {
     let mut instance = File::open(&format!("src/models/rovers/instances/{}.pddl", name)).unwrap();
     let mut instance_buffer = String::new();

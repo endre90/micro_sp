@@ -3,6 +3,7 @@ use super::*;
 use std::fs::File;
 use std::io::prelude::*;
 
+#[allow(dead_code)]
 pub fn parser(name: &str) -> (ParamPlanningProblem, Vec<String>) {
     let mut f = File::open(&format!("src/models/blocksworld/instances/{}.pddl", name)).unwrap();
     let mut buffer = String::new();

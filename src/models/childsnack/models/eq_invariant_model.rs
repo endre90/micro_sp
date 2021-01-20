@@ -1,6 +1,7 @@
 use crate::models::childsnack::models::eq_invariant_parser::parser;
 use super::*;
 
+#[allow(dead_code)]
 pub fn model(name: &str) -> ParamPlanningProblem {
 
     let (parsed, objects) = parser(name);
@@ -182,44 +183,7 @@ pub fn model(name: &str) -> ParamPlanningProblem {
 
     let mut invariants = vec!();    
 
-    // // 1. a tray can only be at one place at a time
-    // // 2. a child can't both be waiting and served
-    // // 3. a sandwich can't both notexist and be on a tray
-
-    // for tray in &trays {
-    //     for place1 in &places {
-    //         for place2 in &places {
-    //             if place1 != place2 {
-    //                 // 1. a tray can only be at one place at a time
-    //                 invariants.push(
-    //                     pnot!(
-    //                         &pand!(
-    //                             &pass!(&new_bool_assign_c!(&format!("at_{}_{}", tray, place1), true, "c")),
-    //                             &pass!(&new_bool_assign_c!(&format!("at_{}_{}", tray, place2), true, "c"))
-    //                         )
-    //                     )
-    //                 );
-    //             }   
-    //         }
-    //     }
-    // }
-
-    // for child in &children {
-    //     let mut local_vec = vec![];
-    //     for place in &places {
-    //         local_vec.push(pass!(&new_bool_assign_c!(&format!("waiting_{}_{}", child, place), true, "c")))
-    //     };
-    //     //2. a child can't both be waiting and served
-    //     invariants.push(
-    //         pnot!(
-    //             &pand!(
-    //                 &Predicate::OR(local_vec.clone()),
-    //                 &pass!(&new_bool_assign_c!(&format!("served_{}", child), true, "c"))
-    //             )
-    //         )
-    //     );
-    // }
-
+    // works
     for sandwich in &sandwiches {
         for tray in &trays {
             invariants.push(

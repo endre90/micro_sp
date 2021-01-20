@@ -1,7 +1,7 @@
 use super::*;
 use std::str::FromStr;
 use z3_sys::*;
-use z3_v2::*;
+use micro_z3_rust::*;
 
 /// Given a planning result, remove sections that lead back to an already visited state.
 /// Actually, have to do this iterativelly since removing a loop might remove part of another one.
@@ -92,7 +92,7 @@ pub fn get_predicate_assigns(pred: &Predicate) -> Vec<Assignment> {
         Predicate::OR(x) => s.extend(x.iter().flat_map(|p| get_predicate_assigns(p))),
         Predicate::NOT(x) => s.extend(get_predicate_assigns(x)),
         Predicate::ASS(x) => s.push(x.clone()),
-        Predicate::EQ(x, y) => (),
+        Predicate::EQ(_x, _y) => (),
         Predicate::PBEQ(x, _) => s.extend(x.iter().flat_map(|p| get_predicate_assigns(p))),
     }
     s.sort();
@@ -202,27 +202,27 @@ pub fn unparam(prob: &ParamPlanningProblem) -> PlanningProblem {
 
 /// After the incremental algorithm has found a model it is unrolled into a plan.
 pub fn get_planning_result(
-    ctx: &ContextZ3,
+    ctx: &Z3_context,
     prob: &PlanningProblem,
-    model: Z3_model,
+    model: &Z3_model,
     alg: &str,
     nr_steps: u64,
     planning_time: std::time::Duration,
     plan_found: bool,
     model_size: u64
 ) -> PlanningResult {
-    let model_str = ModelToStringZ3::new(&ctx, model);
+    let model_str = model_to_string_z3(&ctx, model);
     let model_vec: Vec<Vec<&str>> = model_str
         .lines()
         .map(|l| l.split(" -> ").collect())
         .collect();
     let vars = get_problem_vars(&prob);
 
-    for m in &model_vec {
-        // if m[1] == "true"{
-            println!("{:?}", m);
-    //     }
-    }
+    // for m in &model_vec {
+    //     // if m[1] == "true"{
+    //         println!("{:?}", m);
+    // //     }
+    // }
     
 
     let mut trace: Vec<PlanningFrame> = vec![];

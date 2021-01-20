@@ -2,7 +2,7 @@ use super::*;
 use std::time::Duration;
 use std::time::Instant;
 use z3_sys::*;
-use z3_v2::*;
+use micro_z3_rust::*;
 
 /// The basic sequential planning algorithm.
 pub fn sequential(prob: &PlanningProblem, logic: &str, timeout: u64, tries: u64) -> PlanningResult {
@@ -13,7 +13,7 @@ pub fn sequential(prob: &PlanningProblem, logic: &str, timeout: u64, tries: u64)
     let mut result = PlanningResult {
         name: prob.name.to_owned(),
         alg: String::from("sequential"),
-        plan_found : false,
+        plan_found : plan_found,
         plan_length: 0,
         trace: vec!(),
         time_to_solve: Duration::from_secs(0),
@@ -22,21 +22,21 @@ pub fn sequential(prob: &PlanningProblem, logic: &str, timeout: u64, tries: u64)
 
     while now.elapsed() < Duration::from_secs(timeout) && step < tries {
         println!("elapsed: {:?}", now.elapsed());
-        let cfg = ConfigZ3::new();
-        let ctx = ContextZ3::new(&cfg);
-        let params = ParamsZ3::new(&ctx);
+        let cfg = new_config_z3();
+        let ctx = new_context_z3(&cfg);
+        let params = params_z3(&ctx);
 
         let slv = match logic {
-            "default" => SolverZ3::new(&ctx),
-            "qffd" => SolverForLogicZ3::new(&ctx, "QF_FD"),
+            "default" => new_solver_z3(&ctx),
+            "qffd" => new_solver_for_logic_z3(&ctx, "QF_FD"),
             _ => panic!("unknown logic!")
         };
 
-        AddUIntParamToParamsZ3::new(&ctx, params, "timeout", (timeout*1000) as u32);
+        add_uint_param_z3(&ctx, &params, "timeout", (timeout*1000) as u32);
 
-        SlvAssertZ3::new(&ctx, &slv, predicate_to_ast(&ctx, &prob.init, 0));
-        SlvAssertZ3::new(&ctx, &slv, predicate_to_ast(&ctx, &prob.invars, 0));
-        SlvAssertZ3::new(&ctx, &slv, predicate_to_ast(&ctx, &prob.goal, step));
+        solver_assert_z3(&ctx, &slv, &predicate_to_ast(&ctx, &prob.init, 0));
+        solver_assert_z3(&ctx, &slv, &predicate_to_ast(&ctx, &prob.invars, 0));
+        solver_assert_z3(&ctx, &slv, &predicate_to_ast(&ctx, &prob.goal, step));
 
         for s in 0..=step {
 
@@ -46,21 +46,21 @@ pub fn sequential(prob: &PlanningProblem, logic: &str, timeout: u64, tries: u64)
                 .trans
                 .iter()
                 .map(|x| {
-                    let trans_assign = EQZ3::new(
+                    let trans_assign = eq_z3(
                         &ctx,
-                        BoolVarZ3::new(
+                        &new_var_z3(
                             &ctx,
-                            &BoolSortZ3::new(&ctx),
+                            &new_bool_sort_z3(&ctx),
                             format!("{}_t{}_s{}", &x.name, s, s).as_str(),
                         ),
-                        BoolZ3::new(&ctx, true),
+                        &new_bool_value_z3(&ctx, true),
                     );
 
                     trans_name_assignments.push(trans_assign);
 
-                    ANDZ3::new(
+                    and_z3(
                         &ctx,
-                        vec![
+                        &vec![
                             trans_assign,
                             predicate_to_ast(&ctx, &x.guard, s - 1),
                             predicate_to_ast(&ctx, &x.update, s),
@@ -70,14 +70,14 @@ pub fn sequential(prob: &PlanningProblem, logic: &str, timeout: u64, tries: u64)
                 })
                 .collect();
 
-            SlvAssertZ3::new(
+            solver_assert_z3(
                 &ctx,
                 &slv,
-                ANDZ3::new(
+                &and_z3(
                     &ctx,
-                    vec![
-                        ORZ3::new(&ctx, trans_assignments.clone()),
-                        PBEQZ3::new(&ctx, trans_name_assignments.clone(), 1),
+                    &vec![
+                        or_z3(&ctx, &trans_assignments),
+                        pbeq_z3(&ctx, &trans_name_assignments, 1),
                     ],
                 ),
             );
@@ -85,19 +85,19 @@ pub fn sequential(prob: &PlanningProblem, logic: &str, timeout: u64, tries: u64)
 
         step = step + 1;
 
-        match SlvCheckZ3::new(&ctx, &slv) == 1 {
+        match solver_check_z3(&ctx, &slv) == 1 {
             false => (),
             true => {
                 plan_found = true;
                 result = get_planning_result(
                     &ctx,
                     &prob,
-                    SlvGetModelZ3::new(&ctx, &slv),
+                    &solver_get_model_z3(&ctx, &slv),
                     "sequential",
                     step,
                     now.elapsed(),
                     plan_found,
-                    ModelSizeZ3::new()
+                    get_model_size_z3()
                 );
                 break;
             }

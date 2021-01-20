@@ -3,6 +3,7 @@ use super::*;
 use std::fs::File;
 use std::io::prelude::*;
 
+#[allow(dead_code)]
 pub fn parser(name: &str) -> (ParamPlanningProblem, Vec<String>) {
     let mut f = File::open(&format!("src/models/blocksworld/instances/{}.pddl", name)).unwrap();
     let mut buffer = String::new();
@@ -48,7 +49,7 @@ pub fn parser(name: &str) -> (ParamPlanningProblem, Vec<String>) {
         .filter(|y| y[0] == "ONTABLE")
         .map(|z| z[1])
         .collect::<Vec<&str>>();
-    let hand_empty_init = match inits.iter().find(|y| *y == &"HANDEMPTY") {
+    let _hand_empty_init = match inits.iter().find(|y| *y == &"HANDEMPTY") {
         Some(_) => true,
         None => false,
     };
@@ -58,7 +59,7 @@ pub fn parser(name: &str) -> (ParamPlanningProblem, Vec<String>) {
         .filter(|y| y[0] == "ON")
         .map(|z| (z[1], z[2]))
         .collect::<Vec<(&str, &str)>>();
-    let hand_empty_goal = match goal.iter().find(|y| *y == &"HANDEMPTY") {
+    let _hand_empty_goal = match goal.iter().find(|y| *y == &"HANDEMPTY") {
         Some(_) => true,
         None => false,
     };

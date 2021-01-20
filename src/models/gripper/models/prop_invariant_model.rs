@@ -1,6 +1,7 @@
 use crate::models::gripper::models::prop_explicit_parser::parser;
 use super::*;
 
+#[allow(dead_code)]
 pub fn model(name: &str) -> ParamPlanningProblem {
 
     let (parsed, objects) = parser(name);
