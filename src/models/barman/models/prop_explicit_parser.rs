@@ -6,7 +6,7 @@ use std::collections::HashMap;
 
 #[allow(dead_code)]
 pub fn parser(name: &str) -> (ParamPlanningProblem, HashMap<String, Vec<String>>) {
-    let mut instance = File::open(&format!("src/models/barman/easy_instances/{}.pddl", name)).unwrap();
+    let mut instance = File::open(&format!("src/models/barman/instances/{}.pddl", name)).unwrap();
     let mut instance_buffer = String::new();
 
     instance.read_to_string(&mut instance_buffer).unwrap();
@@ -82,9 +82,9 @@ pub fn parser(name: &str) -> (ParamPlanningProblem, HashMap<String, Vec<String>>
     // objects.insert("shot".to_string(), shots);
     // objects.insert("shaker".to_string(), shakers);
 
-    for o in &objects {
-        println!("{:?}", o)
-    }
+    // for o in &objects {
+    //     println!("{:?}", o)
+    // }
 
     let init_data: Vec<Vec<String>> = init_strings
         .iter()
@@ -117,9 +117,9 @@ pub fn parser(name: &str) -> (ParamPlanningProblem, HashMap<String, Vec<String>>
         .map(|y| y.to_owned()).collect())
         .collect();
 
-    for o in &predicate_data {
-        println!("{:?}", o)
-    }
+    // for o in &predicate_data {
+    //     println!("{:?}", o)
+    // }
 
     fn from_template(data: &Vec<String>, val: bool) -> Predicate {
         match data.len() {
@@ -185,9 +185,9 @@ pub fn parser(name: &str) -> (ParamPlanningProblem, HashMap<String, Vec<String>>
         goal_assert.push(from_template(elem, true))
     }
 
-    for d in &initial_assert {
-        println!("init_data: {:?}", d);
-    }
+    // for d in &initial_assert {
+    //     println!("init_data: {:?}", d);
+    // }
     
     let problem = ParamPlanningProblem::new(
         name, 

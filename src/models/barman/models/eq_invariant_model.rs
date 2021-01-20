@@ -25,9 +25,9 @@ pub fn model(name: &str) -> ParamPlanningProblem {
     let beverages = objects.get("beverage").unwrap_or(&vec!()).to_vec();
     let containers = objects.get("container").unwrap_or(&vec!()).to_vec();
 
-    for o in &objects {
-        println!("{:?}", o)
-    }
+    // for o in &objects {
+    //     println!("{:?}", o)
+    // }
 
     let pos_domain = vec!("left", "right", "table");
 

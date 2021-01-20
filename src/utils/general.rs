@@ -279,36 +279,36 @@ pub fn pprint_result(result: &PlanningResult) -> () {
 
 /// Pretty print a planning result.
 pub fn pprint_result_trans_only(result: &PlanningResult) -> () {
-    println!("======================================================");
-    println!("                   PLANNING RESULT                    ");
-    println!("======================================================");
-    println!("name: {:?}", result.name);
-    println!("algo: {:?}", result.alg);
-    println!("found: {:?}", result.plan_found);
-    println!("lenght: {:?}", result.plan_length);
-    println!("time: {:?}", result.time_to_solve);
-    println!("size: {:?} MB", result.model_size / 1000000);
-    println!("======================================================");
-    for t in 0..result.trace.len() {
-        // println!("frame: {:?}", t);
-        println!("{:?}: {:?}", t, result.trace[t].trans);
-        println!("------------------------------------------------------");
-    }
-    println!("                    END OF RESULT                     ");
-    println!("======================================================");
+    // println!("======================================================");
+    // println!("                   PLANNING RESULT                    ");
+    // println!("======================================================");
+    // println!("name: {:?}", result.name);
+    // println!("algo: {:?}", result.alg);
+    // println!("found: {:?}", result.plan_found);
+    // println!("lenght: {:?}", result.plan_length);
+    // println!("time: {:?}", result.time_to_solve);
+    // println!("size: {:?} MB", result.model_size / 1000000);
+    // println!("======================================================");
+    // for t in 0..result.trace.len() {
+    //     // println!("frame: {:?}", t);
+    //     println!("{:?}: {:?}", t, result.trace[t].trans);
+    //     println!("------------------------------------------------------");
+    // }
+    // println!("                    END OF RESULT                     ");
+    // println!("======================================================");
 
     let now = Instant::now();
     let delooped = remove_loops(&result);
 
     println!("======================================================");
-    println!("              DELOOPED PLANNING RESULT                ");
+    println!("                   PLANNING RESULT                    ");
     println!("======================================================");
     println!("name: {:?}", delooped.name);
     println!("algo: {:?}", delooped.alg);
     println!("found: {:?}", delooped.plan_found);
     println!("lenght: {:?}", delooped.plan_length);
     println!("time: {:?}", delooped.time_to_solve);
-    println!("delooping_time: {:?}", now.elapsed());
+    println!("deloop: {:?}", now.elapsed());
     println!("size: {:?} MB", delooped.model_size / 1000000);
     println!("======================================================");
     for t in 0..delooped.trace.len() {

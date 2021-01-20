@@ -602,8 +602,8 @@ pub fn model(name: &str) -> ParamPlanningProblem {
         &parsed.init,
         &parsed.goal,
         &transitions,
-        // &Predicate::AND(invariants),
-        &Predicate::TRUE,
+        &Predicate::AND(invariants),
+        // &Predicate::TRUE,
         &vec!(c)
     );
 

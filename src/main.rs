@@ -22,7 +22,7 @@ async fn main() -> io::Result<()> {
     let ha = handle_args();
 
     let result = match ha.alg.as_str() {
-        // "seq" => sequential(&unparam(&ha.model), ha.logic.as_str(), ha.timeout, ha.max_steps),
+        "seq" => sequential(&unparam(&ha.model), ha.logic.as_str(), ha.timeout, ha.max_steps),
         "inc" => incremental(&unparam(&ha.model), ha.logic.as_str(), ha.timeout, ha.max_steps),
         "sub" => subgoaling(&ha.model, ha.logic.as_str(), ha.timeout, ha.max_steps),
         "skp" => skipping(&unparam(&ha.model), ha.logic.as_str(), ha.timeout, ha.max_steps),

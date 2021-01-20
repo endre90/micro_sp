@@ -7,7 +7,7 @@ use std::collections::HashMap;
 #[allow(dead_code)]
 pub fn parser(name: &str) -> (ParamPlanningProblem, HashMap<String, Vec<String>>) {
 
-    let mut instance = File::open(&format!("src/models/barman/easy_instances/{}.pddl", name)).unwrap();
+    let mut instance = File::open(&format!("src/models/barman/instances/{}.pddl", name)).unwrap();
     let mut instance_buffer = String::new();
 
     instance.read_to_string(&mut instance_buffer).unwrap();

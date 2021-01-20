@@ -4,7 +4,7 @@
 :objects rover0store - Store
 :objects waypoint0 waypoint1 waypoint2 waypoint3 - Waypoint
 :objects camera0 - Camera
-:objects objective0 objective1 - Objective
+:objects objective0 - Objective
 
 :init visible waypoint1 waypoint0
 :init visible waypoint0 waypoint1
@@ -40,18 +40,12 @@
 :init can_traverse rover0 waypoint1 waypoint2
 :init can_traverse rover0 waypoint2 waypoint1
 :init on_board camera0 rover0
-:init calibration_target camera0 objective1
+:init calibration_target camera0 objective0
 :init supports camera0 colour
 :init supports camera0 high_res
 :init visible_from objective0 waypoint0
 :init visible_from objective0 waypoint1
 :init visible_from objective0 waypoint2
 :init visible_from objective0 waypoint3
-:init visible_from objective1 waypoint0
-:init visible_from objective1 waypoint1
-:init visible_from objective1 waypoint2
-:init visible_from objective1 waypoint3
 
-:goal communicated_soil_data waypoint2
-:goal communicated_rock_data waypoint3
-:goal communicated_image_data objective1 high_res
+:goal communicated_image_data objective0 colour
