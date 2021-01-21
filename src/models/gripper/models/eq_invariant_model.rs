@@ -40,12 +40,12 @@ pub fn model(name: &str) -> ParamPlanningProblem {
                         &format!("pick_{}_{}_{}", ball, room, gripper),
                         &ppred!(
                             &pass!(&new_enum_assign_c!("at-robby", &rooms, &format!("{}", room), "c", "c")),
-                            &pass!(&new_enum_assign_c!(&format!("at_{}", ball), &ball_domain, &format!("{}", room), "c", "c")),
-                            &pass!(&new_bool_assign_c!(&format!("free_{}", gripper), true, "c"))
+                            &pass!(&new_enum_assign_c!(&format!("at_{}", ball), &ball_domain, &format!("{}", room), "c", "c"))
+                            // &pass!(&new_bool_assign_c!(&format!("free_{}", gripper), true, "c"))
                         ),
                         &ppred!(
-                            &pass!(&new_enum_assign_c!(&format!("at_{}", ball), &ball_domain, &format!("{}", gripper), "c", "c")),
-                            &pass!(&new_bool_assign_c!(&format!("free_{}", gripper), false, "c"))
+                            &pass!(&new_enum_assign_c!(&format!("at_{}", ball), &ball_domain, &format!("{}", gripper), "c", "c"))
+                            // &pass!(&new_bool_assign_c!(&format!("free_{}", gripper), false, "c"))
                         )
                     )
                 )
@@ -65,8 +65,8 @@ pub fn model(name: &str) -> ParamPlanningProblem {
                             &pass!(&new_enum_assign_c!(&format!("at_{}", ball), &ball_domain, &format!("{}", gripper), "c", "c"))
                         ),
                         &ppred!(
-                            &pass!(&new_enum_assign_c!(&format!("at_{}", ball), &ball_domain, &format!("{}", room), "c", "c")),
-                            &pass!(&new_bool_assign_c!(&format!("free_{}", gripper), true, "c"))
+                            &pass!(&new_enum_assign_c!(&format!("at_{}", ball), &ball_domain, &format!("{}", room), "c", "c"))
+                            // &pass!(&new_bool_assign_c!(&format!("free_{}", gripper), true, "c"))
                         )
                     )
                 )
@@ -79,9 +79,11 @@ pub fn model(name: &str) -> ParamPlanningProblem {
     // 1. if a gripper carries a ball, it is not free
     // 2. the ball can't be in two rooms simultaneously
 
-    for gripper in &grippers {    
+    for gripper in &grippers {   
+        let mut local_vec = vec!(); 
         for ball in &balls {
             // 1. if the ball is at a gripper, it is not free
+            local_vec.push(pass!(&new_enum_assign_c!(&format!("at_{}", ball), &ball_domain, &format!("{}", gripper), "c", "c")));
             invariants.push(
                 pnot!(
                     &pand!(
@@ -91,7 +93,15 @@ pub fn model(name: &str) -> ParamPlanningProblem {
                 )
             );
         }
+        invariants.push(
+            por!(
+                &Predicate::PBEQ(local_vec.clone(), 1),
+                &Predicate::PBEQ(local_vec, 0)
+            )
+        )
     }
+
+    // 3? for all balls, only one can be in one gripper at a time.
 
     let c = Parameter::new("c", &true);
 
