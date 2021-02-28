@@ -80,8 +80,12 @@ pub fn parser(name: &str) -> (ParamPlanningProblem, HashMap<String, Vec<String>>
     objects.insert("beverage".to_string(), beverages.clone());
     objects.insert("container".to_string(), containers);
 
-    let pos_domain = vec!("left", "right", "table");
+    for o in &objects {
+        println!("{:?}", o)
+    }
 
+    let pos_domain = vec!("left", "right", "table");
+    
     let mut state_domain: Vec<&str> = vec!();
     let clean = vec!("clean");
     let empty = beverages.iter().map(|x| format!("empty_{}", x)).collect::<Vec<String>>();
@@ -99,41 +103,32 @@ pub fn parser(name: &str) -> (ParamPlanningProblem, HashMap<String, Vec<String>>
     state_domain.extend(contains.iter().map(|x| x.as_str()).collect::<Vec<&str>>());
     state_domain.extend(contains_mix.iter().map(|x| x.as_str()).collect::<Vec<&str>>());
 
+    println!("{:?}", state_domain);
+
     fn instance_1(name: &str, objects: HashMap<String, Vec<String>>, pos_domain: &Vec<&str>, state_domain: &Vec<&str>) -> (ParamPlanningProblem, HashMap<String, Vec<String>>) {
 
+        let levels = objects.get("level").unwrap_or(&vec!()).to_vec();
+        let ingredients = objects.get("ingredient").unwrap_or(&vec!()).to_vec();
+
         let initial = vec!(
-            pass!(&new_enum_assign_c!(&format!("pos_shaker1"), &pos_domain, &format!("table"), "pos", "c")),
-            pass!(&new_enum_assign_c!(&format!("pos_shot1"), &pos_domain, &format!("table"), "pos", "c")),
-            pass!(&new_enum_assign_c!(&format!("pos_shot2"), &pos_domain, &format!("table"), "pos", "c")),
-            pass!(&new_bool_assign_c!("dispenses_dispenser1_ingredient1", true, "c")),
-            pass!(&new_bool_assign_c!("dispenses_dispenser1_ingredient2", false, "c")),
-            pass!(&new_bool_assign_c!("dispenses_dispenser2_ingredient2", true, "c")),
-            pass!(&new_bool_assign_c!("dispenses_dispenser2_ingredient1", false, "c")),
-            pass!(&new_enum_assign_c!("state_shaker1", &state_domain, &format!("clean"), "state", "c")),
-            pass!(&new_enum_assign_c!("state_shot1", &state_domain, &format!("clean"), "state", "c")),
-            pass!(&new_enum_assign_c!("state_shot2", &state_domain, &format!("clean"), "state", "c")),
-            pass!(&new_bool_assign_c!("shaker_empty_level_shaker1_l0", true, "c")),
-            pass!(&new_bool_assign_c!("shaker_shaker1_l0", true, "c")),
-            pass!(&new_bool_assign_c!("next_l0_l1", true, "c")),
-            pass!(&new_bool_assign_c!("next_l2_l0", false, "c")),
-            pass!(&new_bool_assign_c!("next_l0_l0", false, "c")),
-            pass!(&new_bool_assign_c!("next_l1_l2", true, "c")),
-            pass!(&new_bool_assign_c!("next_l0_l2", true, "c")),
-            pass!(&new_bool_assign_c!("next_l1_l1", false, "c")),
-            pass!(&new_bool_assign_c!("next_l2_l2", false, "c")),
-            pass!(&new_bool_assign_c!("next_l1_l0", false, "c")),
-            pass!(&new_bool_assign_c!("next_l2_l0", false, "c")),
-            pass!(&new_bool_assign_c!("next_l2_l1", false, "c")),
-            pass!(&new_bool_assign_c!("shaked_shaker1", false, "c")),
-            pass!(&new_bool_assign_c!("cocktail_part1_cocktail1_ingredient1", true, "c")),
-            pass!(&new_bool_assign_c!("cocktail_part2_cocktail1_ingredient2", true, "c")),
-            pass!(&new_bool_assign_c!("cocktail_part1_cocktail1_ingredient2", false, "c")),
-            pass!(&new_bool_assign_c!("cocktail_part2_cocktail1_ingredient1", false, "c"))
+            pass!(&new_enum_assign_c!("pos_shaker1", &pos_domain, "table", "pos", "c")),
+            pass!(&new_enum_assign_c!("pos_shot1", &pos_domain, "table", "pos", "c")),
+            pass!(&new_enum_assign_c!("dispenses_dispenser1", &ingredients, "ingredient1", "disp", "c")),
+            pass!(&new_enum_assign_c!("state_shaker1", &state_domain, "clean", "state", "c")),
+            pass!(&new_enum_assign_c!("state_shot1", &state_domain, "clean", "state", "c")),
+            pass!(&new_enum_assign_c!("shaker_empty_level_shaker1", &levels ,"l0", "level", "c")),
+            pass!(&new_enum_assign_c!("shaker_level_shaker1", &levels, "l0", "level", "c")),
+            pass!(&new_enum_assign_c!("next_l0", &levels, "l1", "level", "c")),
+            pass!(&new_enum_assign_c!("next_l1", &levels, "l2", "level", "c")),
+            pass!(&new_enum_assign_c!("cocktail_part1", &ingredients, "ingredient1", "cocktail", "c")),
+            pass!(&new_enum_assign_c!("cocktail_part2", &ingredients, "ingredient2", "cocktail", "c"))
         );
     
         let goal = vec!(
-            pass!(&new_enum_assign_c!(&format!("state_shot1"), &state_domain, &format!("contains_cocktail1"), "state", "c"))
+            pass!(&new_enum_assign_c!(&format!("state_shaker1"), &state_domain, &format!("contains_cocktail1"), "state", "c"))
         );
+
+        let c = Parameter::new("c", &true);
 
         let problem = ParamPlanningProblem::new(
             name, 
@@ -141,7 +136,7 @@ pub fn parser(name: &str) -> (ParamPlanningProblem, HashMap<String, Vec<String>>
             &ParamPredicate::new(&goal), 
             &vec!(), 
             &Predicate::TRUE,
-            &vec!()
+            &vec!(c)
         );
     
         (problem, objects)

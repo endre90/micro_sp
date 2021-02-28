@@ -21,6 +21,6 @@
 :init next l0 l1
 :init next l1 l2
 :init cocktail_part1 cocktail1 ingredient1
-:init cocktail_part2 cocktail1 ingredient1
+:init cocktail_part2 cocktail1 ingredient2
 
 :goal contains shot1 cocktail1

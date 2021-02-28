@@ -1,11 +1,12 @@
 :objects child1 child2 child3 child4 child5 child6 - child
 :objects bread1 bread2 bread3 bread4 bread5 bread6 - bread-portion
 :objects content1 content2 content3 content4 content5 content6 - content-portion
-:objects tray1 - tray
+:objects tray1 tray2 - tray
 :objects table1 table2 kitchen - place
 :objects sandwich1 sandwich2 sandwich3 sandwich4 sandwich5 sandwich6 - sandwich
 
 :init at tray1 kitchen
+:init at tray2 kitchen
 :init at_kitchen_bread bread1
 :init at_kitchen_content content1
 :init at_kitchen_bread bread2

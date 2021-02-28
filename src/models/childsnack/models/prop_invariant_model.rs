@@ -86,12 +86,15 @@ pub fn model(name: &str) -> ParamPlanningProblem {
                         &ppred!(
                             &pass!(&new_bool_assign_c!(&format!("at_kitchen_bread_{}", bread_portion), true, "c")),
                             &pass!(&new_bool_assign_c!(&format!("at_kitchen_content_{}", content_portion), true, "c")),
+                            // &pass!(&new_bool_assign_c!(&format!("no_gluten_bread_{}", bread_portion), false, "c")),
+                            // &pass!(&new_bool_assign_c!(&format!("no_gluten_content_{}", content_portion), false, "c")),
                             &pass!(&new_bool_assign_c!(&format!("notexist_{}", sandwich), true, "c"))
                         ),
                         &ppred!(
                             &pass!(&new_bool_assign_c!(&format!("at_kitchen_bread_{}", bread_portion), false, "c")),
                             &pass!(&new_bool_assign_c!(&format!("at_kitchen_content_{}", content_portion), false, "c")),
                             &pass!(&new_bool_assign_c!(&format!("at_kitchen_sandwich_{}", sandwich), true, "c")),
+                            // &pass!(&new_bool_assign_c!(&format!("no_gluten_sandwich_{}", sandwich), false, "c")),
                             &pass!(&new_bool_assign_c!(&format!("notexist_{}", sandwich), false, "c"))
                         )
                     )
@@ -185,6 +188,7 @@ pub fn model(name: &str) -> ParamPlanningProblem {
                                 &pass!(&new_bool_assign_c!(&format!("not_allergic_gluten_{}", child), true, "c")),
                                 &pass!(&new_bool_assign_c!(&format!("ontray_{}_{}", sandwich, tray), true, "c")),
                                 &pass!(&new_bool_assign_c!(&format!("waiting_{}_{}", child, place), true, "c")),
+                                // &pass!(&new_bool_assign_c!(&format!("no_gluten_sandwich_{}", sandwich), false, "c")),
                                 &pass!(&new_bool_assign_c!(&format!("at_{}_{}", tray, place), true, "c"))
                             ),
                             &ppred!(

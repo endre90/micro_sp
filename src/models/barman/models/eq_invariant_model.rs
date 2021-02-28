@@ -30,6 +30,7 @@ pub fn model(name: &str) -> ParamPlanningProblem {
     // }
 
     let pos_domain = vec!("left", "right", "table");
+    let tf_fomain = vec!("true", "false");
 
     let mut state_domain: Vec<&str> = vec!();
     let clean = vec!("clean");
@@ -90,7 +91,7 @@ pub fn model(name: &str) -> ParamPlanningProblem {
                             &format!("fill_shot_{}_{}_{}_{}", shot, ingredient, hand, dispenser),
                             &ppred!(
                                 &pass!(&new_enum_assign_c!(&format!("pos_{}", shot), &pos_domain, &format!("{}", hand), "pos", "c")),
-                                &pass!(&new_bool_assign_c!(&format!("dispenses_{}_{}", dispenser, ingredient), true, "c")),
+                                &pass!(&new_enum_assign_c!(&format!("dispenses_{}", dispenser), &ingredients, &format!("{}", ingredient), "disp", "c")),
                                 &pass!(&new_enum_assign_c!(&format!("state_{}", shot), &state_domain, &format!("clean"), "state", "c"))
                             ),
                             &ppred!(
@@ -112,7 +113,7 @@ pub fn model(name: &str) -> ParamPlanningProblem {
                             &format!("refill_shot_{}_{}_{}_{}", shot, ingredient, hand, dispenser),
                             &ppred!(
                                 &pass!(&new_enum_assign_c!(&format!("pos_{}", shot), &pos_domain, &format!("{}", hand), "pos", "c")),
-                                &pass!(&new_bool_assign_c!(&format!("dispenses_{}_{}", dispenser, ingredient), true, "c")),
+                                &pass!(&new_enum_assign_c!(&format!("dispenses_{}", dispenser), &ingredients, &format!("{}", ingredient), "disp", "c")),
                                 &pass!(&new_enum_assign_c!(&format!("state_{}", shot), &state_domain, &format!("empty_{}", ingredient), "state", "c"))
                             ),
                             &ppred!(
@@ -176,15 +177,14 @@ pub fn model(name: &str) -> ParamPlanningProblem {
                                         &pass!(&new_enum_assign_c!(&format!("pos_{}", shot), &pos_domain, &format!("{}", hand), "pos", "c")),
                                         &pass!(&new_enum_assign_c!(&format!("state_{}", shot), &state_domain, &format!("contains_{}", ingredient), "state", "c")),
                                         &pass!(&new_enum_assign_c!(&format!("state_{}", shot), &state_domain, &format!("clean"), "state", "c")),
-                                        &pass!(&new_bool_assign_c!(&format!("shaker_level_{}_{}", shaker, level1), true, "c")),
-                                        &pass!(&new_bool_assign_c!(&format!("next_{}_{}", level1, level2), true, "c"))
+                                        &pass!(&new_enum_assign_c!(&format!("shaker_level_{}", shaker), &levels, &format!("{}", level1), "level", "c")),
+                                        &pass!(&new_enum_assign_c!(&format!("next_{}", level1), &levels, &format!("{}", level2), "level", "c"))
                                     ),
                                     &ppred!(
                                         &pass!(&new_enum_assign_c!(&format!("state_{}", shot), &state_domain, &format!("empty_{}", ingredient), "state", "c")),
                                         &pass!(&new_enum_assign_c!(&format!("state_{}", shaker), &state_domain, &format!("contains_{}", ingredient), "state", "c")),
-                                        &pass!(&new_bool_assign_c!(&format!("shaked_{}", shaker), false, "c")),
-                                        &pass!(&new_bool_assign_c!(&format!("shaker_level_{}_{}", shaker, level1), false, "c")),
-                                        &pass!(&new_bool_assign_c!(&format!("shaker_level_{}_{}", shaker, level2), true, "c"))
+                                        &pass!(&new_enum_assign_c!(&format!("shaked_{}", shaker), &tf_fomain, "false", "tf", "c")),
+                                        &pass!(&new_enum_assign_c!(&format!("shaker_level_{}", shaker), &levels, &format!("{}", level2), "level", "c"))
                                     )
                                 )  
                             )
@@ -207,15 +207,14 @@ pub fn model(name: &str) -> ParamPlanningProblem {
                                     &ppred!(
                                         &pass!(&new_enum_assign_c!(&format!("pos_{}", shot), &pos_domain, &format!("{}", hand), "pos", "c")),
                                         &pass!(&new_enum_assign_c!(&format!("state_{}", shot), &state_domain, &format!("contains_{}", ingredient), "state", "c")),
-                                        &pass!(&new_bool_assign_c!(&format!("shaked_{}", shaker), false, "c")),
-                                        &pass!(&new_bool_assign_c!(&format!("shaker_level_{}_{}", shaker, level1), true, "c")),
-                                        &pass!(&new_bool_assign_c!(&format!("next_{}_{}", level1, level2), true, "c"))
+                                        &pass!(&new_enum_assign_c!(&format!("shaked_{}", shaker), &tf_fomain, "false", "tf", "c")),
+                                        &pass!(&new_enum_assign_c!(&format!("shaker_level_{}", shaker), &levels, &format!("{}", level1), "level", "c")),
+                                        &pass!(&new_enum_assign_c!(&format!("next_{}", level1), &levels, &format!("{}", level2), "level", "c"))
                                     ),
                                     &ppred!(
                                         &pass!(&new_enum_assign_c!(&format!("state_{}", shot), &state_domain, &format!("empty_{}", ingredient), "state", "c")),
                                         &pass!(&new_enum_assign_c!(&format!("state_{}", shaker), &state_domain, &format!("contains_{}", ingredient), "state", "c")),
-                                        &pass!(&new_bool_assign_c!(&format!("shaker_level_{}_{}", shaker, level1), false, "c")),
-                                        &pass!(&new_bool_assign_c!(&format!("shaker_level_{}_{}", shaker, level2), true, "c"))
+                                        &pass!(&new_enum_assign_c!(&format!("shaker_level_{}", shaker), &levels, &format!("{}", level2), "level", "c"))
                                     )
                                 )  
                             )
@@ -237,14 +236,12 @@ pub fn model(name: &str) -> ParamPlanningProblem {
                                 &ppred!(
                                     &pass!(&new_enum_assign_c!(&format!("pos_{}", shaker), &pos_domain, &format!("{}", hand), "pos", "c")),
                                     &pass!(&new_enum_assign_c!(&format!("state_{}", shaker), &state_domain, &format!("contains_{}", cocktail), "state", "c")),
-                                    &pass!(&new_bool_assign_c!(&format!("shaked_{}", shaker), true, "c")),
-                                    &pass!(&new_bool_assign_c!(&format!("shaker_level_{}_{}", shaker, level1), true, "c")),
-                                    &pass!(&new_bool_assign_c!(&format!("shaker_empty_level_{}_{}", shaker, level2), true, "c"))
+                                    &pass!(&new_enum_assign_c!(&format!("shaked_{}", shaker), &tf_fomain, "true", "tf", "c")),
+                                    &pass!(&new_enum_assign_c!(&format!("shaker_level_{}", shaker), &levels, &format!("{}", level1), "level", "c")),
+                                    &pass!(&new_enum_assign_c!(&format!("shaker_empty_level_{}", shaker), &levels ,&format!("{}", level2), "level", "c"))
                                 ),
                                 &ppred!(
-                                    &pass!(&new_bool_assign_c!(&format!("shaked_{}", shaker), false, "c")),
-                                    &pass!(&new_bool_assign_c!(&format!("shaker_level_{}_{}", shaker, level1), false, "c")),
-                                    &pass!(&new_bool_assign_c!(&format!("shaker_level_{}_{}", shaker, level2), true, "c")),
+                                    &pass!(&new_enum_assign_c!(&format!("shaker_level_{}", shaker), &levels, &format!("{}", level2), "level", "c")),
                                     &pass!(&new_enum_assign_c!(&format!("state_{}", shaker), &state_domain, &format!("empty_{}", cocktail), "state", "c"))
                                 )
                             )
@@ -285,12 +282,12 @@ pub fn model(name: &str) -> ParamPlanningProblem {
                                 &ppred!(
                                     &pass!(&new_enum_assign_c!(&format!("pos_{}", shaker), &pos_domain, &format!("{}", hand), "pos", "c")),
                                     &pass!(&new_enum_assign_c!(&format!("state_{}", shaker), &state_domain, &format!("contains_{}_{}", ingredient1, ingredient2), "state", "c")),
-                                    &pass!(&new_bool_assign_c!(&format!("cocktail_part1_{}_{}", cocktail, ingredient1), true, "c")),
-                                    &pass!(&new_bool_assign_c!(&format!("cocktail_part2_{}_{}", cocktail, ingredient2), true, "c")),
-                                    &pass!(&new_bool_assign_c!(&format!("shaked_{}", shaker), false, "c"))
+                                    &pass!(&new_enum_assign_c!(&format!("cocktail_part1_{}", cocktail), &ingredients, &format!("{}", ingredient1), "cocktail", "c")),
+                                    &pass!(&new_enum_assign_c!(&format!("cocktail_part2_{}", cocktail), &ingredients, &format!("{}", ingredient2), "cocktail", "c")),
+                                    &pass!(&new_enum_assign_c!(&format!("shaked_{}", shaker), &tf_fomain, "false", "tf", "c"))
                                 ),
                                 &ppred!(
-                                    &pass!(&new_bool_assign_c!(&format!("shaked_{}", shaker), true, "c")),
+                                    &pass!(&new_enum_assign_c!(&format!("shaked_{}", shaker), &tf_fomain, "true", "tf", "c")),
                                     &pass!(&new_enum_assign_c!(&format!("state_{}", shaker), &state_domain, &format!("contains_{}", cocktail), "state", "c"))
                                 )
                             )
@@ -312,16 +309,15 @@ pub fn model(name: &str) -> ParamPlanningProblem {
                                     &format!("pour_shaker_to_shot_{}_{}_{}_{}_{}_{}", beverage, shot, hand, shaker, level1, level2),
                                     &ppred!(
                                         &pass!(&new_enum_assign_c!(&format!("pos_{}", shaker), &pos_domain, &format!("{}", hand), "pos", "c")),
-                                        &pass!(&new_bool_assign_c!(&format!("shaked_{}", shaker), true, "c")),
+                                        &pass!(&new_enum_assign_c!(&format!("shaked_{}", shaker), &tf_fomain, "true", "tf", "c")),
                                         &pass!(&new_enum_assign_c!(&format!("state_{}", shot), &state_domain, &format!("clean"), "state", "c")),
                                         &pass!(&new_enum_assign_c!(&format!("state_{}", shaker), &state_domain, &format!("contains_{}", beverage), "state", "c")),
-                                        &pass!(&new_bool_assign_c!(&format!("shaker_level_{}_{}", shaker, level1), true, "c")),
-                                        &pass!(&new_bool_assign_c!(&format!("next_{}_{}", level2, level1), true, "c"))
+                                        &pass!(&new_enum_assign_c!(&format!("shaker_level_{}", shaker), &levels, &format!("{}", level1), "level", "c")),
+                                        &pass!(&new_enum_assign_c!(&format!("next_{}", level2), &levels, &format!("{}", level1), "level", "c"))
                                     ),
                                     &ppred!(
                                         &pass!(&new_enum_assign_c!(&format!("state_{}", shot), &state_domain, &format!("contains_{}", beverage), "state", "c")),
-                                        &pass!(&new_bool_assign_c!(&format!("shaker_level_{}_{}", shaker, level1), false, "c")),
-                                        &pass!(&new_bool_assign_c!(&format!("shaker_level_{}_{}", shaker, level2), true, "c"))
+                                        &pass!(&new_enum_assign_c!(&format!("shaker_level_{}", shaker), &levels, &format!("{}", level2), "level", "c"))
                                     )
                                 )
                             )
@@ -339,6 +335,29 @@ pub fn model(name: &str) -> ParamPlanningProblem {
     // // one hand has to be empty when cleaning a container
     // // one hand has to be empty when shaking a shaker
 
+    // 1. per hand, o nly one container can be held.
+
+    // for hand in &hands {   
+    //     let mut local_vec = vec!(); 
+    //     for ball in &balls {
+    //         // 1. if the ball is at a gripper, it is not free
+    //         local_vec.push(pass!(&new_enum_assign_c!(&format!("at_{}", ball), &ball_domain, &format!("{}", gripper), "c", "c")));
+    //         invariants.push(
+    //             pnot!(
+    //                 &pand!(
+    //                     &pass!(&new_enum_assign_c!(&format!("at_{}", ball), &ball_domain, &format!("{}", gripper), "c", "c")),
+    //                     &pass!(&new_bool_assign_c!(&format!("free_{}", gripper), true, "c"))
+    //                 )
+    //             )
+    //         );
+    //     }
+    //     invariants.push(
+    //         por!(
+    //             &Predicate::PBEQ(local_vec.clone(), 1),
+    //             &Predicate::PBEQ(local_vec, 0)
+    //         )
+    //     )
+    // }
 
 
     let c = Parameter::new("c", &true);

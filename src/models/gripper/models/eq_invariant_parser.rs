@@ -53,9 +53,9 @@ pub fn parser(name: &str) -> (ParamPlanningProblem, HashMap<String, Vec<String>>
     objects.insert("ball".to_string(), balls);
     objects.insert("gripper".to_string(), grippers);
     
-    for o in &objects {
-        println!("objects: {:?}", o)
-    }
+    // for o in &objects {
+    //     println!("objects: {:?}", o)
+    // }
 
     let init_data: Vec<Vec<String>> = init_strings
         .iter()
@@ -79,15 +79,15 @@ pub fn parser(name: &str) -> (ParamPlanningProblem, HashMap<String, Vec<String>>
         .map(|k| k.iter().skip(1).map(|y| y.to_owned()).collect::<Vec<String>>())
         .collect();
 
-    for o in &init_data {
-            println!("init data: {:?}", o)
-        }
-    for o in &bool_init_data {
-            println!("bool data: {:?}", o)
-        }
-    for o in &enum_init_data {
-            println!("enum data: {:?}", o)
-        }
+    // for o in &init_data {
+    //         println!("init data: {:?}", o)
+    //     }
+    // for o in &bool_init_data {
+    //         println!("bool data: {:?}", o)
+    //     }
+    // for o in &enum_init_data {
+    //         println!("enum data: {:?}", o)
+    //     }
 
     let mut predicates = File::open(&format!("src/models/gripper/eq_instances/predicates.pddl")).unwrap();
     let mut predicates_buffer = String::new();
@@ -123,12 +123,12 @@ pub fn parser(name: &str) -> (ParamPlanningProblem, HashMap<String, Vec<String>>
         .map(|k| k.iter().skip(1).map(|y| y.to_owned()).collect::<Vec<String>>())
         .collect();
 
-    for o in &bool_predicate_data {
-        println!("bool predicates: {:?}", o)
-    }
-    for o in &enum_predicate_data {
-        println!("enum predicates: {:?}", o)
-    }
+    // for o in &bool_predicate_data {
+    //     println!("bool predicates: {:?}", o)
+    // }
+    // for o in &enum_predicate_data {
+    //     println!("enum predicates: {:?}", o)
+    // }
 
     fn bool_from_template(data: &Vec<String>, val: bool) -> Predicate {
         match data.len() {
@@ -224,15 +224,15 @@ pub fn parser(name: &str) -> (ParamPlanningProblem, HashMap<String, Vec<String>>
         .map(|k| k.iter().skip(1).map(|y| y.to_owned()).collect::<Vec<String>>())
         .collect();
 
-    for o in &goal_data {
-            println!("goal data: {:?}", o)
-        }
-    for o in &bool_goal_data {
-            println!("bool goal data: {:?}", o)
-        }
-    for o in &enum_goal_data {
-            println!("enum goal data: {:?}", o)
-        }
+    // for o in &goal_data {
+    //         println!("goal data: {:?}", o)
+    //     }
+    // for o in &bool_goal_data {
+    //         println!("bool goal data: {:?}", o)
+    //     }
+    // for o in &enum_goal_data {
+    //         println!("enum goal data: {:?}", o)
+    //     }
 
     let mut bool_goal_assert = vec![];
     let mut enum_goal_assert = vec![];
@@ -245,25 +245,25 @@ pub fn parser(name: &str) -> (ParamPlanningProblem, HashMap<String, Vec<String>>
         enum_goal_assert.push(enum_from_template(elem))
     }
 
-    for d in &bool_initial_assert {
-        println!("bool_init_data: {:?}", d);
-    }
+    // for d in &bool_initial_assert {
+    //     println!("bool_init_data: {:?}", d);
+    // }
 
-    for d in &enum_initial_assert {
-        println!("enum_init_data: {:?}", d);
-    }
+    // for d in &enum_initial_assert {
+    //     println!("enum_init_data: {:?}", d);
+    // }
 
     let mut initial_assert = vec!();
     initial_assert.extend(bool_initial_assert);
     initial_assert.extend(enum_initial_assert);
 
-    for d in &bool_goal_assert {
-        println!("bool_goal_data: {:?}", d);
-    }
+    // for d in &bool_goal_assert {
+    //     println!("bool_goal_data: {:?}", d);
+    // }
 
-    for d in &enum_goal_assert {
-        println!("enum_goal_data: {:?}", d);
-    }
+    // for d in &enum_goal_assert {
+    //     println!("enum_goal_data: {:?}", d);
+    // }
 
     let mut goal_assert = vec!();
     goal_assert.extend(bool_goal_assert);

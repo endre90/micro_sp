@@ -2,7 +2,7 @@
 :objects left right - hand
 :objects shot1 shot2 - shot
 :objects ingredient1 ingredient2 - ingredient
-:objects cocktail1 - cocktail
+:objects cocktail1 cocktail2 - cocktail
 :objects dispenser1 dispenser2 - dispenser
 :objects l0 l1 l2 - level
 
@@ -24,6 +24,9 @@
 :init next l0 l1
 :init next l1 l2
 :init cocktail_part1 cocktail1 ingredient1
-:init cocktail_part2 cocktail1 ingredient1
+:init cocktail_part2 cocktail1 ingredient2
+:init cocktail_part1 cocktail2 ingredient1
+:init cocktail_part2 cocktail2 ingredient2
 
 :goal contains shot1 cocktail1
+:goal contains shot2 cocktail2

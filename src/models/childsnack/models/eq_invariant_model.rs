@@ -20,32 +20,6 @@ pub fn model(name: &str) -> ParamPlanningProblem {
     let child_domain = objects.get("child_domain").unwrap_or(&vec!()).to_vec();
     let tf_domain = objects.get("tf_domain").unwrap_or(&vec!()).to_vec();
 
-    // for sandwich in &sandwiches {
-    //     for bread_portion in &bread_portions {
-    //         for content_portion in &content_portions {
-    //             transitions.push(
-    //                 ParamTransition::new(
-    //                     &format!("make_sandwich_no_gluten_{}_{}_{}", sandwich, bread_portion, content_portion),
-    //                     &ppred!(
-    //                         &pass!(&new_bool_assign_c!(&format!("at_kitchen_bread_{}", bread_portion), true, "c")),
-    //                         &pass!(&new_bool_assign_c!(&format!("at_kitchen_content_{}", content_portion), true, "c")),
-    //                         &pass!(&new_bool_assign_c!(&format!("no_gluten_bread_{}", bread_portion), true, "c")),
-    //                         &pass!(&new_bool_assign_c!(&format!("no_gluten_content_{}", content_portion), true, "c")),
-    //                         &pass!(&new_bool_assign_c!(&format!("notexist_{}", sandwich), true, "c"))
-    //                     ),
-    //                     &ppred!(
-    //                         &pass!(&new_bool_assign_c!(&format!("at_kitchen_bread_{}", bread_portion), false, "c")),
-    //                         &pass!(&new_bool_assign_c!(&format!("at_kitchen_content_{}", content_portion), false, "c")),
-    //                         &pass!(&new_bool_assign_c!(&format!("at_kitchen_sandwich_{}", sandwich), true, "c")),
-    //                         &pass!(&new_bool_assign_c!(&format!("no_gluten_sandwich_{}", sandwich), true, "c")),
-    //                         &pass!(&new_bool_assign_c!(&format!("notexist_{}", sandwich), false, "c"))
-    //                     )
-    //                 )
-    //             )
-    //         }
-    //     }
-    // }
-
     for sandwich in &sandwiches {
         for bread_portion in &bread_portions {
             for content_portion in &content_portions {
@@ -81,11 +55,14 @@ pub fn model(name: &str) -> ParamPlanningProblem {
                         &ppred!(
                             &pass!(&new_enum_assign_c!(&format!("at_kitchen_bread_{}", bread_portion), &tf_domain, "true", "tf", "c")),
                             &pass!(&new_enum_assign_c!(&format!("at_kitchen_content_{}", content_portion), &tf_domain, "true", "tf", "c")),
+                            // &pass!(&new_enum_assign_c!(&format!("no_gluten_bread_{}", bread_portion), &tf_domain, "false", "tf", "c")),
+                            // &pass!(&new_enum_assign_c!(&format!("no_gluten_content_{}", content_portion), &tf_domain, "false", "tf", "c")),
                             &pass!(&new_enum_assign_c!(&format!("{}", sandwich), &sandwich_domain, "notexist", "sandwich", "c"))
                         ),
                         &ppred!(
                             &pass!(&new_enum_assign_c!(&format!("at_kitchen_bread_{}", bread_portion), &tf_domain, "false", "tf", "c")),
                             &pass!(&new_enum_assign_c!(&format!("at_kitchen_content_{}", content_portion), &tf_domain, "false", "tf", "c")),
+                            // &pass!(&new_enum_assign_c!(&format!("no_gluten_sandwich_{}", sandwich), &tf_domain, "false", "tf", "c")),
                             &pass!(&new_enum_assign_c!(&format!("{}", sandwich), &sandwich_domain, "kitchen", "sandwich", "c"))
                         )
                     )

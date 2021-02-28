@@ -3,8 +3,6 @@
 :objects left right - gripper
 
 :init enum at-robby rooma
-; :init bool free left
-; :init bool free right
 :init enum at ball6 rooma
 :init enum at ball5 rooma
 :init enum at ball4 rooma

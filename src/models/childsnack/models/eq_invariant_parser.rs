@@ -96,7 +96,7 @@ pub fn parser(name: &str) -> (ParamPlanningProblem, HashMap<String, Vec<String>>
     let (initial, goal) = match name {
         "instance_10" => (
             vec!(
-                pass!(&new_enum_assign_c!("tray1", &tray_domain, "kitchen", "tray", "c")),
+                pass!(&new_enum_assign_c!("tray1", &places, "kitchen", "places", "c")),
                 pass!(&new_enum_assign_c!("at_kitchen_bread_bread1", &tf_domain, "true", "tf", "c")),
                 pass!(&new_enum_assign_c!("at_kitchen_content_content1", &tf_domain, "true", "tf", "c")),
                 pass!(&new_enum_assign_c!("at_kitchen_bread_bread2", &tf_domain, "true", "tf", "c")),
@@ -142,25 +142,25 @@ pub fn parser(name: &str) -> (ParamPlanningProblem, HashMap<String, Vec<String>>
         "instance_2" => (
             vec!(
                 pass!(&new_enum_assign_c!("tray1", &tray_domain, "kitchen", "tray", "c")),
-                pass!(&new_enum_assign_c!("tray2", &tray_domain, "kitchen", "tray", "c")),
+                // pass!(&new_enum_assign_c!("tray2", &tray_domain, "kitchen", "tray", "c")),
                 pass!(&new_enum_assign_c!("at_kitchen_bread_bread1", &tf_domain, "true", "tf", "c")),
                 pass!(&new_enum_assign_c!("at_kitchen_bread_bread2", &tf_domain, "true", "tf", "c")),
                 pass!(&new_enum_assign_c!("at_kitchen_content_content1", &tf_domain, "true", "tf", "c")),
                 pass!(&new_enum_assign_c!("at_kitchen_content_content2", &tf_domain, "true", "tf", "c")),
                 pass!(&new_enum_assign_c!("no_gluten_bread_bread1", &tf_domain, "true", "tf", "c")),
-                pass!(&new_enum_assign_c!("no_gluten_bread_bread2", &tf_domain, "true", "tf", "c")),
+                // pass!(&new_enum_assign_c!("no_gluten_bread_bread2", &tf_domain, "true", "tf", "c")),
                 pass!(&new_enum_assign_c!("no_gluten_content_content1", &tf_domain, "true", "tf", "c")),
-                pass!(&new_enum_assign_c!("no_gluten_content_content2", &tf_domain, "true", "tf", "c")),
+                // pass!(&new_enum_assign_c!("no_gluten_content_content2", &tf_domain, "true", "tf", "c")),
                 pass!(&new_enum_assign_c!("allergic_gluten_child1", &tf_domain, "true", "tf", "c")),
-                pass!(&new_enum_assign_c!("allergic_gluten_child2", &tf_domain, "true", "tf", "c")),
+                // pass!(&new_enum_assign_c!("allergic_gluten_child2", &tf_domain, "true", "tf", "c")),
                 pass!(&new_enum_assign_c!("child1", &child_domain, "table1", "child", "c")),
-                pass!(&new_enum_assign_c!("child2", &child_domain, "table2", "child", "c")),
-                pass!(&new_enum_assign_c!("sandwich1", &sandwich_domain, "notexist", "sandwich", "c")),
-                pass!(&new_enum_assign_c!("sandwich2", &sandwich_domain, "notexist", "sandwich", "c"))
+                // pass!(&new_enum_assign_c!("child2", &child_domain, "table2", "child", "c")),
+                pass!(&new_enum_assign_c!("sandwich1", &sandwich_domain, "notexist", "sandwich", "c"))
+                // pass!(&new_enum_assign_c!("sandwich2", &sandwich_domain, "notexist", "sandwich", "c"))
             ),
             vec!(
-                pass!(&new_enum_assign_c!("child1", &child_domain, "served", "child", "c")),
-                pass!(&new_enum_assign_c!("child2", &child_domain, "served", "child", "c"))
+                pass!(&new_enum_assign_c!("child1", &child_domain, "served", "child", "c"))
+                // pass!(&new_enum_assign_c!("child2", &child_domain, "served", "child", "c"))
             )
         ),
         "instance_3" => (
