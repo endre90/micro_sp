@@ -9,6 +9,12 @@ pub enum SPValue {
     String(String),
 }
 
+#[derive(Debug, PartialEq, Clone)]
+pub enum VarOrVal {
+    String(String),
+    SPValue(SPValue)
+}
+
 pub trait ToSPValue {
     fn to_spvalue(&self) -> SPValue;
 }

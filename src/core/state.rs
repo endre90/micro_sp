@@ -24,6 +24,7 @@ impl State {
         self.state.contains_key(key)
     }
 
+    // panic maye or handle later?
     pub fn get(self, key: &str) -> Option<SPValue> {
         match self.state.get(key) {
             Some(value) => Some(value.to_owned()),
@@ -31,9 +32,15 @@ impl State {
         }
     }
 
-    pub fn update(self, change: HashMap<String, SPValue>) -> State {
+    pub fn update(self, var: &str, val: SPValue) -> State {
         let mut state = self.state.clone();
-        change.iter().for_each(|(k, v)| {
+        state.insert(var.to_string(), val.clone());
+        State { state }
+    }
+
+    pub fn updates(self, changes: HashMap<String, SPValue>) -> State {
+        let mut state = self.state.clone();
+        changes.iter().for_each(|(k, v)| {
             state.insert(k.to_string(), v.clone());
         });
         State { state }

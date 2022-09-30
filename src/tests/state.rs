@@ -35,3 +35,47 @@ fn test_state_keys() {
         ))
     )
 }
+
+#[test]
+fn test_state_contains() {
+    let john_doe = john_doe();
+    assert_eq!(true, State::new(john_doe.clone()).contains("surname"));
+    assert_ne!(true, State::new(john_doe.clone()).contains("job"));
+}
+
+#[test]
+fn test_state_get() {
+    let john_doe = john_doe();
+    assert_eq!(
+        Some(185.to_spvalue()),
+        State::new(john_doe.clone()).get("height")
+    );
+    assert_ne!(
+        186.to_spvalue(),
+        State::new(john_doe.clone()).get("height").unwrap()
+    );
+    assert_eq!(None, State::new(john_doe).get("job"));
+}
+
+#[test]
+fn test_state_update() {
+    let john_doe = john_doe();
+    let old_state = State::new(john_doe.clone());
+    let new_state = old_state.clone().update("weight", 87.5.to_spvalue());
+    assert_ne!(old_state, new_state);
+    assert_eq!(87.5.to_spvalue(), new_state.clone().get("weight").unwrap());
+}
+
+#[test]
+fn test_state_updates() {
+    let john_doe = john_doe();
+    let old_state = State::new(john_doe.clone());
+    let new_state = old_state.clone().updates(HashMap::from([
+        ("weight".to_string(), 87.5.to_spvalue()),
+        ("job".to_string(), "carpenter".to_spvalue()),
+    ]));
+    assert_ne!(old_state, new_state);
+    assert_eq!(87.5.to_spvalue(), new_state.clone().get("weight").unwrap());
+    assert_eq!(None, old_state.get("job"));
+    assert_eq!("carpenter".to_spvalue(), new_state.get("job").unwrap());
+}
