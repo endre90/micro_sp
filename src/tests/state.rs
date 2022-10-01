@@ -47,14 +47,20 @@ fn test_state_contains() {
 fn test_state_get() {
     let john_doe = john_doe();
     assert_eq!(
-        Some(185.to_spvalue()),
+        185.to_spvalue(),
         State::new(john_doe.clone()).get("height")
     );
     assert_ne!(
         186.to_spvalue(),
-        State::new(john_doe.clone()).get("height").unwrap()
+        State::new(john_doe.clone()).get("height")
     );
-    assert_eq!(None, State::new(john_doe).get("job"));
+}
+
+#[test]
+#[should_panic]
+fn test_state_get_panic() {
+    let john_doe = john_doe();
+    State::new(john_doe).get("job");
 }
 
 #[test]
@@ -63,7 +69,7 @@ fn test_state_update() {
     let old_state = State::new(john_doe.clone());
     let new_state = old_state.clone().update("weight", 87.5.to_spvalue());
     assert_ne!(old_state, new_state);
-    assert_eq!(87.5.to_spvalue(), new_state.clone().get("weight").unwrap());
+    assert_eq!(87.5.to_spvalue(), new_state.clone().get("weight"));
 }
 
 #[test]
@@ -75,7 +81,6 @@ fn test_state_updates() {
         ("job".to_string(), "carpenter".to_spvalue()),
     ]));
     assert_ne!(old_state, new_state);
-    assert_eq!(87.5.to_spvalue(), new_state.clone().get("weight").unwrap());
-    assert_eq!(None, old_state.get("job"));
-    assert_eq!("carpenter".to_spvalue(), new_state.get("job").unwrap());
+    assert_eq!(87.5.to_spvalue(), new_state.clone().get("weight"));
+    assert_eq!("carpenter".to_spvalue(), new_state.get("job"));
 }

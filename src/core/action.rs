@@ -9,15 +9,22 @@ pub struct Action {
 impl Action {
     pub fn assign(self, state: &State) -> State
  {
-    if !state.clone().contains(&self.var) {
-        panic!("key {} is not in the state", self.var)
-    }
-
-    match self.var_or_val {
-        VarOrVal::String(x) => match state.clone().contains(&x) {
-            true => state.clone().update(&self.var, state.clone().get(&x).unwrap()),
-            false => panic!("No such variable {} in the state", x)
-        }
-        VarOrVal::SPValue(x) => state.clone().update(&self.var, x)
+    match state.clone().contains(&self.var) {
+        true => {
+            match self.var_or_val {
+                VarOrVal::String(x) => match state.clone().contains(&x) {
+                    true => state.clone().update(&self.var, state.clone().get(&x)),
+                    // {
+                    //     match state.clone().get(&x) {
+                    //         Some(val) => Some(state.clone().update(&self.var, val)),
+                    //         None => None
+                    //     }
+                    // }
+                    false => panic!("Variable {x} not in the state.")
+                }
+                VarOrVal::SPValue(x) => state.clone().update(&self.var, x)
+            }
+        },
+        false => panic!("Variable {} not in the state.", self.var)
     }
  }}

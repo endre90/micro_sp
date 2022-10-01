@@ -17,11 +17,11 @@ impl Predicate {
             Predicate::EQ(x, y) => match x {
                 VarOrVal::String(vx) => match y {
                     VarOrVal::String(vy) => state.clone().get(&vx) == state.clone().get(&vy),
-                    VarOrVal::SPValue(vy) => state.clone().get(&vx) == Some(vy)
+                    VarOrVal::SPValue(vy) => state.clone().get(&vx) == vy
                 }
                 VarOrVal::SPValue(vx) => match y {
-                    VarOrVal::String(vy) => Some(vx) == state.clone().get(&vy),
-                    VarOrVal::SPValue(vy) => Some(vx) == Some(vy)
+                    VarOrVal::String(vy) => vx == state.clone().get(&vy),
+                    VarOrVal::SPValue(vy) => vx == vy
                 }
             }
         }

@@ -24,11 +24,12 @@ impl State {
         self.state.contains_key(key)
     }
 
-    // panic maye or handle later?
-    pub fn get(self, key: &str) -> Option<SPValue> {
+    // Need to panic because if both keys are not 
+    // found in EQ, None == None
+    pub fn get(self, key: &str) -> SPValue {
         match self.state.get(key) {
-            Some(value) => Some(value.to_owned()),
-            None => None,
+            Some(value) => value.to_owned(),
+            None => panic!("Variable {key} not found in the state."),
         }
     }
 
