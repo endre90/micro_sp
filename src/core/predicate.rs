@@ -5,7 +5,7 @@ pub enum Predicate {
     NOT(Box<Predicate>),
     AND(Vec<Predicate>),
     OR(Vec<Predicate>),
-    EQ(VarOrVal, VarOrVal)
+    EQ(VarOrVal, VarOrVal),
 }
 
 impl Predicate {
@@ -17,13 +17,13 @@ impl Predicate {
             Predicate::EQ(x, y) => match x {
                 VarOrVal::String(vx) => match y {
                     VarOrVal::String(vy) => state.clone().get(&vx) == state.clone().get(&vy),
-                    VarOrVal::SPValue(vy) => state.clone().get(&vx) == vy
-                }
+                    VarOrVal::SPValue(vy) => state.clone().get(&vx) == vy,
+                },
                 VarOrVal::SPValue(vx) => match y {
                     VarOrVal::String(vy) => vx == state.clone().get(&vy),
-                    VarOrVal::SPValue(vy) => vx == vy
-                }
-            }
+                    VarOrVal::SPValue(vy) => vx == vy,
+                },
+            },
         }
     }
 }

@@ -1,6 +1,6 @@
 #![allow(unused_imports)]
 #![allow(dead_code)]
-use micro_sp::{SPValue, State, ToSPValue, VarOrVal, Predicate, ToVal, ToVar, eq, not, and, or};
+use micro_sp::{and, eq, not, or, Predicate, SPValue, State, ToSPValue, ToVal, ToVar, VarOrVal};
 use std::collections::{HashMap, HashSet};
 
 fn john_doe() -> HashMap<String, SPValue> {
@@ -46,8 +46,8 @@ fn test_predicate_and() {
     let eq2 = Predicate::EQ("name".to_var(), "name".to_var());
     let eq3 = Predicate::EQ("weight".to_var(), 80.5.to_val());
     let eqf = Predicate::EQ("height".to_var(), 175.to_val());
-    let and = Predicate::AND(vec!(eq.clone(), eq2.clone(), eq3.clone()));
-    let andf = Predicate::AND(vec!(eq, eq2, eq3, eqf));
+    let and = Predicate::AND(vec![eq.clone(), eq2.clone(), eq3.clone()]);
+    let andf = Predicate::AND(vec![eq, eq2, eq3, eqf]);
     assert!(and.eval(&s1));
     assert!(!andf.eval(&s1));
 }
@@ -59,8 +59,8 @@ fn test_predicate_or() {
     let eq2 = Predicate::EQ("name".to_var(), "name".to_var());
     let eq3 = Predicate::EQ("weight".to_var(), 80.5.to_val());
     let eqf = Predicate::EQ("height".to_var(), 175.to_val());
-    let or = Predicate::OR(vec!(eq.clone(), eq2.clone(), eq3.clone()));
-    let or2 = Predicate::OR(vec!(eq, eq2, eq3, eqf));
+    let or = Predicate::OR(vec![eq.clone(), eq2.clone(), eq3.clone()]);
+    let or2 = Predicate::OR(vec![eq, eq2, eq3, eqf]);
     assert!(or.eval(&s1));
     assert!(or2.eval(&s1));
 }
@@ -72,12 +72,18 @@ fn test_predicate_complex() {
     let eq2 = Predicate::EQ("name".to_var(), "name".to_var());
     let eq3 = Predicate::EQ("weight".to_var(), 80.5.to_val());
     let eqf = Predicate::EQ("height".to_var(), 175.to_val());
-    let and = Predicate::AND(vec!(eq.clone(), eq2.clone(), eq3.clone()));
-    let andf = Predicate::AND(vec!(eq.clone(), eq2.clone(), eq3.clone(), eqf.clone()));
-    let or = Predicate::OR(vec!(eq.clone(), eq2.clone(), eq3.clone()));
-    let or2 = Predicate::OR(vec!(eq, eq2, eq3, eqf));
+    let and = Predicate::AND(vec![eq.clone(), eq2.clone(), eq3.clone()]);
+    let andf = Predicate::AND(vec![eq.clone(), eq2.clone(), eq3.clone(), eqf.clone()]);
+    let or = Predicate::OR(vec![eq.clone(), eq2.clone(), eq3.clone()]);
+    let or2 = Predicate::OR(vec![eq, eq2, eq3, eqf]);
     let not = Predicate::NOT(Box::new(or.clone()));
-    let cmplx = Predicate::AND(vec!(Predicate::NOT(Box::new(not.clone())), or, or2, and, Predicate::NOT(Box::new(andf))));
+    let cmplx = Predicate::AND(vec![
+        Predicate::NOT(Box::new(not.clone())),
+        or,
+        or2,
+        and,
+        Predicate::NOT(Box::new(andf)),
+    ]);
     assert!(cmplx.eval(&s1));
 }
 

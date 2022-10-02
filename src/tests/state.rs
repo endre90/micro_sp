@@ -46,14 +46,8 @@ fn test_state_contains() {
 #[test]
 fn test_state_get() {
     let john_doe = john_doe();
-    assert_eq!(
-        185.to_spvalue(),
-        State::new(john_doe.clone()).get("height")
-    );
-    assert_ne!(
-        186.to_spvalue(),
-        State::new(john_doe.clone()).get("height")
-    );
+    assert_eq!(185.to_spvalue(), State::new(john_doe.clone()).get("height"));
+    assert_ne!(186.to_spvalue(), State::new(john_doe.clone()).get("height"));
 }
 
 #[test]

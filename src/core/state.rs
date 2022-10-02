@@ -24,7 +24,7 @@ impl State {
         self.state.contains_key(key)
     }
 
-    // Need to panic because if both keys are not 
+    // Need to panic because if both keys are not
     // found in EQ, None == None
     pub fn get(self, key: &str) -> SPValue {
         match self.state.get(key) {
