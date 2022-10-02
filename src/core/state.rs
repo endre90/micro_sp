@@ -1,10 +1,28 @@
 use crate::SPValue;
 use serde::*;
 use std::collections::{HashMap, HashSet};
+use std::hash::{Hash, Hasher};
 
-#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub struct State {
     pub state: HashMap<String, SPValue>,
+}
+
+impl Hash for State {
+    fn hash<H: Hasher>(&self, s: &mut H) {
+        self.state
+            .keys()
+            .into_iter()
+            .map(|x| x.to_owned())
+            .collect::<Vec<String>>()
+            .hash(s);
+        self.state
+            .values()
+            .into_iter()
+            .map(|x| x.to_owned())
+            .collect::<Vec<SPValue>>()
+            .hash(s);
+    }
 }
 
 impl State {

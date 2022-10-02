@@ -5,6 +5,7 @@ pub use crate::core::sp_value::*;
 pub use crate::core::state::*;
 pub use crate::core::transition::*;
 pub use crate::core::var_or_val::*;
+pub use crate::core::planning::*;
 
 pub mod macros;
 pub use crate::macros::action::*;

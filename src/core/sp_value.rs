@@ -1,10 +1,10 @@
 use serde::*;
 use std::fmt;
 
-#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Clone, Serialize, Deserialize, Hash, Eq)]
 pub enum SPValue {
     Bool(bool),
-    Float32(f32),
+    // Float32(f32),
     Int32(i32),
     String(String),
 }
@@ -19,11 +19,11 @@ impl ToSPValue for bool {
     }
 }
 
-impl ToSPValue for f32 {
-    fn to_spvalue(&self) -> SPValue {
-        SPValue::Float32(*self)
-    }
-}
+// impl ToSPValue for f32 {
+//     fn to_spvalue(&self) -> SPValue {
+//         SPValue::Float32(*self)
+//     }
+// }
 
 impl ToSPValue for i32 {
     fn to_spvalue(&self) -> SPValue {
@@ -48,7 +48,7 @@ impl fmt::Display for SPValue {
         match self {
             SPValue::Bool(b) if *b => write!(fmtr, "true"),
             SPValue::Bool(_) => write!(fmtr, "false"),
-            SPValue::Float32(f) => write!(fmtr, "{}", f),
+            // SPValue::Float32(f) => write!(fmtr, "{}", f),
             SPValue::Int32(i) => write!(fmtr, "{}", i),
             SPValue::String(s) => write!(fmtr, "{}", s),
         }

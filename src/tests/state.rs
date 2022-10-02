@@ -8,7 +8,7 @@ fn john_doe() -> HashMap<String, SPValue> {
         ("name".to_string(), "John".to_spvalue()),
         ("surname".to_string(), "Doe".to_spvalue()),
         ("height".to_string(), 185.to_spvalue()),
-        ("weight".to_string(), 80.5.to_spvalue()),
+        ("weight".to_string(), 80.to_spvalue()),
         ("smart".to_string(), true.to_spvalue()),
     ])
 }
@@ -61,9 +61,9 @@ fn test_state_get_panic() {
 fn test_state_update() {
     let john_doe = john_doe();
     let old_state = State::new(john_doe.clone());
-    let new_state = old_state.clone().update("weight", 87.5.to_spvalue());
+    let new_state = old_state.clone().update("weight", 87.to_spvalue());
     assert_ne!(old_state, new_state);
-    assert_eq!(87.5.to_spvalue(), new_state.clone().get("weight"));
+    assert_eq!(87.to_spvalue(), new_state.clone().get("weight"));
 }
 
 #[test]
@@ -71,10 +71,10 @@ fn test_state_updates() {
     let john_doe = john_doe();
     let old_state = State::new(john_doe.clone());
     let new_state = old_state.clone().updates(HashMap::from([
-        ("weight".to_string(), 87.5.to_spvalue()),
+        ("weight".to_string(), 87.to_spvalue()),
         ("job".to_string(), "carpenter".to_spvalue()),
     ]));
     assert_ne!(old_state, new_state);
-    assert_eq!(87.5.to_spvalue(), new_state.clone().get("weight"));
+    assert_eq!(87.to_spvalue(), new_state.clone().get("weight"));
     assert_eq!("carpenter".to_spvalue(), new_state.get("job"));
 }

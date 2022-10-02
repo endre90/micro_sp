@@ -32,11 +32,11 @@ impl ToVal for bool {
     }
 }
 
-impl ToVal for f32 {
-    fn to_val(&self) -> VarOrVal {
-        VarOrVal::SPValue(SPValue::Float32(*self))
-    }
-}
+// impl ToVal for f32 {
+//     fn to_val(&self) -> VarOrVal {
+//         VarOrVal::SPValue(SPValue::Float32(*self))
+//     }
+// }
 
 impl ToVal for i32 {
     fn to_val(&self) -> VarOrVal {

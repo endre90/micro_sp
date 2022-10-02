@@ -8,7 +8,7 @@ fn john_doe() -> HashMap<String, SPValue> {
         ("name".to_string(), "John".to_spvalue()),
         ("surname".to_string(), "Doe".to_spvalue()),
         ("height".to_string(), 185.to_spvalue()),
-        ("weight".to_string(), 80.5.to_spvalue()),
+        ("weight".to_string(), 80.to_spvalue()),
         ("smart".to_string(), true.to_spvalue()),
     ])
 }
@@ -43,12 +43,12 @@ fn test_transition_eval() {
 fn test_transition_take() {
     let s = State::new(john_doe());
     let a1 = a!("weight", 85.to_val());
-    let a2 = a!("weight", 87.5.to_val());
-    let t1 = t!("gains_weight", eq!("weight".to_var(), 80.5.to_val()), vec!(a1));
+    let a2 = a!("weight", 87.to_val());
+    let t1 = t!("gains_weight", eq!("weight".to_var(), 80.to_val()), vec!(a1));
     let t2 = t!("gains_weight_again", eq!("weight".to_var(), 85.to_val()), vec!(a2));
     let s_next_1 = t1.take(&s);
     let s_next_2 = t2.take(&s_next_1);
-    let new_state = s.clone().update("weight", 87.5.to_spvalue());
+    let new_state = s.clone().update("weight", 87.to_spvalue());
     assert_eq!(s_next_2, new_state);
 }
 
@@ -56,7 +56,7 @@ fn test_transition_take() {
 #[should_panic]
 fn test_transition_take_panic() {
     let s = State::new(john_doe());
-    let a1 = a!("weight", 87.5.to_val());
+    let a1 = a!("weight", 87.to_val());
     let t1 = t!("gains_weight", eq!("weight".to_var(), 85.to_val()), vec!(a1));
     t1.take(&s);
 }
@@ -65,9 +65,9 @@ fn test_transition_take_panic() {
 fn test_transition_ordering() {
     let s = State::new(john_doe());
     let a1 = a!("weight", 85.to_val());
-    let a2 = a!("weight", 87.5.to_val());
+    let a2 = a!("weight", 87.to_val());
     let a3 = a!("weight", 90.to_val());
-    let t1 = t!("gains_weight_again", eq!("weight".to_var(), 80.5.to_val()), vec!(a1, a2, a3));
+    let t1 = t!("gains_weight_again", eq!("weight".to_var(), 80.to_val()), vec!(a1, a2, a3));
     let s_next_1 = t1.take(&s);
     assert_eq!(s_next_1.get("weight"), 90.to_spvalue());
 }

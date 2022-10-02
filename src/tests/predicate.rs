@@ -8,7 +8,7 @@ fn john_doe() -> HashMap<String, SPValue> {
         ("name".to_string(), "John".to_spvalue()),
         ("surname".to_string(), "Doe".to_spvalue()),
         ("height".to_string(), 185.to_spvalue()),
-        ("weight".to_string(), 80.5.to_spvalue()),
+        ("weight".to_string(), 80.to_spvalue()),
         ("smart".to_string(), true.to_spvalue()),
     ])
 }
@@ -44,7 +44,7 @@ fn test_predicate_and() {
     let s1 = State::new(john_doe());
     let eq = Predicate::EQ("smart".to_var(), true.to_val());
     let eq2 = Predicate::EQ("name".to_var(), "name".to_var());
-    let eq3 = Predicate::EQ("weight".to_var(), 80.5.to_val());
+    let eq3 = Predicate::EQ("weight".to_var(), 80.to_val());
     let eqf = Predicate::EQ("height".to_var(), 175.to_val());
     let and = Predicate::AND(vec![eq.clone(), eq2.clone(), eq3.clone()]);
     let andf = Predicate::AND(vec![eq, eq2, eq3, eqf]);
@@ -57,7 +57,7 @@ fn test_predicate_or() {
     let s1 = State::new(john_doe());
     let eq = Predicate::EQ("smart".to_var(), true.to_val());
     let eq2 = Predicate::EQ("name".to_var(), "name".to_var());
-    let eq3 = Predicate::EQ("weight".to_var(), 80.5.to_val());
+    let eq3 = Predicate::EQ("weight".to_var(), 80.to_val());
     let eqf = Predicate::EQ("height".to_var(), 175.to_val());
     let or = Predicate::OR(vec![eq.clone(), eq2.clone(), eq3.clone()]);
     let or2 = Predicate::OR(vec![eq, eq2, eq3, eqf]);
@@ -70,7 +70,7 @@ fn test_predicate_complex() {
     let s1 = State::new(john_doe());
     let eq = Predicate::EQ("smart".to_var(), true.to_val());
     let eq2 = Predicate::EQ("name".to_var(), "name".to_var());
-    let eq3 = Predicate::EQ("weight".to_var(), 80.5.to_val());
+    let eq3 = Predicate::EQ("weight".to_var(), 80.to_val());
     let eqf = Predicate::EQ("height".to_var(), 175.to_val());
     let and = Predicate::AND(vec![eq.clone(), eq2.clone(), eq3.clone()]);
     let andf = Predicate::AND(vec![eq.clone(), eq2.clone(), eq3.clone(), eqf.clone()]);
@@ -110,7 +110,7 @@ fn test_predicate_and_macro() {
     let s1 = State::new(john_doe());
     let eq = eq!("smart".to_var(), true.to_val());
     let eq2 = eq!("name".to_var(), "name".to_var());
-    let eq3 = eq!("weight".to_var(), 80.5.to_val());
+    let eq3 = eq!("weight".to_var(), 80.to_val());
     let eqf = eq!("height".to_var(), 175.to_val());
     let and = and!(eq, eq2, eq3);
     let andf = and!(eq, eq2, eq3, eqf);
@@ -123,7 +123,7 @@ fn test_predicate_or_macro() {
     let s1 = State::new(john_doe());
     let eq = eq!("smart".to_var(), true.to_val());
     let eq2 = eq!("name".to_var(), "name".to_var());
-    let eq3 = eq!("weight".to_var(), 80.5.to_val());
+    let eq3 = eq!("weight".to_var(), 80.to_val());
     let eqf = eq!("height".to_var(), 175.to_val());
     let or = or!(eq, eq2, eq3);
     let orf = or!(eq, eq2, eq3, eqf);
@@ -136,7 +136,7 @@ fn test_predicate_complex_macro() {
     let s1 = State::new(john_doe());
     let eq = eq!("smart".to_var(), true.to_val());
     let eq2 = eq!("name".to_var(), "name".to_var());
-    let eq3 = eq!("weight".to_var(), 80.5.to_val());
+    let eq3 = eq!("weight".to_var(), 80.to_val());
     let eqf = eq!("height".to_var(), 175.to_val());
     let and = and!(eq, eq2, eq3);
     let andf = and!(eq, eq2, eq3, eqf);
