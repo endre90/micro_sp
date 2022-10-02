@@ -8,7 +8,7 @@ macro_rules! eq {
 #[macro_export]
 macro_rules! not {
     ($a:expr) => {
-        Predicate::NOT(Box::new($a))
+        Predicate::NOT(Box::new($a.clone()))
     };
 }
 
@@ -21,7 +21,7 @@ macro_rules! and {
         {
             let mut temp_vec = Vec::new();
             $(
-                temp_vec.push($x.to_owned());
+                temp_vec.push($x.clone());
             )*
             Predicate::AND(temp_vec)
         }
@@ -37,7 +37,7 @@ macro_rules! or {
         {
             let mut temp_vec: Vec<Predicate> = Vec::new();
             $(
-                temp_vec.push($x.to_owned());
+                temp_vec.push($x.clone());
             )*
             Predicate::OR(temp_vec)
         }

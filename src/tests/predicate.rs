@@ -1,6 +1,6 @@
 #![allow(unused_imports)]
 #![allow(dead_code)]
-use micro_sp::{SPValue, State, ToSPValue, VarOrVal, Predicate, ToVal, ToVar};
+use micro_sp::{SPValue, State, ToSPValue, VarOrVal, Predicate, ToVal, ToVar, eq, not, and, or};
 use std::collections::{HashMap, HashSet};
 
 fn john_doe() -> HashMap<String, SPValue> {
@@ -16,11 +16,10 @@ fn john_doe() -> HashMap<String, SPValue> {
 #[test]
 fn test_predicate_eq() {
     let s1 = State::new(john_doe());
-    let s2 = State::new(john_doe());
     let eq = Predicate::EQ("name".to_var(), "name".to_var());
     let eq2 = Predicate::EQ("height".to_var(), 175.to_val());
     assert!(eq.eval(&s1));
-    assert_ne!(true, eq2.eval(&s2));
+    assert_ne!(true, eq2.eval(&s1));
 }
 
 #[test]
@@ -31,90 +30,113 @@ fn test_predicate_eq_panic() {
     eq.eval(&s1);
 }
 
+#[test]
+fn test_predicate_not() {
+    let s1 = State::new(john_doe());
+    let not = Predicate::NOT(Box::new(Predicate::EQ("smart".to_var(), false.to_val())));
+    let notf = Predicate::NOT(Box::new(Predicate::EQ("smart".to_var(), true.to_val())));
+    assert!(not.eval(&s1));
+    assert!(!notf.eval(&s1));
+}
 
+#[test]
+fn test_predicate_and() {
+    let s1 = State::new(john_doe());
+    let eq = Predicate::EQ("smart".to_var(), true.to_val());
+    let eq2 = Predicate::EQ("name".to_var(), "name".to_var());
+    let eq3 = Predicate::EQ("weight".to_var(), 80.5.to_val());
+    let eqf = Predicate::EQ("height".to_var(), 175.to_val());
+    let and = Predicate::AND(vec!(eq.clone(), eq2.clone(), eq3.clone()));
+    let andf = Predicate::AND(vec!(eq, eq2, eq3, eqf));
+    assert!(and.eval(&s1));
+    assert!(!andf.eval(&s1));
+}
 
-// def test_guards_not():
-//     """
-//     Testing the class Not
-//     """
+#[test]
+fn test_predicate_or() {
+    let s1 = State::new(john_doe());
+    let eq = Predicate::EQ("smart".to_var(), true.to_val());
+    let eq2 = Predicate::EQ("name".to_var(), "name".to_var());
+    let eq3 = Predicate::EQ("weight".to_var(), 80.5.to_val());
+    let eqf = Predicate::EQ("height".to_var(), 175.to_val());
+    let or = Predicate::OR(vec!(eq.clone(), eq2.clone(), eq3.clone()));
+    let or2 = Predicate::OR(vec!(eq, eq2, eq3, eqf));
+    assert!(or.eval(&s1));
+    assert!(or2.eval(&s1));
+}
 
-//     s1 = State(v1 = False, v2 = True, v3 = "open")
-//     eq = Eq("v1", False)
-//     eq2 = Eq("v3", "closed")
-//     assert not Not(eq).eval(s1)
-//     assert Not(eq2).eval(s1)
-//     eq3 = Eq("v10", "open")
-//     with pytest.raises(NotInStateException) as e:
-//         Not(eq3).eval(s1)
+#[test]
+fn test_predicate_complex() {
+    let s1 = State::new(john_doe());
+    let eq = Predicate::EQ("smart".to_var(), true.to_val());
+    let eq2 = Predicate::EQ("name".to_var(), "name".to_var());
+    let eq3 = Predicate::EQ("weight".to_var(), 80.5.to_val());
+    let eqf = Predicate::EQ("height".to_var(), 175.to_val());
+    let and = Predicate::AND(vec!(eq.clone(), eq2.clone(), eq3.clone()));
+    let andf = Predicate::AND(vec!(eq.clone(), eq2.clone(), eq3.clone(), eqf.clone()));
+    let or = Predicate::OR(vec!(eq.clone(), eq2.clone(), eq3.clone()));
+    let or2 = Predicate::OR(vec!(eq, eq2, eq3, eqf));
+    let not = Predicate::NOT(Box::new(or.clone()));
+    let cmplx = Predicate::AND(vec!(Predicate::NOT(Box::new(not.clone())), or, or2, and, Predicate::NOT(Box::new(andf))));
+    assert!(cmplx.eval(&s1));
+}
 
-//     # these lasts tests checks the _eq__ and __hash__ implementation. 
-//     assert Not(eq) == Not(eq) 
-//     assert hash(Not(eq)) == hash(Not(eq))
-//     assert Not(eq) != Not(eq2) 
-//     assert hash(Not(eq)) != hash(Not(eq2))
+#[test]
+fn test_predicate_eq_macro() {
+    let s1 = State::new(john_doe());
+    let eq = eq!("name".to_var(), "name".to_var());
+    let eq2 = eq!("height".to_var(), 175.to_val());
+    assert!(eq.eval(&s1));
+    assert_ne!(true, eq2.eval(&s1));
+}
 
-// def test_guards_and():
-//     """
-//     Testing the class And
-//     """
+#[test]
+fn test_predicate_not_macro() {
+    let s1 = State::new(john_doe());
+    let not = not!(eq!("smart".to_var(), false.to_val()));
+    let notf = not!(eq!("smart".to_var(), true.to_val()));
+    assert!(not.eval(&s1));
+    assert!(!notf.eval(&s1));
+}
 
-//     s1 = State(v1 = False, v2 = True, v3 = "open")
-//     s2 = State(v1 = True, v2 = True, v3 = "open")
-//     eq = Eq("v1", "v2")
-//     eq2 = Eq("v3", "open")
-//     eq3 = Eq("v1", True)
-//     eq4 = Eq("v2", True)
-//     assert not And(eq, eq2, eq3).eval(s1)
-//     assert And(eq, eq2, eq3, eq4).eval(s2)
+#[test]
+fn test_predicate_and_macro() {
+    let s1 = State::new(john_doe());
+    let eq = eq!("smart".to_var(), true.to_val());
+    let eq2 = eq!("name".to_var(), "name".to_var());
+    let eq3 = eq!("weight".to_var(), 80.5.to_val());
+    let eqf = eq!("height".to_var(), 175.to_val());
+    let and = and!(eq, eq2, eq3);
+    let andf = and!(eq, eq2, eq3, eqf);
+    assert!(and.eval(&s1));
+    assert!(!andf.eval(&s1));
+}
 
-//     eq5 = Eq("v10", "open")
-//     with pytest.raises(NotInStateException) as e:
-//         And(eq, eq2, eq3, eq4, eq5).eval(s2)
+#[test]
+fn test_predicate_or_macro() {
+    let s1 = State::new(john_doe());
+    let eq = eq!("smart".to_var(), true.to_val());
+    let eq2 = eq!("name".to_var(), "name".to_var());
+    let eq3 = eq!("weight".to_var(), 80.5.to_val());
+    let eqf = eq!("height".to_var(), 175.to_val());
+    let or = or!(eq, eq2, eq3);
+    let orf = or!(eq, eq2, eq3, eqf);
+    assert!(or.eval(&s1));
+    assert!(orf.eval(&s1));
+}
 
-//     # these lasts tests checks the _eq__ and __hash__ implementation. 
-//     assert And(eq, eq2) == And(eq, eq2)
-//     assert hash(And(eq, eq2)) == hash(And(eq, eq2))
-//     assert And(eq, eq2) != And(eq, eq3)
-//     assert hash(And(eq, eq2)) != hash(And(eq, eq3))
-
-// def test_guards_or():
-//     """
-//     Testing the class Or
-//     """
-
-//     s1 = State(v1 = False, v2 = True, v3 = "open")
-//     eq = Eq("v1", "v2")
-//     eq2 = Eq("v3", "open")
-//     eq3 = Eq("v1", True)
-//     eq4 = Eq("v2", True)
-//     eq5 = And(eq, eq2, eq3)
-//     assert not Or(eq, eq3, eq5).eval(s1)
-//     assert Or(eq, eq2, eq3, eq4).eval(s1)
-
-//     eq6 = Eq("v10", "open")
-//     with pytest.raises(NotInStateException) as e:
-//         Or(eq, eq2, eq3, eq4, eq6).eval(s1)
-
-//     # these lasts tests checks the _eq__ and __hash__ implementation. 
-//     assert Or(eq, eq2) == Or(eq, eq2)
-//     assert hash(Or(eq, eq2)) == hash(Or(eq, eq2))
-//     assert Or(eq, eq2) != Or(eq, eq3)
-//     assert hash(Or(eq, eq2)) != hash(Or(eq, eq3))
-
-
-// def test_guards_complex():
-//     """
-//     ...
-//     """
-//     s1 = State(a = False, b = True, c = False, d = True)
-//     s2 = State(a = True, b = True, c = False, d = True)
-    
-//     g = guards.from_str('!a && (b || c || d) && (d != False)')
-//     assert g.eval(s1) and not g.eval(s2)
-
-//     # these lasts tests checks the _eq__ and __hash__ implementation. 
-//     assert g == g
-//     assert hash(g) == hash(g)
-//     g2 = guards.from_str('!a && (b || c || d) && (d != True)')
-//     assert g != g2
-//     assert hash(g) != hash(g2)
+#[test]
+fn test_predicate_complex_macro() {
+    let s1 = State::new(john_doe());
+    let eq = eq!("smart".to_var(), true.to_val());
+    let eq2 = eq!("name".to_var(), "name".to_var());
+    let eq3 = eq!("weight".to_var(), 80.5.to_val());
+    let eqf = eq!("height".to_var(), 175.to_val());
+    let and = and!(eq, eq2, eq3);
+    let andf = and!(eq, eq2, eq3, eqf);
+    let or = or!(eq, eq2, eq3);
+    let or2 = or!(eq, eq2, eq3, eqf);
+    let not = not!(or);
+    let cmplx = and!(not!(not), or, or2, and, not!(andf));
+    assert!(cmplx.eval(&s1));
+}
