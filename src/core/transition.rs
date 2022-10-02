@@ -1,6 +1,6 @@
 use crate::{Action, Predicate, State};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Transition {
     pub name: String,
     pub guard: Predicate,
@@ -8,7 +8,7 @@ pub struct Transition {
 }
 
 impl Transition {
-    pub fn new(name: &str, guard: &Predicate, actions: &Vec<Action>) -> Transition {
+    pub fn new(name: &str, guard: Predicate, actions: Vec<Action>) -> Transition {
         Transition {
             name: name.to_string(),
             guard: guard.to_owned(),

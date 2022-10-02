@@ -2,6 +2,8 @@ use crate::{State, VarOrVal};
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Predicate {
+    TRUE,
+    FALSE,
     NOT(Box<Predicate>),
     AND(Vec<Predicate>),
     OR(Vec<Predicate>),
@@ -11,6 +13,8 @@ pub enum Predicate {
 impl Predicate {
     pub fn eval(self, state: &State) -> bool {
         match self {
+            Predicate::TRUE => true,
+            Predicate::FALSE => false,
             Predicate::NOT(p) => !p.eval(&state),
             Predicate::AND(p) => p.iter().all(|pp| pp.clone().eval(&state)),
             Predicate::OR(p) => p.iter().any(|pp| pp.clone().eval(&state)),

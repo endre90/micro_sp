@@ -7,4 +7,6 @@ pub use crate::core::transition::*;
 pub use crate::core::var_or_val::*;
 
 pub mod macros;
+pub use crate::macros::action::*;
 pub use crate::macros::predicate::*;
+pub use crate::macros::transition::*;

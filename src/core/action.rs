@@ -7,6 +7,12 @@ pub struct Action {
 }
 
 impl Action {
+    pub fn new(var: &str, var_or_val: VarOrVal) -> Action {
+        Action {
+            var: var.to_string(),
+            var_or_val
+        }
+    }
     pub fn assign(self, state: &State) -> State {
         match state.clone().contains(&self.var) {
             true => match self.var_or_val {
