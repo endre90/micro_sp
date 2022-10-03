@@ -1,28 +1,29 @@
-use crate::{State, VarOrVal};
+use crate::{State, SPCommon, SPVariable};
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, Hash)]
 pub struct Action {
-    pub var: String,
-    pub var_or_val: VarOrVal,
+    pub var: SPVariable,
+    pub common: SPCommon,
 }
 
 impl Action {
-    pub fn new(var: &str, var_or_val: VarOrVal) -> Action {
+    pub fn new(var: SPVariable, common: SPCommon) -> Action {
         Action {
-            var: var.to_string(),
-            var_or_val
+            var,
+            common
         }
     }
+    // TODO: have to check also if common is in the domain of the variable
     pub fn assign(self, state: &State) -> State {
-        match state.clone().contains(&self.var) {
-            true => match self.var_or_val {
-                VarOrVal::String(x) => match state.clone().contains(&x) {
-                    true => state.clone().update(&self.var, state.clone().get(&x)),
-                    false => panic!("Variable {x} not in the state."),
+        match state.clone().contains_name(&self.var.name) {
+            true => match self.common {
+                SPCommon::SPVariable(x) => match state.clone().contains(&x) {
+                    true => state.clone().update(&self.var.name, &state.clone().get(&x)),
+                    false => panic!("Variable {:?} not in the state.", x.name),
                 },
-                VarOrVal::SPValue(x) => state.clone().update(&self.var, x),
+                SPCommon::SPValue(x) => state.clone().update(&self.var.name, &x),
             },
-            false => panic!("Variable {} not in the state.", self.var),
+            false => panic!("Variable {} not in the state.", self.var.name),
         }
     }
 }

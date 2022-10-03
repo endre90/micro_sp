@@ -1,4 +1,4 @@
-use crate::{State, VarOrVal};
+use crate::{State, SPCommon};
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Predicate {
@@ -7,7 +7,7 @@ pub enum Predicate {
     NOT(Box<Predicate>),
     AND(Vec<Predicate>),
     OR(Vec<Predicate>),
-    EQ(VarOrVal, VarOrVal),
+    EQ(SPCommon, SPCommon),
 }
 
 impl Predicate {
@@ -15,17 +15,17 @@ impl Predicate {
         match self {
             Predicate::TRUE => true,
             Predicate::FALSE => false,
-            Predicate::NOT(p) => !p.eval(&state),
+            Predicate::NOT(p) => !p.eval(&state.clone()),
             Predicate::AND(p) => p.iter().all(|pp| pp.clone().eval(&state)),
             Predicate::OR(p) => p.iter().any(|pp| pp.clone().eval(&state)),
             Predicate::EQ(x, y) => match x {
-                VarOrVal::String(vx) => match y {
-                    VarOrVal::String(vy) => state.clone().get(&vx) == state.clone().get(&vy),
-                    VarOrVal::SPValue(vy) => state.clone().get(&vx) == vy,
+                SPCommon::SPVariable(vx) => match y {
+                    SPCommon::SPVariable(vy) => state.clone().get_val(&vx.name) == state.clone().get_val(&vy.name),
+                    SPCommon::SPValue(vy) => state.clone().get_val(&vx.name) == vy,
                 },
-                VarOrVal::SPValue(vx) => match y {
-                    VarOrVal::String(vy) => vx == state.clone().get(&vy),
-                    VarOrVal::SPValue(vy) => vx == vy,
+                SPCommon::SPValue(vx) => match y {
+                    SPCommon::SPVariable(vy) => vx == state.clone().get_val(&vy.name),
+                    SPCommon::SPValue(vy) => vx == vy,
                 },
             },
         }

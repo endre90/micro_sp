@@ -4,9 +4,38 @@ use std::fmt;
 #[derive(Debug, PartialEq, Clone, Serialize, Deserialize, Hash, Eq)]
 pub enum SPValue {
     Bool(bool),
-    // Float32(f32),
+    // Float32(f32), // can't eq or hash
     Int32(i32),
     String(String),
+}
+
+/// Used by Variables for defining type. Must be the same as SPValue
+#[derive(Debug, PartialEq, Copy, Clone, Serialize, Deserialize, Hash, Eq)]
+pub enum SPValueType {
+    Bool,
+    // Float32, 
+    Int32,
+    String
+}
+
+impl SPValue {
+    pub fn is_type(&self, t: SPValueType) -> bool {
+        match self {
+            SPValue::Bool(_) => SPValueType::Bool == t,
+            // SPValue::Float32(_) => SPValueType::Float32 == t, 
+            SPValue::Int32(_) => SPValueType::Int32 == t,
+            SPValue::String(_) => SPValueType::String == t,
+        }
+    }
+
+    pub fn has_type(&self) -> SPValueType {
+        match self {
+            SPValue::Bool(_) => SPValueType::Bool,
+            // SPValue::Float32(_) => SPValueType::Float32, 
+            SPValue::Int32(_) => SPValueType::Int32,
+            SPValue::String(_) => SPValueType::String,
+        }
+    }
 }
 
 pub trait ToSPValue {
