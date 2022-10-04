@@ -9,34 +9,34 @@ fn john_doe() -> HashMap<SPVariable, SPValue> {
     let name = SPVariable::new(
         "name",
         &SPValueType::String,
-        &vec!["John".to_spvalue(), "Jack".to_spvalue()],
+        &vec!["John".to_spval(), "Jack".to_spval()],
     );
     let surname = SPVariable::new(
         "surname",
         &SPValueType::String,
-        &vec!["Doe".to_spvalue(), "Crawford".to_spvalue()],
+        &vec!["Doe".to_spval(), "Crawford".to_spval()],
     );
     let height = SPVariable::new(
         "height",
         &SPValueType::Int32,
-        &vec![180.to_spvalue(), 185.to_spvalue(), 190.to_spvalue()],
+        &vec![180.to_spval(), 185.to_spval(), 190.to_spval()],
     );
     let weight = SPVariable::new(
         "weight",
         &SPValueType::Int32,
-        &vec![80.to_spvalue(), 85.to_spvalue(), 90.to_spvalue()],
+        &vec![80.to_spval(), 85.to_spval(), 90.to_spval()],
     );
     let smart = SPVariable::new(
         "smart",
         &SPValueType::Bool,
-        &vec![true.to_spvalue(), false.to_spvalue()],
+        &vec![true.to_spval(), false.to_spval()],
     );
     HashMap::from([
-        (name, "John".to_spvalue()),
-        (surname, "Doe".to_spvalue()),
-        (height, 185.to_spvalue()),
-        (weight, 80.to_spvalue()),
-        (smart, true.to_spvalue()),
+        (name, "John".to_spval()),
+        (surname, "Doe".to_spval()),
+        (height, 185.to_spval()),
+        (weight, 80.to_spval()),
+        (smart, true.to_spval()),
     ])
 }
 
@@ -46,7 +46,7 @@ fn test_predicate_eq() {
     let s1 = State::new(&john_doe);
     let s2 = State::new(&john_doe);
     let eq = Predicate::EQ(SPVariable::to_common_from_name("name", &s1), SPVariable::to_common_from_name("name", &s2));
-    let eq2 = Predicate::EQ(SPVariable::to_common_from_name("height", &s1), 175.to_val());
+    let eq2 = Predicate::EQ(SPVariable::to_common_from_name("height", &s1), 175.to_comval());
     assert!(eq.eval(&s1));
     assert_ne!(true, eq2.eval(&s1));
 }
@@ -62,8 +62,8 @@ fn test_predicate_eq_panic() {
 #[test]
 fn test_predicate_not() {
     let s1 = State::new(&john_doe());
-    let not = Predicate::NOT(Box::new(Predicate::EQ(SPVariable::to_common_from_name("smart", &s1), false.to_val())));
-    let notf = Predicate::NOT(Box::new(Predicate::EQ(SPVariable::to_common_from_name("smart", &s1), true.to_val())));
+    let not = Predicate::NOT(Box::new(Predicate::EQ(SPVariable::to_common_from_name("smart", &s1), false.to_comval())));
+    let notf = Predicate::NOT(Box::new(Predicate::EQ(SPVariable::to_common_from_name("smart", &s1), true.to_comval())));
     assert!(not.eval(&s1));
     assert!(!notf.eval(&s1));
 }
@@ -73,10 +73,10 @@ fn test_predicate_and() {
     let john_doe = john_doe();
     let s1 = State::new(&john_doe);
     let s2 = State::new(&john_doe);
-    let eq = Predicate::EQ(SPVariable::to_common_from_name("smart", &s1), true.to_val());
+    let eq = Predicate::EQ(SPVariable::to_common_from_name("smart", &s1), true.to_comval());
     let eq2 = Predicate::EQ(SPVariable::to_common_from_name("name", &s1), SPVariable::to_common_from_name("name", &s2));
-    let eq3 = Predicate::EQ(SPVariable::to_common_from_name("weight", &s1), 80.to_val());
-    let eqf = Predicate::EQ(SPVariable::to_common_from_name("height", &s1), 175.to_val());
+    let eq3 = Predicate::EQ(SPVariable::to_common_from_name("weight", &s1), 80.to_comval());
+    let eqf = Predicate::EQ(SPVariable::to_common_from_name("height", &s1), 175.to_comval());
     let and = Predicate::AND(vec![eq.clone(), eq2.clone(), eq3.clone()]);
     let andf = Predicate::AND(vec![eq, eq2, eq3, eqf]);
     assert!(and.eval(&s1));
@@ -88,10 +88,10 @@ fn test_predicate_or() {
     let john_doe = john_doe();
     let s1 = State::new(&john_doe);
     let s2 = State::new(&john_doe);
-    let eq = Predicate::EQ(SPVariable::to_common_from_name("smart", &s1), true.to_val());
+    let eq = Predicate::EQ(SPVariable::to_common_from_name("smart", &s1), true.to_comval());
     let eq2 = Predicate::EQ(SPVariable::to_common_from_name("name", &s1), SPVariable::to_common_from_name("name", &s2));
-    let eq3 = Predicate::EQ(SPVariable::to_common_from_name("weight", &s1), 80.to_val());
-    let eqf = Predicate::EQ(SPVariable::to_common_from_name("height", &s1), 175.to_val());
+    let eq3 = Predicate::EQ(SPVariable::to_common_from_name("weight", &s1), 80.to_comval());
+    let eqf = Predicate::EQ(SPVariable::to_common_from_name("height", &s1), 175.to_comval());
     let or = Predicate::OR(vec![eq.clone(), eq2.clone(), eq3.clone()]);
     let or2 = Predicate::OR(vec![eq, eq2, eq3, eqf]);
     assert!(or.eval(&s1));
@@ -103,10 +103,10 @@ fn test_predicate_complex() {
     let john_doe = john_doe();
     let s1 = State::new(&john_doe);
     let s2 = State::new(&john_doe);
-    let eq = Predicate::EQ(SPVariable::to_common_from_name("smart", &s1), true.to_val());
+    let eq = Predicate::EQ(SPVariable::to_common_from_name("smart", &s1), true.to_comval());
     let eq2 = Predicate::EQ(SPVariable::to_common_from_name("name", &s1), SPVariable::to_common_from_name("name", &s2));
-    let eq3 = Predicate::EQ(SPVariable::to_common_from_name("weight", &s1), 80.to_val());
-    let eqf = Predicate::EQ(SPVariable::to_common_from_name("height", &s1), 175.to_val());
+    let eq3 = Predicate::EQ(SPVariable::to_common_from_name("weight", &s1), 80.to_comval());
+    let eqf = Predicate::EQ(SPVariable::to_common_from_name("height", &s1), 175.to_comval());
     let and = Predicate::AND(vec![eq.clone(), eq2.clone(), eq3.clone()]);
     let andf = Predicate::AND(vec![eq.clone(), eq2.clone(), eq3.clone(), eqf.clone()]);
     let or = Predicate::OR(vec![eq.clone(), eq2.clone(), eq3.clone()]);
@@ -127,8 +127,8 @@ fn test_predicate_eq_macro() {
     let john_doe = john_doe();
     let s1 = State::new(&john_doe);
     let s2 = State::new(&john_doe);
-    let eq = eq!("name".to_var(&s1), "name".to_var(&s2));
-    let eq2 = eq!("height".to_var(&s1), 175.to_val());
+    let eq = eq!("name".to_comvar(&s1), "name".to_comvar(&s2));
+    let eq2 = eq!("height".to_comvar(&s1), 175.to_comval());
     assert!(eq.eval(&s1));
     assert_ne!(true, eq2.eval(&s1));
 }
@@ -137,8 +137,8 @@ fn test_predicate_eq_macro() {
 fn test_predicate_not_macro() {
     let john_doe = john_doe();
     let s1 = State::new(&john_doe);
-    let not = not!(eq!("smart".to_var(&s1), false.to_val()));
-    let notf = not!(eq!("smart".to_var(&s1), true.to_val()));
+    let not = not!(eq!("smart".to_comvar(&s1), false.to_comval()));
+    let notf = not!(eq!("smart".to_comvar(&s1), true.to_comval()));
     assert!(not.eval(&s1));
     assert!(!notf.eval(&s1));
 }
@@ -148,10 +148,10 @@ fn test_predicate_and_macro() {
     let john_doe = john_doe();
     let s1 = State::new(&john_doe);
     let s2 = State::new(&john_doe);
-    let eq = eq!("smart".to_var(&s1), true.to_val());
-    let eq2 = eq!("name".to_var(&s1), "name".to_var(&s2));
-    let eq3 = eq!("weight".to_var(&s1), 80.to_val());
-    let eqf = eq!("height".to_var(&s1), 175.to_val());
+    let eq = eq!("smart".to_comvar(&s1), true.to_comval());
+    let eq2 = eq!("name".to_comvar(&s1), "name".to_comvar(&s2));
+    let eq3 = eq!("weight".to_comvar(&s1), 80.to_comval());
+    let eqf = eq!("height".to_comvar(&s1), 175.to_comval());
     let and = and!(eq, eq2, eq3);
     let andf = and!(eq, eq2, eq3, eqf);
     assert!(and.eval(&s1));
@@ -163,10 +163,10 @@ fn test_predicate_or_macro() {
     let john_doe = john_doe();
     let s1 = State::new(&john_doe);
     let s2 = State::new(&john_doe);
-    let eq = eq!("smart".to_var(&s1), true.to_val());
-    let eq2 = eq!("name".to_var(&s1), "name".to_var(&s2));
-    let eq3 = eq!("weight".to_var(&s1), 80.to_val());
-    let eqf = eq!("height".to_var(&s1), 175.to_val());
+    let eq = eq!("smart".to_comvar(&s1), true.to_comval());
+    let eq2 = eq!("name".to_comvar(&s1), "name".to_comvar(&s2));
+    let eq3 = eq!("weight".to_comvar(&s1), 80.to_comval());
+    let eqf = eq!("height".to_comvar(&s1), 175.to_comval());
     let or = or!(eq, eq2, eq3);
     let orf = or!(eq, eq2, eq3, eqf);
     assert!(or.eval(&s1));
@@ -178,10 +178,10 @@ fn test_predicate_complex_macro() {
     let john_doe = john_doe();
     let s1 = State::new(&john_doe);
     let s2 = State::new(&john_doe);
-    let eq = eq!("smart".to_var(&s1), true.to_val());
-    let eq2 = eq!("name".to_var(&s1), "name".to_var(&s2));
-    let eq3 = eq!("weight".to_var(&s1), 80.to_val());
-    let eqf = eq!("height".to_var(&s1), 175.to_val());
+    let eq = eq!("smart".to_comvar(&s1), true.to_comval());
+    let eq2 = eq!("name".to_comvar(&s1), "name".to_comvar(&s2));
+    let eq3 = eq!("weight".to_comvar(&s1), 80.to_comval());
+    let eqf = eq!("height".to_comvar(&s1), 175.to_comval());
     let and = and!(eq, eq2, eq3);
     let andf = and!(eq, eq2, eq3, eqf);
     let or = or!(eq, eq2, eq3);

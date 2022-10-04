@@ -7,34 +7,34 @@ fn john_doe() -> HashMap<SPVariable, SPValue> {
     let name = SPVariable::new(
         "name",
         &SPValueType::String,
-        &vec!["John".to_spvalue(), "Jack".to_spvalue()],
+        &vec!["John".to_spval(), "Jack".to_spval()],
     );
     let surname = SPVariable::new(
         "surname",
         &SPValueType::String,
-        &vec!["Doe".to_spvalue(), "Crawford".to_spvalue()],
+        &vec!["Doe".to_spval(), "Crawford".to_spval()],
     );
     let height = SPVariable::new(
         "height",
         &SPValueType::Int32,
-        &vec![180.to_spvalue(), 185.to_spvalue(), 190.to_spvalue()],
+        &vec![180.to_spval(), 185.to_spval(), 190.to_spval()],
     );
     let weight = SPVariable::new(
         "weight",
         &SPValueType::Int32,
-        &vec![80.to_spvalue(), 85.to_spvalue(), 90.to_spvalue()],
+        &vec![80.to_spval(), 85.to_spval(), 90.to_spval()],
     );
     let smart = SPVariable::new(
         "smart",
         &SPValueType::Bool,
-        &vec![true.to_spvalue(), false.to_spvalue()],
+        &vec![true.to_spval(), false.to_spval()],
     );
     HashMap::from([
-        (name, "John".to_spvalue()),
-        (surname, "Doe".to_spvalue()),
-        (height, 185.to_spvalue()),
-        (weight, 80.to_spvalue()),
-        (smart, true.to_spvalue()),
+        (name, "John".to_spval()),
+        (surname, "Doe".to_spval()),
+        (height, 185.to_spval()),
+        (weight, 80.to_spval()),
+        (smart, true.to_spval()),
     ])
 }
 
@@ -42,34 +42,34 @@ fn john_doe_faulty() -> HashMap<SPVariable, SPValue> {
     let name = SPVariable::new(
         "name",
         &SPValueType::String,
-        &vec!["John".to_spvalue(), "Jack".to_spvalue()],
+        &vec!["John".to_spval(), "Jack".to_spval()],
     );
     let surname = SPVariable::new(
         "surname",
         &SPValueType::String,
-        &vec!["Doe".to_spvalue(), "Crawford".to_spvalue()],
+        &vec!["Doe".to_spval(), "Crawford".to_spval()],
     );
     let height = SPVariable::new(
         "height",
         &SPValueType::Int32,
-        &vec![180.to_spvalue(), 185.to_spvalue(), 190.to_spvalue()],
+        &vec![180.to_spval(), 185.to_spval(), 190.to_spval()],
     );
     let weight = SPVariable::new(
         "weight",
         &SPValueType::Int32,
-        &vec![80.to_spvalue(), 85.to_spvalue(), 90.to_spvalue()],
+        &vec![80.to_spval(), 85.to_spval(), 90.to_spval()],
     );
     let smart = SPVariable::new(
         "smart",
         &SPValueType::Bool,
-        &vec![true.to_spvalue(), false.to_spvalue()],
+        &vec![true.to_spval(), false.to_spval()],
     );
     HashMap::from([
-        (name, "John".to_spvalue()),
-        (surname, "Doe".to_spvalue()),
-        (height, 185.to_spvalue()),
-        (weight, 81.to_spvalue()),
-        (smart, true.to_spvalue()),
+        (name, "John".to_spval()),
+        (surname, "Doe".to_spval()),
+        (height, 185.to_spval()),
+        (weight, 81.to_spval()),
+        (smart, true.to_spval()),
     ])
 }
 
@@ -94,27 +94,27 @@ fn test_state_keys() {
     let name = SPVariable::new(
         "name",
         &SPValueType::String,
-        &vec!["John".to_spvalue(), "Jack".to_spvalue()],
+        &vec!["John".to_spval(), "Jack".to_spval()],
     );
     let surname = SPVariable::new(
         "surname",
         &SPValueType::String,
-        &vec!["Doe".to_spvalue(), "Crawford".to_spvalue()],
+        &vec!["Doe".to_spval(), "Crawford".to_spval()],
     );
     let height = SPVariable::new(
         "height",
         &SPValueType::Int32,
-        &vec![180.to_spvalue(), 185.to_spvalue(), 190.to_spvalue()],
+        &vec![180.to_spval(), 185.to_spval(), 190.to_spval()],
     );
     let weight = SPVariable::new(
         "weight",
         &SPValueType::Int32,
-        &vec![80.to_spvalue(), 85.to_spvalue(), 90.to_spvalue()],
+        &vec![80.to_spval(), 85.to_spval(), 90.to_spval()],
     );
     let smart = SPVariable::new(
         "smart",
         &SPValueType::Bool,
-        &vec![true.to_spvalue(), false.to_spvalue()],
+        &vec![true.to_spval(), false.to_spval()],
     );
     assert_eq!(
         keys,
@@ -144,12 +144,12 @@ fn test_state_contains() {
     let surname = SPVariable::new(
         "surname",
         &SPValueType::String,
-        &vec!["Doe".to_spvalue(), "Crawford".to_spvalue()],
+        &vec!["Doe".to_spval(), "Crawford".to_spval()],
     );
     let job = SPVariable::new(
         "job",
         &SPValueType::String,
-        &vec!["Carpenter".to_spvalue(), "Waiter".to_spvalue()],
+        &vec!["Carpenter".to_spval(), "Waiter".to_spval()],
     );
     assert_eq!(true, State::new(&john_doe).contains(&surname));
     assert_ne!(true, State::new(&john_doe.clone()).contains(&job));
@@ -168,27 +168,27 @@ fn test_state_get() {
     let height = SPVariable::new(
         "height",
         &SPValueType::Int32,
-        &vec![180.to_spvalue(), 185.to_spvalue(), 190.to_spvalue()],
+        &vec![180.to_spval(), 185.to_spval(), 190.to_spval()],
     );
-    assert_eq!(185.to_spvalue(), State::new(&john_doe).get(&height));
-    assert_ne!(186.to_spvalue(), State::new(&john_doe).get(&height));
+    assert_eq!(185.to_spval(), State::new(&john_doe).get(&height));
+    assert_ne!(186.to_spval(), State::new(&john_doe).get(&height));
 }
 
 #[test]
-fn test_state_get_val() {
+fn test_state_get_spval() {
     let john_doe = john_doe();
-    State::new(&john_doe).get_val("height");
+    State::new(&john_doe).get_spval("height");
 }
 
 #[test]
-fn test_state_get_var() {
+fn test_state_get_spvar() {
     let john_doe = john_doe();
     let height = SPVariable::new(
         "height",
         &SPValueType::Int32,
-        &vec![180.to_spvalue(), 185.to_spvalue(), 190.to_spvalue()],
+        &vec![180.to_spval(), 185.to_spval(), 190.to_spval()],
     );
-    assert_eq!(height, State::new(&john_doe).get_var("height"));
+    assert_eq!(height, State::new(&john_doe).get_spvar("height"));
 }
 
 #[test]
@@ -198,25 +198,25 @@ fn test_state_get_panic() {
     let job = SPVariable::new(
         "job",
         &SPValueType::String,
-        &vec!["Carpenter".to_spvalue(), "Waiter".to_spvalue()],
+        &vec!["Carpenter".to_spval(), "Waiter".to_spval()],
     );
     State::new(&john_doe).get(&job);
 }
 
 #[test]
 #[should_panic]
-fn test_state_get_val_panic() {
+fn test_state_get_spval_panic() {
     let john_doe = john_doe();
-    State::new(&john_doe).get_val("job");
+    State::new(&john_doe).get_spval("job");
 }
 
 #[test]
 fn test_state_update() {
     let john_doe = john_doe();
     let old_state = State::new(&john_doe);
-    let new_state = old_state.clone().update("weight", &87.to_spvalue());
+    let new_state = old_state.clone().update("weight", &90.to_spval());
     assert_ne!(old_state, new_state);
-    assert_eq!(87.to_spvalue(), new_state.clone().get_val("weight"));
+    assert_eq!(90.to_spval(), new_state.clone().get_spval("weight"));
 }
 
 // #[test]
@@ -224,10 +224,10 @@ fn test_state_update() {
 //     let john_doe = john_doe();
 //     let old_state = State::new(john_doe.clone());
 //     let new_state = old_state.clone().updates(HashMap::from([
-//         ("weight".to_string(), 87.to_spvalue()),
-//         ("job".to_string(), "carpenter".to_spvalue()),
+//         ("weight".to_string(), 87.to_spval()),
+//         ("job".to_string(), "carpenter".to_spval()),
 //     ]));
 //     assert_ne!(old_state, new_state);
-//     assert_eq!(87.to_spvalue(), new_state.clone().get("weight"));
-//     assert_eq!("carpenter".to_spvalue(), new_state.get("job"));
+//     assert_eq!(87.to_spval(), new_state.clone().get("weight"));
+//     assert_eq!("carpenter".to_spval(), new_state.get("job"));
 // }

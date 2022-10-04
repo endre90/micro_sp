@@ -20,11 +20,11 @@ impl Predicate {
             Predicate::OR(p) => p.iter().any(|pp| pp.clone().eval(&state)),
             Predicate::EQ(x, y) => match x {
                 SPCommon::SPVariable(vx) => match y {
-                    SPCommon::SPVariable(vy) => state.clone().get_val(&vx.name) == state.clone().get_val(&vy.name),
-                    SPCommon::SPValue(vy) => state.clone().get_val(&vx.name) == vy,
+                    SPCommon::SPVariable(vy) => state.clone().get_spval(&vx.name) == state.clone().get_spval(&vy.name),
+                    SPCommon::SPValue(vy) => state.clone().get_spval(&vx.name) == vy,
                 },
                 SPCommon::SPValue(vx) => match y {
-                    SPCommon::SPVariable(vy) => vx == state.clone().get_val(&vy.name),
+                    SPCommon::SPVariable(vy) => vx == state.clone().get_spval(&vy.name),
                     SPCommon::SPValue(vy) => vx == vy,
                 },
             },

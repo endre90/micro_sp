@@ -1,54 +1,56 @@
 #![allow(unused_imports)]
 #![allow(dead_code)]
 use micro_sp::{
-    a, eq, simple_transition_planner, t, Action, Predicate, SPValue, State, ToSPValue, ToVal,
-    ToVar, Transition,
+    a, eq, simple_transition_planner, t, v, Action, Predicate, SPValue, State, ToSPCommon,
+    ToSPCommonVar, ToSPValue, ToSPVariable, Transition, SPVariable, SPValueType
 };
 use std::collections::{HashMap, HashSet};
 
 #[test]
 fn test_planning_simple() {
-    let s = State::new(HashMap::from([("pos".to_string(), "a".to_spvalue())]));
+    let pos = v!("pos", &vec!("a".to_spval(), "b".to_spval(), "c".to_spval(), "d".to_spval(), "e".to_spval(), "f".to_spval()));
+    // let s = State::new(state)
+    let s = State::new(&HashMap::from([(pos.clone(), "a".to_spval())]));
 
     let t1 = t!(
         "a_to_b",
-        eq!("pos".to_var(), "a".to_val()),
-        vec!(a!("pos", "b".to_val()))
+        eq!("pos".to_comvar(&s), "a".to_comval()),
+        vec!(a!(pos.clone(), "b".to_comval()))
     );
     let t2 = t!(
         "b_to_c",
-        eq!("pos".to_var(), "b".to_val()),
-        vec!(a!("pos", "c".to_val()))
+        eq!("pos".to_comvar(&s), "b".to_comval()),
+        vec!(a!(pos.clone(), "c".to_comval()))
     );
     let t3 = t!(
         "c_to_d",
-        eq!("pos".to_var(), "c".to_val()),
-        vec!(a!("pos", "d".to_val()))
+        eq!("pos".to_comvar(&s), "c".to_comval()),
+        vec!(a!(pos.clone(), "d".to_comval()))
     );
     let t4 = t!(
         "d_to_e",
-        eq!("pos".to_var(), "d".to_val()),
-        vec!(a!("pos", "e".to_val()))
+        eq!("pos".to_comvar(&s), "d".to_comval()),
+        vec!(a!(pos.clone(), "e".to_comval()))
     );
     let t5 = t!(
         "e_to_f",
-        eq!("pos".to_var(), "e".to_val()),
-        vec!(a!("pos", "f".to_val()))
+        eq!("pos".to_comvar(&s), "e".to_comval()),
+        vec!(a!(pos.clone(), "f".to_comval()))
     );
     let t6 = t!(
         "a_to_c",
-        eq!("pos".to_var(), "a".to_val()),
-        vec!(a!("pos", "c".to_val()))
+        eq!("pos".to_comvar(&s), "a".to_comval()),
+        vec!(a!(pos.clone(), "c".to_comval()))
     );
     let t7 = t!(
         "d_to_f",
-        eq!("pos".to_var(), "d".to_val()),
-        vec!(a!("pos", "f".to_val()))
+        eq!("pos".to_comvar(&s), "d".to_comval()),
+        vec!(a!(pos.clone(), "f".to_comval()))
     );
 
     let result = simple_transition_planner(
         s.clone(),
-        eq!("pos".to_var(), "f".to_val()),
+        eq!("pos".to_comvar(&s), "f".to_comval()),
         vec![
             t1.clone(),
             t2.clone(),
@@ -66,7 +68,7 @@ fn test_planning_simple() {
 
     let result = simple_transition_planner(
         s.clone(),
-        eq!("pos".to_var(), "a".to_val()),
+        eq!("pos".to_comvar(&s), "a".to_comval()),
         vec![
             t1.clone(),
             t2.clone(),
@@ -84,7 +86,7 @@ fn test_planning_simple() {
 
     let result = simple_transition_planner(
         s.clone(),
-        eq!("pos".to_var(), "f".to_val()),
+        eq!("pos".to_comvar(&s), "f".to_comval()),
         vec![t1.clone(), t2.clone()],
         10,
     );

@@ -64,7 +64,7 @@ impl State {
         map.contains_key(key)
     }
 
-    pub fn get_val(self, key: &str) -> SPValue {
+    pub fn get_spval(self, key: &str) -> SPValue {
         let mut map = HashMap::new();
         self.state.iter().for_each(|(k, v)| {
             map.insert(k.name.clone(), v.clone());
@@ -75,7 +75,7 @@ impl State {
         }
     }
 
-    pub fn get_var(self, key: &str) -> SPVariable {
+    pub fn get_spvar(self, key: &str) -> SPVariable {
         match self.state.iter().find(|(k, _)| k.name == key) {
             Some((var, _)) => var.to_owned(),
             None => panic!("Variable {key} not found in the state."),
@@ -93,10 +93,16 @@ impl State {
 
     // have to add check if value is in the domain
     pub fn update(self, var: &str, val: &SPValue) -> State {
-        let var = self.clone().get_var(var);
-        let mut state = self.state.clone();
-        state.insert(var.clone(), val.clone());
-        State { state }
+        let var = self.clone().get_spvar(var);
+        match var.domain.contains(val) {
+            true => {
+                let mut state = self.state.clone();
+                state.insert(var.clone(), val.clone());
+                State { state }
+            },
+            false => panic!("Value {} to update the variable {} is not in its domain.", val, var.name)
+        }
+        
     }
 
     // pub fn updates(self, changes: HashMap<String, SPValue>) -> State {

@@ -18,46 +18,28 @@ impl SPVariable {
         }
     }
     pub fn from_name(name: &str, state: &State) -> SPVariable {
-        state.clone().get_var(name)
+        state.clone().get_spvar(name)
     }
     pub fn to_common(var: &SPVariable) -> SPCommon {
         SPCommon::SPVariable(var.clone())
     }
     pub fn to_common_from_name(name: &str, state: &State) -> SPCommon {
-        SPCommon::SPVariable(state.clone().get_var(name).clone())
+        SPCommon::SPVariable(state.clone().get_spvar(name).clone())
     }
 }
 
 pub trait ToSPVariable {
-    fn to_spvar(&self) -> SPValue;
+    fn to_spvar(&self, state: &State) -> SPVariable;
 }
 
-impl ToSPValue for bool {
-    fn to_spvalue(&self) -> SPValue {
-        SPValue::Bool(*self)
+impl ToSPVariable for String {
+    fn to_spvar(&self, state: &State) -> SPVariable {
+        SPVariable::from_name(self, state)
     }
 }
 
-// impl ToSPValue for f32 {
-//     fn to_spvalue(&self) -> SPValue {
-//         SPValue::Float32(*self)
-//     }
-// }
-
-impl ToSPValue for i32 {
-    fn to_spvalue(&self) -> SPValue {
-        SPValue::Int32(*self)
-    }
-}
-
-impl ToSPValue for String {
-    fn to_spvalue(&self) -> SPValue {
-        SPValue::String(self.clone())
-    }
-}
-
-impl ToSPValue for &str {
-    fn to_spvalue(&self) -> SPValue {
-        SPValue::String((*self).to_string())
+impl ToSPVariable for &str {
+    fn to_spvar(&self, state: &State) -> SPVariable {
+        SPVariable::from_name(self, state)
     }
 }

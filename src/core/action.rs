@@ -13,7 +13,7 @@ impl Action {
             common
         }
     }
-    // TODO: have to check also if common is in the domain of the variable
+    
     pub fn assign(self, state: &State) -> State {
         match state.clone().contains_name(&self.var.name) {
             true => match self.common {

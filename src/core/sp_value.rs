@@ -39,35 +39,35 @@ impl SPValue {
 }
 
 pub trait ToSPValue {
-    fn to_spvalue(&self) -> SPValue;
+    fn to_spval(&self) -> SPValue;
 }
 
 impl ToSPValue for bool {
-    fn to_spvalue(&self) -> SPValue {
+    fn to_spval(&self) -> SPValue {
         SPValue::Bool(*self)
     }
 }
 
 // impl ToSPValue for f32 {
-//     fn to_spvalue(&self) -> SPValue {
+//     fn to_spval(&self) -> SPValue {
 //         SPValue::Float32(*self)
 //     }
 // }
 
 impl ToSPValue for i32 {
-    fn to_spvalue(&self) -> SPValue {
+    fn to_spval(&self) -> SPValue {
         SPValue::Int32(*self)
     }
 }
 
 impl ToSPValue for String {
-    fn to_spvalue(&self) -> SPValue {
+    fn to_spval(&self) -> SPValue {
         SPValue::String(self.clone())
     }
 }
 
 impl ToSPValue for &str {
-    fn to_spvalue(&self) -> SPValue {
+    fn to_spval(&self) -> SPValue {
         SPValue::String((*self).to_string())
     }
 }
