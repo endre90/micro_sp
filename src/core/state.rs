@@ -36,6 +36,16 @@ impl State {
         }
     }
 
+    pub fn add(state: &HashMap<SPVariable, SPValue>) -> State {
+        state.iter().for_each(|(k, v)| match k.domain.contains(v) {
+            true => (),
+            false => panic!("Value {:?} not in the domain of variable {:?}", v, k.name),
+        });
+        State {
+            state: state.to_owned(),
+        }
+    }
+
     pub fn names(self) -> HashSet<String> {
         self.state
             .keys()

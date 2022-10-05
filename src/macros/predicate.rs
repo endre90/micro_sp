@@ -6,6 +6,13 @@ macro_rules! eq {
 }
 
 #[macro_export]
+macro_rules! eq2 {
+    ($a:expr, $b:expr) => {
+        Predicate::EQ(SPCommon::SPVariable($a.clone()), $b)
+    };
+}
+
+#[macro_export]
 macro_rules! not {
     ($a:expr) => {
         Predicate::NOT(Box::new($a.clone()))
