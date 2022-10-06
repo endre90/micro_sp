@@ -36,6 +36,15 @@ impl SPValue {
             SPValue::String(_) => SPValueType::String,
         }
     }
+
+    pub fn value_as_string(&self) -> String {
+        match self {
+            SPValue::Bool(x) => x.to_string(),
+            // SPValue::Float32(_) => SPValueType::Float32, 
+            SPValue::Int32(x) => x.to_string(),
+            SPValue::String(x) => x.to_string(),
+        }
+    }
 }
 
 pub trait ToSPValue {
