@@ -7,8 +7,8 @@ use std::{
 use rand::seq::SliceRandom;
 
 use crate::{
-    a, and, eq, simple_transition_planner, Action, PlanningResult, Predicate, SPCommon, SPVariable,
-    State, ToSPCommon, ToSPValue, Transition,
+    and, eq, simple_transition_planner, PlanningResult, Predicate, SPCommon, SPVariable,
+    State, Transition,
 };
 
 #[derive(Debug, PartialEq, Clone)]

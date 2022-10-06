@@ -8,7 +8,7 @@ use std::collections::{HashMap, HashSet};
 
 #[test]
 fn test_planning_simple() {
-    let pos = v!("pos", &vec!("a".to_spval(), "b".to_spval(), "c".to_spval(), "d".to_spval(), "e".to_spval(), "f".to_spval()));
+    let pos = v!("pos", &vec!("a", "b", "c", "d", "e", "f"));
     // let s = State::new(state)
     let s = State::new(&HashMap::from([(pos.clone(), "a".to_spval())]));
 

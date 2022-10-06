@@ -49,3 +49,13 @@ impl ToSPCommonVar for &str {
         SPVariable::to_common_from_name(self, state)
     }
 }
+
+// pub trait ToSPCommonVar {
+//     fn to_comvar(&self) -> SPCommon;
+// }
+
+// impl ToSPCommonVar for SPVariable {
+//     fn to_comvar(&self) -> SPCommon {
+//         SPCommon::SPVariable(self.clone())
+//     }
+// }
