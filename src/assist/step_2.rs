@@ -6,7 +6,7 @@ pub fn step_2(
     valid_combinations: Vec<(State, Predicate)>,
     model: Vec<Transition>,
     max_plan_lenght: usize,
-) -> HashSet<String> {
+) -> Vec<String> {
     let all_transitions = model
         .iter()
         .map(|t| t.name.clone())
@@ -25,5 +25,7 @@ pub fn step_2(
         .difference(&taken_transitions)
         .map(|x| x.to_owned())
         .collect::<HashSet<String>>();
-    not_taken_transitions
+    let mut to_return = not_taken_transitions.iter().map(|x| x.to_owned()).collect::<Vec<String>>();
+    to_return.sort();
+    to_return
 }

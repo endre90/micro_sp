@@ -85,6 +85,9 @@ fn test_step_2() {
         eq!("pos".to_comvar(&s), "b".to_comval()),
     ));
 
+    let not_taken_transitions = step_2(comb.clone(), transitions.clone(), 20);
+    println!("not taken: {:?}", not_taken_transitions);
+
     // at this point not taken: {"turn_off", "b_to_c", "c_to_d"}
     comb.push((
         s!([

@@ -6,6 +6,7 @@ use micro_sp::{
 };
 use std::collections::{HashMap, HashSet};
 
+// use the transition state space and not the complete state space for this search.
 #[test]
 fn test_step_1_1() {
     let stat = v!("stat", &vec!("on", "off"));
@@ -52,7 +53,6 @@ fn test_step_1_1() {
     );
 
     let result = step_1(
-        vec![pos, stat],
         vec![t1.clone(), t2.clone(), t3.clone(), t4.clone(), t5.clone()],
         100, // max_tries
         50,  // max_combinations
@@ -124,7 +124,6 @@ fn test_step_1_2() {
     ));
 
     let result = step_1(
-        vec![pos, stat],
         transitions,
         100, // max_tries
         50,  // max_combinations

@@ -8,7 +8,7 @@ use rand::seq::SliceRandom;
 
 use crate::{
     and, eq, simple_transition_planner, PlanningResult, Predicate, SPCommon, SPVariable,
-    State, Transition,
+    State, Transition, get_model_vars,
 };
 
 #[derive(Debug, PartialEq, Clone)]
@@ -20,7 +20,6 @@ pub struct Step1Solution {
 }
 
 pub fn step_1(
-    vars: Vec<SPVariable>,
     model: Vec<Transition>,
     max_tries: usize,
     max_state_combinations: usize,
@@ -28,6 +27,8 @@ pub fn step_1(
     max_plan_lenght: usize,
 ) -> Step1Solution {
     let now = Instant::now();
+    let vars = get_model_vars(&model);
+    println!("{:?}", vars);
     let mut tried_init_states: Vec<State> = vec![];
     let mut tried_goal_states: Vec<State> = vec![];
     let mut nr_init_tries = 0;

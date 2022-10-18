@@ -1,4 +1,4 @@
-use crate::{Action, Predicate, State};
+use crate::{get_predicate_vars, Action, Predicate, SPVariable, State};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Transition {
@@ -32,4 +32,23 @@ impl Transition {
         }
         new_state
     }
+}
+
+pub fn get_transition_vars(trans: &Transition) -> Vec<SPVariable> {
+    let mut s = Vec::new();
+    let guard_vars = get_predicate_vars(&trans.guard);
+    let action_vars: Vec<SPVariable> = trans.actions.iter().map(|x| x.var.to_owned()).collect();
+    s.extend(guard_vars);
+    s.extend(action_vars);
+    s.sort();
+    s.dedup();
+    s
+}
+
+pub fn get_model_vars(model: &Vec<Transition>) -> Vec<SPVariable> {
+    let mut s = Vec::new();
+    model.iter().for_each(|x| s.extend(get_transition_vars(x)));
+    s.sort();
+    s.dedup();
+    s
 }

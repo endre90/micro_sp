@@ -2,7 +2,7 @@ use serde::*;
 
 use crate::{SPValue, SPValueType, State, SPCommon};
 
-#[derive(Debug, PartialEq, Clone, Serialize, Deserialize, Hash, Eq)]
+#[derive(Debug, PartialEq, Clone, Serialize, Deserialize, Hash, Eq, PartialOrd, Ord)]
 pub struct SPVariable {
     pub name: String,
     pub value_type: SPValueType,

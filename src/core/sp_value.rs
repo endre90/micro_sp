@@ -1,7 +1,7 @@
 use serde::*;
 use std::fmt;
 
-#[derive(Debug, PartialEq, Clone, Serialize, Deserialize, Hash, Eq)]
+#[derive(Debug, PartialEq, Clone, Serialize, Deserialize, Hash, Eq, PartialOrd, Ord)]
 pub enum SPValue {
     Bool(bool),
     // Float32(f32), // can't eq or hash
@@ -10,7 +10,7 @@ pub enum SPValue {
 }
 
 /// Used by Variables for defining type. Must be the same as SPValue
-#[derive(Debug, PartialEq, Copy, Clone, Serialize, Deserialize, Hash, Eq)]
+#[derive(Debug, PartialEq, Copy, Clone, Serialize, Deserialize, Hash, Eq, PartialOrd, Ord)]
 pub enum SPValueType {
     Bool,
     // Float32, 
