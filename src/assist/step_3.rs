@@ -38,8 +38,7 @@
 
 // we might have to manually say something like: no, 1 transition is bad, I want 2, now I want 3 and so on...
 
-// don't try to replace any "faulty" transitions, rather add the generated ones into the model,
-// but keep removing the generated ones in the next iterations
+// keep removing the generated ones in the next iterations
 
 // on one side show these transitions, and on the other side show the names of transitions that were not taken
 
@@ -94,56 +93,60 @@ pub fn step_3(
     valid_combinations: Vec<(State, Predicate)>,
     model: Vec<Transition>,
     max_plan_lenght: usize,
-    increment_tries: usize
+    max_trans: usize,
+    max_tries: usize
 ) -> Vec<Transition> {
-    let mut tried_transitions = model.clone();
+    // let mut model_transitions = model.clone();
+    let mut failed_transitions = model.clone();
     let vars = get_model_vars(&model);
-    
-    loop {
+    let mut nr_trans = 0;
+    let mut tries = 0;
+    let mut failed = false;
+    let mut working_trans = vec!();
+    'outer: loop {
+        if tries >= max_tries {
+            break
+        }
         let new_trans = generate_random_transition("FIX", &vars);
         match new_trans {
             Some(t) => {
-                if !tried_transitions.contains(&t) {
-                    tried_transitions.push(t);
-                    'inner: for (init, goal) in valid_combinations {
+                if !failed_transitions.contains(&t) { 
+                    // FIRST: we have to check if all of them pass without adding a new transition
+                    // generate up to several counterexample transitions for one transition length i.e. FIX_0 (forbid the ones that exist already)
+                    // for more than 1 FIX, also have more sounterexamples
+
+                    // need to check for all transitions
+                    
+                    // also, have to remove the failed ones from the main transitions list
+                    // and have a failed tries list, so that we don't end up with random going back plans and such...
+                    println!("ADDED NEW TRANSITION!");
+                    let mut model_transitions = model.clone();
+                    model_transitions.push(t.clone());
+                    'inner: for (init, goal) in &valid_combinations {
                         let result = simple_transition_planner(
-                            init,
-                            goal,
-                            tried_transitions.clone(),
+                            init.clone(),
+                            goal.clone(),
+                            model_transitions.clone(),
                             max_plan_lenght,
                         );
                         if !result.found {
+                            failed_transitions.push(t.clone());
+                            failed = true;
                             break 'inner;
                         }
+                    }
+                    if !failed {
+                        working_trans.push(t.clone());
+                        break 'outer;
+                    } else {
+                        failed = false;
                     }
                 }
             }
             None => (),
         }
+        tries = tries + 1;
     }
 
-    let all_transitions = model
-        .iter()
-        .map(|t| (t.name.clone(), t.clone()))
-        .collect::<HashMap<String, Transition>>();
-    let mut taken_transitions = HashSet::new();
-    for comb in valid_combinations {
-        let result = simple_transition_planner(comb.0, comb.1, model.clone(), max_plan_lenght);
-        match &result.found {
-            true => result.trace.iter().for_each(|t| {
-                taken_transitions.insert(t.clone());
-            }),
-            false => (),
-        }
-    }
-    let not_taken_transitions = all_transitions
-        .difference(&taken_transitions)
-        .map(|x| x.to_owned())
-        .collect::<HashSet<String>>();
-    let mut to_return = not_taken_transitions
-        .iter()
-        .map(|x| x.to_owned())
-        .collect::<Vec<String>>();
-    to_return.sort();
-    to_return
+    working_trans
 }
