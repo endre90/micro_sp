@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
 use crate::{State, SPCommon, SPVariable, SPValue};
+use std::fmt;
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Predicate {
@@ -56,6 +57,27 @@ pub fn get_predicate_vars(pred: &Predicate) -> Vec<SPVariable> {
     s.sort();
     s.dedup();
     s
+}
+
+impl fmt::Display for Predicate {
+    fn fmt(&self, fmtr: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let s: String = match &self {
+            Predicate::AND(x) => {
+                let children: Vec<_> = x.iter().map(|p| format!("{}", p)).collect();
+                format!("({})", children.join(" && "))
+            }
+            Predicate::OR(x) => {
+                let children: Vec<_> = x.iter().map(|p| format!("{}", p)).collect();
+                format!("({})", children.join(" || "))
+            }
+            Predicate::NOT(p) => format!("!({})", p),
+            Predicate::TRUE => "TRUE".into(),
+            Predicate::FALSE => "FALSE".into(),
+            Predicate::EQ(x, y) => format!("{} = {}", x, y),
+        };
+
+        write!(fmtr, "{}", &s)
+    }
 }
 
 // pub fn predicate_to_state_space(pred: &Predicate) -> Vec<State> {

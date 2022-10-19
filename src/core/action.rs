@@ -1,4 +1,5 @@
-use crate::{State, SPCommon, SPVariable};
+use crate::{State, SPCommon, SPVariable, SPValue};
+use std::fmt;
 
 #[derive(Debug, PartialEq, Clone, Hash)]
 pub struct Action {
@@ -25,5 +26,11 @@ impl Action {
             },
             false => panic!("Variable {} not in the state.", self.var.name),
         }
+    }
+}
+
+impl fmt::Display for Action {
+    fn fmt(&self, fmtr: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(fmtr, "{} <= {}", self.var, self.common)
     }
 }
