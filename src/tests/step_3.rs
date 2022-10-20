@@ -256,7 +256,7 @@ fn test_step_3_new_1() {
 
     // at this point not taken {"b_to_c"}, but since we see that it is added as a valid combination, the error is there
 
-    let posslible_solutions = step_3_new(comb, transitions, 20, 1, 20, 100);
+    let posslible_solutions = step_3_new(comb, transitions, 20, 3, 50, 200);
     let mut hint_frame = 0;
     match posslible_solutions {
         None => println!("All init/goal combinations are already possible!"),
@@ -278,7 +278,7 @@ fn test_step_3_new_1() {
                         .collect::<String>()
                 );
                 println!("goal: {}", hint.1);
-                println!("plan: {:?}", hint.2.trace);
+                println!("plan: {:?}", hint.2.plan);
             }
             println!("------------------------------");
             for mut g in tuple.1 {

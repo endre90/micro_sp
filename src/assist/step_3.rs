@@ -46,8 +46,8 @@ use rand::seq::SliceRandom;
 use std::collections::{HashMap, HashSet};
 
 use crate::{
-    get_model_vars, simple_transition_planner, Action, PlanningResult, Predicate, SPCommon,
-    SPVariable, State, Transition,
+    core::transition, get_model_vars, simple_transition_planner, Action, PlanningResult, Predicate,
+    SPCommon, SPVariable, State, Transition,
 };
 
 pub fn generate_random_transition(name: &str, vars: &Vec<SPVariable>) -> Option<Transition> {
@@ -137,7 +137,20 @@ pub fn step_3_new(
                     match gt {
                         None => {} //generation failed, just increment the number of tries
                         Some(generated_transition) => {
-                            match tried_transitions.contains(&generated_transition) {
+                            let copmarable_generated_transition = Transition::new(
+                                "asdf",
+                                generated_transition.guard.clone(),
+                                generated_transition.actions.clone(),
+                            );
+                            let comparable_tried_transitions = tried_transitions
+                                .iter()
+                                .map(|t| {
+                                    Transition::new("asdf", t.guard.clone(), t.actions.clone())
+                                })
+                                .collect::<Vec<Transition>>();
+                            match comparable_tried_transitions
+                                .contains(&copmarable_generated_transition)
+                            {
                                 true => {} // we have already tried this one, just increment the number of tries
                                 false => {
                                     // ok now we can add the generated transition(s) to the model and try to find a solution
@@ -145,6 +158,7 @@ pub fn step_3_new(
                                     let mut valid_combination_results = vec![];
                                     let mut modified_model = model.clone();
                                     modified_model.push(generated_transition.clone());
+                                   
                                     for (init, goal) in &valid_combinations {
                                         valid_combination_results.push((
                                             init.clone(),
@@ -161,10 +175,32 @@ pub fn step_3_new(
                                         false => {}
                                         true => {
                                             nr_solutions = nr_solutions + 1;
-                                            if !valid_generated_transitions.contains(&generated_transition) {
-                                                valid_generated_transitions.push(generated_transition);
+                                            let copmarable_valid_generated_transitions =
+                                                valid_generated_transitions
+                                                    .iter()
+                                                    .map(|t| {
+                                                        Transition::new(
+                                                            "asdf",
+                                                            t.guard.clone(),
+                                                            t.actions.clone(),
+                                                        )
+                                                    })
+                                                    .collect::<Vec<Transition>>();
+                                            if !copmarable_valid_generated_transitions
+                                                .contains(&copmarable_generated_transition)
+                                            {
+                                                valid_generated_transitions
+                                                    .push(generated_transition.clone());
                                             }
-                                            hint_frames = valid_combination_results;
+                                            // filter out the combinations which don't use the generated transitions
+                                            let mut filtered = vec!();
+                                            for x in valid_combination_results {
+                                                if x.2.plan.contains(&generated_transition.name) {
+                                                    filtered.push(x.clone())
+                                                }
+                                            }
+                                            hint_frames.extend(filtered);
+                                            // hint_frames = valid_combination_results;
                                         }
                                     }
                                 }

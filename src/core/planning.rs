@@ -6,7 +6,7 @@ use crate::{State, Transition, Predicate};
 pub struct PlanningResult {
     pub found: bool,
     pub length: usize,
-    pub trace: Vec<String>,
+    pub plan: Vec<String>,
     pub time: Duration,
 }
 
@@ -31,7 +31,7 @@ pub fn simple_transition_planner(
                     true => break PlanningResult {
                         found: true,
                         length: path.len(),
-                        trace: path,
+                        plan: path,
                         time: now.elapsed()
                     },
                     false => match path.len() > max_depth {

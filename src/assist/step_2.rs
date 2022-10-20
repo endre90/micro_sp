@@ -15,7 +15,7 @@ pub fn step_2(
     for comb in valid_combinations {
         let result = simple_transition_planner(comb.0, comb.1, model.clone(), max_plan_lenght);
         match &result.found {
-            true => result.trace.iter().for_each(|t| {
+            true => result.plan.iter().for_each(|t| {
                 taken_transitions.insert(t.clone());
             }),
             false => (),

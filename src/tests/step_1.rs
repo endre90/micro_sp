@@ -81,7 +81,7 @@ fn test_step_1_1() {
 
         println!("init: {:?}", inits);
         println!("goal: {:?}", goals);
-        println!("plan: {:?}", r.2.trace);
+        println!("plan: {:?}", r.2.plan);
         println!("-----------------------------");
     }
 }
@@ -152,7 +152,7 @@ fn test_step_1_2() {
 
         println!("init: {:?}", inits);
         println!("goal: {:?}", goals);
-        println!("plan: {:?}", r.2.trace);
+        println!("plan: {:?}", r.2.plan);
         println!("-----------------------------");
     }
 }

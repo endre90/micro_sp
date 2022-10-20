@@ -64,7 +64,7 @@ fn test_planning_simple() {
     );
     assert_eq!(result.found, true);
     assert_eq!(result.length, 3);
-    assert_eq!(result.trace, vec!("a_to_c", "c_to_d", "d_to_f"));
+    assert_eq!(result.plan, vec!("a_to_c", "c_to_d", "d_to_f"));
 
     let result = simple_transition_planner(
         s.clone(),
@@ -82,7 +82,7 @@ fn test_planning_simple() {
     );
     assert_eq!(result.found, true);
     assert_eq!(result.length, 0);
-    assert_eq!(result.trace, Vec::<&str>::new());
+    assert_eq!(result.plan, Vec::<&str>::new());
 
     let result = simple_transition_planner(
         s.clone(),
@@ -92,5 +92,5 @@ fn test_planning_simple() {
     );
     assert_eq!(result.found, false);
     assert_eq!(result.length, 0);
-    assert_eq!(result.trace, Vec::<&str>::new());
+    assert_eq!(result.plan, Vec::<&str>::new());
 }
