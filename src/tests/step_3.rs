@@ -1,7 +1,7 @@
 #![allow(unused_imports)]
 #![allow(dead_code)]
 use micro_sp::{
-    a, and, eq, eq2, s, simple_transition_planner, step_3, step_3_new, t, v, Action, Predicate,
+    a, and, eq, eq2, s, simple_transition_planner, step_3, step_3_new, step_3_new_new, t, v, Action, Predicate, postprocess,
     SPCommon, SPValue, SPValueType, SPVariable, State, ToSPCommon, ToSPCommonVar, ToSPValue,
     ToSPVariable, Transition,
 };
@@ -294,6 +294,207 @@ fn test_step_3_new_1() {
                         println!("{}: {} / [{}]", g.name, g.guard, action_string)
                     }
                     None => println!("{} / []", g.guard),
+                }
+            }
+        }
+    }
+}
+
+
+#[test]
+fn test_step_3_new_new_1() {
+    let pos = v!("pos", &vec!("a", "b", "c", "d", "e", "f"));
+    let s = State::new(&HashMap::from([(pos.clone(), "a".to_spval())]));
+
+    let mut transitions = vec![];
+
+    transitions.push(t!(
+        "a_to_b",
+        eq!("pos".to_comvar(&s), "a".to_comval()),
+        vec!(a!(pos.clone(), "b".to_comval()))
+    ));
+    transitions.push(t!(
+        "b_to_c",
+        eq!("pos".to_comvar(&s), "b".to_comval()),
+        vec!(a!(pos.clone(), "a".to_comval()))
+    ));
+    transitions.push(t!(
+        "c_to_d",
+        eq!("pos".to_comvar(&s), "c".to_comval()),
+        vec!(a!(pos.clone(), "d".to_comval()))
+    ));
+
+    // valid init/goal combinations
+    let mut comb = vec![];
+
+    // TODO: have to introduce don't cares in the initial state
+    comb.push((
+        s!([(pos.clone(), "a".to_spval()),]),
+        eq!("pos".to_comvar(&s), "b".to_comval()),
+    ));
+    comb.push((
+        s!([(pos.clone(), "a".to_spval()),]),
+        eq!("pos".to_comvar(&s), "c".to_comval()),
+    ));
+    comb.push((
+        s!([(pos.clone(), "a".to_spval()),]),
+        eq!("pos".to_comvar(&s), "d".to_comval()),
+    ));
+    comb.push((
+        s!([(pos.clone(), "b".to_spval()),]),
+        eq!("pos".to_comvar(&s), "c".to_comval()),
+    ));
+    comb.push((
+        s!([(pos.clone(), "b".to_spval()),]),
+        eq!("pos".to_comvar(&s), "d".to_comval()),
+    ));
+    comb.push((
+        s!([(pos.clone(), "c".to_spval()),]),
+        eq!("pos".to_comvar(&s), "d".to_comval()),
+    ));
+
+    // at this point not taken {"b_to_c"}, but since we see that it is added as a valid combination, the error is there
+
+    let posslible_solutions = step_3_new_new(comb, transitions, 20, 3, 50, 200);
+    let mut hint_frame = 0;
+    match posslible_solutions {
+        None => println!("All init/goal combinations are already possible!"),
+        Some(tuple) => {
+            for hint in tuple.0 {
+                hint_frame = hint_frame + 1;
+                println!("------------------------------");
+                println!("hint frame: {}", hint_frame);
+                println!(
+                    "init: {}",
+                    hint.init
+                        .state
+                        .iter()
+                        .map(|(var, val)| format!(
+                            "{} = {} ",
+                            var.name.to_string(),
+                            val.to_string()
+                        ))
+                        .collect::<String>()
+                );
+                println!("goal: {}", hint.goal);
+                println!("plan: {:?}", hint.result.plan);
+                println!("tier: {:?}", hint.tier);
+            }
+            println!("------------------------------");
+            for mut g in tuple.1 {
+                match g.actions.pop() {
+                    Some(last_action) => {
+                        let mut action_string = g
+                            .actions
+                            .iter()
+                            .map(|x| format!("{}, ", x.to_string()))
+                            .collect::<String>();
+                        let last_action_string = &format!("{}", last_action.to_string());
+                        action_string.extend(last_action_string.chars());
+                        println!("{}: {} / [{}]", g.name, g.guard, action_string)
+                    }
+                    None => println!("{} / []", g.guard),
+                }
+            }
+        }
+    }
+}
+
+#[test]
+fn test_step_3_new_new_1_with_postprocess() {
+    let pos = v!("pos", &vec!("a", "b", "c", "d", "e", "f"));
+    let s = State::new(&HashMap::from([(pos.clone(), "a".to_spval())]));
+
+    let mut transitions = vec![];
+
+    transitions.push(t!(
+        "a_to_b",
+        eq!("pos".to_comvar(&s), "a".to_comval()),
+        vec!(a!(pos.clone(), "b".to_comval()))
+    ));
+    transitions.push(t!(
+        "b_to_c",
+        eq!("pos".to_comvar(&s), "b".to_comval()),
+        vec!(a!(pos.clone(), "a".to_comval()))
+    ));
+    transitions.push(t!(
+        "c_to_d",
+        eq!("pos".to_comvar(&s), "c".to_comval()),
+        vec!(a!(pos.clone(), "d".to_comval()))
+    ));
+
+    // valid init/goal combinations
+    let mut comb = vec![];
+
+    // TODO: have to introduce don't cares in the initial state
+    comb.push((
+        s!([(pos.clone(), "a".to_spval()),]),
+        eq!("pos".to_comvar(&s), "b".to_comval()),
+    ));
+    comb.push((
+        s!([(pos.clone(), "a".to_spval()),]),
+        eq!("pos".to_comvar(&s), "c".to_comval()),
+    ));
+    comb.push((
+        s!([(pos.clone(), "a".to_spval()),]),
+        eq!("pos".to_comvar(&s), "d".to_comval()),
+    ));
+    comb.push((
+        s!([(pos.clone(), "b".to_spval()),]),
+        eq!("pos".to_comvar(&s), "c".to_comval()),
+    ));
+    comb.push((
+        s!([(pos.clone(), "b".to_spval()),]),
+        eq!("pos".to_comvar(&s), "d".to_comval()),
+    ));
+    comb.push((
+        s!([(pos.clone(), "c".to_spval()),]),
+        eq!("pos".to_comvar(&s), "d".to_comval()),
+    ));
+
+    // at this point not taken {"b_to_c"}, but since we see that it is added as a valid combination, the error is there
+
+    let non_processed_solutions = step_3_new_new(comb.clone(), transitions.clone(), 20, 3, 50, 200);
+    let postprocessed_solutions = postprocess(comb, transitions, 20, non_processed_solutions);
+    let mut hint_frame = 0;
+    match postprocessed_solutions {
+        None => println!("All init/goal combinations are already possible!"),
+        Some(tuple) => {
+            for hint in tuple.0 {
+                hint_frame = hint_frame + 1;
+                println!("------------------------------");
+                println!("hint frame: {}", hint_frame);
+                println!(
+                    "init: {}",
+                    hint.init
+                        .state
+                        .iter()
+                        .map(|(var, val)| format!(
+                            "{} = {} ",
+                            var.name.to_string(),
+                            val.to_string()
+                        ))
+                        .collect::<String>()
+                );
+                println!("goal: {}", hint.goal);
+                println!("plan: {:?}", hint.result.plan);
+                println!("tier: {:?}", hint.tier);
+            }
+            println!("------------------------------");
+            for mut g in tuple.1 {
+                match g.0.actions.pop() {
+                    Some(last_action) => {
+                        let mut action_string = g.0
+                            .actions
+                            .iter()
+                            .map(|x| format!("{}, ", x.to_string()))
+                            .collect::<String>();
+                        let last_action_string = &format!("{}", last_action.to_string());
+                        action_string.extend(last_action_string.chars());
+                        println!("tier: {:?}", g.1);
+                        println!("{}: {} / [{}]", g.0.name, g.0.guard, action_string)
+                    }
+                    None => println!("{} / []", g.0.guard),
                 }
             }
         }

@@ -25,7 +25,10 @@ pub fn step_2(
         .difference(&taken_transitions)
         .map(|x| x.to_owned())
         .collect::<HashSet<String>>();
-    let mut to_return = not_taken_transitions.iter().map(|x| x.to_owned()).collect::<Vec<String>>();
+    let mut to_return = not_taken_transitions
+        .iter()
+        .map(|x| x.to_owned())
+        .collect::<Vec<String>>();
     to_return.sort();
     to_return
 }
