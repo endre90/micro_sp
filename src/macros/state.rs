@@ -1,9 +1,10 @@
 #[macro_export]
 macro_rules! s {
     ($a:expr) => {
-        State::new(&HashMap::from($a))
-        // Action::new($a, $b)
+        State::from_vec(
+            &($a.iter()
+                .map(|(var, val)| (var.clone().clone(), val.clone()))
+                .collect::<Vec<(SPVariable, SPValue)>>()),
+        )
     };
 }
-
-// let s = State::new(&HashMap::from([(pos.clone(), "a".to_spval()), (stat.clone(), "off".to_spval())]));

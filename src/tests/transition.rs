@@ -1,6 +1,6 @@
 #![allow(unused_imports)]
 #![allow(dead_code)]
-use micro_sp::{State, Action, Transition, SPValue, SPVariable, SPValueType, ToSPValue, ToSPCommon, ToSPCommonVar, Predicate, a, t, eq, ToSPVariable};
+use crate::{State, Action, Transition, SPValue, SPVariable, SPValueType, ToSPValue, ToSPCommon, ToSPCommonVar, Predicate, a, t, eq};
 use std::collections::{HashMap, HashSet};
 
 fn john_doe() -> HashMap<SPVariable, SPValue> {
@@ -40,8 +40,12 @@ fn john_doe() -> HashMap<SPVariable, SPValue> {
 
 #[test]
 fn test_transition_new() {
-    let s = State::new(&john_doe());
-    let a1 = a!("weight".to_spvar(&s), 85.to_comval());
+    let weight = SPVariable::new(
+        "weight",
+        &SPValueType::Int32,
+        &vec![80.to_spval(), 85.to_spval(), 90.to_spval(), 87.to_spval()],
+    );
+    let a1 = a!(&weight, 85.cl());
     let t1 = Transition::new("gains_weight", Predicate::TRUE, vec!(a1.clone()));
     let t2 = Transition::new("gains_weight", Predicate::TRUE, vec!(a1));
     assert_eq!(t1, t2);
@@ -49,8 +53,12 @@ fn test_transition_new() {
 
 #[test]
 fn test_transition_new_macro() {
-    let s = State::new(&john_doe());
-    let a1 = a!("weight".to_spvar(&s), 85.to_comval());
+    let weight = SPVariable::new(
+        "weight",
+        &SPValueType::Int32,
+        &vec![80.to_spval(), 85.to_spval(), 90.to_spval(), 87.to_spval()],
+    );
+    let a1 = a!(&weight, 85.cl());
     let t1 = t!("gains_weight", Predicate::TRUE, vec!(a1.clone()));
     let t2 = t!("gains_weight", Predicate::TRUE, vec!(a1));
     assert_eq!(t1, t2);
@@ -59,7 +67,12 @@ fn test_transition_new_macro() {
 #[test]
 fn test_transition_eval() {
     let s = State::new(&john_doe());
-    let a1 = a!("weight".to_spvar(&s), 85.to_comval());
+    let weight = SPVariable::new(
+        "weight",
+        &SPValueType::Int32,
+        &vec![80.to_spval(), 85.to_spval(), 90.to_spval(), 87.to_spval()],
+    );
+    let a1 = a!(&weight, 85.cl());
     let t1 = t!("gains_weight", Predicate::TRUE, vec!(a1.clone()));
     let t2 = t!("gains_weight", Predicate::FALSE, vec!(a1));
     assert!(t1.eval(&s));
@@ -69,10 +82,15 @@ fn test_transition_eval() {
 #[test]
 fn test_transition_take() {
     let s = State::new(&john_doe());
-    let a1 = a!("weight".to_spvar(&s), 85.to_comval());
-    let a2 = a!("weight".to_spvar(&s), 87.to_comval());
-    let t1 = t!("gains_weight", eq!("weight".to_comvar(&s), 80.to_comval()), vec!(a1));
-    let t2 = t!("gains_weight_again", eq!("weight".to_comvar(&s), 85.to_comval()), vec!(a2));
+    let weight = SPVariable::new(
+        "weight",
+        &SPValueType::Int32,
+        &vec![80.to_spval(), 85.to_spval(), 90.to_spval(), 87.to_spval()],
+    );
+    let a1 = a!(&weight, 85.cl());
+    let a2 = a!(&weight, 87.cl());
+    let t1 = t!("gains_weight", eq!(&weight.cr(), 80.cl()), vec!(a1));
+    let t2 = t!("gains_weight_again", eq!(&weight.cr(), 85.cl()), vec!(a2));
     let s_next_1 = t1.take(&s);
     let s_next_2 = t2.take(&s_next_1);
     let new_state = s.clone().update("weight", &87.to_spval());
@@ -83,18 +101,28 @@ fn test_transition_take() {
 #[should_panic]
 fn test_transition_take_panic() {
     let s = State::new(&john_doe());
-    let a1 = a!("weight".to_spvar(&s), 87.to_comval());
-    let t1 = t!("gains_weight", eq!("weight".to_comvar(&s), 85.to_comval()), vec!(a1));
+    let weight = SPVariable::new(
+        "weight",
+        &SPValueType::Int32,
+        &vec![80.to_spval(), 85.to_spval(), 90.to_spval(), 87.to_spval()],
+    );
+    let a1 = a!(&weight, 87.cl());
+    let t1 = t!("gains_weight", eq!(&weight.cr(), 85.cl()), vec!(a1));
     t1.take(&s);
 }
 
 #[test]
 fn test_transition_ordering() {
     let s = State::new(&john_doe());
-    let a1 = a!("weight".to_spvar(&s), 85.to_comval());
-    let a2 = a!("weight".to_spvar(&s), 87.to_comval());
-    let a3 = a!("weight".to_spvar(&s), 90.to_comval());
-    let t1 = t!("gains_weight_again", eq!("weight".to_comvar(&s), 80.to_comval()), vec!(a1, a2, a3));
+    let weight = SPVariable::new(
+        "weight",
+        &SPValueType::Int32,
+        &vec![80.to_spval(), 85.to_spval(), 90.to_spval(), 87.to_spval()],
+    );
+    let a1 = a!(&weight, 85.cl());
+    let a2 = a!(&weight, 87.cl());
+    let a3 = a!(&weight, 90.cl());
+    let t1 = t!("gains_weight_again", eq!(&weight.cr(), 80.cl()), vec!(a1, a2, a3));
     let s_next_1 = t1.take(&s);
     assert_eq!(s_next_1.get_spval("weight"), 90.to_spval());
 }

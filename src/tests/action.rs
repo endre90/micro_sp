@@ -1,6 +1,6 @@
 #![allow(unused_imports)]
 #![allow(dead_code)]
-use micro_sp::{SPValue, SPValueType, SPVariable, State, ToSPValue, ToSPCommon, ToSPCommonVar, Action, ToSPVariable};
+use crate::{SPValue, SPValueType, SPVariable, State, ToSPValue, ToSPCommon, ToSPCommonVar, Action, a};
 use std::collections::{HashMap, HashSet};
 
 fn john_doe() -> HashMap<SPVariable, SPValue> {
@@ -42,8 +42,13 @@ fn john_doe() -> HashMap<SPVariable, SPValue> {
 fn test_action_assign() {
     let john_doe = john_doe();
     let s = State::new(&john_doe);
-    let a1 = Action::new("weight".to_spvar(&s), 85.to_comval());
-    let a2 = Action::new("weight".to_spvar(&s), 90.to_comval());
+    let weight = SPVariable::new(
+        "weight",
+        &SPValueType::Int32,
+        &vec![80.to_spval(), 85.to_spval(), 90.to_spval()],
+    );
+    let a1 = Action::new(weight.clone(), 85.cl());
+    let a2 = Action::new(weight.clone(), 90.cl());
     let s_next_1 = a1.assign(&s);
     let s_next_2 = a2.assign(&s_next_1);
     assert_eq!(s_next_1.get_spval("weight"), 85.to_spval());
@@ -55,6 +60,42 @@ fn test_action_assign() {
 fn test_action_assign_panic() {
     let john_doe = john_doe();
     let s = State::new(&john_doe);
-    let a1 = Action::new("bitrhyear".to_spvar(&s), 1967.to_comval());
+    let bitrhyear = SPVariable::new(
+        "bitrhyear",
+        &SPValueType::Int32,
+        &vec![1967.to_spval(), 1966.to_spval()],
+    );
+    let a1 = Action::new(bitrhyear.clone(), 1967.cl());
+    a1.assign(&s);
+}
+
+#[test]
+fn test_action_assign_macro() {
+    let john_doe = john_doe();
+    let s = State::new(&john_doe);
+    let weight = SPVariable::new(
+        "weight",
+        &SPValueType::Int32,
+        &vec![80.to_spval(), 85.to_spval(), 90.to_spval()],
+    );
+    let a1 = a!(&weight, 85.cl());
+    let a2 = a!(&weight, 90.cl());
+    let s_next_1 = a1.assign(&s);
+    let s_next_2 = a2.assign(&s_next_1);
+    assert_eq!(s_next_1.get_spval("weight"), 85.to_spval());
+    assert_eq!(s_next_2.get_spval("weight"), 90.to_spval());
+}
+
+#[test]
+#[should_panic]
+fn test_action_assign_macro_panic() {
+    let john_doe = john_doe();
+    let s = State::new(&john_doe);
+    let bitrhyear = SPVariable::new(
+        "bitrhyear",
+        &SPValueType::Int32,
+        &vec![1967.to_spval(), 1966.to_spval()],
+    );
+    let a1 = a!(&bitrhyear, 1967.cl());
     a1.assign(&s);
 }

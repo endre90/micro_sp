@@ -1,6 +1,6 @@
 use crate::{get_predicate_vars, Action, Predicate, SPVariable, State};
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Eq)]
 pub struct Transition {
     pub name: String,
     pub guard: Predicate,
@@ -31,6 +31,12 @@ impl Transition {
             false => panic!("Guard is false."),
         }
         new_state
+    }
+}
+
+impl PartialEq for Transition {
+    fn eq(&self, other: &Transition) -> bool {
+        self.guard == other.guard && self.actions == other.actions
     }
 }
 

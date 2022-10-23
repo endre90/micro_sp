@@ -1,7 +1,6 @@
-use serde::*;
 use std::fmt;
 
-#[derive(Debug, PartialEq, Clone, Serialize, Deserialize, Hash, Eq, PartialOrd, Ord)]
+#[derive(Debug, PartialEq, Clone, Hash, Eq, PartialOrd, Ord)]
 pub enum SPValue {
     Bool(bool),
     // Float32(f32), // can't eq or hash
@@ -10,7 +9,7 @@ pub enum SPValue {
 }
 
 /// Used by Variables for defining type. Must be the same as SPValue
-#[derive(Debug, PartialEq, Copy, Clone, Serialize, Deserialize, Hash, Eq, PartialOrd, Ord)]
+#[derive(Debug, PartialEq, Copy, Clone, Hash, Eq, PartialOrd, Ord)]
 pub enum SPValueType {
     Bool,
     // Float32, 
@@ -37,7 +36,7 @@ impl SPValue {
         }
     }
 
-    pub fn value_as_string(&self) -> String {
+    pub fn to_string(&self) -> String {
         match self {
             SPValue::Bool(x) => x.to_string(),
             // SPValue::Float32(_) => SPValueType::Float32, 
@@ -56,12 +55,6 @@ impl ToSPValue for bool {
         SPValue::Bool(*self)
     }
 }
-
-// impl ToSPValue for f32 {
-//     fn to_spval(&self) -> SPValue {
-//         SPValue::Float32(*self)
-//     }
-// }
 
 impl ToSPValue for i32 {
     fn to_spval(&self) -> SPValue {

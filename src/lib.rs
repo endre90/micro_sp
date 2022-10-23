@@ -8,12 +8,9 @@ pub use crate::core::sp_variable::*;
 pub use crate::core::state::*;
 pub use crate::core::transition::*;
 
-pub mod assist;
-pub use crate::assist::step_1::*;
-pub use crate::assist::step_2::*;
-pub use crate::assist::step_3::*;
-
 pub mod macros;
 pub use crate::macros::action::*;
 pub use crate::macros::predicate::*;
 pub use crate::macros::transition::*;
+
+pub mod tests;

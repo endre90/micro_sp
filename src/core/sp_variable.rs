@@ -1,9 +1,7 @@
-use serde::*;
-
 use crate::{SPValue, SPValueType, State, SPCommon};
 use std::fmt;
 
-#[derive(Debug, PartialEq, Clone, Serialize, Deserialize, Hash, Eq, PartialOrd, Ord)]
+#[derive(Debug, PartialEq, Clone, Hash, Eq, PartialOrd, Ord)]
 pub struct SPVariable {
     pub name: String,
     pub value_type: SPValueType,
@@ -29,32 +27,8 @@ impl SPVariable {
     }
 }
 
-pub trait ToSPVariable {
-    fn to_spvar(&self, state: &State) -> SPVariable;
-}
-
-impl ToSPVariable for String {
-    fn to_spvar(&self, state: &State) -> SPVariable {
-        SPVariable::from_name(self, state)
-    }
-}
-
-impl ToSPVariable for &str {
-    fn to_spvar(&self, state: &State) -> SPVariable {
-        SPVariable::from_name(self, state)
-    }
-}
-
 impl fmt::Display for SPVariable {
     fn fmt(&self, fmtr: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(fmtr, "{}", self.name.to_owned())
-        // match self {
-            
-        //     // SPVariable::Bool(b) if *b => write!(fmtr, "true"),
-        //     // SPValue::Bool(_) => write!(fmtr, "false"),
-        //     // // SPValue::Float32(f) => write!(fmtr, "{}", f),
-        //     // SPValue::Int32(i) => write!(fmtr, "{}", i),
-        //     // SPValue::String(s) => write!(fmtr, "{}", s),
-        // }
     }
 }

@@ -1,9 +1,7 @@
-use std::collections::HashMap;
-
-use crate::{State, SPCommon, SPVariable, SPValue};
+use crate::{State, SPCommon, SPVariable};
 use std::fmt;
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, Eq)]
 pub enum Predicate {
     TRUE,
     FALSE,

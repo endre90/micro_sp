@@ -1,9 +1,8 @@
 use crate::{SPValue, SPVariable};
-use serde::*;
 use std::collections::{HashMap, HashSet};
 use std::hash::{Hash, Hasher};
 
-#[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct State {
     pub state: HashMap<SPVariable, SPValue>,
 }
@@ -34,6 +33,12 @@ impl State {
         State {
             state: state.to_owned(),
         }
+    }
+
+    pub fn from_vec(vec: &Vec<(SPVariable, SPValue)>) -> State {
+        let mut state_map = HashMap::new();
+        vec.iter().for_each(|(var, val)| {state_map.insert(var.clone(), val.clone());});
+        State::new(&state_map)
     }
 
     pub fn add(state: &HashMap<SPVariable, SPValue>) -> State {
@@ -111,15 +116,6 @@ impl State {
                 State { state }
             },
             false => panic!("Value {} to update the variable {} is not in its domain.", val, var.name)
-        }
-        
+        }   
     }
-
-    // pub fn updates(self, changes: HashMap<String, SPValue>) -> State {
-    //     let mut state = self.state.clone();
-    //     changes.iter().for_each(|(k, v)| {
-    //         state.insert(k.to_string(), v.clone());
-    //     });
-    //     State { state }
-    // }
 }

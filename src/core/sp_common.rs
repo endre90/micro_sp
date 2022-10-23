@@ -1,53 +1,53 @@
-use crate::{SPValue, SPVariable, State};
+use crate::{SPValue, SPVariable};
 use std::fmt;
 
-#[derive(Debug, PartialEq, Clone, Hash)]
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub enum SPCommon {
     SPVariable(SPVariable),
     SPValue(SPValue),
 }
 
 pub trait ToSPCommon {
-    fn to_comval(&self) -> SPCommon;
+    fn cl(&self) -> SPCommon;
+}
+
+impl ToSPCommon for SPValue {
+    fn cl(&self) -> SPCommon {
+        SPCommon::SPValue(self.clone())
+    }
 }
 
 impl ToSPCommon for bool {
-    fn to_comval(&self) -> SPCommon {
+    fn cl(&self) -> SPCommon {
         SPCommon::SPValue(SPValue::Bool(*self))
     }
 }
 
 impl ToSPCommon for i32 {
-    fn to_comval(&self) -> SPCommon {
+    fn cl(&self) -> SPCommon {
         SPCommon::SPValue(SPValue::Int32(*self))
     }
 }
 
 impl ToSPCommon for String {
-    fn to_comval(&self) -> SPCommon {
+    fn cl(&self) -> SPCommon {
         SPCommon::SPValue(SPValue::String(self.clone()))
     }
 }
 
 impl ToSPCommon for &str {
-    fn to_comval(&self) -> SPCommon {
+    fn cl(&self) -> SPCommon {
         SPCommon::SPValue(SPValue::String((*self).to_string()))
     }
 }
 
 pub trait ToSPCommonVar {
-    fn to_comvar(&self, state: &State) -> SPCommon;
+    fn cr(&self) -> SPCommon;
 }
 
-impl ToSPCommonVar for String {
-    fn to_comvar(&self, state: &State) -> SPCommon {
-        SPVariable::to_common_from_name(self, state)
-    }
-}
-
-impl ToSPCommonVar for &str {
-    fn to_comvar(&self, state: &State) -> SPCommon {
-        SPVariable::to_common_from_name(self, state)
+impl ToSPCommonVar for SPVariable {
+    fn cr(&self) -> SPCommon {
+        SPCommon::SPVariable(self.clone())
     }
 }
 
@@ -65,13 +65,3 @@ impl fmt::Display for SPCommon {
         }
     }
 }
-
-// pub trait ToSPCommonVar {
-//     fn to_comvar(&self) -> SPCommon;
-// }
-
-// impl ToSPCommonVar for SPVariable {
-//     fn to_comvar(&self) -> SPCommon {
-//         SPCommon::SPVariable(self.clone())
-//     }
-// }

@@ -1,14 +1,7 @@
 #[macro_export]
 macro_rules! eq {
     ($a:expr, $b:expr) => {
-        Predicate::EQ($a, $b)
-    };
-}
-
-#[macro_export]
-macro_rules! eq2 {
-    ($a:expr, $b:expr) => {
-        Predicate::EQ(SPCommon::SPVariable($a.clone()), $b)
+        Predicate::EQ($a.clone(), $b.clone())
     };
 }
 

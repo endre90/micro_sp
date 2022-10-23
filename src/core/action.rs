@@ -1,7 +1,7 @@
-use crate::{State, SPCommon, SPVariable, SPValue};
+use crate::{State, SPCommon, SPVariable};
 use std::fmt;
 
-#[derive(Debug, PartialEq, Clone, Hash)]
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct Action {
     pub var: SPVariable,
     pub common: SPCommon,

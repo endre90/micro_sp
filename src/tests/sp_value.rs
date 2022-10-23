@@ -1,6 +1,6 @@
 #![allow(unused_imports)]
 #![allow(dead_code)]
-use micro_sp::{SPValue, SPValueType, SPVariable, State, ToSPValue};
+use crate::{SPValue, SPValueType, SPVariable, State, ToSPValue};
 use std::collections::{HashMap, HashSet};
 
 #[test]
