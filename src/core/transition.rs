@@ -1,4 +1,5 @@
 use crate::{get_predicate_vars, Action, Predicate, SPVariable, State};
+use std::fmt;
 
 #[derive(Debug, Clone, Eq)]
 pub struct Transition {
@@ -57,4 +58,24 @@ pub fn get_model_vars(model: &Vec<Transition>) -> Vec<SPVariable> {
     s.sort();
     s.dedup();
     s
+}
+
+impl fmt::Display for Transition {
+    fn fmt(&self, fmtr: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let mut action_string = "".to_string();
+        let mut actions = self.actions.clone();
+        match actions.pop() {
+            Some(last_action) => {
+                action_string = self
+                    .actions
+                    .iter()
+                    .map(|x| format!("{}, ", x.to_string()))
+                    .collect::<String>();
+                let last_action_string = &format!("{}", last_action.to_string());
+                action_string.extend(last_action_string.chars());
+            }
+            None => (),
+        }
+        write!(fmtr, "{}: {} / {}", self.name, self.guard, action_string)
+    }
 }
