@@ -1,6 +1,7 @@
 use crate::{SPValue, SPValueType, State, SPCommon};
 use std::fmt;
 
+/// An SPVariable is a named unit of data of type SPValueType that can be assigned a value from its finite domain.
 #[derive(Debug, PartialEq, Clone, Hash, Eq, PartialOrd, Ord)]
 pub struct SPVariable {
     pub name: String,

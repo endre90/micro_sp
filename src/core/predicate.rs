@@ -1,7 +1,8 @@
 use crate::{State, SPCommon, SPVariable};
 use std::fmt;
 
-#[derive(Debug, PartialEq, Clone, Eq)]
+/// A predicate is an equality logical formula that can evaluate to either true or false.
+#[derive(Debug, PartialEq, Clone, Eq, Hash)]
 pub enum Predicate {
     TRUE,
     FALSE,

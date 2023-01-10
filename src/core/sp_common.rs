@@ -1,6 +1,7 @@
 use crate::{SPValue, SPVariable};
 use std::fmt;
 
+/// SPCommon can either be a SPVariable or a SPValue.
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub enum SPCommon {
     SPVariable(SPVariable),

@@ -1,7 +1,7 @@
 use crate::{get_predicate_vars, Action, Predicate, SPVariable, State};
 use std::fmt;
 
-#[derive(Debug, Clone, Eq)]
+#[derive(Debug, Clone, Eq, Hash)]
 pub struct Transition {
     pub name: String,
     pub guard: Predicate,
@@ -30,6 +30,14 @@ impl Transition {
                 }
             }
             false => panic!("Guard is false."),
+        }
+        new_state
+    }
+
+    pub fn take_planning(self, state: &State) -> State {
+        let mut new_state = state.clone();
+        for a in self.actions {
+            new_state = a.assign(&new_state)
         }
         new_state
     }

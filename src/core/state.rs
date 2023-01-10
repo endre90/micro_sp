@@ -35,21 +35,38 @@ impl State {
         }
     }
 
+    pub fn new_empty() -> State {
+        State { state: HashMap::new() }
+    }
+
     pub fn from_vec(vec: &Vec<(SPVariable, SPValue)>) -> State {
         let mut state_map = HashMap::new();
         vec.iter().for_each(|(var, val)| {state_map.insert(var.clone(), val.clone());});
         State::new(&state_map)
     }
 
-    pub fn add(state: &HashMap<SPVariable, SPValue>) -> State {
-        state.iter().for_each(|(k, v)| match k.domain.contains(v) {
-            true => (),
-            false => panic!("Value {:?} not in the domain of variable {:?}", v, k.name),
-        });
-        State {
-            state: state.to_owned(),
-        }
-    }
+    // pub fn add(to_add: &(SPVariable, SPValue)) -> State {
+    //     if to_add.0.domain.contains(to_add.1) {
+    //         state.
+    //     }
+    //     state.iter().for_each(|(k, v)| match k.domain.contains(v) {
+    //         true => (),
+    //         false => panic!("Value {:?} not in the domain of variable {:?}", v, k.name),
+    //     });
+    //     State {
+    //         state: state.to_owned(),
+    //     }
+    // }
+
+    // pub fn add(state: &HashMap<SPVariable, SPValue>) -> State {
+    //     state.iter().for_each(|(k, v)| match k.domain.contains(v) {
+    //         true => (),
+    //         false => panic!("Value {:?} not in the domain of variable {:?}", v, k.name),
+    //     });
+    //     State {
+    //         state: state.to_owned(),
+    //     }
+    // }
 
     pub fn names(self) -> HashSet<String> {
         self.state

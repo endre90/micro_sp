@@ -1,5 +1,5 @@
 use micro_sp::{
-    a, and, bv, eq, s, simple_transition_planner, t, v, Action, Predicate, SPValue, SPValueType,
+    a, and, bv, eq, s, bfs_transition_planner, t, v, Action, Predicate, SPValue, SPValueType,
     SPVariable, State, ToSPCommon, ToSPCommonVar, ToSPValue, Transition,
 };
 
@@ -73,8 +73,6 @@ fn main() {
         }
     }
 
-    // maybe extend each domain with and UNKNOWN, so that unititialized vars
-    // are unknown rather that not in state
     let init = s!(vec!(
         (&stat, "off".to_spval()),
         (&grip, "closed".to_spval()),
@@ -94,6 +92,6 @@ fn main() {
         eq!(&pos.cr(), "a".cl())
     );
 
-    let result = simple_transition_planner(init, goal, transitions, 30);
+    let result = bfs_transition_planner(init, goal, transitions, 30);
     println!("{:?}", result.plan);
 }

@@ -1,5 +1,6 @@
 use std::fmt;
 
+/// SPValue represent a variable value of a specific type.
 #[derive(Debug, PartialEq, Clone, Hash, Eq, PartialOrd, Ord)]
 pub enum SPValue {
     Bool(bool),
@@ -8,20 +9,20 @@ pub enum SPValue {
     String(String),
 }
 
-/// Used by Variables for defining type. Must be the same as SPValue
+/// Used by SPVariables for defining their type. Must be the same as SPValue.
 #[derive(Debug, PartialEq, Copy, Clone, Hash, Eq, PartialOrd, Ord)]
 pub enum SPValueType {
     Bool,
-    // Float32, 
+    // Float32,
     Int32,
-    String
+    String,
 }
 
 impl SPValue {
     pub fn is_type(&self, t: SPValueType) -> bool {
         match self {
             SPValue::Bool(_) => SPValueType::Bool == t,
-            // SPValue::Float32(_) => SPValueType::Float32 == t, 
+            // SPValue::Float32(_) => SPValueType::Float32 == t,
             SPValue::Int32(_) => SPValueType::Int32 == t,
             SPValue::String(_) => SPValueType::String == t,
         }
@@ -30,7 +31,7 @@ impl SPValue {
     pub fn has_type(&self) -> SPValueType {
         match self {
             SPValue::Bool(_) => SPValueType::Bool,
-            // SPValue::Float32(_) => SPValueType::Float32, 
+            // SPValue::Float32(_) => SPValueType::Float32,
             SPValue::Int32(_) => SPValueType::Int32,
             SPValue::String(_) => SPValueType::String,
         }
@@ -39,7 +40,7 @@ impl SPValue {
     pub fn to_string(&self) -> String {
         match self {
             SPValue::Bool(x) => x.to_string(),
-            // SPValue::Float32(_) => SPValueType::Float32, 
+            // SPValue::Float32(_) => SPValueType::Float32,
             SPValue::Int32(x) => x.to_string(),
             SPValue::String(x) => x.to_string(),
         }

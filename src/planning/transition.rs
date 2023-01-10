@@ -10,7 +10,7 @@ pub struct PlanningResult {
     pub time: Duration,
 }
 
-pub fn simple_transition_planner(
+pub fn bfs_transition_planner(
     state: State,
     goal: Predicate,
     model: Vec<Transition>,

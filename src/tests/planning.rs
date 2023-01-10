@@ -1,7 +1,7 @@
 #![allow(unused_imports)]
 #![allow(dead_code)]
 use crate::{
-    a, eq, simple_transition_planner, t, v, Action, Predicate, SPValue, State, ToSPCommon,
+    a, eq, bfs_transition_planner, t, v, Action, Predicate, SPValue, State, ToSPCommon,
     ToSPCommonVar, ToSPValue, Transition, SPVariable, SPValueType
 };
 use std::collections::{HashMap, HashSet};
@@ -47,7 +47,7 @@ fn test_planning_simple() {
         vec!(a!(pos.clone(), "f".cl()))
     );
 
-    let result = simple_transition_planner(
+    let result = bfs_transition_planner(
         s.clone(),
         eq!(&pos.cr(), "f".cl()),
         vec![
@@ -65,7 +65,7 @@ fn test_planning_simple() {
     assert_eq!(result.length, 3);
     assert_eq!(result.plan, vec!("a_to_c", "c_to_d", "d_to_f"));
 
-    let result = simple_transition_planner(
+    let result = bfs_transition_planner(
         s.clone(),
         eq!(&pos.cr(), "a".cl()),
         vec![
@@ -83,7 +83,7 @@ fn test_planning_simple() {
     assert_eq!(result.length, 0);
     assert_eq!(result.plan, Vec::<&str>::new());
 
-    let result = simple_transition_planner(
+    let result = bfs_transition_planner(
         s.clone(),
         eq!(&pos.cr(), "f".cl()),
         vec![t1.clone(), t2.clone()],

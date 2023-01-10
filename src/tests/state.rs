@@ -218,16 +218,3 @@ fn test_state_update() {
     assert_ne!(old_state, new_state);
     assert_eq!(90.to_spval(), new_state.clone().get_spval("weight"));
 }
-
-// #[test]
-// fn test_state_updates() {
-//     let john_doe = john_doe();
-//     let old_state = State::new(john_doe.clone());
-//     let new_state = old_state.clone().updates(HashMap::from([
-//         ("weight".to_string(), 87.to_spval()),
-//         ("job".to_string(), "carpenter".to_spval()),
-//     ]));
-//     assert_ne!(old_state, new_state);
-//     assert_eq!(87.to_spval(), new_state.clone().get("weight"));
-//     assert_eq!("carpenter".to_spval(), new_state.get("job"));
-// }

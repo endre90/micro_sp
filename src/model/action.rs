@@ -1,6 +1,7 @@
 use crate::{State, SPCommon, SPVariable};
 use std::fmt;
 
+/// Actions update the assignments of the state variables.
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct Action {
     pub var: SPVariable,
