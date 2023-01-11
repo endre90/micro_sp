@@ -58,7 +58,7 @@ impl fmt::Display for SPCommon {
             SPCommon::SPValue(val) => match val {
                 SPValue::Bool(b) if *b => write!(fmtr, "true"),
                 SPValue::Bool(_) => write!(fmtr, "false"),
-                // SPValue::Float32(f) => write!(fmtr, "{}", f),
+                SPValue::Float64(f) => write!(fmtr, "{}", f),
                 SPValue::Int32(i) => write!(fmtr, "{}", i),
                 SPValue::String(s) => write!(fmtr, "{}", s),
             },

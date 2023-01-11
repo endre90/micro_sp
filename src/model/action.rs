@@ -17,10 +17,10 @@ impl Action {
     }
     
     pub fn assign(self, state: &State) -> State {
-        match state.clone().contains_name(&self.var.name) {
+        match state.state.clone().contains_key(&self.var.name) {
             true => match self.common {
-                SPCommon::SPVariable(x) => match state.clone().contains(&x) {
-                    true => state.clone().update(&self.var.name, &state.clone().get(&x)),
+                SPCommon::SPVariable(x) => match state.state.clone().contains_key(&x.name) {
+                    true => state.clone().update(&self.var.name, &state.state.clone().get(&x.name).unwrap().val),
                     false => panic!("Variable {:?} not in the state.", x.name),
                 },
                 SPCommon::SPValue(x) => state.clone().update(&self.var.name, &x),

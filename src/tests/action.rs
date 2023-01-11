@@ -51,8 +51,8 @@ fn test_action_assign() {
     let a2 = Action::new(weight.clone(), 90.cl());
     let s_next_1 = a1.assign(&s);
     let s_next_2 = a2.assign(&s_next_1);
-    assert_eq!(s_next_1.get_spval("weight"), 85.to_spval());
-    assert_eq!(s_next_2.get_spval("weight"), 90.to_spval());
+    assert_eq!(s_next_1.state.get("weight").unwrap().val, 85.to_spval());
+    assert_eq!(s_next_2.state.get("weight").unwrap().val, 90.to_spval());
 }
 
 #[test]
@@ -82,8 +82,8 @@ fn test_action_assign_macro() {
     let a2 = a!(&weight, 90.cl());
     let s_next_1 = a1.assign(&s);
     let s_next_2 = a2.assign(&s_next_1);
-    assert_eq!(s_next_1.get_spval("weight"), 85.to_spval());
-    assert_eq!(s_next_2.get_spval("weight"), 90.to_spval());
+    assert_eq!(s_next_1.state.get("weight").unwrap().val, 85.to_spval());
+    assert_eq!(s_next_2.state.get("weight").unwrap().val, 90.to_spval());
 }
 
 #[test]

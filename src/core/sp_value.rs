@@ -1,10 +1,12 @@
 use std::fmt;
+use ordered_float::OrderedFloat;
+use std::f32::NAN;
 
 /// SPValue represent a variable value of a specific type.
 #[derive(Debug, PartialEq, Clone, Hash, Eq, PartialOrd, Ord)]
 pub enum SPValue {
     Bool(bool),
-    // Float32(f32), // can't eq or hash
+    Float64(OrderedFloat<f64>),
     Int32(i32),
     String(String),
 }
@@ -13,7 +15,7 @@ pub enum SPValue {
 #[derive(Debug, PartialEq, Copy, Clone, Hash, Eq, PartialOrd, Ord)]
 pub enum SPValueType {
     Bool,
-    // Float32,
+    Float64,
     Int32,
     String,
 }
@@ -22,7 +24,7 @@ impl SPValue {
     pub fn is_type(&self, t: SPValueType) -> bool {
         match self {
             SPValue::Bool(_) => SPValueType::Bool == t,
-            // SPValue::Float32(_) => SPValueType::Float32 == t,
+            SPValue::Float64(_) => SPValueType::Float64 == t,
             SPValue::Int32(_) => SPValueType::Int32 == t,
             SPValue::String(_) => SPValueType::String == t,
         }
@@ -31,7 +33,7 @@ impl SPValue {
     pub fn has_type(&self) -> SPValueType {
         match self {
             SPValue::Bool(_) => SPValueType::Bool,
-            // SPValue::Float32(_) => SPValueType::Float32,
+            SPValue::Float64(_) => SPValueType::Float64,
             SPValue::Int32(_) => SPValueType::Int32,
             SPValue::String(_) => SPValueType::String,
         }
@@ -40,7 +42,7 @@ impl SPValue {
     pub fn to_string(&self) -> String {
         match self {
             SPValue::Bool(x) => x.to_string(),
-            // SPValue::Float32(_) => SPValueType::Float32,
+            SPValue::Float64(x) => x.to_string(),
             SPValue::Int32(x) => x.to_string(),
             SPValue::String(x) => x.to_string(),
         }
@@ -63,6 +65,12 @@ impl ToSPValue for i32 {
     }
 }
 
+impl ToSPValue for f64 {
+    fn to_spval(&self) -> SPValue {
+        SPValue::Float64(OrderedFloat(*self))
+    }
+}
+
 impl ToSPValue for String {
     fn to_spval(&self) -> SPValue {
         SPValue::String(self.clone())
@@ -80,7 +88,7 @@ impl fmt::Display for SPValue {
         match self {
             SPValue::Bool(b) if *b => write!(fmtr, "true"),
             SPValue::Bool(_) => write!(fmtr, "false"),
-            // SPValue::Float32(f) => write!(fmtr, "{}", f),
+            SPValue::Float64(f) => write!(fmtr, "{}", f),
             SPValue::Int32(i) => write!(fmtr, "{}", i),
             SPValue::String(s) => write!(fmtr, "{}", s),
         }

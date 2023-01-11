@@ -12,6 +12,7 @@ pub enum Predicate {
     EQ(SPCommon, SPCommon),
 }
 
+// TODO: clean from unwraps...
 impl Predicate {
     pub fn eval(self, state: &State) -> bool {
         match self {
@@ -22,11 +23,11 @@ impl Predicate {
             Predicate::OR(p) => p.iter().any(|pp| pp.clone().eval(&state)),
             Predicate::EQ(x, y) => match x {
                 SPCommon::SPVariable(vx) => match y {
-                    SPCommon::SPVariable(vy) => state.clone().get_spval(&vx.name) == state.clone().get_spval(&vy.name),
-                    SPCommon::SPValue(vy) => state.clone().get_spval(&vx.name) == vy,
+                    SPCommon::SPVariable(vy) => state.state.clone().get(&vx.name).unwrap().val == state.state.clone().get(&vy.name).unwrap().val,
+                    SPCommon::SPValue(vy) => state.state.clone().get(&vx.name).unwrap().val == vy,
                 },
                 SPCommon::SPValue(vx) => match y {
-                    SPCommon::SPVariable(vy) => vx == state.clone().get_spval(&vy.name),
+                    SPCommon::SPVariable(vy) => vx == state.state.clone().get(&vy.name).unwrap().val,
                     SPCommon::SPValue(vy) => vx == vy,
                 },
             },

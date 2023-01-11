@@ -1,10 +1,10 @@
-use crate::{SPValue, SPVariable};
+use crate::{SPAssignment, SPValue, SPVariable};
 use std::collections::{HashMap, HashSet};
 use std::hash::{Hash, Hasher};
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct State {
-    pub state: HashMap<SPVariable, SPValue>,
+    pub state: HashMap<String, SPAssignment>,
 }
 
 impl Hash for State {
@@ -13,12 +13,18 @@ impl Hash for State {
             .keys()
             .into_iter()
             .map(|x| x.to_owned())
+            .collect::<Vec<String>>()
+            .hash(s);
+        self.state
+            .values()
+            .into_iter()
+            .map(|x| x.var.to_owned())
             .collect::<Vec<SPVariable>>()
             .hash(s);
         self.state
             .values()
             .into_iter()
-            .map(|x| x.to_owned())
+            .map(|x| x.val.to_owned())
             .collect::<Vec<SPValue>>()
             .hash(s);
     }
@@ -31,17 +37,32 @@ impl State {
             false => panic!("Value {:?} not in the domain of variable {:?}", v, k.name),
         });
         State {
-            state: state.to_owned(),
+            state: state
+                .iter()
+                .map(|(x, y)| {
+                    (
+                        x.name.clone(),
+                        SPAssignment {
+                            var: x.clone(),
+                            val: y.clone(),
+                        },
+                    )
+                })
+                .collect::<HashMap<String, SPAssignment>>(),
         }
     }
 
     pub fn new_empty() -> State {
-        State { state: HashMap::new() }
+        State {
+            state: HashMap::new(),
+        }
     }
 
     pub fn from_vec(vec: &Vec<(SPVariable, SPValue)>) -> State {
         let mut state_map = HashMap::new();
-        vec.iter().for_each(|(var, val)| {state_map.insert(var.clone(), val.clone());});
+        vec.iter().for_each(|(var, val)| {
+            state_map.insert(var.clone(), val.clone());
+        });
         State::new(&state_map)
     }
 
@@ -68,71 +89,67 @@ impl State {
     //     }
     // }
 
-    pub fn names(self) -> HashSet<String> {
-        self.state
-            .keys()
-            .into_iter()
-            .map(|k| k.name.to_string())
-            .collect::<HashSet<String>>()
-    }
+    // pub fn names(self) -> HashSet<String> {
+    //     self.state
+    //         .keys()
+    //         .into_iter()
+    //         .map(|k| k.name.to_string())
+    //         .collect::<HashSet<String>>()
+    // }
 
-    pub fn keys(self) -> HashSet<SPVariable> {
-        self.state
-            .keys()
-            .into_iter()
-            .map(|k| k.to_owned())
-            .collect::<HashSet<SPVariable>>()
-    }
+    // pub fn keys(self) -> HashSet<SPVariable> {
+    //     self.state
+    //         .keys()
+    //         .into_iter()
+    //         .map(|k| k.to_owned())
+    //         .collect::<HashSet<SPVariable>>()
+    // }
 
-    pub fn contains(self, key: &SPVariable) -> bool {
-        self.state.contains_key(key)
-    }
+    // pub fn contains(self, key: &str) -> bool {
+    //     self.state.contains_key(key)
+    // }
 
-    pub fn contains_name(self, key: &str) -> bool {
-        let mut map = HashMap::new();
-        self.state.iter().for_each(|(k, v)| {
-            map.insert(k.name.clone(), v);
-        });
-        map.contains_key(key)
-    }
-
-    pub fn get_spval(self, key: &str) -> SPValue {
-        let mut map = HashMap::new();
-        self.state.iter().for_each(|(k, v)| {
-            map.insert(k.name.clone(), v.clone());
-        });
-        match map.get(key) {
-            Some(value) => value.to_owned(),
-            None => panic!("Variable {key} not found in the state."),
-        }
-    }
-
-    pub fn get_spvar(self, key: &str) -> SPVariable {
-        match self.state.iter().find(|(k, _)| k.name == key) {
-            Some((var, _)) => var.to_owned(),
-            None => panic!("Variable {key} not found in the state."),
-        }
-    }
-
-    // Need to panic because if both keys are not
-    // found in EQ, None == None
-    pub fn get(self, key: &SPVariable) -> SPValue {
-        match self.state.get(key) {
-            Some(value) => value.to_owned(),
-            None => panic!("Variable {} not found in the state.", key.name),
+    pub fn add(self, assignment: &SPAssignment) -> State {
+        match self.state.clone().get(&assignment.var.name) {
+            Some(_) => panic!("already in state"),
+            None => {
+                let mut state = self.state.clone();
+                state.insert(assignment.var.name.to_string(), assignment.clone());
+                State { state }
+            }
         }
     }
 
     // have to add check if value is in the domain
-    pub fn update(self, var: &str, val: &SPValue) -> State {
-        let var = self.clone().get_spvar(var);
-        match var.domain.contains(val) {
-            true => {
-                let mut state = self.state.clone();
-                state.insert(var.clone(), val.clone());
-                State { state }
+    pub fn update(self, name: &str, val: &SPValue) -> State {
+        match self.state.clone().get(name) {
+            Some(assignment) => match assignment.var.domain.contains(val) {
+                true => {
+                    let mut state = self.state.clone();
+                    state.insert(
+                        name.to_string(),
+                        SPAssignment {
+                            var: assignment.var.clone(),
+                            val: val.clone(),
+                        },
+                    );
+                    State { state }
+                }
+                false => panic!(
+                    "Value {} to update the variable {} is not in its domain.",
+                    val, assignment.var.name
+                ),
             },
-            false => panic!("Value {} to update the variable {} is not in its domain.", val, var.name)
-        }   
+            None => panic!("Variable {} not in state.", name),
+        }
+        // let var = self.clone().get_spvar(var);
+        // match var.domain.contains(val) {
+        //     true => {
+        //         let mut state = self.state.clone();
+        //         state.insert(var.clone(), val.clone());
+        //         State { state }
+        //     },
+        //     false => panic!("Value {} to update the variable {} is not in its domain.", val, var.name)
+        // }
     }
 }

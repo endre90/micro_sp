@@ -17,15 +17,15 @@ impl SPVariable {
             domain: domain.to_owned(),
         }
     }
-    pub fn from_name(name: &str, state: &State) -> SPVariable {
-        state.clone().get_spvar(name)
-    }
-    pub fn to_common(var: &SPVariable) -> SPCommon {
-        SPCommon::SPVariable(var.clone())
-    }
-    pub fn to_common_from_name(name: &str, state: &State) -> SPCommon {
-        SPCommon::SPVariable(state.clone().get_spvar(name).clone())
-    }
+    // pub fn from_name(name: &str, state: &State) -> SPVariable {
+    //     state.clone().get_spvar(name)
+    // }
+    // pub fn to_common(var: &SPVariable) -> SPCommon {
+    //     SPCommon::SPVariable(var.clone())
+    // }
+    // pub fn to_common_from_name(name: &str, state: &State) -> SPCommon {
+    //     SPCommon::SPVariable(state.clone().get_spvar(name).clone())
+    // }
 }
 
 impl fmt::Display for SPVariable {

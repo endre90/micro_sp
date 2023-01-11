@@ -124,7 +124,7 @@ fn test_transition_ordering() {
     let a3 = a!(&weight, 90.cl());
     let t1 = t!("gains_weight_again", eq!(&weight.cr(), 80.cl()), vec!(a1, a2, a3));
     let s_next_1 = t1.take(&s);
-    assert_eq!(s_next_1.get_spval("weight"), 90.to_spval());
+    assert_eq!(s_next_1.state.get("weight").unwrap().val, 90.to_spval());
 }
 
 #[test]
@@ -141,7 +141,7 @@ fn test_transition_ordering_panic() {
     let a3 = a!(&weight, 90.cl());
     let t1 = t!("gains_weight_again", eq!(&weight.cr(), 80.cl()), vec!(a1, a3, a2));
     let s_next_1 = t1.take(&s);
-    assert_eq!(s_next_1.get_spval("weight"), 90.to_spval());
+    assert_eq!(s_next_1.state.get("weight").unwrap().val, 90.to_spval());
 }
 
 #[test]
