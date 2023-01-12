@@ -1,29 +1,29 @@
-use crate::{State, SPCommon, SPVariable};
+use crate::{State, SPWrapped, SPVariable};
 use std::fmt;
 
 /// Actions update the assignments of the state variables.
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct Action {
     pub var: SPVariable,
-    pub common: SPCommon,
+    pub var_or_val: SPWrapped,
 }
 
 impl Action {
-    pub fn new(var: SPVariable, common: SPCommon) -> Action {
+    pub fn new(var: SPVariable, var_or_val: SPWrapped) -> Action {
         Action {
             var,
-            common
+            var_or_val
         }
     }
     
     pub fn assign(self, state: &State) -> State {
-        match state.state.clone().contains_key(&self.var.name) {
-            true => match self.common {
-                SPCommon::SPVariable(x) => match state.state.clone().contains_key(&x.name) {
-                    true => state.clone().update(&self.var.name, &state.state.clone().get(&x.name).unwrap().val),
+        match state.contains(&self.var.name) {
+            true => match self.var_or_val {
+                SPWrapped::SPVariable(x) => match state.contains(&x.name) {
+                    true => state.clone().update(&self.var.name, state.get_value(&x.name)),
                     false => panic!("Variable {:?} not in the state.", x.name),
                 },
-                SPCommon::SPValue(x) => state.clone().update(&self.var.name, &x),
+                SPWrapped::SPValue(x) => state.clone().update(&self.var.name, x),
             },
             false => panic!("Variable {} not in the state.", self.var.name),
         }
@@ -32,6 +32,6 @@ impl Action {
 
 impl fmt::Display for Action {
     fn fmt(&self, fmtr: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(fmtr, "{} <= {}", self.var, self.common)
+        write!(fmtr, "{} <= {}", self.var, self.var_or_val)
     }
 }

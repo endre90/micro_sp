@@ -10,76 +10,51 @@ pub enum SPWrapped {
 }
 
 pub trait ToSPWrapped {
-    fn to_spwrapped(&self) -> SPWrapped;
+    fn wrap(&self) -> SPWrapped;
 }
 
 impl ToSPWrapped for SPValue {
-    fn to_spwrapped(&self) -> SPWrapped {
+    fn wrap(&self) -> SPWrapped {
         SPWrapped::SPValue(self.clone())
     }
 }
 
 impl ToSPWrapped for bool {
-    fn to_spwrapped(&self) -> SPWrapped {
+    fn wrap(&self) -> SPWrapped {
         SPWrapped::SPValue(SPValue::Bool(*self))
     }
 }
 
 impl ToSPWrapped for i32 {
-    fn to_spwrapped(&self) -> SPWrapped {
+    fn wrap(&self) -> SPWrapped {
         SPWrapped::SPValue(SPValue::Int32(*self))
     }
 }
 
 impl ToSPWrapped for f64 {
-    fn to_spwrapped(&self) -> SPWrapped {
+    fn wrap(&self) -> SPWrapped {
         SPWrapped::SPValue(SPValue::Float64(OrderedFloat(*self)))
     }
 }
 
 impl ToSPWrapped for String {
-    fn to_spwrapped(&self) -> SPWrapped {
+    fn wrap(&self) -> SPWrapped {
         SPWrapped::SPValue(SPValue::String(self.clone()))
     }
 }
 
 impl ToSPWrapped for &str {
-    fn to_spwrapped(&self) -> SPWrapped {
+    fn wrap(&self) -> SPWrapped {
         SPWrapped::SPValue(SPValue::String((*self).to_string()))
     }
 }
 
-// impl<T> ToSPWrapped for Vec<T>
-// where
-//     T: ToSPWrapped,
-// {
-//     fn to_spwrapped(&self) -> SPWrapped {
-//         let res = self
-//             .iter()
-//             .map(|x| x.to_spwrapped())
-//             .collect::<Vec<SPWrapped>>();
-//         res.to_spwrapped()
-//     }
-// }
-
-// impl ToSPWrapped for Vec<SPWrapped> {
-//     fn to_spwrapped(&self) -> SPWrapped {
-//         if self.is_empty() {
-//             SPWrapped::SPValue(SPValue::Array(SPValue::Unknown, self.clone().))
-//         } else {
-//             let spvaltype = self[0].has_type();
-//             assert!(self.iter().all(|e| e.has_type() == spvaltype));
-//             SPValue::Array(spvaltype, self.clone())
-//         }
-//     }
-// }
-
 pub trait ToSPWrappedVar {
-    fn to_spwrapped(&self) -> SPWrapped;
+    fn wrap(&self) -> SPWrapped;
 }
 
 impl ToSPWrappedVar for SPVariable {
-    fn to_spwrapped(&self) -> SPWrapped {
+    fn wrap(&self) -> SPWrapped {
         SPWrapped::SPVariable(self.clone())
     }
 }

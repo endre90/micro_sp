@@ -5,39 +5,58 @@ use std::fmt;
 pub struct Transition {
     pub name: String,
     pub guard: Predicate,
+    pub runner_guard: Predicate,
     pub actions: Vec<Action>,
+    pub runner_actions: Vec<Action>,
 }
 
 impl Transition {
-    pub fn new(name: &str, guard: Predicate, actions: Vec<Action>) -> Transition {
+    pub fn new(
+        name: &str,
+        guard: Predicate,
+        runner_guard: Predicate,
+        actions: Vec<Action>,
+        runner_actions: Vec<Action>,
+    ) -> Transition {
         Transition {
             name: name.to_string(),
-            guard: guard.to_owned(),
-            actions: actions.to_owned(),
+            guard,
+            runner_guard,
+            actions,
+            runner_actions,
         }
     }
 
-    pub fn eval(self, state: &State) -> bool {
+    pub fn eval_planning(self, state: &State) -> bool {
         self.guard.eval(state)
     }
 
-    pub fn take(self, state: &State) -> State {
+    pub fn eval_running(self, state: &State) -> bool {
+        self.guard.eval(state) && self.runner_guard.eval(state)
+    }
+
+    pub fn take_planning(self, state: &State) -> State {
         let mut new_state = state.clone();
-        match self.clone().eval(state) {
+        match self.clone().eval_planning(state) {
             true => {
                 for a in self.actions {
                     new_state = a.assign(&new_state)
                 }
             }
-            false => panic!("Guard is false."),
+            false => (),
         }
         new_state
     }
 
-    pub fn take_planning(self, state: &State) -> State {
+    pub fn take_running(self, state: &State) -> State {
         let mut new_state = state.clone();
-        for a in self.actions {
-            new_state = a.assign(&new_state)
+        match self.clone().eval_planning(state) && self.clone().eval_running(state) {
+            true => {
+                for a in self.actions {
+                    new_state = a.assign(&new_state)
+                }
+            }
+            false => (),
         }
         new_state
     }
@@ -45,11 +64,33 @@ impl Transition {
 
 impl PartialEq for Transition {
     fn eq(&self, other: &Transition) -> bool {
-        self.guard == other.guard && self.actions == other.actions
+        self.guard == other.guard
+            && self.runner_guard == other.runner_guard
+            && self.actions == other.actions
+            && self.runner_actions == other.runner_actions
     }
 }
 
-pub fn get_transition_vars(trans: &Transition) -> Vec<SPVariable> {
+pub fn get_transition_vars_all(trans: &Transition) -> Vec<SPVariable> {
+    let mut s = Vec::new();
+    let guard_vars = get_predicate_vars(&trans.guard);
+    let runner_guard_vars = get_predicate_vars(&trans.runner_guard);
+    let action_vars: Vec<SPVariable> = trans.actions.iter().map(|x| x.var.to_owned()).collect();
+    let runner_action_vars: Vec<SPVariable> = trans
+        .runner_actions
+        .iter()
+        .map(|x| x.var.to_owned())
+        .collect();
+    s.extend(guard_vars);
+    s.extend(runner_guard_vars);
+    s.extend(action_vars);
+    s.extend(runner_action_vars);
+    s.sort();
+    s.dedup();
+    s
+}
+
+pub fn get_transition_planning_vars(trans: &Transition) -> Vec<SPVariable> {
     let mut s = Vec::new();
     let guard_vars = get_predicate_vars(&trans.guard);
     let action_vars: Vec<SPVariable> = trans.actions.iter().map(|x| x.var.to_owned()).collect();
@@ -60,9 +101,11 @@ pub fn get_transition_vars(trans: &Transition) -> Vec<SPVariable> {
     s
 }
 
-pub fn get_model_vars(model: &Vec<Transition>) -> Vec<SPVariable> {
+pub fn get_model_planning_vars(model: &Vec<Transition>) -> Vec<SPVariable> {
     let mut s = Vec::new();
-    model.iter().for_each(|x| s.extend(get_transition_vars(x)));
+    model
+        .iter()
+        .for_each(|x| s.extend(get_transition_planning_vars(x)));
     s.sort();
     s.dedup();
     s

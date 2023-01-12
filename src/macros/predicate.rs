@@ -6,6 +6,13 @@ macro_rules! eq {
 }
 
 #[macro_export]
+macro_rules! neq {
+    ($a:expr, $b:expr) => {
+        Predicate::NEQ($a.clone(), $b.clone())
+    };
+}
+
+#[macro_export]
 macro_rules! not {
     ($a:expr) => {
         Predicate::NOT(Box::new($a.clone()))
