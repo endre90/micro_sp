@@ -6,3 +6,11 @@ pub struct SPAssignment {
     pub val: SPValue
 }
 
+impl SPAssignment {
+    pub fn new(var: SPVariable, val: SPValue) -> SPAssignment {
+        match var.has_type().1 == val.has_type() {
+            true => SPAssignment { var, val },
+            false => panic!("Vrong value type to be assignmet to a variable.")
+        }
+    }
+}

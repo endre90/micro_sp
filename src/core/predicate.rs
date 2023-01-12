@@ -1,4 +1,4 @@
-use crate::{SPCommon, SPVariable, State};
+use crate::{SPWrapped, SPVariable};
 use std::fmt;
 
 /// A predicate is an equality logical formula that can evaluate to either true or false.
@@ -9,7 +9,7 @@ pub enum Predicate {
     NOT(Box<Predicate>),
     AND(Vec<Predicate>),
     OR(Vec<Predicate>),
-    EQ(SPCommon, SPCommon),
+    EQ(SPWrapped, SPWrapped),
 }
 
 // TODO: clean from unwraps...
