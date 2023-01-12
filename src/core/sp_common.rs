@@ -61,6 +61,9 @@ impl fmt::Display for SPCommon {
                 SPValue::Float64(f) => write!(fmtr, "{}", f),
                 SPValue::Int32(i) => write!(fmtr, "{}", i),
                 SPValue::String(s) => write!(fmtr, "{}", s),
+                SPValue::Time(t) => write!(fmtr, "{:?} s", t.elapsed().unwrap_or_default()),
+                SPValue::Array(_, a) => write!(fmtr, "{:?}", a),
+                SPValue::Unknown => write!(fmtr, "[unknown]"),
             },
             SPCommon::SPVariable(var) => write!(fmtr, "{}", var.name.to_owned()),
         }

@@ -1,4 +1,4 @@
-use crate::{State, SPCommon, SPVariable};
+use crate::{SPCommon, SPVariable, State};
 use std::fmt;
 
 /// A predicate is an equality logical formula that can evaluate to either true or false.
@@ -23,11 +23,16 @@ impl Predicate {
             Predicate::OR(p) => p.iter().any(|pp| pp.clone().eval(&state)),
             Predicate::EQ(x, y) => match x {
                 SPCommon::SPVariable(vx) => match y {
-                    SPCommon::SPVariable(vy) => state.state.clone().get(&vx.name).unwrap().val == state.state.clone().get(&vy.name).unwrap().val,
+                    SPCommon::SPVariable(vy) => {
+                        state.state.clone().get(&vx.name).unwrap().val
+                            == state.state.clone().get(&vy.name).unwrap().val
+                    }
                     SPCommon::SPValue(vy) => state.state.clone().get(&vx.name).unwrap().val == vy,
                 },
                 SPCommon::SPValue(vx) => match y {
-                    SPCommon::SPVariable(vy) => vx == state.state.clone().get(&vy.name).unwrap().val,
+                    SPCommon::SPVariable(vy) => {
+                        vx == state.state.clone().get(&vy.name).unwrap().val
+                    }
                     SPCommon::SPValue(vy) => vx == vy,
                 },
             },
@@ -46,11 +51,11 @@ pub fn get_predicate_vars(pred: &Predicate) -> Vec<SPVariable> {
         Predicate::EQ(x, y) => {
             match x {
                 SPCommon::SPVariable(vx) => s.push(vx.to_owned()),
-                _ => ()
+                _ => (),
             }
             match y {
                 SPCommon::SPVariable(vy) => s.push(vy.to_owned()),
-                _ => ()
+                _ => (),
             }
         }
     }
@@ -132,9 +137,8 @@ impl fmt::Display for Predicate {
 //     // make mutable hashmaps first...
 //     // and then compare and see stuff
 
-
 //     // for u in unresolved {
-//     //     match u.0 == 
+//     //     match u.0 ==
 //     // }
 //     // s
 // }
