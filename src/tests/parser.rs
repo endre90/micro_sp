@@ -14,6 +14,7 @@ fn john_doe() -> Vec<(SPVariable, SPValue)> {
     let height = iv!("height", vec!(180, 185, 190));
     let weight = fv!("weight", vec!(80.0, 82.5, 85.0));
     let smart = bv!("smart");
+    let alive = bv!("alive");
 
     vec![
         (name, "John".to_spvalue()),
@@ -21,6 +22,7 @@ fn john_doe() -> Vec<(SPVariable, SPValue)> {
         (height, 185.to_spvalue()),
         (weight, 80.0.to_spvalue()),
         (smart, true.to_spvalue()),
+        (alive, true.to_spvalue()),
     ]
 }
 
@@ -98,11 +100,11 @@ fn parse_predicates() {
     );
     assert_eq!(pred_parser::eq(eq1, &s), Ok(eq2));
 
-    let eq1 = "var: smart == FALSE";
+    let eq1 = "var:smart == FALSE";
     let eq2 = EQ(bv!("smart").wrap(), false.wrap());
     assert_eq!(pred_parser::eq(eq1, &s), Ok(eq2));
 
-    let eq1 = "var: smart == true";
+    let eq1 = "var:smart == true";
     let eq2 = EQ(bv!("smart").wrap(), true.wrap());
     assert_eq!(pred_parser::eq(eq1, &s), Ok(eq2));
     
@@ -133,4 +135,22 @@ fn parse_predicates() {
     );
     let or = OR(vec![eq2, NOT(Box::new(eq3))]);
     assert_eq!(pred_parser::pred(eq1, &s), Ok(or));
+
+    let eq1 = "var:smart == TRUE || !(FALSE != var:smart)";
+    let hej = s.get_all("smart").var.wrap();
+    let eq2 = EQ(hej.clone(), true.to_spvalue().wrap());
+    let eq3 = NEQ(false.to_spvalue().wrap(), hej);
+    let or = OR(vec![eq2, NOT(Box::new(eq3))]);
+    assert_eq!(pred_parser::pred(eq1, &s), Ok(or));
+
+    let impl1 = " var:smart == TRUE ->  var:alive == FALSE || TRUE  ";
+    let hej = s.get_all("smart").var.wrap();
+    let hopp = s.get_all("alive").var.wrap();
+    let eq1 = EQ(hej, true.to_spvalue().wrap());
+    let eq2 = EQ(hopp, false.to_spvalue().wrap());
+    let impl2 = OR(vec![NOT(Box::new(eq1)), OR(vec![eq2, TRUE])]);
+    assert_eq!(pred_parser::pred(impl1, &s), Ok(impl2.clone()));
+    let impl1 = "var:smart == TRUE -> (var:alive == FALSE || TRUE)";
+    assert_eq!(pred_parser::pred(impl1, &s), Ok(impl2));
 }
+
