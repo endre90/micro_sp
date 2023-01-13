@@ -12,9 +12,9 @@ pub use crate::model::predicate::*;
 // pub use crate::model::operation::*;
 pub use crate::model::transition::*;
 
-// pub mod planning;
+pub mod planning;
 // pub use crate::planning::operation::*;
-// pub use crate::planning::transition::*;
+pub use crate::planning::transition::*;
 
 pub mod macros;
 pub use crate::macros::action::*;

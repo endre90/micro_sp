@@ -1,55 +1,27 @@
 #![allow(unused_imports)]
 #![allow(dead_code)]
 use crate::{
-    a, eq, bfs_transition_planner, t, v, Action, Predicate, SPValue, State, ToSPCommon,
-    ToSPCommonVar, ToSPValue, Transition, SPVariable, SPValueType
+    a, eq, bfs_transition_planner, t, v, Action, Predicate, SPValue, State, ToSPWrapped,
+    ToSPWrappedVar, ToSPValue, Transition, SPVariable, SPValueType, SPVariableType
 };
 use std::collections::{HashMap, HashSet};
 
 #[test]
 fn test_planning_simple() {
-    let pos = v!("pos", &vec!("a", "b", "c", "d", "e", "f"));
-    let s = State::new(&HashMap::from([(pos.clone(), "a".to_spval())]));
-
-    let t1 = t!(
-        "a_to_b",
-        eq!(&pos.cr(), "a".cl()),
-        vec!(a!(pos.clone(), "b".cl()))
-    );
-    let t2 = t!(
-        "b_to_c",
-        eq!(&pos.cr(), "b".cl()),
-        vec!(a!(pos.clone(), "c".cl()))
-    );
-    let t3 = t!(
-        "c_to_d",
-        eq!(&pos.cr(), "c".cl()),
-        vec!(a!(pos.clone(), "d".cl()))
-    );
-    let t4 = t!(
-        "d_to_e",
-        eq!(&pos.cr(), "d".cl()),
-        vec!(a!(pos.clone(), "e".cl()))
-    );
-    let t5 = t!(
-        "e_to_f",
-        eq!(&pos.cr(), "e".cl()),
-        vec!(a!(pos.clone(), "f".cl()))
-    );
-    let t6 = t!(
-        "a_to_c",
-        eq!(&pos.cr(), "a".cl()),
-        vec!(a!(pos.clone(), "c".cl()))
-    );
-    let t7 = t!(
-        "d_to_f",
-        eq!(&pos.cr(), "d".cl()),
-        vec!(a!(pos.clone(), "f".cl()))
-    );
+    let pos = v!("pos", vec!("a", "b", "c", "d", "e", "f"));
+    let s = State::from_vec(&vec!((pos.clone(), "a".to_spvalue())));
+    
+    let t1 = t!("a_to_b", eq!(pos.wrap(), "a".wrap()), vec!(a!(pos.clone(), "b".wrap())));
+    let t2 = t!("b_to_c", eq!(pos.wrap(), "b".wrap()), vec!(a!(pos.clone(), "c".wrap())));
+    let t3 = t!("c_to_d", eq!(pos.wrap(), "c".wrap()), vec!(a!(pos.clone(), "d".wrap())));
+    let t4 = t!("d_to_e", eq!(pos.wrap(), "d".wrap()), vec!(a!(pos.clone(), "e".wrap())));
+    let t5 = t!("e_to_f", eq!(pos.wrap(), "e".wrap()), vec!(a!(pos.clone(), "f".wrap())));
+    let t6 = t!("a_to_c", eq!(pos.wrap(), "a".wrap()), vec!(a!(pos.clone(), "c".wrap())));
+    let t7 = t!("d_to_f", eq!(pos.wrap(), "d".wrap()), vec!(a!(pos.clone(), "f".wrap())));
 
     let result = bfs_transition_planner(
         s.clone(),
-        eq!(&pos.cr(), "f".cl()),
+        eq!(pos.wrap(), "f".wrap()),
         vec![
             t1.clone(),
             t2.clone(),
@@ -67,7 +39,7 @@ fn test_planning_simple() {
 
     let result = bfs_transition_planner(
         s.clone(),
-        eq!(&pos.cr(), "a".cl()),
+        eq!(&pos.wrap(), "a".wrap()),
         vec![
             t1.clone(),
             t2.clone(),
@@ -85,7 +57,7 @@ fn test_planning_simple() {
 
     let result = bfs_transition_planner(
         s.clone(),
-        eq!(&pos.cr(), "f".cl()),
+        eq!(&pos.wrap(), "f".wrap()),
         vec![t1.clone(), t2.clone()],
         10,
     );

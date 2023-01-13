@@ -44,10 +44,10 @@ pub fn bfs_transition_planner(
                             false => {
                                 visited.insert(s.clone());
                                 model.iter().for_each(|t| {
-                                    match t.clone().eval(&s) {
+                                    match t.clone().eval_planning(&s) {
                                         false => (),
                                         true => {
-                                            let next_s = t.clone().take(&s);
+                                            let next_s = t.clone().take_planning(&s);
                                             let mut next_p = path.clone();
                                             next_p.push(t.name.clone());
                                             stack.insert(0, (next_s, next_p));

@@ -5,6 +5,6 @@ mod sp_variable;
 mod sp_wrapped;
 mod action;
 mod transition;
-// mod planning;
+mod planning;
 // mod operation;
 mod parser;
