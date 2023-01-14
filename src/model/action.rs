@@ -1,8 +1,10 @@
+use serde::{Serialize, Deserialize};
+
 use crate::{State, SPWrapped, SPVariable};
 use std::fmt;
 
 /// Actions update the assignments of the state variables.
-#[derive(Debug, PartialEq, Eq, Clone, Hash)]
+#[derive(Debug, PartialEq, Eq, Clone, Hash, Serialize, Deserialize)]
 pub struct Action {
     pub var: SPVariable,
     pub var_or_val: SPWrapped,

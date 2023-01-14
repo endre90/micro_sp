@@ -1,9 +1,10 @@
 use std::fmt;
 use ordered_float::OrderedFloat;
+use serde::{Serialize, Deserialize};
 use std::time::SystemTime;
 
 /// SPValue represent a variable value of a specific type.
-#[derive(Debug, PartialEq, Clone, Hash, Eq, PartialOrd, Ord)]
+#[derive(Debug, PartialEq, Clone, Hash, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum SPValue {
     Bool(bool),
     Float64(OrderedFloat<f64>),
@@ -15,7 +16,7 @@ pub enum SPValue {
 }
 
 /// Used by SPVariables for defining their type. Must be the same as SPValue.
-#[derive(Debug, PartialEq, Copy, Clone, Hash, Eq, PartialOrd, Ord)]
+#[derive(Debug, PartialEq, Copy, Clone, Hash, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum SPValueType {
     Bool,
     Float64,

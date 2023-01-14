@@ -1,8 +1,9 @@
 use crate::{SPAssignment, SPValue, SPVariable, SPVariableType};
 use std::collections::HashMap;
+use serde::{Deserialize, Serialize};
 use std::hash::{Hash, Hasher};
 
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub struct State {
     pub state: HashMap<String, SPAssignment>,
 }
@@ -29,6 +30,8 @@ impl Hash for State {
             .hash(s);
     }
 }
+
+// unsafe impl Send for State {}
 
 impl State {
     pub fn new() -> State {

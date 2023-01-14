@@ -1,8 +1,10 @@
+use serde::{Serialize, Deserialize};
+
 use crate::{SPValue, SPValueType, ToSPValue};
 use std::fmt;
 
 /// An SPVariable is a named unit of data of type SPValueType that can be assigned a value from its finite domain.
-#[derive(Debug, PartialEq, Clone, Hash, Eq, PartialOrd, Ord)]
+#[derive(Debug, PartialEq, Clone, Hash, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct SPVariable {
     pub name: String,
     pub variable_type: SPVariableType,
@@ -10,7 +12,7 @@ pub struct SPVariable {
     pub domain: Vec<SPValue>,
 }
 
-#[derive(Debug, PartialEq, Clone, Hash, Eq, PartialOrd, Ord)]
+#[derive(Debug, PartialEq, Clone, Hash, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum SPVariableType {
     Planner,
     Runner,

@@ -1,7 +1,14 @@
+use serde::{Serialize, Deserialize};
+
 use crate::{get_predicate_vars_all, get_predicate_vars_planner, get_predicate_vars_runner, Action, Predicate, SPVariable, State};
 use std::fmt;
 
-#[derive(Debug, Clone, Eq, Hash)]
+// Do I need transition types?
+// Do I neew variable types like measured, controlled and effect?
+// Do I want to implement a synthesis algorithm using some specifications, SCT?
+// Do I want to plug back in Z# as the planner and specification handling tool?
+
+#[derive(Debug, Clone, Eq, Hash, Serialize, Deserialize)]
 pub struct Transition {
     pub name: String,
     pub guard: Predicate,

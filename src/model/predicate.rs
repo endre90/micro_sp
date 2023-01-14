@@ -1,8 +1,10 @@
+use serde::{Serialize, Deserialize};
+
 use crate::{SPVariable, SPWrapped, State, SPVariableType};
 use std::fmt;
 
 /// A predicate is an equality logical formula that can evaluate to either true or false.
-#[derive(Debug, PartialEq, Clone, Eq, Hash)]
+#[derive(Debug, PartialEq, Clone, Eq, Hash, Serialize, Deserialize)]
 pub enum Predicate {
     TRUE,
     FALSE,

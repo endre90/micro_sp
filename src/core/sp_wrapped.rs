@@ -1,9 +1,10 @@
 use crate::{SPValue, SPVariable};
 use ordered_float::OrderedFloat;
+use serde::{Serialize, Deserialize};
 use std::fmt;
 
 /// SPWrapped can either be a SPVariable or a SPValue.
-#[derive(Debug, PartialEq, Eq, Clone, Hash)]
+#[derive(Debug, PartialEq, Eq, Clone, Hash, Serialize, Deserialize)]
 pub enum SPWrapped {
     SPVariable(SPVariable),
     SPValue(SPValue),

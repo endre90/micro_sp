@@ -1,6 +1,8 @@
+use serde::{Serialize, Deserialize};
+
 use crate::{SPValue, SPVariable};
 
-#[derive(Debug, PartialEq, Clone, Hash, Eq, PartialOrd, Ord)]
+#[derive(Debug, PartialEq, Clone, Hash, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct SPAssignment {
     pub var: SPVariable,
     pub val: SPValue
