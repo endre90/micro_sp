@@ -1,7 +1,7 @@
 #![allow(unused_imports)]
 #![allow(dead_code)]
 use crate::{
-    a, assign, bv, bv_run, fv, fv_run, iv, iv_run, t, t_plus, v, v_run, Predicate, Transition, eq, ToSPWrappedVar,
+    a, assign, bv, bv_run, fv, fv_run, iv, iv_run, t, t_plus, v, v_run, Predicate, Transition, eq, ToSPWrappedVar, pred_parser,
 };
 use crate::{
     Action, SPAssignment, SPValue, SPValueType, SPVariable, SPVariableType, State, ToSPValue,
@@ -16,6 +16,7 @@ fn john_doe() -> Vec<(SPVariable, SPValue)> {
     let height = iv!("height", vec!(180, 185, 190));
     let weight = fv!("weight", vec!(80.0, 82.5, 85.0));
     let smart = bv!("smart");
+    let alive = bv_run!("alive");
 
     vec![
         (name, "John".to_spvalue()),
@@ -23,6 +24,7 @@ fn john_doe() -> Vec<(SPVariable, SPValue)> {
         (height, 185.to_spvalue()),
         (weight, 80.0.to_spvalue()),
         (smart, true.to_spvalue()),
+        (alive, true.to_spvalue()),
     ]
 }
 
@@ -219,3 +221,27 @@ fn test_transition_vec_equality() {
     assert_eq!(trans1, trans2);
     assert_ne!(trans2, trans3);
 }
+
+// #[test]
+// fn test_transition_get_vars_all() {
+//     let s = State::from_vec(&john_doe());
+//     let name = v!("name", vec!("John", "Jack"));
+//     let surname = v!("surname", vec!("Doe", "Crawford"));
+//     let height = iv!("height", vec!(180, 185, 190));
+//     let weight = fv!("weight", vec!(80.0, 82.5, 85.0));
+//     let smart = bv!("smart");
+//     let alive = bv_run!("alive");
+
+//     let guard = pred_parser::pred("var:smart == TRUE -> (var:alive == FALSE || TRUE)", &s);
+
+//     // Transitions should be equal even if they have a different name
+//     let t1 = t!("gains_weight_again", eq!(&weight.wrap(), 80.0.wrap()), vec!(a1.clone(), a2.clone(), a3.clone()));
+//     let t2 = t!("gains_weight_again", eq!(&weight.wrap(), 80.0.wrap()), vec!(a1.clone(), a2.clone(), a3.clone()));
+//     let t3 = t!("loses_weight_again", eq!(&weight.wrap(), 80.0.wrap()), vec!(a1.clone(), a2.clone(), a3.clone()));
+//     let t4 = t!("loses_weight_again", eq!(&weight.wrap(), 80.0.wrap()), vec!(a3.clone(), a2.clone()));
+//     let trans1 = vec!(t1.clone(), t3.clone());
+//     let trans2 = vec!(t2.clone(), t3.clone());
+//     let trans3 = vec!(t2.clone(), t4.clone());
+//     assert_eq!(trans1, trans2);
+//     assert_ne!(trans2, trans3);
+// }

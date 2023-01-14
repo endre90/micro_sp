@@ -1,4 +1,4 @@
-use crate::{get_predicate_vars, Action, Predicate, SPVariable, State};
+use crate::{get_predicate_vars_all, get_predicate_vars_planner, get_predicate_vars_runner, Action, Predicate, SPVariable, State};
 use std::fmt;
 
 #[derive(Debug, Clone, Eq, Hash)]
@@ -71,10 +71,11 @@ impl PartialEq for Transition {
     }
 }
 
+// TODO: test
 pub fn get_transition_vars_all(trans: &Transition) -> Vec<SPVariable> {
     let mut s = Vec::new();
-    let guard_vars = get_predicate_vars(&trans.guard);
-    let runner_guard_vars = get_predicate_vars(&trans.runner_guard);
+    let guard_vars = get_predicate_vars_all(&trans.guard);
+    let runner_guard_vars = get_predicate_vars_all(&trans.runner_guard);
     let action_vars: Vec<SPVariable> = trans.actions.iter().map(|x| x.var.to_owned()).collect();
     let runner_action_vars: Vec<SPVariable> = trans
         .runner_actions
@@ -90,22 +91,74 @@ pub fn get_transition_vars_all(trans: &Transition) -> Vec<SPVariable> {
     s
 }
 
-pub fn get_transition_planning_vars(trans: &Transition) -> Vec<SPVariable> {
+// TODO: test
+pub fn get_transition_vars_planner(trans: &Transition) -> Vec<SPVariable> {
     let mut s = Vec::new();
-    let guard_vars = get_predicate_vars(&trans.guard);
+    let guard_vars = get_predicate_vars_planner(&trans.guard);
+    let runner_guard_vars = get_predicate_vars_planner(&trans.runner_guard);
     let action_vars: Vec<SPVariable> = trans.actions.iter().map(|x| x.var.to_owned()).collect();
+    let runner_action_vars: Vec<SPVariable> = trans
+        .runner_actions
+        .iter()
+        .map(|x| x.var.to_owned())
+        .collect();
     s.extend(guard_vars);
+    s.extend(runner_guard_vars);
     s.extend(action_vars);
+    s.extend(runner_action_vars);
     s.sort();
     s.dedup();
     s
 }
 
-pub fn get_model_planning_vars(model: &Vec<Transition>) -> Vec<SPVariable> {
+// TODO: test
+pub fn get_transition_vars_runner(trans: &Transition) -> Vec<SPVariable> {
+    let mut s = Vec::new();
+    let guard_vars = get_predicate_vars_runner(&trans.guard);
+    let runner_guard_vars = get_predicate_vars_runner(&trans.runner_guard);
+    let action_vars: Vec<SPVariable> = trans.actions.iter().map(|x| x.var.to_owned()).collect();
+    let runner_action_vars: Vec<SPVariable> = trans
+        .runner_actions
+        .iter()
+        .map(|x| x.var.to_owned())
+        .collect();
+    s.extend(guard_vars);
+    s.extend(runner_guard_vars);
+    s.extend(action_vars);
+    s.extend(runner_action_vars);
+    s.sort();
+    s.dedup();
+    s
+}
+
+// TODO: test
+pub fn get_transition_model_vars_all(model: &Vec<Transition>) -> Vec<SPVariable> {
     let mut s = Vec::new();
     model
         .iter()
-        .for_each(|x| s.extend(get_transition_planning_vars(x)));
+        .for_each(|x| s.extend(get_transition_vars_all(x)));
+    s.sort();
+    s.dedup();
+    s
+}
+
+// TODO: test
+pub fn get_transition_model_vars_planner(model: &Vec<Transition>) -> Vec<SPVariable> {
+    let mut s = Vec::new();
+    model
+        .iter()
+        .for_each(|x| s.extend(get_transition_vars_planner(x)));
+    s.sort();
+    s.dedup();
+    s
+}
+
+// TODO: test
+pub fn get_transition_model_vars_runner(model: &Vec<Transition>) -> Vec<SPVariable> {
+    let mut s = Vec::new();
+    model
+        .iter()
+        .for_each(|x| s.extend(get_transition_vars_planner(x)));
     s.sort();
     s.dedup();
     s

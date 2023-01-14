@@ -1,4 +1,4 @@
-use crate::{SPVariable, SPWrapped, State};
+use crate::{SPVariable, SPWrapped, State, SPVariableType};
 use std::fmt;
 
 /// A predicate is an equality logical formula that can evaluate to either true or false.
@@ -51,14 +51,15 @@ impl Predicate {
     }
 }
 
-pub fn get_predicate_vars(pred: &Predicate) -> Vec<SPVariable> {
+// TODO: test...
+pub fn get_predicate_vars_all(pred: &Predicate) -> Vec<SPVariable> {
     let mut s = Vec::new();
     match pred {
         Predicate::TRUE => {}
         Predicate::FALSE => {}
-        Predicate::AND(x) => s.extend(x.iter().flat_map(|p| get_predicate_vars(p))),
-        Predicate::OR(x) => s.extend(x.iter().flat_map(|p| get_predicate_vars(p))),
-        Predicate::NOT(x) => s.extend(get_predicate_vars(x)),
+        Predicate::AND(x) => s.extend(x.iter().flat_map(|p| get_predicate_vars_all(p))),
+        Predicate::OR(x) => s.extend(x.iter().flat_map(|p| get_predicate_vars_all(p))),
+        Predicate::NOT(x) => s.extend(get_predicate_vars_all(x)),
         Predicate::EQ(x, y) => {
             match x {
                 SPWrapped::SPVariable(vx) => s.push(vx.to_owned()),
@@ -76,6 +77,100 @@ pub fn get_predicate_vars(pred: &Predicate) -> Vec<SPVariable> {
             }
             match y {
                 SPWrapped::SPVariable(vy) => s.push(vy.to_owned()),
+                _ => (),
+            }
+        }
+    }
+    s.sort();
+    s.dedup();
+    s
+}
+
+// TODO: test...
+pub fn get_predicate_vars_planner(pred: &Predicate) -> Vec<SPVariable> {
+    let mut s = Vec::new();
+    match pred {
+        Predicate::TRUE => {}
+        Predicate::FALSE => {}
+        Predicate::AND(x) => s.extend(x.iter().flat_map(|p| get_predicate_vars_planner(p))),
+        Predicate::OR(x) => s.extend(x.iter().flat_map(|p| get_predicate_vars_planner(p))),
+        Predicate::NOT(x) => s.extend(get_predicate_vars_planner(x)),
+        Predicate::EQ(x, y) => {
+            match x {
+                SPWrapped::SPVariable(vx) => match vx.variable_type {
+                    SPVariableType::Planner => s.push(vx.to_owned()),
+                    _ => ()
+                }
+                _ => (),
+            }
+            match y {
+                SPWrapped::SPVariable(vy) => match vy.variable_type {
+                    SPVariableType::Planner => s.push(vy.to_owned()),
+                    _ => ()
+                }
+                _ => (),
+            }
+        }
+        Predicate::NEQ(x, y) => {
+            match x {
+                SPWrapped::SPVariable(vx) => match vx.variable_type {
+                    SPVariableType::Planner => s.push(vx.to_owned()),
+                    _ => ()
+                }
+                _ => (),
+            }
+            match y {
+                SPWrapped::SPVariable(vy) => match vy.variable_type {
+                    SPVariableType::Planner => s.push(vy.to_owned()),
+                    _ => ()
+                }
+                _ => (),
+            }
+        }
+    }
+    s.sort();
+    s.dedup();
+    s
+}
+
+// TODO: test...
+pub fn get_predicate_vars_runner(pred: &Predicate) -> Vec<SPVariable> {
+    let mut s = Vec::new();
+    match pred {
+        Predicate::TRUE => {}
+        Predicate::FALSE => {}
+        Predicate::AND(x) => s.extend(x.iter().flat_map(|p| get_predicate_vars_runner(p))),
+        Predicate::OR(x) => s.extend(x.iter().flat_map(|p| get_predicate_vars_runner(p))),
+        Predicate::NOT(x) => s.extend(get_predicate_vars_runner(x)),
+        Predicate::EQ(x, y) => {
+            match x {
+                SPWrapped::SPVariable(vx) => match vx.variable_type {
+                    SPVariableType::Runner => s.push(vx.to_owned()),
+                    _ => ()
+                }
+                _ => (),
+            }
+            match y {
+                SPWrapped::SPVariable(vy) => match vy.variable_type {
+                    SPVariableType::Runner => s.push(vy.to_owned()),
+                    _ => ()
+                }
+                _ => (),
+            }
+        }
+        Predicate::NEQ(x, y) => {
+            match x {
+                SPWrapped::SPVariable(vx) => match vx.variable_type {
+                    SPVariableType::Runner => s.push(vx.to_owned()),
+                    _ => ()
+                }
+                _ => (),
+            }
+            match y {
+                SPWrapped::SPVariable(vy) => match vy.variable_type {
+                    SPVariableType::Runner => s.push(vy.to_owned()),
+                    _ => ()
+                }
                 _ => (),
             }
         }
