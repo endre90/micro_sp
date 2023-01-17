@@ -65,14 +65,14 @@ impl State {
 
     pub fn get_value(&self, name: &str) -> SPValue {
         match self.state.clone().get(name) {
-            None => panic!("Not in state!"),
+            None => panic!("Variable {} Not in state!", name),
             Some(x) => x.val.clone()
         }
     }
 
     pub fn get_all(&self, name: &str) -> SPAssignment {
         match self.state.clone().get(name) {
-            None => panic!("Not in state!"),
+            None => panic!("Variable {} not in state!", name),
             Some(x) => x.clone()
         }
     }
