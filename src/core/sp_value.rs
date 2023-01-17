@@ -25,6 +25,9 @@ pub enum SPValueType {
     Time,
     Array,
     Unknown,
+    Float64Array,
+    Int32Array,
+    StringArray
 }
 
 impl SPValue {
@@ -47,7 +50,13 @@ impl SPValue {
             SPValue::Int32(_) => SPValueType::Int32,
             SPValue::String(_) => SPValueType::String,
             SPValue::Time(_) => SPValueType::Time,
-            SPValue::Array(t, _) => *t,
+            SPValue::Array(t, _) => match *t {
+                SPValueType::Float64 => SPValueType::Float64Array,
+                SPValueType::Int32 => SPValueType::Int32Array,
+                SPValueType::String => SPValueType::StringArray,
+                SPValueType::Array => self.has_type(),
+                _ => SPValueType::Array,
+            },
             SPValue::Unknown => SPValueType::Unknown,
         }
     }
@@ -162,6 +171,9 @@ impl fmt::Display for SPValueType {
             SPValueType::Time => write!(fmtr, "Time"),
             SPValueType::Array => write!(fmtr, "Array"),
             SPValueType::Unknown => write!(fmtr, "[unknown]"),
+            SPValueType::Float64Array => write!(fmtr, "Float64Array"),
+            SPValueType::Int32Array => write!(fmtr, "Int32Array"),
+            SPValueType::StringArray => write!(fmtr, "StringArray"),
         }
     }
 }

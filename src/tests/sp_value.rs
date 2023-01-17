@@ -43,8 +43,8 @@ fn test_sp_value_has_type() {
     assert_eq!(SPValueType::String, string_val.has_type());
     assert_eq!(SPValueType::Float64, float_val.has_type());
     assert_eq!(SPValueType::Time, time_val.has_type());
-    assert_eq!(SPValueType::String, array_val.has_type());
-    assert_eq!(SPValueType::Int32, array_val2.has_type());
+    assert_eq!(SPValueType::StringArray, array_val.has_type());
+    assert_eq!(SPValueType::Int32Array, array_val2.has_type());
     assert_eq!(SPValueType::Unknown, unknown_val.has_type());
     assert_ne!(SPValueType::Bool, int_val.has_type());
     assert_ne!(SPValueType::Int32, string_val.has_type());
