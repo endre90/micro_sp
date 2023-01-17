@@ -121,27 +121,3 @@ macro_rules! av_run {
         )
     };
 }
-
-#[macro_export]
-macro_rules! sav {
-    ($a:expr, $b:expr) => {
-        SPVariable::new(
-            $a.clone(),
-            SPVariableType::Planner,
-            SPValueType::StringArray,
-            $b.iter().map(|x| x.clone().to_spvalue()).collect(),
-        )
-    };
-}
-
-#[macro_export]
-macro_rules! sav_run {
-    ($a:expr) => {
-        SPVariable::new(
-            $a.clone(),
-            SPVariableType::Runner,
-            SPValueType::StringArray,
-            vec!(),
-        )
-    };
-}
