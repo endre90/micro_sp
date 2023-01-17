@@ -1,6 +1,9 @@
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
-use crate::{get_predicate_vars_all, get_predicate_vars_planner, get_predicate_vars_runner, Action, Predicate, SPVariable, State};
+use crate::{
+    get_predicate_vars_all, get_predicate_vars_planner, get_predicate_vars_runner, Action,
+    Predicate, SPVariable, State,
+};
 use std::fmt;
 
 // Do I need transition types?

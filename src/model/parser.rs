@@ -1,4 +1,6 @@
-use crate::{SPVariable, SPWrapped, State, ToSPValue, Predicate};
+use crate::{
+    Action, Predicate, SPVariable, SPWrapped, State, ToSPValue, ToSPWrapped, ToSPWrappedVar,
+};
 
 peg::parser!(pub grammar pred_parser() for str {
 
@@ -10,19 +12,24 @@ peg::parser!(pub grammar pred_parser() for str {
     }
 
     pub rule value(state: &State) -> SPWrapped
-    = _ var:variable(&state) _ { SPWrapped::SPVariable(var) }
-    / _ "true" _ { SPWrapped::SPValue(true.to_spvalue()) }
-    / _ "TRUE" _ { SPWrapped::SPValue(true.to_spvalue()) }
-    / _ "false" _ { SPWrapped::SPValue(false.to_spvalue()) }
-    / _ "FALSE" _ { SPWrapped::SPValue(false.to_spvalue()) }
-    / _ n:$(['a'..='z' | 'A'..='Z' | '_']+) _ { SPWrapped::SPValue(n.to_spvalue()) }
-    / _ "\"" n:$(!['"'] [_])* "\"" _ { 
-        SPWrapped::SPValue(n.into_iter().collect::<Vec<_>>().join("").to_spvalue()) 
-    }
-    / _ n:$(['0'..='9']+) _ { 
-        let i: i32 = n.parse().unwrap(); 
-        SPWrapped::SPValue(i.to_spvalue())
-    }
+        = _ var:variable(&state) _ { SPWrapped::SPVariable(var) }
+        / _ "true" _ { SPWrapped::SPValue(true.to_spvalue()) }
+        / _ "TRUE" _ { SPWrapped::SPValue(true.to_spvalue()) }
+        / _ "false" _ { SPWrapped::SPValue(false.to_spvalue()) }
+        / _ "FALSE" _ { SPWrapped::SPValue(false.to_spvalue()) }
+        / _ n:$(['a'..='z' | 'A'..='Z' | '_']+) _ { SPWrapped::SPValue(n.to_spvalue()) }
+        / _ "\"" n:$(!['"'] [_])* "\"" _ {
+            SPWrapped::SPValue(n.into_iter().collect::<Vec<_>>().join("").to_spvalue())
+        }
+        / _ n:$(['0'..='9']+ "." ['0'..='9']+) _ {
+            let f: f64 = n.parse().unwrap();
+            SPWrapped::SPValue(f.to_spvalue())
+        }
+        / _ n:$(['0'..='9']+) _ {
+            let i: i32 = n.parse().unwrap();
+            SPWrapped::SPValue(i.to_spvalue())
+        }
+
     pub rule eq(state: &State) -> Predicate
         = p1:value(&state) _ "==" _ p2:value(&state) { Predicate::EQ(p1,p2) }
         / p1:value(&state) _ "!=" _ p2:value(&state) { Predicate::NEQ(p1,p2) }
@@ -63,4 +70,8 @@ peg::parser!(pub grammar pred_parser() for str {
         _ "FALSE" _ { Predicate::FALSE }
         _ "false" _ { Predicate::FALSE }
     }
+
+    pub rule action(state: &State) -> Action
+    = p1:variable(&state) _ "<-" _ p2:variable(&state) { Action::new(p1, state.get_value(&p2.name).wrap()) }
+    / p1:variable(&state) _ "<-" _ p2:value(&state) { Action::new(p1, p2) }
 });

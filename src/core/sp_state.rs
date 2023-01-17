@@ -31,8 +31,6 @@ impl Hash for State {
     }
 }
 
-// unsafe impl Send for State {}
-
 impl State {
     pub fn new() -> State {
         State {

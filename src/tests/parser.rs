@@ -34,6 +34,10 @@ fn parse_values() {
         Ok(SPWrapped::SPValue(9.to_spvalue()))
     );
     assert_eq!(
+        pred_parser::value("19.123", &s),
+        Ok(SPWrapped::SPValue(19.123.to_spvalue()))
+    );
+    assert_eq!(
         pred_parser::value("hej", &s),
         Ok(SPWrapped::SPValue("hej".to_spvalue()))
     );
@@ -154,3 +158,14 @@ fn parse_predicates() {
     assert_eq!(pred_parser::pred(impl1, &s), Ok(impl2));
 }
 
+#[test]
+fn parse_actions() {
+    let s = State::from_vec(&john_doe());
+    let weight = fv!("weight", vec!(80.0, 82.5, 85.0));
+    let weight_2 = fv!("weight_2", vec!(85.0, 87.5));
+    let s_new = s.add(SPAssignment::new(weight_2, 85.0.to_spvalue()));
+    let a1 = a!(weight.clone(), 82.5.wrap());
+    let a2 = a!(weight.clone(), 85.0.wrap());
+    assert_eq!(pred_parser::action("var:weight <- 82.5", &s), Ok(a1));
+    assert_eq!(pred_parser::action("var:weight <- var:weight_2", &s_new), Ok(a2));
+}

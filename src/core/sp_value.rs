@@ -151,3 +151,17 @@ impl fmt::Display for SPValue {
         }
     }
 }
+
+impl fmt::Display for SPValueType {
+    fn fmt(&self, fmtr: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            SPValueType::Bool => write!(fmtr, "Bool"),
+            SPValueType::Float64 => write!(fmtr, "Float64"),
+            SPValueType::Int32 => write!(fmtr, "Int32"),
+            SPValueType::String => write!(fmtr, "String"),
+            SPValueType::Time => write!(fmtr, "Time"),
+            SPValueType::Array => write!(fmtr, "Array"),
+            SPValueType::Unknown => write!(fmtr, "[unknown]"),
+        }
+    }
+}
