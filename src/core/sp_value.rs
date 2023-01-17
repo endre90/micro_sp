@@ -152,7 +152,7 @@ impl fmt::Display for SPValue {
         match self {
             SPValue::Bool(b) if *b => write!(fmtr, "true"),
             SPValue::Bool(_) => write!(fmtr, "false"),
-            SPValue::Float64(f) => write!(fmtr, "{}", f),
+            SPValue::Float64(f) => write!(fmtr, "{}", f.0),
             SPValue::Int32(i) => write!(fmtr, "{}", i),
             SPValue::String(s) => write!(fmtr, "{}", s),
             SPValue::Time(t) => write!(fmtr, "{:?}", t.elapsed().unwrap_or_default()),

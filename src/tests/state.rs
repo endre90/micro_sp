@@ -50,6 +50,13 @@ fn test_state_from_vec() {
 }
 
 #[test]
+fn test_state_display() {
+    let john_doe = john_doe();
+    let new_state = State::from_vec(&john_doe);
+    print!("{}", new_state)
+}
+
+#[test]
 #[should_panic]
 fn test_state_from_vec_panic() {
     let john_doe = john_doe();

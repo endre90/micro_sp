@@ -1,5 +1,5 @@
 use crate::{SPAssignment, SPValue, SPVariable, SPVariableType};
-use std::collections::HashMap;
+use std::{collections::HashMap, fmt};
 use serde::{Deserialize, Serialize};
 use std::hash::{Hash, Hasher};
 
@@ -115,5 +115,17 @@ impl State {
             },
             None => panic!("Variable {} not in state.", name),
         }
+    }
+}
+
+impl fmt::Display for State {
+    fn fmt(&self, fmtr: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let s: String = {
+            // let sorted = self.state.sort();
+            let children: Vec<_> = self.state.iter().map(|(k, v)| format!("    {}: {}", k, v.val)).collect();
+            format!("{}", children.join("\n"))
+        };
+
+        write!(fmtr, "State: {{\n{}\n}}\n", &s)
     }
 }
