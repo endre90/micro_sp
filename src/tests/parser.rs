@@ -1,7 +1,7 @@
 #![allow(unused_imports)]
 #![allow(dead_code)]
 use crate::{
-    a, assign, bv, bv_run, fv, fv_run, iv, iv_run, t, t_plus, v, v_run, Predicate::*, Transition, eq, ToSPWrappedVar, pred_parser, SPWrapped,
+    a, assign, bv, bv_run, fv, fv_run, iv, iv_run, v, v_run, Predicate::*, Transition, eq, ToSPWrappedVar, pred_parser, SPWrapped,
 };
 use crate::{
     Action, SPAssignment, SPValue, SPValueType, SPVariable, SPVariableType, State, ToSPValue,

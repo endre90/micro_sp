@@ -20,6 +20,7 @@ pub struct Transition {
     pub runner_actions: Vec<Action>,
 }
 
+// TODO: check the variables in guards and actions for the Runner/Planner type
 impl Transition {
     pub fn new(
         name: &str,
