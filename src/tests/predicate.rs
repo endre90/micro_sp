@@ -1,7 +1,8 @@
 #![allow(unused_imports)]
 #![allow(dead_code)]
 use crate::{
-    assign, bv, bv_run, fv, fv_run, iv, iv_run, v, v_run, Predicate, ToSPWrapped, ToSPWrappedVar, eq, not, neq, and, or,
+    and, assign, av_run, bv, bv_run, eq, fv, fv_run, iv, iv_run, neq, not, or, pred_parser, v,
+    v_run, Predicate, ToSPWrapped, ToSPWrappedVar, get_predicate_vars_all, get_predicate_vars_planner, get_predicate_vars_runner,
 };
 use crate::{SPAssignment, SPValue, SPValueType, SPVariable, SPVariableType, State, ToSPValue};
 use std::collections::{HashMap, HashSet};
@@ -167,4 +168,102 @@ fn test_predicate_or_macro() {
     let or2 = or!(vec![eq, eq2, eqf]);
     assert!(or.eval(&s1));
     assert!(or2.eval(&s1));
+}
+
+fn make_robot_initial_state() -> State {
+    let state = State::new();
+    let state = state.add(SPAssignment::new(
+        v_run!("runner_goal"),
+        "var:ur_current_pose == c".to_spvalue(),
+    ));
+    let state = state.add(SPAssignment::new(
+        av_run!("runner_plan"),
+        Vec::<String>::new().to_spvalue(),
+    ));
+    let state = state.add(SPAssignment::new(
+        bv_run!("runner_replan"),
+        true.to_spvalue(),
+    ));
+    let state = state.add(SPAssignment::new(
+        bv_run!("runner_replanned"),
+        false.to_spvalue(),
+    ));
+    let state = state.add(SPAssignment::new(
+        bv_run!("ur_action_trigger"),
+        false.to_spvalue(),
+    ));
+    let state = state.add(SPAssignment::new(
+        v_run!("ur_action_state"),
+        "initial".to_spvalue(),
+    ));
+    let state = state.add(SPAssignment::new(
+        v!("ur_current_pose", vec!("a", "b", "c")),
+        "a".to_spvalue(),
+    ));
+    let state = state.add(SPAssignment::new(
+        v!("ur_command", vec!("movej", "movel")),
+        "movej".to_spvalue(),
+    ));
+    let state = state.add(SPAssignment::new(
+        fv!("ur_velocity", vec!(0.1, 0.2, 0.3)),
+        0.2.to_spvalue(),
+    ));
+    let state = state.add(SPAssignment::new(
+        fv!("ur_acceleration", vec!(0.2, 0.4, 0.6)),
+        0.4.to_spvalue(),
+    ));
+    let state = state.add(SPAssignment::new(
+        v!("ur_goal_feature_id", vec!("a", "b", "c")),
+        "a".to_spvalue(),
+    ));
+    let state = state.add(SPAssignment::new(
+        v!("ur_tcp_id", vec!("svt_tcp")),
+        "svt_tcp".to_spvalue(),
+    ));
+    state
+}
+
+#[test]
+fn test_predicate_get_all_variables() {
+    let state = make_robot_initial_state();
+    let pred = pred_parser::pred(
+        "var:ur_action_trigger == false && var:ur_action_state == initial && var:ur_current_pose != a",
+        &state,
+    ).unwrap();
+    let vars = get_predicate_vars_all(&pred);
+    let vars_init = vec!(
+        v_run!("ur_action_state"),
+        bv_run!("ur_action_trigger"),
+        v!("ur_current_pose", vec!("a", "b", "c"))
+    );
+    assert_eq!(vars, vars_init)
+}
+
+#[test]
+fn test_predicate_get_planner_variables() {
+    let state = make_robot_initial_state();
+    let pred = pred_parser::pred(
+        "var:ur_action_trigger == false && var:ur_action_state == initial && var:ur_current_pose != a",
+        &state,
+    ).unwrap();
+    let vars = get_predicate_vars_planner(&pred);
+    let vars_init = vec!(
+        v!("ur_current_pose", vec!("a", "b", "c"))
+    );
+    assert_eq!(vars, vars_init)
+}
+
+#[test]
+fn test_predicate_get_runner_variables() {
+    let state = make_robot_initial_state();
+    let pred = pred_parser::pred(
+        "var:ur_action_trigger == false && var:ur_action_state == initial && var:ur_current_pose != a",
+        &state,
+    ).unwrap();
+    let vars = get_predicate_vars_runner(&pred);
+    let vars_init = vec!(
+        v_run!("ur_action_state"),
+        bv_run!("ur_action_trigger")
+    );
+    assert_eq!(vars, vars_init)
 }

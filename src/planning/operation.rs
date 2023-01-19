@@ -44,7 +44,7 @@ pub fn bfs_operation_planner(
                             false => {
                                 visited.insert(s.clone());
                                 model.iter().for_each(|o| {
-                                    match o.clone().eval(&s) {
+                                    match o.clone().eval_planning(&s) {
                                         false => (),
                                         true => {
                                             let next_s = o.clone().take_planning(&s);

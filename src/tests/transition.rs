@@ -93,6 +93,66 @@ fn test_transition_eval_running() {
 }
 
 #[test]
+#[should_panic]
+fn test_transition_planner_var_in_runner_guard_panic() {
+    let s = State::from_vec(&john_doe());
+    let t1 = t!(
+        "gains_weight",
+        "true",
+        "var:weight == 85.0",
+        vec!("var:weight <- 85.0", "var:height <- 190"),
+        Vec::<&str>::new(),
+        &s
+    );
+    assert!(t1.eval_running(&s));
+}
+
+#[test]
+#[should_panic]
+fn test_transition_runner_var_in_planner_guard_panic() {
+    let s = State::from_vec(&john_doe());
+    let t1 = t!(
+        "gains_weight",
+        "var:alive == true",
+        "true",
+        vec!("var:weight <- 85.0", "var:height <- 190"),
+        Vec::<&str>::new(),
+        &s
+    );
+    assert!(t1.eval_running(&s));
+}
+
+#[test]
+#[should_panic]
+fn test_transition_planner_var_in_runner_action_panic() {
+    let s = State::from_vec(&john_doe());
+    let t1 = t!(
+        "gains_weight",
+        "true",
+        "true",
+        Vec::<&str>::new(),
+        vec!("var:weight <- 85.0", "var:height <- 190"),
+        &s
+    );
+    assert!(t1.eval_running(&s));
+}
+
+#[test]
+#[should_panic]
+fn test_transition_runner_var_in_planner_action_panic() {
+    let s = State::from_vec(&john_doe());
+    let t1 = t!(
+        "gains_weight",
+        "true",
+        "true",
+        vec!("var:alive <- false", "var:height <- 190"),
+        Vec::<&str>::new(),
+        &s
+    );
+    assert!(t1.eval_running(&s));
+}
+
+#[test]
 fn test_transition_take_planning() {
     let s = State::from_vec(&john_doe());
     let weight = fv!("weight", vec!(80.0, 82.5, 85.0));

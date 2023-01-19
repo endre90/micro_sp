@@ -1,3 +1,5 @@
+use serde::{Serialize, Deserialize};
+
 use crate::{
     eq, Action, Predicate, SPValue, SPValueType, SPVariable, State, ToSPValue,
     ToSPWrapped, ToSPWrappedVar, Transition,
@@ -14,37 +16,23 @@ use std::{collections::HashMap, fmt};
 //     // Reseting
 // }
 
-#[derive(Debug, PartialEq, Clone, Eq, Hash)]
+#[derive(Debug, PartialEq, Clone, Eq, Hash, Serialize, Deserialize)]
 pub struct Operation {
     pub name: String,
     pub precondition: Transition,
-    pub postcondition: Transition,
-    // pub effect: Vec<Action>, // figure out in whixh scenarios do wen need this and in which is it enought to have only run
-    // pub run: Option<Transition>,
+    pub postcondition: Transition
 }
-
-// pub fn initialize_ops(ops: Vec<Operation>) -> HashMap<Operation, OperationState> {
-//     let mut operations = HashMap::new();
-//     ops.iter().for_each(
-//         |o| match operations.insert(o.clone(), OperationState::Initial) {
-//             _ => (),
-//         },
-//     );
-//     operations
-// }
 
 impl Operation {
     pub fn new(
         name: &str,
-        precondition: &Transition,
-        postcondition: &Transition,
-        // run: &Option<Transition>,
+        precondition: Transition,
+        postcondition: Transition
     ) -> Operation {
         Operation {
             name: name.to_string(),
-            precondition: precondition.to_owned(),
-            postcondition: postcondition.to_owned(),
-            // run: run.to_owned(),
+            precondition,
+            postcondition
         }
     }
 
@@ -62,6 +50,11 @@ impl Operation {
         } else {
             false
         }
+    }
+
+    pub fn take_planning(self, state: &State) -> State {
+        self.postcondition.take_planning(&self.precondition.take_planning(state))
+        // effects?
     }
 
     // pub fn start(self, state: &State) -> bool {

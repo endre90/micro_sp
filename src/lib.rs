@@ -9,8 +9,9 @@ pub mod model;
 pub use crate::model::action::*;
 pub use crate::model::parser::*;
 pub use crate::model::predicate::*;
-// pub use crate::model::operation::*;
+pub use crate::model::operation::*;
 pub use crate::model::transition::*;
+pub use crate::model::operation_model::*;
 
 pub mod planning;
 // pub use crate::planning::operation::*;
