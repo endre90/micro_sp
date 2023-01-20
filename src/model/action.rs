@@ -1,6 +1,6 @@
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
-use crate::{State, SPWrapped, SPVariable};
+use crate::{SPVariable, SPWrapped, State};
 use std::fmt;
 
 /// Actions update the assignments of the state variables.
@@ -12,17 +12,16 @@ pub struct Action {
 
 impl Action {
     pub fn new(var: SPVariable, var_or_val: SPWrapped) -> Action {
-        Action {
-            var,
-            var_or_val
-        }
+        Action { var, var_or_val }
     }
-    
+
     pub fn assign(self, state: &State) -> State {
         match state.contains(&self.var.name) {
             true => match self.var_or_val {
                 SPWrapped::SPVariable(x) => match state.contains(&x.name) {
-                    true => state.clone().update(&self.var.name, state.get_value(&x.name)),
+                    true => state
+                        .clone()
+                        .update(&self.var.name, state.get_value(&x.name)),
                     false => panic!("Variable {:?} not in the state.", x.name),
                 },
                 SPWrapped::SPValue(x) => state.clone().update(&self.var.name, x),

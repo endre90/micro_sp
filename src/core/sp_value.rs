@@ -1,6 +1,6 @@
-use std::fmt;
 use ordered_float::OrderedFloat;
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
+use std::fmt;
 use std::time::SystemTime;
 
 /// SPValue represent a variable value of a specific type.
@@ -76,8 +76,14 @@ impl SPValue {
             SPValue::Int32(x) => x.to_string(),
             SPValue::String(x) => x.to_string(),
             SPValue::Time(x) => format!("{:?}", x.elapsed().unwrap_or_default()),
-            SPValue::Array(_, arr) => format!("[{}]", arr.iter().map(|x| x.to_string()).collect::<Vec<String>>().join(", ")),
-            SPValue::Unknown => "[unknown]".to_string()
+            SPValue::Array(_, arr) => format!(
+                "[{}]",
+                arr.iter()
+                    .map(|x| x.to_string())
+                    .collect::<Vec<String>>()
+                    .join(", ")
+            ),
+            SPValue::Unknown => "[unknown]".to_string(),
         }
     }
 }

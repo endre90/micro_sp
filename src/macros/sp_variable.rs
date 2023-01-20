@@ -21,7 +21,7 @@ macro_rules! v_run {
             $a.clone(),
             SPVariableType::Runner,
             SPValueType::String,
-            vec!(),
+            vec![],
         )
     };
 }
@@ -69,7 +69,7 @@ macro_rules! iv_run {
             $a.clone(),
             SPVariableType::Runner,
             SPValueType::Int32,
-            vec!(),
+            vec![],
         )
     };
 }
@@ -93,7 +93,7 @@ macro_rules! fv_run {
             $a.clone(),
             SPVariableType::Runner,
             SPValueType::Float64,
-            vec!(),
+            vec![],
         )
     };
 }
@@ -117,7 +117,7 @@ macro_rules! av_run {
             $a.clone(),
             SPVariableType::Runner,
             SPValueType::Array,
-            vec!(),
+            vec![],
         )
     };
 }

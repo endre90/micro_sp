@@ -1,7 +1,7 @@
 use crate::{SPAssignment, SPValue, SPVariable, SPVariableType};
-use std::{collections::HashMap, fmt};
 use serde::{Deserialize, Serialize};
 use std::hash::{Hash, Hasher};
+use std::{collections::HashMap, fmt};
 
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub struct State {
@@ -66,14 +66,14 @@ impl State {
     pub fn get_value(&self, name: &str) -> SPValue {
         match self.state.clone().get(name) {
             None => panic!("Variable {} Not in state!", name),
-            Some(x) => x.val.clone()
+            Some(x) => x.val.clone(),
         }
     }
 
     pub fn get_all(&self, name: &str) -> SPAssignment {
         match self.state.clone().get(name) {
             None => panic!("Variable {} not in state!", name),
-            Some(x) => x.clone()
+            Some(x) => x.clone(),
         }
     }
 
@@ -122,7 +122,11 @@ impl fmt::Display for State {
     fn fmt(&self, fmtr: &mut fmt::Formatter<'_>) -> fmt::Result {
         let s: String = {
             // let sorted = self.state.sort();
-            let children: Vec<_> = self.state.iter().map(|(k, v)| format!("    {}: {}", k, v.val)).collect();
+            let children: Vec<_> = self
+                .state
+                .iter()
+                .map(|(k, v)| format!("    {}: {}", k, v.val))
+                .collect();
             format!("{}", children.join("\n"))
         };
 

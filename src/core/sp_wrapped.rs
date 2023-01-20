@@ -1,6 +1,6 @@
 use crate::{SPValue, SPVariable};
 use ordered_float::OrderedFloat;
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 use std::fmt;
 
 /// SPWrapped can either be a SPVariable or a SPValue.

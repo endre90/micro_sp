@@ -1,6 +1,4 @@
-use crate::{
-    Action, Predicate, SPVariable, SPWrapped, State, ToSPValue, ToSPWrapped, ToSPWrappedVar,
-};
+use crate::{Action, Predicate, SPVariable, SPWrapped, State, ToSPValue, ToSPWrapped};
 
 peg::parser!(pub grammar pred_parser() for str {
 

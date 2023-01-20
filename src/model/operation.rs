@@ -1,38 +1,20 @@
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
-use crate::{
-    eq, Action, Predicate, SPValue, SPValueType, SPVariable, State, ToSPValue,
-    ToSPWrapped, ToSPWrappedVar, Transition,
-};
-use std::{collections::HashMap, fmt};
-
-/// The idea is to save the operation states elsewhere to help the assist tool and the planner
-// #[derive(Debug, PartialEq, Clone, Eq)]
-// pub enum OperationState {
-//     Initial,
-//     Executing,
-//     // Done,
-//     // WaitingToRun,
-//     // Reseting
-// }
+use crate::{Action, State, ToSPValue, ToSPWrapped, Transition};
 
 #[derive(Debug, PartialEq, Clone, Eq, Hash, Serialize, Deserialize)]
 pub struct Operation {
     pub name: String,
     pub precondition: Transition,
-    pub postcondition: Transition
+    pub postcondition: Transition,
 }
 
 impl Operation {
-    pub fn new(
-        name: &str,
-        precondition: Transition,
-        postcondition: Transition
-    ) -> Operation {
+    pub fn new(name: &str, precondition: Transition, postcondition: Transition) -> Operation {
         Operation {
             name: name.to_string(),
             precondition,
-            postcondition
+            postcondition,
         }
     }
 
@@ -53,52 +35,28 @@ impl Operation {
     }
 
     pub fn take_planning(self, state: &State) -> State {
-        self.postcondition.take_planning(&self.precondition.take_planning(state))
+        self.postcondition
+            .take_planning(&self.precondition.take_planning(state))
         // effects?
     }
 
-    // pub fn start(self, state: &State) -> bool {
-    //     if state.get_value(&self.name) == "initial".to_spvalue() {
-    //         self.precondition.eval_running(state)
-    //     } else {
-    //         false
-    //     }
-    // }
+    pub fn start_running(self, state: &State) -> State {
+        let assignment = state.get_all(&self.name);
+        if assignment.val == "initial".to_spvalue() {
+            let action = Action::new(assignment.var, "executing".wrap());
+            action.assign(&self.precondition.take_running(state))
+        } else {
+            state.clone()
+        }
+    }
 
+    pub fn complete_running(self, state: &State) -> State {
+        let assignment = state.get_all(&self.name);
+        if assignment.val == "executing".to_spvalue() {
+            let action = Action::new(assignment.var, "initial".wrap());
+            self.precondition.take_running(&action.assign(&state))
+        } else {
+            state.clone()
+        }
+    }
 }
-
-// pub fn start(
-//     self,
-//     state: &State,
-//     op_state: &HashMap<Operation, OperationState>,
-// ) -> (State, HashMap<Operation, OperationState>) {
-//     match op_state.get(&self) {
-//         Some(_) => {
-//             let mut mut_op_state = op_state.clone();
-//             mut_op_state.insert(self.clone(), OperationState::Executing);
-//             (self.precondition.take(state), mut_op_state.clone())
-//         }
-//         None => panic!("operation doesn't have a state!"),
-//     }
-// }
-
-// pub fn complete(
-//     self,
-//     state: &State,
-//     op_state: &HashMap<Operation, OperationState>,
-// ) -> (State, HashMap<Operation, OperationState>) {
-//     match op_state.get(&self) {
-//         Some(_) => {
-//             let mut mut_op_state = op_state.clone();
-//             mut_op_state.insert(self.clone(), OperationState::Initial);
-//             (self.postcondition.take(state), mut_op_state.clone())
-//         }
-//         None => panic!("operation doesn't have a state!"),
-//     }
-// }
-
-// pub fn take_planning(self, state: &State) -> State {
-//     self.postcondition
-//         .take_planning(&self.precondition.take_planning(state))
-// }
-// }

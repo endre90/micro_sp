@@ -1,6 +1,6 @@
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
-use crate::{SPVariable, SPWrapped, State, SPVariableType};
+use crate::{SPVariable, SPVariableType, SPWrapped, State};
 use std::fmt;
 
 /// A predicate is an equality logical formula that can evaluate to either true or false.
@@ -101,15 +101,15 @@ pub fn get_predicate_vars_planner(pred: &Predicate) -> Vec<SPVariable> {
             match x {
                 SPWrapped::SPVariable(vx) => match vx.variable_type {
                     SPVariableType::Planner => s.push(vx.to_owned()),
-                    _ => ()
-                }
+                    _ => (),
+                },
                 _ => (),
             }
             match y {
                 SPWrapped::SPVariable(vy) => match vy.variable_type {
                     SPVariableType::Planner => s.push(vy.to_owned()),
-                    _ => ()
-                }
+                    _ => (),
+                },
                 _ => (),
             }
         }
@@ -117,15 +117,15 @@ pub fn get_predicate_vars_planner(pred: &Predicate) -> Vec<SPVariable> {
             match x {
                 SPWrapped::SPVariable(vx) => match vx.variable_type {
                     SPVariableType::Planner => s.push(vx.to_owned()),
-                    _ => ()
-                }
+                    _ => (),
+                },
                 _ => (),
             }
             match y {
                 SPWrapped::SPVariable(vy) => match vy.variable_type {
                     SPVariableType::Planner => s.push(vy.to_owned()),
-                    _ => ()
-                }
+                    _ => (),
+                },
                 _ => (),
             }
         }
@@ -148,15 +148,15 @@ pub fn get_predicate_vars_runner(pred: &Predicate) -> Vec<SPVariable> {
             match x {
                 SPWrapped::SPVariable(vx) => match vx.variable_type {
                     SPVariableType::Runner => s.push(vx.to_owned()),
-                    _ => ()
-                }
+                    _ => (),
+                },
                 _ => (),
             }
             match y {
                 SPWrapped::SPVariable(vy) => match vy.variable_type {
                     SPVariableType::Runner => s.push(vy.to_owned()),
-                    _ => ()
-                }
+                    _ => (),
+                },
                 _ => (),
             }
         }
@@ -164,15 +164,15 @@ pub fn get_predicate_vars_runner(pred: &Predicate) -> Vec<SPVariable> {
             match x {
                 SPWrapped::SPVariable(vx) => match vx.variable_type {
                     SPVariableType::Runner => s.push(vx.to_owned()),
-                    _ => ()
-                }
+                    _ => (),
+                },
                 _ => (),
             }
             match y {
                 SPWrapped::SPVariable(vy) => match vy.variable_type {
                     SPVariableType::Runner => s.push(vy.to_owned()),
-                    _ => ()
-                }
+                    _ => (),
+                },
                 _ => (),
             }
         }

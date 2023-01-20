@@ -1,8 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use crate::{
-    Operation, SPAssignment, SPVariable, SPVariableType, State, ToSPValue, Transition,
-};
+use crate::{Operation, SPAssignment, SPVariable, SPVariableType, State, ToSPValue, Transition};
 
 #[derive(Debug, PartialEq, Clone, Eq, Hash, Serialize, Deserialize)]
 pub struct OperationModel {

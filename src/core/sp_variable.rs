@@ -1,4 +1,4 @@
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 use crate::{SPValue, SPValueType, ToSPValue};
 use std::fmt;
@@ -73,7 +73,6 @@ impl SPVariable {
     pub fn has_type(&self) -> (SPVariableType, SPValueType) {
         (self.variable_type.clone(), self.value_type)
     }
-
 }
 
 impl fmt::Display for SPVariable {

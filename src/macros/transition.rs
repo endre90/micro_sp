@@ -6,7 +6,7 @@ macro_rules! t_plan {
             $b.clone(),
             Predicate::TRUE,
             $c.iter().map(|x| x.to_owned()).collect::<Vec<Action>>(),
-            Vec::<Action>::new()
+            Vec::<Action>::new(),
         )
     };
 }
