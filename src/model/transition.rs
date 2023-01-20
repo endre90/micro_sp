@@ -20,6 +20,13 @@ pub struct Transition {
     pub runner_actions: Vec<Action>,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct TransitionResult {
+    pub new_state: State,
+    pub success: bool,
+    pub info: String
+}
+
 impl Transition {
     pub fn new(
         name: &str,
@@ -87,29 +94,64 @@ impl Transition {
 
     pub fn take_planning(self, state: &State) -> State {
         let mut new_state = state.clone();
-        match self.clone().eval_planning(state) {
-            true => {
-                for a in self.actions {
-                    new_state = a.assign(&new_state)
-                }
-            }
-            false => (),
+        for a in self.actions {
+            new_state = a.assign(&new_state)
         }
         new_state
     }
 
     pub fn take_running(self, state: &State) -> State {
         let mut new_state = state.clone();
-        match self.clone().eval_planning(state) && self.clone().eval_running(state) {
-            true => {
-                for a in self.actions {
-                    new_state = a.assign(&new_state)
-                }
-            }
-            false => (),
+        for a in self.actions {
+            new_state = a.assign(&new_state)
+        }
+        for a in self.runner_actions {
+            new_state = a.assign(&new_state)
         }
         new_state
     }
+
+    // pub fn take_planning(self, state: &State) -> TransitionResult {
+    //     let mut new_state = state.clone();
+    //     match self.clone().eval_planning(state) {
+    //         true => {
+    //             for a in self.actions {
+    //                 new_state = a.assign(&new_state)
+    //             }
+    //             TransitionResult {
+    //                 new_state,
+    //                 success: true,
+    //                 info: format!("Transition '{}' was taken.", self.name)
+    //             }
+    //         }
+    //         false => TransitionResult {
+    //             new_state,
+    //             success: false,
+    //             info: format!("Failed to take transition '{}'.", self.name)
+    //         },
+    //     }
+    // }
+
+    // pub fn take_running(self, state: &State) -> TransitionResult {
+    //     let mut new_state = state.clone();
+    //     match self.clone().eval_planning(state) && self.clone().eval_running(state) {
+    //         true => {
+    //             for a in self.actions {
+    //                 new_state = a.assign(&new_state)
+    //             }
+    //             TransitionResult {
+    //                 new_state,
+    //                 success: true,
+    //                 info: format!("Transition '{}' was taken.", self.name)
+    //             }
+    //         }
+    //         false => TransitionResult {
+    //             new_state,
+    //             success: false,
+    //             info: format!("Failed to take transition '{}'.", self.name)
+    //         },
+    //     }
+    // }
 }
 
 impl PartialEq for Transition {

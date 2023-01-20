@@ -14,7 +14,7 @@ pub use crate::model::transition::*;
 pub use crate::model::operation_model::*;
 
 pub mod planning;
-// pub use crate::planning::operation::*;
+pub use crate::planning::operation::*;
 pub use crate::planning::transition::*;
 
 pub mod macros;

@@ -1,23 +1,52 @@
 #![allow(unused_imports)]
 #![allow(dead_code)]
 use crate::{
-    a, eq, bfs_transition_planner, t_plan, v, Action, Predicate, SPValue, State, ToSPWrapped,
-    ToSPWrappedVar, ToSPValue, Transition, SPVariable, SPValueType, SPVariableType
+    a, av_run, bfs_transition_planner, bv, bv_run, eq, fv, pred_parser, t, t_plan, v, v_run,
+    Action, Operation, OperationModel, Predicate, SPAssignment, SPValue, SPValueType, SPVariable,
+    SPVariableType, State, ToSPValue, ToSPWrapped, ToSPWrappedVar, Transition, bfs_operation_planner,
 };
 use std::collections::{HashMap, HashSet};
 
 #[test]
 fn test_planning_simple() {
     let pos = v!("pos", vec!("a", "b", "c", "d", "e", "f"));
-    let s = State::from_vec(&vec!((pos.clone(), "a".to_spvalue())));
-    
-    let t1 = t_plan!("a_to_b", eq!(pos.wrap(), "a".wrap()), vec!(a!(pos.clone(), "b".wrap())));
-    let t2 = t_plan!("b_to_c", eq!(pos.wrap(), "b".wrap()), vec!(a!(pos.clone(), "c".wrap())));
-    let t3 = t_plan!("c_to_d", eq!(pos.wrap(), "c".wrap()), vec!(a!(pos.clone(), "d".wrap())));
-    let t4 = t_plan!("d_to_e", eq!(pos.wrap(), "d".wrap()), vec!(a!(pos.clone(), "e".wrap())));
-    let t5 = t_plan!("e_to_f", eq!(pos.wrap(), "e".wrap()), vec!(a!(pos.clone(), "f".wrap())));
-    let t6 = t_plan!("a_to_c", eq!(pos.wrap(), "a".wrap()), vec!(a!(pos.clone(), "c".wrap())));
-    let t7 = t_plan!("d_to_f", eq!(pos.wrap(), "d".wrap()), vec!(a!(pos.clone(), "f".wrap())));
+    let s = State::from_vec(&vec![(pos.clone(), "a".to_spvalue())]);
+
+    let t1 = t_plan!(
+        "a_to_b",
+        eq!(pos.wrap(), "a".wrap()),
+        vec!(a!(pos.clone(), "b".wrap()))
+    );
+    let t2 = t_plan!(
+        "b_to_c",
+        eq!(pos.wrap(), "b".wrap()),
+        vec!(a!(pos.clone(), "c".wrap()))
+    );
+    let t3 = t_plan!(
+        "c_to_d",
+        eq!(pos.wrap(), "c".wrap()),
+        vec!(a!(pos.clone(), "d".wrap()))
+    );
+    let t4 = t_plan!(
+        "d_to_e",
+        eq!(pos.wrap(), "d".wrap()),
+        vec!(a!(pos.clone(), "e".wrap()))
+    );
+    let t5 = t_plan!(
+        "e_to_f",
+        eq!(pos.wrap(), "e".wrap()),
+        vec!(a!(pos.clone(), "f".wrap()))
+    );
+    let t6 = t_plan!(
+        "a_to_c",
+        eq!(pos.wrap(), "a".wrap()),
+        vec!(a!(pos.clone(), "c".wrap()))
+    );
+    let t7 = t_plan!(
+        "d_to_f",
+        eq!(pos.wrap(), "d".wrap()),
+        vec!(a!(pos.clone(), "f".wrap()))
+    );
 
     let result = bfs_transition_planner(
         s.clone(),
@@ -64,4 +93,161 @@ fn test_planning_simple() {
     assert_eq!(result.found, false);
     assert_eq!(result.length, 0);
     assert_eq!(result.plan, Vec::<&str>::new());
+}
+
+pub fn make_initial_state() -> State {
+    let state = State::new();
+    let state = state.add(SPAssignment::new(
+        v_run!("runner_goal"),
+        "var:ur_current_pose == c".to_spvalue(),
+    ));
+    let state = state.add(SPAssignment::new(
+        av_run!("runner_plan"),
+        Vec::<String>::new().to_spvalue(),
+    ));
+    let state = state.add(SPAssignment::new(
+        bv_run!("runner_replan"),
+        true.to_spvalue(),
+    ));
+    let state = state.add(SPAssignment::new(
+        bv_run!("runner_replanned"),
+        false.to_spvalue(),
+    ));
+    let state = state.add(SPAssignment::new(
+        bv!("ur_action_trigger"),
+        false.to_spvalue(),
+    ));
+    let state = state.add(SPAssignment::new(
+        v!("ur_action_state", vec!("initial", "executing", "done")),
+        "initial".to_spvalue(),
+    ));
+    let state = state.add(SPAssignment::new(
+        v!("ur_current_pose", vec!("a", "b", "c", "d")),
+        "a".to_spvalue(),
+    ));
+    let state = state.add(SPAssignment::new(
+        v!("ur_command", vec!("movej", "movel")),
+        "movej".to_spvalue(),
+    ));
+    let state = state.add(SPAssignment::new(
+        fv!("ur_velocity", vec!(0.1, 0.2, 0.3)),
+        0.2.to_spvalue(),
+    ));
+    let state = state.add(SPAssignment::new(
+        fv!("ur_acceleration", vec!(0.2, 0.4, 0.6)),
+        0.4.to_spvalue(),
+    ));
+    let state = state.add(SPAssignment::new(
+        v!("ur_goal_feature_id", vec!("a", "b", "c", "d")),
+        "a".to_spvalue(),
+    ));
+    let state = state.add(SPAssignment::new(
+        v!("ur_tcp_id", vec!("svt_tcp")),
+        "svt_tcp".to_spvalue(),
+    ));
+    state
+}
+
+#[test]
+fn test_operation_planner() {
+    let state = make_initial_state();
+    let op_move_to_b = Operation::new(
+        "op_move_to_b",
+        t!(
+            "start_moving_to_b",
+            "var:ur_action_trigger == false && var:ur_action_state == initial && var:ur_current_pose != b",
+            "true",
+            vec!(
+                "var:ur_command <- movej", 
+                "var:ur_action_trigger <- true", 
+                "var:ur_goal_feature_id <- b", 
+                "var:ur_tcp_id <- svt_tcp"
+            ),
+            Vec::<&str>::new(),
+            &state
+        ),
+        t!(
+            "complete_moving_to_b",
+            "var:ur_action_state == done",
+            "true",
+            vec!(
+                "var:ur_action_trigger <- false", 
+                "var:ur_current_pose <- b"
+            ),
+            Vec::<&str>::new(),
+            &state
+        )
+    );
+
+    let op_move_to_c = Operation::new(
+        "op_move_to_c",
+        t!(
+            "start_moving_to_c",
+            "var:ur_action_trigger == false && var:ur_action_state == initial && var:ur_current_pose == b",
+            "true",
+            vec!(
+                "var:ur_command <- movej", 
+                "var:ur_action_trigger <- true", 
+                "var:ur_goal_feature_id <- c", 
+                "var:ur_tcp_id <- svt_tcp"
+            ),
+            Vec::<&str>::new(),
+            &state
+        ),
+        t!(
+            "complete_moving_to_c",
+            "var:ur_action_state == done",
+            "true",
+            vec!(
+                "var:ur_action_trigger <- false", 
+                "var:ur_current_pose <- c"
+            ),
+            Vec::<&str>::new(),
+            &state
+        )
+    );
+
+    let op_move_to_d = Operation::new(
+        "op_move_to_d",
+        t!(
+            "start_moving_to_d",
+            "var:ur_action_trigger == false && var:ur_action_state == initial && var:ur_current_pose == c",
+            "true",
+            vec!(
+                "var:ur_command <- movej", 
+                "var:ur_action_trigger <- true", 
+                "var:ur_goal_feature_id <- d", 
+                "var:ur_tcp_id <- svt_tcp"
+            ),
+            Vec::<&str>::new(),
+            &state
+        ),
+        t!(
+            "complete_moving_to_d",
+            "var:ur_action_state == done",
+            "true",
+            vec!(
+                "var:ur_action_trigger <- false", 
+                "var:ur_current_pose <- d"
+            ),
+            Vec::<&str>::new(),
+            &state
+        )
+    );
+
+    // Adding the opeation states in the model
+    let m = OperationModel::new(
+        "asdf",
+        state.clone(),
+        vec![],
+        vec![
+            op_move_to_b.clone(),
+            op_move_to_c.clone(),
+            op_move_to_d.clone(),
+        ],
+    );
+
+    let goal = pred_parser::pred("var:ur_current_pose == d", &m.initial_state).unwrap();
+    let result = bfs_operation_planner(m.initial_state, goal, m.operations, 30);
+    assert_eq!(vec!("op_move_to_b", "op_move_to_c", "op_move_to_d"), result.plan);
 }

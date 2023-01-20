@@ -6,5 +6,5 @@ mod sp_wrapped;
 mod action;
 mod transition;
 mod planning;
-// mod operation;
+mod operation;
 mod parser;

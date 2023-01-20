@@ -176,15 +176,15 @@ fn test_transition_take_planning_panic() {
     t1.take_planning(&s);
 }
 
-#[test]
-fn test_transition_take_planning_fail() {
-    let s = State::from_vec(&john_doe());
-    let weight = fv!("weight", vec!(80.0, 82.5, 85.0));
-    let a1 = a!(weight.clone(), 87.0.wrap());
-    let t1 = t_plan!("gains_weight", eq!(weight.wrap(), 82.5.wrap()), vec!(a1));
-    let next = t1.take_planning(&s);
-    assert_eq!(next, s);
-}
+// #[test]
+// fn test_transition_take_planning_fail() {
+//     let s = State::from_vec(&john_doe());
+//     let weight = fv!("weight", vec!(80.0, 82.5, 85.0));
+//     let a1 = a!(weight.clone(), 87.0.wrap());
+//     let t1 = t_plan!("gains_weight", eq!(weight.wrap(), 82.5.wrap()), vec!(a1));
+//     let next = t1.take_planning(&s);
+//     assert_eq!(next, s);
+// }
 
 #[test]
 fn test_transition_action_ordering() {

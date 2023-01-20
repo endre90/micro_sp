@@ -35,7 +35,7 @@ impl OperationModel {
                         ),
                     );
                 }
-                true => panic!("A variable already named as the operation '{}'.", op.name),
+                true => panic!("A variable already named as the operation '{}' exists.", op.name),
             }
         }
 

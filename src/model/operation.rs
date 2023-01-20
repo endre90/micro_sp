@@ -9,6 +9,13 @@ pub struct Operation {
     pub postcondition: Transition,
 }
 
+// #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+// pub struct OperationResult {
+//     pub new_state: State,
+//     pub success: bool,
+//     pub info: String
+// }
+
 impl Operation {
     pub fn new(name: &str, precondition: Transition, postcondition: Transition) -> Operation {
         Operation {
@@ -35,8 +42,32 @@ impl Operation {
     }
 
     pub fn take_planning(self, state: &State) -> State {
-        self.postcondition
-            .take_planning(&self.precondition.take_planning(state))
+        // let precondition_result = self.precondition.take_planning(state);
+        // if precondition_result.success {
+        //     let postcondition_result = self.postcondition.take_planning(&precondition_result.new_state);
+        //     if postcondition_result.success {
+        //         OperationResult {
+        //             new_state: postcondition_result.new_state,
+        //             success: true,
+        //             info: format!("Operation '{}' succesfully taken.", self.name)
+        //         }
+        //     } else {
+        //         OperationResult {
+        //             new_state: state,
+        //             success: true,
+        //             info: format!("Operation '{}' succesfully taken.", self.name)
+        //         }
+        //     }
+        // }else {
+        //     OperationResult {
+        //         new_state: state,
+        //         success: true,
+        //         info: format!("Operation '{}' succesfully taken.", self.name)
+        //     }
+        // }
+        // match self.precondition.take_planning(state). {
+        // }
+        self.postcondition.take_planning(&self.precondition.take_planning(state)) //.new_state).new_state
         // effects?
     }
 
@@ -54,7 +85,7 @@ impl Operation {
         let assignment = state.get_all(&self.name);
         if assignment.val == "executing".to_spvalue() {
             let action = Action::new(assignment.var, "initial".wrap());
-            self.precondition.take_running(&action.assign(&state))
+            self.postcondition.take_running(&action.assign(&state))
         } else {
             state.clone()
         }
