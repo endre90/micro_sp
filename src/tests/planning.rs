@@ -2,7 +2,7 @@
 #![allow(dead_code)]
 use crate::{
     a, av_run, bfs_transition_planner, bv, bv_run, eq, fv, pred_parser, t, t_plan, v, v_run,
-    Action, Operation, OperationModel, Predicate, SPAssignment, SPValue, SPValueType, SPVariable,
+    Action, Operation, Model, Predicate, SPAssignment, SPValue, SPValueType, SPVariable,
     SPVariableType, State, ToSPValue, ToSPWrapped, ToSPWrappedVar, Transition, bfs_operation_planner,
 };
 use std::collections::{HashMap, HashSet};
@@ -236,7 +236,7 @@ fn test_operation_planner() {
     );
 
     // Adding the opeation states in the model
-    let m = OperationModel::new(
+    let m = Model::new(
         "asdf",
         state.clone(),
         vec![],

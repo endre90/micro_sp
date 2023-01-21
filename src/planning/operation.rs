@@ -1,17 +1,9 @@
 use std::{
     collections::HashSet,
-    time::{Duration, Instant},
+    time::Instant,
 };
 
-use crate::{Operation, Predicate, State};
-
-#[derive(PartialEq, Eq, Clone, Debug, PartialOrd, Ord, Default)]
-pub struct PlanningResult {
-    pub found: bool,
-    pub length: usize,
-    pub plan: Vec<String>,
-    pub time: Duration,
-}
+use crate::{Operation, Predicate, State, PlanningResult};
 
 pub fn bfs_operation_planner(
     state: State,

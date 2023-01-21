@@ -5,13 +5,13 @@ pub use crate::core::sp_value::*;
 pub use crate::core::sp_variable::*;
 pub use crate::core::sp_wrapped::*;
 
-pub mod model;
-pub use crate::model::action::*;
-pub use crate::model::parser::*;
-pub use crate::model::predicate::*;
-pub use crate::model::operation::*;
-pub use crate::model::transition::*;
-pub use crate::model::operation_model::*;
+pub mod modelling;
+pub use crate::modelling::action::*;
+pub use crate::modelling::parser::*;
+pub use crate::modelling::predicate::*;
+pub use crate::modelling::operation::*;
+pub use crate::modelling::transition::*;
+pub use crate::modelling::model::*;
 
 pub mod planning;
 pub use crate::planning::operation::*;

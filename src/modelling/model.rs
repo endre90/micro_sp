@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use crate::{Operation, SPAssignment, SPVariable, SPVariableType, State, ToSPValue, Transition};
 
 #[derive(Debug, PartialEq, Clone, Eq, Hash, Serialize, Deserialize)]
-pub struct OperationModel {
+pub struct Model {
     pub name: String,
     pub initial_state: State,
     pub variables: Vec<SPVariable>,
@@ -11,13 +11,13 @@ pub struct OperationModel {
     pub operations: Vec<Operation>,
 }
 
-impl OperationModel {
+impl Model {
     pub fn new(
         name: &str,
         initial_state: State,
         transitions: Vec<Transition>,
         operations: Vec<Operation>,
-    ) -> OperationModel {
+    ) -> Model {
         let mut state_with_op = initial_state.clone();
         for op in &operations {
             match initial_state.contains(&op.name) {
@@ -39,7 +39,7 @@ impl OperationModel {
             }
         }
 
-        OperationModel {
+        Model {
             name: name.to_string(),
             initial_state: state_with_op.clone(),
             variables: state_with_op
