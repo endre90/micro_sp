@@ -90,4 +90,8 @@ impl Operation {
             state.clone()
         }
     }
+
+    pub fn is_completed(self, state: &State) -> bool {
+        state.get_value(&self.name) == "executing".to_spvalue() && self.postcondition.eval_running(&state)
+    }
 }
