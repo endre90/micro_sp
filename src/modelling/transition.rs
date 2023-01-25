@@ -20,12 +20,32 @@ pub struct Transition {
     pub runner_actions: Vec<Action>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub struct TransitionResult {
-    pub new_state: State,
-    pub success: bool,
-    pub info: String
+/// Transitions have the same formal semantics, but are separated due to their different uses. 
+/// Controlled transitions are taken when their guard condition is evaluated to be true, 
+/// only if they are also activated by the planning system. Automatic transitions are always 
+/// taken when their guard condition is evaluated to be true, regardless of if there are any 
+/// active plans or not. All automatic transitions are taken before any controlled transitions 
+/// can be taken. This ensures that automatic transitions can never be delayed by the planner.
+/// Effect transitions define how the measured state is updated, and as such, they are not
+/// used during control such as for the control transitions and automatic transitions. They 
+/// are important to keep track of, however, as they are needed for online planning and formal 
+/// verification algorithms. They are also used to determine if the plan is correctly 
+/// followed—if the expected effects do not occur, it can be due to an error.
+#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
+pub enum TransitionType {
+    Controlled,
+    Auto,
+    Effect,
+    // Runner, // not sure what these are for
 }
+
+// thanfully not used anywhere
+// #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+// pub struct TransitionResult {
+//     pub new_state: State,
+//     pub success: bool,
+//     pub info: String
+// }
 
 impl Transition {
     pub fn new(
@@ -274,3 +294,19 @@ impl fmt::Display for Transition {
         write!(fmtr, "{}: {} / [{}]", self.name, self.guard, action_string)
     }
 }
+
+// impl fmt::Display for Transition {
+//     fn fmt(&self, fmtr: &mut fmt::Formatter<'_>) -> fmt::Result {
+//         let k = match self.type_ {
+//             TransitionType::Auto => "a",
+//             TransitionType::Controlled => "c",
+//             TransitionType::Effect => "e",
+//             TransitionType::Runner => "r",
+//         };
+
+//         let s = format!("{}_{}: {}/{:?}[{:?}]", k, self.path(), self.guard,
+//                         self.actions, self.runner_actions);
+
+//         write!(fmtr, "{}", &s)
+//     }
+// }

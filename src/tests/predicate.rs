@@ -267,3 +267,14 @@ fn test_predicate_get_runner_variables() {
     );
     assert_eq!(vars, vars_init)
 }
+
+#[test]
+fn test_predicate_keep_only() {
+    let state = make_robot_initial_state();
+    let pred = pred_parser::pred(
+        "var:ur_action_trigger == false && var:ur_action_state == initial || (var:ur_current_pose != a && var:ur_action_state == executing)",
+        &state,
+    ).unwrap();
+    let new_pred = pred.keep_only(&vec!("ur_action_state".to_string()));
+   println!("{:?}", new_pred)
+}

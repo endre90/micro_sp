@@ -84,7 +84,18 @@ impl State {
     pub fn update(&self, name: &str, val: SPValue) -> State {
         match self.state.clone().get(name) {
             Some(assignment) => match assignment.var.variable_type {
-                SPVariableType::Planner => match assignment.var.domain.contains(&val) {
+                SPVariableType::Runner => {
+                    let mut state = self.state.clone();
+                    state.insert(
+                        name.to_string(),
+                        SPAssignment {
+                            var: assignment.var.clone(),
+                            val: val.clone(),
+                        },
+                    );
+                    State { state }
+                }
+                _ => match assignment.var.domain.contains(&val) {
                     true => {
                         let mut state = self.state.clone();
                         state.insert(
@@ -101,17 +112,7 @@ impl State {
                         val, assignment.var.name
                     ),
                 },
-                SPVariableType::Runner => {
-                    let mut state = self.state.clone();
-                    state.insert(
-                        name.to_string(),
-                        SPAssignment {
-                            var: assignment.var.clone(),
-                            val: val.clone(),
-                        },
-                    );
-                    State { state }
-                }
+                
             },
             None => panic!("Variable {} not in state.", name),
         }

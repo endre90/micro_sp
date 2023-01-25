@@ -14,7 +14,9 @@ pub struct SPVariable {
 
 #[derive(Debug, PartialEq, Clone, Hash, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum SPVariableType {
-    Planner,
+    Measured,
+    Estimated,
+    Command,
     Runner,
 }
 
