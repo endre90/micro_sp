@@ -12,6 +12,7 @@ pub use crate::modelling::predicate::*;
 pub use crate::modelling::operation::*;
 pub use crate::modelling::transition::*;
 pub use crate::modelling::model::*;
+pub use crate::modelling::resource::*;
 
 pub mod planning;
 pub use crate::planning::operation::*;

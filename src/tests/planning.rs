@@ -250,10 +250,11 @@ fn test_operation_planner() {
             op_move_to_c.clone(),
             op_move_to_d.clone(),
         ],
+        vec!()
     );
 
-    let goal = pred_parser::pred("var:ur_current_pose == d", &m.initial_state).unwrap();
-    let result = bfs_operation_planner(m.initial_state, goal, m.operations, 30);
+    let goal = pred_parser::pred("var:ur_current_pose == d", &m.state).unwrap();
+    let result = bfs_operation_planner(m.state, goal, m.operations, 30);
     assert_eq!(
         vec!("op_move_to_b", "op_move_to_c", "op_move_to_d"),
         result.plan

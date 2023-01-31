@@ -1,26 +1,28 @@
 use serde::{Deserialize, Serialize};
 
-use crate::{Operation, SPAssignment, SPVariable, SPVariableType, State, ToSPValue, Transition};
+use crate::{Operation, SPAssignment, SPVariable, SPVariableType, State, ToSPValue, Transition, Resource};
 
-#[derive(Debug, PartialEq, Clone, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
 pub struct Model {
     pub name: String,
-    pub initial_state: State,
-    pub variables: Vec<SPVariable>,
+    pub state: State,
+    // pub variables: Vec<SPVariable>,
     pub transitions: Vec<Transition>,
     pub operations: Vec<Operation>,
+    pub resources: Vec<Resource>
 }
 
 impl Model {
     pub fn new(
         name: &str,
-        initial_state: State,
+        state: State,
         transitions: Vec<Transition>,
         operations: Vec<Operation>,
+        resources: Vec<Resource>
     ) -> Model {
-        let mut state_with_op = initial_state.clone();
+        let mut state_with_op = state.clone();
         for op in &operations {
-            match initial_state.contains(&op.name) {
+            match state.contains(&op.name) {
                 false => {
                     state_with_op.state.insert(
                         op.name.clone(),
@@ -41,14 +43,15 @@ impl Model {
 
         Model {
             name: name.to_string(),
-            initial_state: state_with_op.clone(),
-            variables: state_with_op
-                .state
-                .iter()
-                .map(|(_, assignment)| assignment.var.clone())
-                .collect(),
+            state: state_with_op.clone(),
+            // variables: state_with_op
+            //     .state
+            //     .iter()
+            //     .map(|(_, assignment)| assignment.var.clone())
+            //     .collect(),
             transitions,
             operations,
+            resources
         }
     }
 }

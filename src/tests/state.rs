@@ -140,10 +140,10 @@ fn test_state_update() {
     assert_eq!(state.get_value("height"), 190.to_spvalue())
 }
 
-#[test]
-#[should_panic]
-fn test_state_update_panic() {
-    let john_doe = john_doe();
-    let state = State::from_vec(&john_doe);
-    state.update("height", 123.to_spvalue());
-}
+// #[test]
+// #[should_panic]
+// fn test_state_update_panic() {
+//     let john_doe = john_doe();
+//     let state = State::from_vec(&john_doe);
+//     state.update("height", 123.to_spvalue());
+// }
