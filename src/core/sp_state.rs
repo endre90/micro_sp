@@ -107,10 +107,10 @@ impl State {
                         );
                         State { state }
                     }
-                    false => panic!(
-                        "Value {} to update the variable {} is not in its domain.",
-                        val, assignment.var.name
-                    ),
+                    false => {
+                        println!("Value {} to update the variable {} is not in its domain. State not updated!", val, assignment.var.name);
+                        self.clone()
+                    }
                 },
                 
             },
