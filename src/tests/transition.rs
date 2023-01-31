@@ -1,22 +1,24 @@
 #![allow(unused_imports)]
 #![allow(dead_code)]
 use crate::{
-    a, assign, bv, bv_run, fv, fv_run, iv, iv_run, t, t_plan, v, v_run, Predicate, Transition, eq, ToSPWrappedVar, pred_parser,
+    av_command, av_estimated, av_measured, av_runner, bv_command, bv_estimated, bv_measured,
+    bv_runner, fv_command, fv_estimated, fv_measured, fv_runner, iv_command, iv_estimated,
+    iv_measured, iv_runner, v_command, v_estimated, v_measured, v_runner, a, assign, t, t_plan, eq
 };
 use crate::{
     Action, SPAssignment, SPValue, SPValueType, SPVariable, SPVariableType, State, ToSPValue,
-    ToSPWrapped,
+    ToSPWrapped, Predicate, ToSPWrappedVar, Transition, pred_parser
 };
 use std::collections::{HashMap, HashSet};
 use std::f32::consts::E;
 
 fn john_doe() -> Vec<(SPVariable, SPValue)> {
-    let name = v!("name", vec!("John", "Jack"));
-    let surname = v!("surname", vec!("Doe", "Crawford"));
-    let height = iv!("height", vec!(180, 185, 190));
-    let weight = fv!("weight", vec!(80.0, 82.5, 85.0));
-    let smart = bv!("smart");
-    let alive = bv_run!("alive");
+    let name = v_estimated!("name", vec!("John", "Jack"));
+    let surname = v_estimated!("surname", vec!("Doe", "Crawford"));
+    let height = iv_estimated!("height", vec!(180, 185, 190));
+    let weight = fv_estimated!("weight", vec!(80.0, 82.5, 85.0));
+    let smart = bv_estimated!("smart");
+    let alive = bv_runner!("alive");
 
     vec![
         (name, "John".to_spvalue()),
@@ -30,7 +32,7 @@ fn john_doe() -> Vec<(SPVariable, SPValue)> {
 
 #[test]
 fn test_transition_new() {
-    let weight = fv!("weight", vec!(80.0, 82.5, 85.0));
+    let weight = fv_estimated!("weight", vec!(80.0, 82.5, 85.0));
     let a1 = a!(weight.clone(), 85.0.wrap());
     let t1 = Transition::new(
         "gains_weight",
@@ -51,7 +53,7 @@ fn test_transition_new() {
 
 #[test]
 fn test_transition_new_macro() {
-    let weight = fv!("weight", vec!(80.0, 82.5, 85.0));
+    let weight = fv_estimated!("weight", vec!(80.0, 82.5, 85.0));
     let a1 = a!(weight.clone(), 85.0.wrap());
     let t1 = t_plan!("gains_weight", Predicate::TRUE, vec!(a1.clone()));
     let t2 = t_plan!("gains_weight", Predicate::TRUE, vec!(a1));
@@ -61,7 +63,7 @@ fn test_transition_new_macro() {
 #[test]
 fn test_transition_eval_planning() {
     let s = State::from_vec(&john_doe());
-    let weight = fv!("weight", vec!(80.0, 82.5, 85.0));
+    let weight = fv_estimated!("weight", vec!(80.0, 82.5, 85.0));
     let a1 = a!(weight.clone(), 85.0.wrap());
     let t1 = t_plan!("gains_weight", Predicate::TRUE, vec!(a1.clone()));
     let t2 = t_plan!("gains_weight", Predicate::FALSE, vec!(a1));
@@ -155,7 +157,7 @@ fn test_transition_runner_var_in_planner_action_panic() {
 #[test]
 fn test_transition_take_planning() {
     let s = State::from_vec(&john_doe());
-    let weight = fv!("weight", vec!(80.0, 82.5, 85.0));
+    let weight = fv_estimated!("weight", vec!(80.0, 82.5, 85.0));
     let a1 = a!(weight.clone(), 82.5.wrap());
     let a2 = a!(weight.clone(), 85.0.wrap());
     let t1 = t_plan!("gains_weight", eq!(weight.wrap(), 80.0.wrap()), vec!(a1));
@@ -170,7 +172,7 @@ fn test_transition_take_planning() {
 #[should_panic]
 fn test_transition_take_planning_panic() {
     let s = State::from_vec(&john_doe());
-    let weight = fv!("weight", vec!(80.0, 82.5, 85.0));
+    let weight = fv_estimated!("weight", vec!(80.0, 82.5, 85.0));
     let a1 = a!(weight.clone(), 87.0.wrap());
     let t1 = t_plan!("gains_weight", eq!(weight.wrap(), 80.0.wrap()), vec!(a1));
     t1.take_planning(&s);
@@ -179,7 +181,7 @@ fn test_transition_take_planning_panic() {
 // #[test]
 // fn test_transition_take_planning_fail() {
 //     let s = State::from_vec(&john_doe());
-//     let weight = fv!("weight", vec!(80.0, 82.5, 85.0));
+//     let weight = fv_estimated!("weight", vec!(80.0, 82.5, 85.0));
 //     let a1 = a!(weight.clone(), 87.0.wrap());
 //     let t1 = t_plan!("gains_weight", eq!(weight.wrap(), 82.5.wrap()), vec!(a1));
 //     let next = t1.take_planning(&s);
@@ -189,7 +191,7 @@ fn test_transition_take_planning_panic() {
 #[test]
 fn test_transition_action_ordering() {
     let s = State::from_vec(&john_doe());
-    let weight = fv!("weight", vec!(80.0, 82.5, 85.0, 87.5));
+    let weight = fv_estimated!("weight", vec!(80.0, 82.5, 85.0, 87.5));
     let a1 = a!(weight.clone(), 82.5.wrap());
     let a2 = a!(weight.clone(), 85.0.wrap());
     let t1 = t_plan!("gains_weight", eq!(weight.wrap(), 80.0.wrap()), vec!(a1, a2));
@@ -201,7 +203,7 @@ fn test_transition_action_ordering() {
 #[should_panic]
 fn test_transition_action_ordering_panic() {
     let s = State::from_vec(&john_doe());
-    let weight = fv!("weight", vec!(80.0, 82.5, 85.0, 87.5));
+    let weight = fv_estimated!("weight", vec!(80.0, 82.5, 85.0, 87.5));
     let a1 = a!(weight.clone(), 82.5.wrap());
     let a2 = a!(weight.clone(), 85.0.wrap());
     let a3 = a!(weight.clone(), 87.5.wrap());
@@ -213,7 +215,7 @@ fn test_transition_action_ordering_panic() {
 #[test]
 fn test_transition_action_ordering_fail() {
     let s = State::from_vec(&john_doe());
-    let weight = fv!("weight", vec!(80.0, 82.5, 85.0, 87.5));
+    let weight = fv_estimated!("weight", vec!(80.0, 82.5, 85.0, 87.5));
     let a1 = a!(weight.clone(), 82.5.wrap());
     let a2 = a!(weight.clone(), 85.0.wrap());
     let t1 = t_plan!("gains_weight", eq!(weight.wrap(), 80.0.wrap()), vec!(a2, a1));
@@ -223,7 +225,7 @@ fn test_transition_action_ordering_fail() {
 
 #[test]
 fn test_transition_equality() {
-    let weight = fv!("weight", vec!(80.0, 82.5, 85.0, 87.5));
+    let weight = fv_estimated!("weight", vec!(80.0, 82.5, 85.0, 87.5));
     let a1 = a!(weight.clone(), 82.5.wrap());
     let a2 = a!(weight.clone(), 85.0.wrap());
     let a3 = a!(weight.clone(), 87.5.wrap());
@@ -242,7 +244,7 @@ fn test_transition_equality() {
 
 #[test]
 fn test_transition_contained_in_vec() {
-    let weight = fv!("weight", vec!(80.0, 82.5, 85.0, 87.5));
+    let weight = fv_estimated!("weight", vec!(80.0, 82.5, 85.0, 87.5));
     let a1 = a!(weight.clone(), 82.5.wrap());
     let a2 = a!(weight.clone(), 85.0.wrap());
     let a3 = a!(weight.clone(), 87.5.wrap());
@@ -265,7 +267,7 @@ fn test_transition_contained_in_vec() {
 
 #[test]
 fn test_transition_vec_equality() {
-    let weight = fv!("weight", vec!(80.0, 82.5, 85.0, 87.5));
+    let weight = fv_estimated!("weight", vec!(80.0, 82.5, 85.0, 87.5));
     let a1 = a!(weight.clone(), 82.5.wrap());
     let a2 = a!(weight.clone(), 85.0.wrap());
     let a3 = a!(weight.clone(), 87.5.wrap());
@@ -285,12 +287,12 @@ fn test_transition_vec_equality() {
 // #[test]
 // fn test_transition_get_vars_all() {
 //     let s = State::from_vec(&john_doe());
-//     let name = v!("name", vec!("John", "Jack"));
-//     let surname = v!("surname", vec!("Doe", "Crawford"));
-//     let height = iv!("height", vec!(180, 185, 190));
-//     let weight = fv!("weight", vec!(80.0, 82.5, 85.0));
-//     let smart = bv!("smart");
-//     let alive = bv_run!("alive");
+//     let name = v_estimated!("name", vec!("John", "Jack"));
+//     let surname = v_estimated!("surname", vec!("Doe", "Crawford"));
+//     let height = iv_estimated!("height", vec!(180, 185, 190));
+//     let weight = fv_estimated!("weight", vec!(80.0, 82.5, 85.0));
+//     let smart = bv_estimated!("smart");
+//     let alive = bv_runner!("alive");
 
 //     let guard = pred_parser::pred("var:smart == TRUE -> (var:alive == FALSE || TRUE)", &s);
 

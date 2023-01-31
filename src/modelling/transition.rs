@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     get_predicate_vars_all, get_predicate_vars_planner, get_predicate_vars_runner, Action,
-    Predicate, SPVariable, SPVariableType, State,
+    Predicate, SPVariable, SPVariableType, State
 };
 use std::fmt;
 
@@ -20,6 +20,7 @@ pub struct Transition {
     pub runner_actions: Vec<Action>,
 }
 
+// skip this for now, but will probably need it
 /// Transitions have the same formal semantics, but are separated due to their different uses. 
 /// Controlled transitions are taken when their guard condition is evaluated to be true, 
 /// only if they are also activated by the planning system. Automatic transitions are always 
@@ -80,11 +81,11 @@ impl Transition {
             actions: {
                 for action in &actions {
                     match action.var.variable_type {
-                        SPVariableType::Planner => (),
                         SPVariableType::Runner => panic!(
                             "Runner type variable '{}' can't be in the non-runner action.",
                             action.var.name
                         ),
+                        _ => (),
                     }
                 }
                 actions
@@ -92,11 +93,11 @@ impl Transition {
             runner_actions: {
                 for action in &runner_actions {
                     match action.var.variable_type {
-                        SPVariableType::Planner => panic!(
+                        SPVariableType::Runner => (),
+                        _ => panic!(
                             "Planner type variable '{}' can't be in the runner action.",
                             action.var.name
                         ),
-                        SPVariableType::Runner => (),
                     }
                 }
                 runner_actions

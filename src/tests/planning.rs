@@ -1,15 +1,20 @@
 #![allow(unused_imports)]
 #![allow(dead_code)]
 use crate::{
-    a, av_run, bfs_transition_planner, bv, bv_run, eq, fv, pred_parser, t, t_plan, v, v_run,
-    Action, Operation, Model, Predicate, SPAssignment, SPValue, SPValueType, SPVariable,
-    SPVariableType, State, ToSPValue, ToSPWrapped, ToSPWrappedVar, Transition, bfs_operation_planner,
+    a, bfs_operation_planner, bfs_transition_planner, eq, pred_parser, t, t_plan, Action, Model,
+    Operation, Predicate, SPAssignment, SPValue, SPValueType, SPVariable, SPVariableType, State,
+    ToSPValue, ToSPWrapped, ToSPWrappedVar, Transition,
+};
+use crate::{
+    av_command, av_estimated, av_measured, av_runner, bv_command, bv_estimated, bv_measured,
+    bv_runner, fv_command, fv_estimated, fv_measured, fv_runner, iv_command, iv_estimated,
+    iv_measured, iv_runner, v_command, v_estimated, v_measured, v_runner,
 };
 use std::collections::{HashMap, HashSet};
 
 #[test]
 fn test_planning_simple() {
-    let pos = v!("pos", vec!("a", "b", "c", "d", "e", "f"));
+    let pos = v_estimated!("pos", vec!("a", "b", "c", "d", "e", "f"));
     let s = State::from_vec(&vec![(pos.clone(), "a".to_spvalue())]);
 
     let t1 = t_plan!(
@@ -98,51 +103,51 @@ fn test_planning_simple() {
 pub fn make_initial_state() -> State {
     let state = State::new();
     let state = state.add(SPAssignment::new(
-        v_run!("runner_goal"),
+        v_runner!("runner_goal"),
         "var:ur_current_pose == c".to_spvalue(),
     ));
     let state = state.add(SPAssignment::new(
-        av_run!("runner_plan"),
+        av_runner!("runner_plan"),
         Vec::<String>::new().to_spvalue(),
     ));
     let state = state.add(SPAssignment::new(
-        bv_run!("runner_replan"),
+        bv_runner!("runner_replan"),
         true.to_spvalue(),
     ));
     let state = state.add(SPAssignment::new(
-        bv_run!("runner_replanned"),
+        bv_runner!("runner_replanned"),
         false.to_spvalue(),
     ));
     let state = state.add(SPAssignment::new(
-        bv!("ur_action_trigger"),
+        bv_estimated!("ur_action_trigger"),
         false.to_spvalue(),
     ));
     let state = state.add(SPAssignment::new(
-        v!("ur_action_state", vec!("initial", "executing", "done")),
+        v_estimated!("ur_action_state", vec!("initial", "executing", "done")),
         "initial".to_spvalue(),
     ));
     let state = state.add(SPAssignment::new(
-        v!("ur_current_pose", vec!("a", "b", "c", "d")),
+        v_estimated!("ur_current_pose", vec!("a", "b", "c", "d")),
         "a".to_spvalue(),
     ));
     let state = state.add(SPAssignment::new(
-        v!("ur_command", vec!("movej", "movel")),
+        v_estimated!("ur_command", vec!("movej", "movel")),
         "movej".to_spvalue(),
     ));
     let state = state.add(SPAssignment::new(
-        fv!("ur_velocity", vec!(0.1, 0.2, 0.3)),
+        fv_estimated!("ur_velocity", vec!(0.1, 0.2, 0.3)),
         0.2.to_spvalue(),
     ));
     let state = state.add(SPAssignment::new(
-        fv!("ur_acceleration", vec!(0.2, 0.4, 0.6)),
+        fv_estimated!("ur_acceleration", vec!(0.2, 0.4, 0.6)),
         0.4.to_spvalue(),
     ));
     let state = state.add(SPAssignment::new(
-        v!("ur_goal_feature_id", vec!("a", "b", "c", "d")),
+        v_estimated!("ur_goal_feature_id", vec!("a", "b", "c", "d")),
         "a".to_spvalue(),
     ));
     let state = state.add(SPAssignment::new(
-        v!("ur_tcp_id", vec!("svt_tcp")),
+        v_estimated!("ur_tcp_id", vec!("svt_tcp")),
         "svt_tcp".to_spvalue(),
     ));
     state
@@ -249,5 +254,8 @@ fn test_operation_planner() {
 
     let goal = pred_parser::pred("var:ur_current_pose == d", &m.initial_state).unwrap();
     let result = bfs_operation_planner(m.initial_state, goal, m.operations, 30);
-    assert_eq!(vec!("op_move_to_b", "op_move_to_c", "op_move_to_d"), result.plan);
+    assert_eq!(
+        vec!("op_move_to_b", "op_move_to_c", "op_move_to_d"),
+        result.plan
+    );
 }

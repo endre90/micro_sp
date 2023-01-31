@@ -42,33 +42,7 @@ impl Operation {
     }
 
     pub fn take_planning(self, state: &State) -> State {
-        // let precondition_result = self.precondition.take_planning(state);
-        // if precondition_result.success {
-        //     let postcondition_result = self.postcondition.take_planning(&precondition_result.new_state);
-        //     if postcondition_result.success {
-        //         OperationResult {
-        //             new_state: postcondition_result.new_state,
-        //             success: true,
-        //             info: format!("Operation '{}' succesfully taken.", self.name)
-        //         }
-        //     } else {
-        //         OperationResult {
-        //             new_state: state,
-        //             success: true,
-        //             info: format!("Operation '{}' succesfully taken.", self.name)
-        //         }
-        //     }
-        // }else {
-        //     OperationResult {
-        //         new_state: state,
-        //         success: true,
-        //         info: format!("Operation '{}' succesfully taken.", self.name)
-        //     }
-        // }
-        // match self.precondition.take_planning(state). {
-        // }
-        self.postcondition.take_planning(&self.precondition.take_planning(state)) //.new_state).new_state
-        // effects?
+        self.postcondition.take_planning(&self.precondition.take_planning(state))
     }
 
     pub fn start_running(self, state: &State) -> State {

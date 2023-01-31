@@ -1,6 +1,10 @@
 #![allow(unused_imports)]
 #![allow(dead_code)]
-use crate::{av, av_run, bv, bv_run, fv, fv_run, iv, iv_run, v, v_run};
+use crate::{
+    av_command, av_estimated, av_measured, av_runner, bv_command, bv_estimated, bv_measured,
+    bv_runner, fv_command, fv_estimated, fv_measured, fv_runner, iv_command, iv_estimated,
+    iv_measured, iv_runner, v_command, v_estimated, v_measured, v_runner,
+};
 use crate::{
     SPValue, SPValueType, SPVariable, SPVariableType, SPWrapped, ToSPValue, ToSPWrapped,
     ToSPWrappedVar,
@@ -55,14 +59,14 @@ fn test_wrap_spvalues() {
 
 #[test]
 fn test_wrap_variables() {
-    let string_var = v!("position", vec!("a", "b", "c"));
-    let string_var_run = v_run!("position");
-    let int_var = iv!("counter", vec!(1, 2, 3));
-    let int_var_run = iv_run!("counter");
-    let bool_var = bv!("toggle");
-    let bool_var_run = bv_run!("toggle");
-    let float_var = fv!("speed", vec!(0.1, 0.3));
-    let float_var_run = fv_run!("speed");
+    let string_var = v_estimated!("position", vec!("a", "b", "c"));
+    let string_var_run = v_runner!("position");
+    let int_var = iv_estimated!("counter", vec!(1, 2, 3));
+    let int_var_run = iv_runner!("counter");
+    let bool_var = bv_estimated!("toggle");
+    let bool_var_run = bv_runner!("toggle");
+    let float_var = fv_estimated!("speed", vec!(0.1, 0.3));
+    let float_var_run = fv_runner!("speed");
     assert_eq!(
         SPWrapped::SPVariable(string_var.clone()),
         string_var.wrap()

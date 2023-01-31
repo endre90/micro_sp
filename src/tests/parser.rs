@@ -1,20 +1,23 @@
 #![allow(unused_imports)]
 #![allow(dead_code)]
+
 use crate::{
-    a, assign, bv, bv_run, fv, fv_run, iv, iv_run, v, v_run, Predicate::*, Transition, eq, ToSPWrappedVar, pred_parser, SPWrapped,
+    av_command, av_estimated, av_measured, av_runner, bv_command, bv_estimated, bv_measured,
+    bv_runner, fv_command, fv_estimated, fv_measured, fv_runner, iv_command, iv_estimated,
+    iv_measured, iv_runner, v_command, v_estimated, v_measured, v_runner,
 };
 use crate::{
     Action, SPAssignment, SPValue, SPValueType, SPVariable, SPVariableType, State, ToSPValue,
-    ToSPWrapped,
+    ToSPWrapped, a, assign, Predicate::*, Transition, eq, ToSPWrappedVar, pred_parser, SPWrapped
 };
 
 fn john_doe() -> Vec<(SPVariable, SPValue)> {
-    let name = v!("name", vec!("John", "Jack"));
-    let surname = v!("surname", vec!("Doe", "Crawford"));
-    let height = iv!("height", vec!(180, 185, 190));
-    let weight = fv!("weight", vec!(80.0, 82.5, 85.0));
-    let smart = bv!("smart");
-    let alive = bv!("alive");
+    let name = v_estimated!("name", vec!("John", "Jack"));
+    let surname = v_estimated!("surname", vec!("Doe", "Crawford"));
+    let height = iv_estimated!("height", vec!(180, 185, 190));
+    let weight = fv_estimated!("weight", vec!(80.0, 82.5, 85.0));
+    let smart = bv_estimated!("smart");
+    let alive = bv_estimated!("alive");
 
     vec![
         (name, "John".to_spvalue()),
@@ -105,15 +108,15 @@ fn parse_predicates() {
     assert_eq!(pred_parser::eq(eq1, &s), Ok(eq2));
 
     let eq1 = "var:smart == FALSE";
-    let eq2 = EQ(bv!("smart").wrap(), false.wrap());
+    let eq2 = EQ(bv_estimated!("smart").wrap(), false.wrap());
     assert_eq!(pred_parser::eq(eq1, &s), Ok(eq2));
 
     let eq1 = "var:smart == true";
-    let eq2 = EQ(bv!("smart").wrap(), true.wrap());
+    let eq2 = EQ(bv_estimated!("smart").wrap(), true.wrap());
     assert_eq!(pred_parser::eq(eq1, &s), Ok(eq2));
     
     let neq1 = "var:smart != true";
-    let neq2 = NEQ(bv!("smart").wrap(), true.wrap());
+    let neq2 = NEQ(bv_estimated!("smart").wrap(), true.wrap());
     assert_eq!(pred_parser::eq(neq1, &s), Ok(neq2));
 
     let eq1 = "TRUE == TRUE || FALSE != FALSE";
@@ -161,8 +164,8 @@ fn parse_predicates() {
 #[test]
 fn parse_actions() {
     let s = State::from_vec(&john_doe());
-    let weight = fv!("weight", vec!(80.0, 82.5, 85.0));
-    let weight_2 = fv!("weight_2", vec!(85.0, 87.5));
+    let weight = fv_estimated!("weight", vec!(80.0, 82.5, 85.0));
+    let weight_2 = fv_estimated!("weight_2", vec!(85.0, 87.5));
     let s_new = s.add(SPAssignment::new(weight_2, 85.0.to_spvalue()));
     let a1 = a!(weight.clone(), 82.5.wrap());
     let a2 = a!(weight.clone(), 85.0.wrap());

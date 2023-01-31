@@ -3,11 +3,11 @@
 // use crate::{SPValue, SPValueType, SPVariable, SPVariableType, ToSPValue};
 
 #[macro_export]
-macro_rules! v {
+macro_rules! v_command {
     ($a:expr, $b:expr) => {
         SPVariable::new(
             $a.clone(),
-            SPVariableType::Planner,
+            SPVariableType::Command, 
             SPValueType::String,
             $b.iter().map(|x| x.clone().to_spvalue()).collect(),
         )
@@ -15,7 +15,31 @@ macro_rules! v {
 }
 
 #[macro_export]
-macro_rules! v_run {
+macro_rules! v_measured {
+    ($a:expr, $b:expr) => {
+        SPVariable::new(
+            $a.clone(),
+            SPVariableType::Measured, 
+            SPValueType::String,
+            $b.iter().map(|x| x.clone().to_spvalue()).collect(),
+        )
+    };
+}
+
+#[macro_export]
+macro_rules! v_estimated {
+    ($a:expr, $b:expr) => {
+        SPVariable::new(
+            $a.clone(),
+            SPVariableType::Estimated, 
+            SPValueType::String,
+            $b.iter().map(|x| x.clone().to_spvalue()).collect(),
+        )
+    };
+}
+
+#[macro_export]
+macro_rules! v_runner {
     ($a:expr) => {
         SPVariable::new(
             $a.clone(),
@@ -27,11 +51,11 @@ macro_rules! v_run {
 }
 
 #[macro_export]
-macro_rules! bv {
+macro_rules! bv_command {
     ($a:expr) => {
         SPVariable::new(
             $a.clone(),
-            SPVariableType::Planner,
+            SPVariableType::Command,
             SPValueType::Bool,
             vec![true.to_spvalue(), false.to_spvalue()],
         )
@@ -39,7 +63,31 @@ macro_rules! bv {
 }
 
 #[macro_export]
-macro_rules! bv_run {
+macro_rules! bv_measured {
+    ($a:expr) => {
+        SPVariable::new(
+            $a.clone(),
+            SPVariableType::Measured,
+            SPValueType::Bool,
+            vec![true.to_spvalue(), false.to_spvalue()],
+        )
+    };
+}
+
+#[macro_export]
+macro_rules! bv_estimated {
+    ($a:expr) => {
+        SPVariable::new(
+            $a.clone(),
+            SPVariableType::Estimated,
+            SPValueType::Bool,
+            vec![true.to_spvalue(), false.to_spvalue()],
+        )
+    };
+}
+
+#[macro_export]
+macro_rules! bv_runner {
     ($a:expr) => {
         SPVariable::new(
             $a.clone(),
@@ -51,11 +99,11 @@ macro_rules! bv_run {
 }
 
 #[macro_export]
-macro_rules! iv {
+macro_rules! iv_command {
     ($a:expr, $b:expr) => {
         SPVariable::new(
             $a.clone(),
-            SPVariableType::Planner,
+            SPVariableType::Command,
             SPValueType::Int32,
             $b.iter().map(|x| x.clone().to_spvalue()).collect(),
         )
@@ -63,7 +111,31 @@ macro_rules! iv {
 }
 
 #[macro_export]
-macro_rules! iv_run {
+macro_rules! iv_measured {
+    ($a:expr, $b:expr) => {
+        SPVariable::new(
+            $a.clone(),
+            SPVariableType::Measured,
+            SPValueType::Int32,
+            $b.iter().map(|x| x.clone().to_spvalue()).collect(),
+        )
+    };
+}
+
+#[macro_export]
+macro_rules! iv_estimated {
+    ($a:expr, $b:expr) => {
+        SPVariable::new(
+            $a.clone(),
+            SPVariableType::Estimated,
+            SPValueType::Int32,
+            $b.iter().map(|x| x.clone().to_spvalue()).collect(),
+        )
+    };
+}
+
+#[macro_export]
+macro_rules! iv_runner {
     ($a:expr) => {
         SPVariable::new(
             $a.clone(),
@@ -75,11 +147,11 @@ macro_rules! iv_run {
 }
 
 #[macro_export]
-macro_rules! fv {
+macro_rules! fv_command {
     ($a:expr, $b:expr) => {
         SPVariable::new(
             $a.clone(),
-            SPVariableType::Planner,
+            SPVariableType::Command,
             SPValueType::Float64,
             $b.iter().map(|x| x.clone().to_spvalue()).collect(),
         )
@@ -87,7 +159,31 @@ macro_rules! fv {
 }
 
 #[macro_export]
-macro_rules! fv_run {
+macro_rules! fv_measured {
+    ($a:expr, $b:expr) => {
+        SPVariable::new(
+            $a.clone(),
+            SPVariableType::Measured,
+            SPValueType::Float64,
+            $b.iter().map(|x| x.clone().to_spvalue()).collect(),
+        )
+    };
+}
+
+#[macro_export]
+macro_rules! fv_estimated {
+    ($a:expr, $b:expr) => {
+        SPVariable::new(
+            $a.clone(),
+            SPVariableType::Estimated,
+            SPValueType::Float64,
+            $b.iter().map(|x| x.clone().to_spvalue()).collect(),
+        )
+    };
+}
+
+#[macro_export]
+macro_rules! fv_runner {
     ($a:expr) => {
         SPVariable::new(
             $a.clone(),
@@ -99,11 +195,11 @@ macro_rules! fv_run {
 }
 
 #[macro_export]
-macro_rules! av {
+macro_rules! av_command {
     ($a:expr, $b:expr) => {
         SPVariable::new(
             $a.clone(),
-            SPVariableType::Planner,
+            SPVariableType::Command,
             SPValueType::Array,
             $b.iter().map(|x| x.clone().to_spvalue()).collect(),
         )
@@ -111,7 +207,31 @@ macro_rules! av {
 }
 
 #[macro_export]
-macro_rules! av_run {
+macro_rules! av_measured {
+    ($a:expr, $b:expr) => {
+        SPVariable::new(
+            $a.clone(),
+            SPVariableType::Measured,
+            SPValueType::Array,
+            $b.iter().map(|x| x.clone().to_spvalue()).collect(),
+        )
+    };
+}
+
+#[macro_export]
+macro_rules! av_estimated {
+    ($a:expr, $b:expr) => {
+        SPVariable::new(
+            $a.clone(),
+            SPVariableType::Estimated,
+            SPValueType::Array,
+            $b.iter().map(|x| x.clone().to_spvalue()).collect(),
+        )
+    };
+}
+
+#[macro_export]
+macro_rules! av_runner {
     ($a:expr) => {
         SPVariable::new(
             $a.clone(),

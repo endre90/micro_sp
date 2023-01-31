@@ -147,34 +147,18 @@ pub fn get_predicate_vars_planner(pred: &Predicate) -> Vec<SPVariable> {
         Predicate::AND(x) => s.extend(x.iter().flat_map(|p| get_predicate_vars_planner(p))),
         Predicate::OR(x) => s.extend(x.iter().flat_map(|p| get_predicate_vars_planner(p))),
         Predicate::NOT(x) => s.extend(get_predicate_vars_planner(x)),
-        Predicate::EQ(x, y) => {
+        Predicate::EQ(x, y) | Predicate::NEQ(x, y) => {
             match x {
                 SPWrapped::SPVariable(vx) => match vx.variable_type {
-                    SPVariableType::Planner => s.push(vx.to_owned()),
-                    _ => (),
+                    SPVariableType::Runner => (),
+                    _ => s.push(vx.to_owned()),
                 },
                 _ => (),
             }
             match y {
                 SPWrapped::SPVariable(vy) => match vy.variable_type {
-                    SPVariableType::Planner => s.push(vy.to_owned()),
-                    _ => (),
-                },
-                _ => (),
-            }
-        }
-        Predicate::NEQ(x, y) => {
-            match x {
-                SPWrapped::SPVariable(vx) => match vx.variable_type {
-                    SPVariableType::Planner => s.push(vx.to_owned()),
-                    _ => (),
-                },
-                _ => (),
-            }
-            match y {
-                SPWrapped::SPVariable(vy) => match vy.variable_type {
-                    SPVariableType::Planner => s.push(vy.to_owned()),
-                    _ => (),
+                    SPVariableType::Runner => (),
+                    _ => s.push(vy.to_owned()),
                 },
                 _ => (),
             }

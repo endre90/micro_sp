@@ -1,59 +1,64 @@
 #![allow(unused_imports)]
 #![allow(dead_code)]
 use crate::{
-    av_run, bv, bv_run, fv, pred_parser, t, v, v_run, Action, Operation, SPAssignment, SPValueType,
-    SPVariable, SPVariableType, State, ToSPValue, Transition, Model,
+    av_command, av_estimated, av_measured, av_runner, bv_command, bv_estimated, bv_measured,
+    bv_runner, fv_command, fv_estimated, fv_measured, fv_runner, iv_command, iv_estimated,
+    iv_measured, iv_runner, v_command, v_estimated, v_measured, v_runner,
+};
+use crate::{
+    t, Model, Operation, SPAssignment, SPValueType, SPVariable, SPVariableType, State, ToSPValue,
+    ToSPWrappedVar, Transition, pred_parser, Action
 };
 use std::collections::{HashMap, HashSet};
 
 pub fn make_initial_state() -> State {
     let state = State::new();
     let state = state.add(SPAssignment::new(
-        v_run!("runner_goal"),
+        v_runner!("runner_goal"),
         "var:ur_current_pose == c".to_spvalue(),
     ));
     let state = state.add(SPAssignment::new(
-        av_run!("runner_plan"),
+        av_runner!("runner_plan"),
         Vec::<String>::new().to_spvalue(),
     ));
     let state = state.add(SPAssignment::new(
-        bv_run!("runner_replan"),
+        bv_runner!("runner_replan"),
         true.to_spvalue(),
     ));
     let state = state.add(SPAssignment::new(
-        bv_run!("runner_replanned"),
+        bv_runner!("runner_replanned"),
         false.to_spvalue(),
     ));
     let state = state.add(SPAssignment::new(
-        bv!("ur_action_trigger"),
+        bv_estimated!("ur_action_trigger"),
         false.to_spvalue(),
     ));
     let state = state.add(SPAssignment::new(
-        v!("ur_action_state", vec!("initial", "executing", "done")),
+        v_estimated!("ur_action_state", vec!("initial", "executing", "done")),
         "initial".to_spvalue(),
     ));
     let state = state.add(SPAssignment::new(
-        v!("ur_current_pose", vec!("a", "b", "c")),
+        v_estimated!("ur_current_pose", vec!("a", "b", "c")),
         "a".to_spvalue(),
     ));
     let state = state.add(SPAssignment::new(
-        v!("ur_command", vec!("movej", "movel")),
+        v_estimated!("ur_command", vec!("movej", "movel")),
         "movej".to_spvalue(),
     ));
     let state = state.add(SPAssignment::new(
-        fv!("ur_velocity", vec!(0.1, 0.2, 0.3)),
+        fv_estimated!("ur_velocity", vec!(0.1, 0.2, 0.3)),
         0.2.to_spvalue(),
     ));
     let state = state.add(SPAssignment::new(
-        fv!("ur_acceleration", vec!(0.2, 0.4, 0.6)),
+        fv_estimated!("ur_acceleration", vec!(0.2, 0.4, 0.6)),
         0.4.to_spvalue(),
     ));
     let state = state.add(SPAssignment::new(
-        v!("ur_goal_feature_id", vec!("a", "b", "c")),
+        v_estimated!("ur_goal_feature_id", vec!("a", "b", "c")),
         "a".to_spvalue(),
     ));
     let state = state.add(SPAssignment::new(
-        v!("ur_tcp_id", vec!("svt_tcp")),
+        v_estimated!("ur_tcp_id", vec!("svt_tcp")),
         "svt_tcp".to_spvalue(),
     ));
     state
@@ -121,9 +126,9 @@ fn test_operation_eval_planning() {
             &state
         )
     );
-    
+
     // Adding the opeation states in the model
-    let m = Model::new("asdf", state.clone(), vec!(), vec!(op.clone()));
+    let m = Model::new("asdf", state.clone(), vec![], vec![op.clone()]);
     assert_eq!(op.eval_planning(&m.initial_state), true)
 }
 
@@ -158,9 +163,9 @@ fn test_operation_eval_planning_panic() {
             &state
         )
     );
-    
+
     // Adding the opeation states in the model
-    let m = Model::new("asdf", state.clone(), vec!(), vec!(op.clone()));
+    let m = Model::new("asdf", state.clone(), vec![], vec![op.clone()]);
     assert_eq!(op.eval_planning(&m.initial_state), true)
 }
 
@@ -194,9 +199,9 @@ fn test_operation_eval_running() {
             &state
         )
     );
-    
+
     // Adding the opeation states in the model
-    let m = Model::new("asdf", state.clone(), vec!(), vec!(op.clone()));
+    let m = Model::new("asdf", state.clone(), vec![], vec![op.clone()]);
     assert_eq!(op.eval_running(&m.initial_state), true)
 }
 
@@ -231,9 +236,9 @@ fn test_operation_eval_running_panic() {
             &state
         )
     );
-    
+
     // Adding the opeation states in the model
-    let m = Model::new("asdf", state.clone(), vec!(), vec!(op.clone()));
+    let m = Model::new("asdf", state.clone(), vec![], vec![op.clone()]);
     assert_eq!(op.eval_running(&m.initial_state), true)
 }
 
@@ -267,14 +272,12 @@ fn test_operation_take_planning() {
             &state
         )
     );
-    
+
     // Adding the opeation states in the model
-    let m = Model::new("asdf", state.clone(), vec!(), vec!(op.clone()));
+    let m = Model::new("asdf", state.clone(), vec![], vec![op.clone()]);
     let new_state = match op.clone().eval_planning(&m.initial_state) {
         true => op.take_planning(&m.initial_state),
-        false => {
-            m.initial_state
-        }
+        false => m.initial_state,
     };
     assert_eq!(new_state.get_value("ur_current_pose"), "b".to_spvalue());
     assert_eq!(new_state.get_value("ur_action_trigger"), false.to_spvalue());
@@ -313,21 +316,22 @@ fn test_operation_start() {
             &state
         )
     );
-    
+
     // Adding the opeation states in the model
-    let m = Model::new("asdf", state.clone(), vec!(), vec!(op.clone()));
+    let m = Model::new("asdf", state.clone(), vec![], vec![op.clone()]);
     let new_state = match op.clone().eval_running(&m.initial_state) {
         true => op.start_running(&m.initial_state),
-        false => {
-            m.initial_state
-        }
+        false => m.initial_state,
     };
     assert_eq!(new_state.get_value("ur_current_pose"), "a".to_spvalue());
     assert_eq!(new_state.get_value("ur_action_trigger"), true.to_spvalue());
     assert_eq!(new_state.get_value("ur_command"), "movej".to_spvalue());
     assert_eq!(new_state.get_value("ur_goal_feature_id"), "b".to_spvalue());
     assert_eq!(new_state.get_value("ur_tcp_id"), "svt_tcp".to_spvalue());
-    assert_eq!(new_state.get_value("op_move_to_b"), "executing".to_spvalue());
+    assert_eq!(
+        new_state.get_value("op_move_to_b"),
+        "executing".to_spvalue()
+    );
 }
 
 #[test]
@@ -360,27 +364,37 @@ fn test_operation_complete() {
             &state
         )
     );
-    
+
     // Adding the opeation states in the model
-    let m = Model::new("asdf", state.clone(), vec!(), vec!(op.clone()));
+    let m = Model::new("asdf", state.clone(), vec![], vec![op.clone()]);
     let new_state = match op.clone().eval_running(&m.initial_state) {
         true => op.clone().start_running(&m.initial_state),
-        false => {
-            m.initial_state
-        }
+        false => m.initial_state,
     };
     assert_eq!(new_state.get_value("ur_current_pose"), "a".to_spvalue());
     assert_eq!(new_state.get_value("ur_action_trigger"), true.to_spvalue());
     assert_eq!(new_state.get_value("ur_command"), "movej".to_spvalue());
     assert_eq!(new_state.get_value("ur_goal_feature_id"), "b".to_spvalue());
     assert_eq!(new_state.get_value("ur_tcp_id"), "svt_tcp".to_spvalue());
-    assert_eq!(new_state.get_value("op_move_to_b"), "executing".to_spvalue());
+    assert_eq!(
+        new_state.get_value("op_move_to_b"),
+        "executing".to_spvalue()
+    );
 
     let new_state_2 = op.complete_running(&new_state);
     assert_eq!(new_state_2.get_value("ur_current_pose"), "b".to_spvalue());
-    assert_eq!(new_state_2.get_value("ur_action_trigger"), false.to_spvalue());
+    assert_eq!(
+        new_state_2.get_value("ur_action_trigger"),
+        false.to_spvalue()
+    );
     assert_eq!(new_state_2.get_value("ur_command"), "movej".to_spvalue());
-    assert_eq!(new_state_2.get_value("ur_goal_feature_id"), "b".to_spvalue());
+    assert_eq!(
+        new_state_2.get_value("ur_goal_feature_id"),
+        "b".to_spvalue()
+    );
     assert_eq!(new_state_2.get_value("ur_tcp_id"), "svt_tcp".to_spvalue());
-    assert_eq!(new_state_2.get_value("op_move_to_b"), "initial".to_spvalue());
+    assert_eq!(
+        new_state_2.get_value("op_move_to_b"),
+        "initial".to_spvalue()
+    );
 }

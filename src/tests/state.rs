@@ -1,15 +1,19 @@
 #![allow(unused_imports)]
 #![allow(dead_code)]
-use crate::{bv, bv_run, fv, fv_run, iv, iv_run, v, v_run, assign};
-use crate::{SPAssignment, SPValue, SPValueType, SPVariable, SPVariableType, State, ToSPValue};
+use crate::{
+    av_command, av_estimated, av_measured, av_runner, bv_command, bv_estimated, bv_measured,
+    bv_runner, fv_command, fv_estimated, fv_measured, fv_runner, iv_command, iv_estimated,
+    iv_measured, iv_runner, v_command, v_estimated, v_measured, v_runner, assign
+};
+use crate::{SPAssignment, SPValue, SPValueType, SPVariable, SPVariableType, State, ToSPValue, Transition};
 use std::collections::{HashMap, HashSet};
 
 fn john_doe() -> Vec<(SPVariable, SPValue)> {
-    let name = v!("name", vec!("John", "Jack"));
-    let surname = v!("surname", vec!("Doe", "Crawford"));
-    let height = iv!("height", vec!(180, 185, 190));
-    let weight = fv!("weight", vec!(80.0, 82.5, 85.0));
-    let smart = bv!("smart");
+    let name = v_estimated!("name", vec!("John", "Jack"));
+    let surname = v_estimated!("surname", vec!("Doe", "Crawford"));
+    let height = iv_estimated!("height", vec!(180, 185, 190));
+    let weight = fv_estimated!("weight", vec!(80.0, 82.5, 85.0));
+    let smart = bv_estimated!("smart");
 
     vec![
         (name, "John".to_spvalue()),
@@ -21,11 +25,11 @@ fn john_doe() -> Vec<(SPVariable, SPValue)> {
 }
 
 fn john_doe_faulty() -> Vec<(SPVariable, SPValue)> {
-    let name = v!("name", vec!("John", "Jack"));
-    let surname = v!("surname", vec!("Doe", "Crawford"));
-    let height = iv!("height", vec!(180, 185, 190));
-    let weight = fv!("weight", vec!(80.0, 82.5, 85.0));
-    let smart = bv!("smart");
+    let name = v_estimated!("name", vec!("John", "Jack"));
+    let surname = v_estimated!("surname", vec!("Doe", "Crawford"));
+    let height = iv_estimated!("height", vec!(180, 185, 190));
+    let weight = fv_estimated!("weight", vec!(80.0, 82.5, 85.0));
+    let smart = bv_estimated!("smart");
 
     vec![
         (name, "John".to_spvalue()),
@@ -78,14 +82,14 @@ fn test_state_get_all() {
     let state = State::from_vec(&john_doe);
     assert_eq!(
         SPAssignment {
-            var: iv!("height", vec!(180, 185, 190)),
+            var: iv_estimated!("height", vec!(180, 185, 190)),
             val: 185.to_spvalue()
         },
         state.get_all("height")
     );
     assert_ne!(
         SPAssignment {
-            var: iv!("height", vec!(180, 185, 190)),
+            var: iv_estimated!("height", vec!(180, 185, 190)),
             val: 186.to_spvalue()
         },
         state.get_all("height")
@@ -104,7 +108,7 @@ fn test_state_contains() {
 fn test_state_add_not_mutable() {
     let john_doe = john_doe();
     let state = State::from_vec(&john_doe);
-    let wealth = iv!("wealth", vec!(1000, 2000));
+    let wealth = iv_estimated!("wealth", vec!(1000, 2000));
     state.add(assign!(wealth, 2000.to_spvalue()));
     assert_ne!(state.state.len(), 6)
 }
@@ -113,7 +117,7 @@ fn test_state_add_not_mutable() {
 fn test_state_add() {
     let john_doe = john_doe();
     let state = State::from_vec(&john_doe);
-    let wealth = iv!("wealth", vec!(1000, 2000));
+    let wealth = iv_estimated!("wealth", vec!(1000, 2000));
     let state = state.add(assign!(wealth, 2000.to_spvalue()));
     assert_eq!(state.state.len(), 6)
 }
@@ -123,7 +127,7 @@ fn test_state_add() {
 fn test_state_add_already_exists() {
     let john_doe = john_doe();
     let state = State::from_vec(&john_doe);
-    let wealth = iv!("height", vec!(1000, 2000));
+    let wealth = iv_estimated!("height", vec!(1000, 2000));
     let state = state.add(assign!(wealth, 2000.to_spvalue()));
     assert_eq!(state.state.len(), 6)
 }
