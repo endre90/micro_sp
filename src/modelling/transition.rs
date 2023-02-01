@@ -58,50 +58,54 @@ impl Transition {
     ) -> Transition {
         Transition {
             name: name.to_string(),
-            guard: {
-                let variables = get_predicate_vars_runner(&guard);
-                for var in variables {
-                    panic!(
-                        "Runner type variable '{}' can't be in the non-runner guard.",
-                        var.name
-                    )
-                }
-                guard
-            },
-            runner_guard: {
-                let variables = get_predicate_vars_planner(&runner_guard);
-                for var in variables {
-                    panic!(
-                        "Planner type variable '{}' can't be in the runner guard.",
-                        var.name
-                    )
-                }
-                runner_guard
-            },
-            actions: {
-                for action in &actions {
-                    match action.var.variable_type {
-                        SPVariableType::Runner => panic!(
-                            "Runner type variable '{}' can't be in the non-runner action.",
-                            action.var.name
-                        ),
-                        _ => (),
-                    }
-                }
-                actions
-            },
-            runner_actions: {
-                for action in &runner_actions {
-                    match action.var.variable_type {
-                        SPVariableType::Runner => (),
-                        _ => panic!(
-                            "Planner type variable '{}' can't be in the runner action.",
-                            action.var.name
-                        ),
-                    }
-                }
-                runner_actions
-            },
+            guard,
+            runner_guard,
+            actions, 
+            runner_actions
+            // guard: {
+            //     let variables = get_predicate_vars_runner(&guard);
+            //     for var in variables {
+            //         panic!(
+            //             "Runner type variable '{}' can't be in the non-runner guard.",
+            //             var.name
+            //         )
+            //     }
+            //     guard
+            // },
+            // runner_guard: {
+            //     let variables = get_predicate_vars_planner(&runner_guard);
+            //     for var in variables {
+            //         panic!(
+            //             "Planner type variable '{}' can't be in the runner guard.",
+            //             var.name
+            //         )
+            //     }
+            //     runner_guard
+            // },
+            // actions: {
+            //     for action in &actions {
+            //         match action.var.variable_type {
+            //             SPVariableType::Runner => panic!(
+            //                 "Runner type variable '{}' can't be in the non-runner action.",
+            //                 action.var.name
+            //             ),
+            //             _ => (),
+            //         }
+            //     }
+            //     actions
+            // },
+            // runner_actions: {
+            //     for action in &runner_actions {
+            //         match action.var.variable_type {
+            //             SPVariableType::Runner => (),
+            //             _ => panic!(
+            //                 "Planner type variable '{}' can't be in the runner action.",
+            //                 action.var.name
+            //             ),
+            //         }
+            //     }
+            //     runner_actions
+            // },
         }
     }
 
