@@ -124,10 +124,16 @@ impl Transition {
     pub fn take_running(self, state: &State) -> State {
         let mut new_state = state.clone();
         for a in self.actions {
-            new_state = a.assign(&new_state)
+            match a.var.variable_type {
+                SPVariableType::Measured => (),
+                _ => new_state = a.assign(&new_state)
+            }
         }
         for a in self.runner_actions {
-            new_state = a.assign(&new_state)
+            match a.var.variable_type {
+                SPVariableType::Measured => (),
+                _ => new_state = a.assign(&new_state)
+            }
         }
         new_state
     }
