@@ -65,7 +65,7 @@ impl Operation {
         }
     }
 
-    pub fn is_completed(self, state: &State) -> bool {
+    pub fn can_be_completed(self, state: &State) -> bool {
         state.get_value(&self.name) == "executing".to_spvalue() && self.postcondition.eval_running(&state)
     }
 }

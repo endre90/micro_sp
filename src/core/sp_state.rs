@@ -107,12 +107,24 @@ impl State {
                         );
                         State { state }
                     }
-                    false => {
-                        println!("Value {} to update the variable {} is not in its domain. State not updated!", val, assignment.var.name);
-                        self.clone()
-                    }
+                    false => match val {
+                        SPValue::Unknown => {
+                            let mut state = self.state.clone();
+                            state.insert(
+                                name.to_string(),
+                                SPAssignment {
+                                    var: assignment.var.clone(),
+                                    val: val.clone(),
+                                },
+                            );
+                            State { state }
+                        }
+                        _ => {
+                            println!("Value {} to update the variable {} is not in its domain. State not updated!", val, assignment.var.name);
+                            self.clone()
+                        }
+                    },
                 },
-                
             },
             None => panic!("Variable {} not in state.", name),
         }
