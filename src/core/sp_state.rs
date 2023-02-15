@@ -119,6 +119,13 @@ impl State {
                             );
                             State { state }
                         }
+                        SPValue::String(x) => match x.as_str() {
+                            "unknown" => self.clone(),
+                            _ => {
+                                println!("Value {} to update the variable {} is not in its domain. State not updated!", x, assignment.var.name);
+                                self.clone()
+                            }
+                        }
                         _ => {
                             println!("Value {} to update the variable {} is not in its domain. State not updated!", val, assignment.var.name);
                             self.clone()
