@@ -142,11 +142,12 @@ impl fmt::Display for State {
     fn fmt(&self, fmtr: &mut fmt::Formatter<'_>) -> fmt::Result {
         let s: String = {
             // let sorted = self.state.sort();
-            let children: Vec<_> = self
+            let mut children: Vec<_> = self
                 .state
                 .iter()
                 .map(|(k, v)| format!("    {}: {}", k, v.val))
                 .collect();
+            children.sort();
             format!("{}", children.join("\n"))
         };
 
