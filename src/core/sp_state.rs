@@ -1,4 +1,4 @@
-use crate::{SPAssignment, SPValue, SPVariable, SPVariableType};
+use crate::{SPAssignment, SPValue, SPVariable, SPVariableType, SPValueType};
 use serde::{Deserialize, Serialize};
 use std::hash::{Hash, Hasher};
 use std::{collections::HashMap, fmt};
@@ -138,6 +138,23 @@ impl State {
     }
 }
 
+// impl fmt::Display for State {
+//     fn fmt(&self, fmtr: &mut fmt::Formatter<'_>) -> fmt::Result {
+//         let s: String = {
+//             // let sorted = self.state.sort();
+//             let mut children: Vec<_> = self
+//                 .state
+//                 .iter()
+//                 .map(|(k, v)| format!("    {}: {}", k, v.val))
+//                 .collect();
+//             children.sort();
+//             format!("{}", children.join("\n"))
+//         };
+
+//         write!(fmtr, "State: {{\n{}\n}}\n", &s)
+//     }
+// }
+
 impl fmt::Display for State {
     fn fmt(&self, fmtr: &mut fmt::Formatter<'_>) -> fmt::Result {
         let s: String = {
@@ -145,7 +162,11 @@ impl fmt::Display for State {
             let mut children: Vec<_> = self
                 .state
                 .iter()
-                .map(|(k, v)| format!("    {}: {}", k, v.val))
+                .map(|(k, v)| match v.val {
+                    SPValue::Array(some_array, _) => {
+                        format!("{:?}", some_array)
+                    },
+                    _ => format!("    {}: {}", k, v.val)})
                 .collect();
             children.sort();
             format!("{}", children.join("\n"))
