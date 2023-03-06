@@ -164,7 +164,9 @@ impl fmt::Display for State {
                 .iter()
                 .map(|(k, v)| match &v.val {
                     SPValue::Array(_, some_array) => {
-                        some_array.iter().map(|value| format!("        {}\n", value)).collect()
+                        let mut sub_children: Vec<String> = vec!(format!("    {}:", k));
+                        sub_children.extend(some_array.iter().map(|value| format!("        {}\n", value)).collect::<Vec<String>>());
+                        format!("{}", sub_children.join("\n"))
                     },
                     _ => format!("    {}: {}", k, v.val)})
                 .collect();
