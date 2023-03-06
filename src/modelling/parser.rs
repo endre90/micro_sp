@@ -1,4 +1,4 @@
-use crate::{Action, Predicate, SPVariable, SPWrapped, State, ToSPValue, ToSPWrapped};
+use crate::{Action, Predicate, SPVariable, SPWrapped, State, ToSPValue, ToSPWrapped, SPValue};
 
 peg::parser!(pub grammar pred_parser() for str {
 
@@ -11,6 +11,7 @@ peg::parser!(pub grammar pred_parser() for str {
 
     pub rule value(state: &State) -> SPWrapped
         = _ var:variable(&state) _ { SPWrapped::SPVariable(var) }
+        / _ "[unknown]" _ { SPWrapped::SPValue(SPValue::Unknown) }
         / _ "true" _ { SPWrapped::SPValue(true.to_spvalue()) }
         / _ "TRUE" _ { SPWrapped::SPValue(true.to_spvalue()) }
         / _ "false" _ { SPWrapped::SPValue(false.to_spvalue()) }

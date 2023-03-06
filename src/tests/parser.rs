@@ -60,6 +60,10 @@ fn parse_values() {
         pred_parser::value("FALSE", &s),
         Ok(SPWrapped::SPValue(false.to_spvalue()))
     );
+    assert_eq!(
+        pred_parser::value("[unknown]", &s),
+        Ok(SPWrapped::SPValue(SPValue::Unknown))
+    );
 }
 
 #[test]
