@@ -28,6 +28,14 @@ peg::parser!(pub grammar pred_parser() for str {
             let i: i32 = n.parse().unwrap();
             SPWrapped::SPValue(i.to_spvalue())
         }
+        / _ var:variable(&state) "+" _ n:$(['0'..='9']+) {
+            let i: i32 = n.parse().unwrap();
+            let new_val = match state.get_value(&var.name) {
+                SPValue::Int32(val) => (val + i).to_spvalue(),
+                _ => panic!("Can't increment non-integer variable")
+            };
+            SPWrapped::SPValue(new_val)
+        }
 
     pub rule eq(state: &State) -> Predicate
         = p1:value(&state) _ "==" _ p2:value(&state) { Predicate::EQ(p1,p2) }
