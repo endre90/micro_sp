@@ -245,6 +245,7 @@ fn test_operation_planner() {
         "asdf",
         state.clone(),
         vec![],
+        vec![],
         vec![
             op_move_to_b.clone(),
             op_move_to_c.clone(),

@@ -7,7 +7,8 @@ pub struct Model {
     pub name: String,
     pub state: State,
     // pub variables: Vec<SPVariable>,
-    pub transitions: Vec<Transition>,
+    pub auto_transitions: Vec<Transition>,
+    pub auto_operations: Vec<Operation>,
     pub operations: Vec<Operation>,
     pub resources: Vec<Resource>
 }
@@ -16,7 +17,8 @@ impl Model {
     pub fn new(
         name: &str,
         state: State,
-        transitions: Vec<Transition>,
+        auto_transitions: Vec<Transition>,
+        auto_operations: Vec<Operation>,
         operations: Vec<Operation>,
         resources: Vec<Resource>
     ) -> Model {
@@ -49,7 +51,8 @@ impl Model {
             //     .iter()
             //     .map(|(_, assignment)| assignment.var.clone())
             //     .collect(),
-            transitions,
+            auto_transitions,
+            auto_operations,
             operations,
             resources
         }

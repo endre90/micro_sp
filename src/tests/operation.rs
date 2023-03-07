@@ -128,7 +128,7 @@ fn test_operation_eval_planning() {
     );
 
     // Adding the opeation states in the model
-    let m = Model::new("asdf", state.clone(), vec![], vec![op.clone()], vec!());
+    let m = Model::new("asdf", state.clone(), vec![], vec![], vec![op.clone()], vec!());
     assert_eq!(op.eval_planning(&m.state), true)
 }
 
@@ -165,7 +165,7 @@ fn test_operation_eval_planning_panic() {
     );
 
     // Adding the opeation states in the model
-    let m = Model::new("asdf", state.clone(), vec![], vec![op.clone()], vec![]);
+    let m = Model::new("asdf", state.clone(), vec![], vec![], vec![op.clone()], vec![]);
     assert_eq!(op.eval_planning(&m.state), true)
 }
 
@@ -201,7 +201,7 @@ fn test_operation_eval_running() {
     );
 
     // Adding the opeation states in the model
-    let m = Model::new("asdf", state.clone(), vec![], vec![op.clone()], vec![]);
+    let m = Model::new("asdf", state.clone(), vec![], vec![], vec![op.clone()], vec![]);
     assert_eq!(op.eval_running(&m.state), true)
 }
 
@@ -238,7 +238,7 @@ fn test_operation_eval_running_panic() {
     );
 
     // Adding the opeation states in the model
-    let m = Model::new("asdf", state.clone(), vec![], vec![op.clone()], vec![]);
+    let m = Model::new("asdf", state.clone(), vec![], vec![], vec![op.clone()], vec![]);
     assert_eq!(op.eval_running(&m.state), true)
 }
 
@@ -274,7 +274,7 @@ fn test_operation_take_planning() {
     );
 
     // Adding the opeation states in the model
-    let m = Model::new("asdf", state.clone(), vec![], vec![op.clone()], vec![]);
+    let m = Model::new("asdf", state.clone(), vec![], vec![], vec![op.clone()], vec![]);
     let new_state = match op.clone().eval_planning(&m.state) {
         true => op.take_planning(&m.state),
         false => m.state,
@@ -318,7 +318,7 @@ fn test_operation_start() {
     );
 
     // Adding the opeation states in the model
-    let m = Model::new("asdf", state.clone(), vec![], vec![op.clone()], vec![]);
+    let m = Model::new("asdf", state.clone(), vec![], vec![], vec![op.clone()], vec![]);
     let new_state = match op.clone().eval_running(&m.state) {
         true => op.start_running(&m.state),
         false => m.state,
@@ -366,7 +366,7 @@ fn test_operation_complete() {
     );
 
     // Adding the opeation states in the model
-    let m = Model::new("asdf", state.clone(), vec![], vec![op.clone()],  vec![]);
+    let m = Model::new("asdf", state.clone(), vec![], vec![], vec![op.clone()],  vec![]);
     let new_state = match op.clone().eval_running(&m.state) {
         true => op.clone().start_running(&m.state),
         false => m.state,
