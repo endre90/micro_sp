@@ -3,7 +3,7 @@
 use crate::{
     av_command, av_estimated, av_measured, av_runner, bv_command, bv_estimated, bv_measured,
     bv_runner, fv_command, fv_estimated, fv_measured, fv_runner, iv_command, iv_estimated,
-    iv_measured, iv_runner, v_command, v_estimated, v_measured, v_runner,
+    iv_measured, iv_runner, v_command, v_estimated, v_measured, v_runner, assign,
 };
 use crate::{
     t, Model, Operation, SPAssignment, SPValueType, SPVariable, SPVariableType, State, ToSPValue,
@@ -99,6 +99,8 @@ fn test_operation_new() {
 #[test]
 fn test_operation_eval_planning() {
     let state = make_initial_state();
+    let op_move_to_b = v_runner!("op_move_to_b");
+    let state = state.add(assign!(op_move_to_b, "initial".to_spvalue()));
     let op = Operation::new(
         "op_move_to_b",
         t!(
@@ -128,7 +130,7 @@ fn test_operation_eval_planning() {
     );
 
     // Adding the opeation states in the model
-    let m = Model::new("asdf", state.clone(), vec![], vec![], vec![op.clone()], vec!());
+    let m = Model::new("asdf", state.clone(), vec![], vec![op.clone()], vec!());
     assert_eq!(op.eval_planning(&m.state), true)
 }
 
@@ -136,6 +138,8 @@ fn test_operation_eval_planning() {
 #[test]
 fn test_operation_eval_planning_panic() {
     let state = make_initial_state();
+    let op_move_to_b = v_runner!("op_move_to_b");
+    let state = state.add(assign!(op_move_to_b, "initial".to_spvalue()));
     let op = Operation::new(
         "op_move_to_b",
         t!(
@@ -165,13 +169,15 @@ fn test_operation_eval_planning_panic() {
     );
 
     // Adding the opeation states in the model
-    let m = Model::new("asdf", state.clone(), vec![], vec![], vec![op.clone()], vec![]);
+    let m = Model::new("asdf", state.clone(), vec![], vec![op.clone()], vec![]);
     assert_eq!(op.eval_planning(&m.state), true)
 }
 
 #[test]
 fn test_operation_eval_running() {
     let state = make_initial_state();
+    let op_move_to_b = v_runner!("op_move_to_b");
+    let state = state.add(assign!(op_move_to_b, "initial".to_spvalue()));
     let op = Operation::new(
         "op_move_to_b",
         t!(
@@ -201,7 +207,7 @@ fn test_operation_eval_running() {
     );
 
     // Adding the opeation states in the model
-    let m = Model::new("asdf", state.clone(), vec![], vec![], vec![op.clone()], vec![]);
+    let m = Model::new("asdf", state.clone(), vec![], vec![op.clone()], vec![]);
     assert_eq!(op.eval_running(&m.state), true)
 }
 
@@ -209,6 +215,8 @@ fn test_operation_eval_running() {
 #[test]
 fn test_operation_eval_running_panic() {
     let state = make_initial_state();
+    let op_move_to_b = v_runner!("op_move_to_b");
+    let state = state.add(assign!(op_move_to_b, "initial".to_spvalue()));
     let op = Operation::new(
         "op_move_to_b",
         t!(
@@ -238,13 +246,15 @@ fn test_operation_eval_running_panic() {
     );
 
     // Adding the opeation states in the model
-    let m = Model::new("asdf", state.clone(), vec![], vec![], vec![op.clone()], vec![]);
+    let m = Model::new("asdf", state.clone(), vec![], vec![op.clone()], vec![]);
     assert_eq!(op.eval_running(&m.state), true)
 }
 
 #[test]
 fn test_operation_take_planning() {
     let state = make_initial_state();
+    let op_move_to_b = v_runner!("op_move_to_b");
+    let state = state.add(assign!(op_move_to_b, "initial".to_spvalue()));
     let op = Operation::new(
         "op_move_to_b",
         t!(
@@ -274,7 +284,7 @@ fn test_operation_take_planning() {
     );
 
     // Adding the opeation states in the model
-    let m = Model::new("asdf", state.clone(), vec![], vec![], vec![op.clone()], vec![]);
+    let m = Model::new("asdf", state.clone(), vec![], vec![op.clone()], vec![]);
     let new_state = match op.clone().eval_planning(&m.state) {
         true => op.take_planning(&m.state),
         false => m.state,
@@ -289,6 +299,8 @@ fn test_operation_take_planning() {
 #[test]
 fn test_operation_start() {
     let state = make_initial_state();
+    let op_move_to_b = v_runner!("op_move_to_b");
+    let state = state.add(assign!(op_move_to_b, "initial".to_spvalue()));
     let op = Operation::new(
         "op_move_to_b",
         t!(
@@ -318,7 +330,7 @@ fn test_operation_start() {
     );
 
     // Adding the opeation states in the model
-    let m = Model::new("asdf", state.clone(), vec![], vec![], vec![op.clone()], vec![]);
+    let m = Model::new("asdf", state.clone(), vec![], vec![op.clone()], vec![]);
     let new_state = match op.clone().eval_running(&m.state) {
         true => op.start_running(&m.state),
         false => m.state,
@@ -337,6 +349,8 @@ fn test_operation_start() {
 #[test]
 fn test_operation_complete() {
     let state = make_initial_state();
+    let op_move_to_b = v_runner!("op_move_to_b");
+    let state = state.add(assign!(op_move_to_b, "initial".to_spvalue()));
     let op = Operation::new(
         "op_move_to_b",
         t!(
@@ -366,7 +380,7 @@ fn test_operation_complete() {
     );
 
     // Adding the opeation states in the model
-    let m = Model::new("asdf", state.clone(), vec![], vec![], vec![op.clone()],  vec![]);
+    let m = Model::new("asdf", state.clone(), vec![], vec![op.clone()],  vec![]);
     let new_state = match op.clone().eval_running(&m.state) {
         true => op.clone().start_running(&m.state),
         false => m.state,

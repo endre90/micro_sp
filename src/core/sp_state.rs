@@ -1,4 +1,4 @@
-use crate::{SPAssignment, SPValue, SPVariable, SPVariableType, SPValueType};
+use crate::{SPAssignment, SPValue, SPVariable, SPVariableType};
 use serde::{Deserialize, Serialize};
 use std::hash::{Hash, Hasher};
 use std::{collections::HashMap, fmt};

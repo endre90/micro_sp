@@ -3,7 +3,7 @@
 use crate::{
     a, bfs_operation_planner, bfs_transition_planner, eq, pred_parser, t, t_plan, Action, Model,
     Operation, Predicate, SPAssignment, SPValue, SPValueType, SPVariable, SPVariableType, State,
-    ToSPValue, ToSPWrapped, ToSPWrappedVar, Transition,
+    ToSPValue, ToSPWrapped, ToSPWrappedVar, Transition, assign,
 };
 use crate::{
     av_command, av_estimated, av_measured, av_runner, bv_command, bv_estimated, bv_measured,
@@ -156,6 +156,12 @@ pub fn make_initial_state() -> State {
 #[test]
 fn test_operation_planner() {
     let state = make_initial_state();
+    let op_move_to_b = v_runner!("op_move_to_b");
+    let op_move_to_c = v_runner!("op_move_to_c");
+    let op_move_to_d = v_runner!("op_move_to_d");
+    let state = state.add(assign!(op_move_to_b, "initial".to_spvalue()));
+    let state = state.add(assign!(op_move_to_c, "initial".to_spvalue()));
+    let state = state.add(assign!(op_move_to_d, "initial".to_spvalue()));
     let op_move_to_b = Operation::new(
         "op_move_to_b",
         t!(
@@ -244,7 +250,6 @@ fn test_operation_planner() {
     let m = Model::new(
         "asdf",
         state.clone(),
-        vec![],
         vec![],
         vec![
             op_move_to_b.clone(),
