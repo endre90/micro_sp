@@ -4,7 +4,7 @@ use std::sync::Mutex;
 use crate::State;
 
 // define alias from State Shard
-type StateShard = State;
+pub type StateShard = State;
 
 #[derive(Debug)]
 pub struct ShardedMutex {
@@ -44,3 +44,6 @@ impl ShardedMutex {
         hasher.finish() as usize % self.mutexes.len()
     }
 }
+
+unsafe impl Sync for ShardedMutex {}
+unsafe impl Send for ShardedMutex {}
