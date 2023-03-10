@@ -33,12 +33,12 @@ impl ShardedMutex {
         Self { mutexes }
     }
 
-    pub fn lock(&self, key: &str) -> std::sync::MutexGuard<StateShard> {
+    pub fn lock(&self, key: &str) -> std::sync::MutexGuard<State> {
         let shard_index = self.get_shard_index(key);
         self.mutexes[shard_index].lock().unwrap()
     }
 
-    pub fn lock_all_read_only(&self) -> State {
+    pub fn collect_all(&self) -> Arc<Mutex<State>>  {
         let mut result = HashMap::new();
 
         for mutex in &self.mutexes {
@@ -49,9 +49,7 @@ impl ShardedMutex {
         }
 
         let arc = Arc::new(Mutex::new(State {state: result}));
-        let guard = arc.lock().unwrap();
-
-        guard.clone()
+        arc
 
     }
 
