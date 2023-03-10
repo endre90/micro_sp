@@ -4,6 +4,7 @@ pub use crate::core::sp_state::*;
 pub use crate::core::sp_value::*;
 pub use crate::core::sp_variable::*;
 pub use crate::core::sp_wrapped::*;
+pub use crate::core::sharded_mutex::*;
 
 pub mod modelling;
 pub use crate::modelling::action::*;
