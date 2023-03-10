@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
-use std::sync::Mutex;
+use std::sync::{Mutex, Arc};
 use crate::State;
 
 // define alias from State Shard
@@ -38,12 +38,26 @@ impl ShardedMutex {
         self.mutexes[shard_index].lock().unwrap()
     }
 
+    pub fn lock_all_read_only(&self) -> State {
+        let mut result = HashMap::new();
+
+        for mutex in &self.mutexes {
+            let shard = mutex.lock().unwrap();
+            for (key, value) in shard.state.clone() {
+                result.insert(key.clone(), value.clone());
+            }
+        }
+
+        let arc = Arc::new(Mutex::new(State {state: result}));
+        let guard = arc.lock().unwrap();
+
+        guard.clone()
+
+    }
+
     pub fn get_shard_index(&self, key: &str) -> usize {
         let mut hasher = std::collections::hash_map::DefaultHasher::new();
         key.hash(&mut hasher);
         hasher.finish() as usize % self.mutexes.len()
     }
 }
-
-unsafe impl Sync for ShardedMutex {}
-unsafe impl Send for ShardedMutex {}
