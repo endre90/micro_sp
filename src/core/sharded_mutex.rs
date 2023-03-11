@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
 use std::sync::{Mutex, Arc};
-use crate::State;
+use crate::{State, SPAssignment};
 
 pub type StateShard = State;
 
@@ -76,7 +76,7 @@ pub type StateShard = State;
 // might need a hashmap after all...
 #[derive(Debug)]
 pub struct ShardedMutex {
-    pub mutexes: Vec<Mutex<HashMap<String, StateShard>>>,
+    pub mutexes: Vec<Mutex<HashMap<String, SPAssignment>>>,
 }
 
 impl ShardedMutex {
@@ -88,7 +88,7 @@ impl ShardedMutex {
         Self { mutexes }
     }
 
-    pub fn lock(&self, key: &str) -> std::sync::MutexGuard<HashMap<String, StateShard>> {
+    pub fn lock(&self, key: &str) -> std::sync::MutexGuard<HashMap<String, SPAssignment>> {
         let shard_index = self.get_shard_index(key);
         self.mutexes[shard_index].lock().unwrap()
     }
