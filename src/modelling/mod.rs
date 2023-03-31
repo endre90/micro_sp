@@ -4,4 +4,3 @@ pub mod model;
 pub mod parser;
 pub mod predicate;
 pub mod transition;
-pub mod resource;

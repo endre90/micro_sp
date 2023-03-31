@@ -1,4 +1,4 @@
-use crate::{Action, Predicate, SPVariable, SPWrapped, State, ToSPValue, ToSPWrapped, SPValue};
+use crate::{Action, Predicate, SPValue, SPVariable, SPWrapped, State, ToSPValue, ToSPWrapped};
 
 peg::parser!(pub grammar pred_parser() for str {
 
@@ -28,6 +28,7 @@ peg::parser!(pub grammar pred_parser() for str {
             let i: i32 = n.parse().unwrap();
             SPWrapped::SPValue(i.to_spvalue())
         }
+        // this is not tested, probably doesn't work
         / _ var:variable(&state) "+" _ n:$(['0'..='9']+) {
             let i: i32 = n.parse().unwrap();
             let new_val = match state.get_value(&var.name) {

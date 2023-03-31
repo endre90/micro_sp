@@ -9,13 +9,6 @@ pub struct Operation {
     pub postcondition: Transition,
 }
 
-// #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
-// pub struct OperationResult {
-//     pub new_state: State,
-//     pub success: bool,
-//     pub info: String
-// }
-
 impl Operation {
     pub fn new(name: &str, precondition: Transition, postcondition: Transition) -> Operation {
         Operation {
@@ -42,7 +35,8 @@ impl Operation {
     }
 
     pub fn take_planning(self, state: &State) -> State {
-        self.postcondition.take_planning(&self.precondition.take_planning(state))
+        self.postcondition
+            .take_planning(&self.precondition.take_planning(state))
     }
 
     pub fn start_running(self, state: &State) -> State {
@@ -66,6 +60,7 @@ impl Operation {
     }
 
     pub fn can_be_completed(self, state: &State) -> bool {
-        state.get_value(&self.name) == "executing".to_spvalue() && self.postcondition.eval_running(&state)
+        state.get_value(&self.name) == "executing".to_spvalue()
+            && self.postcondition.eval_running(&state)
     }
 }

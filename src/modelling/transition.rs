@@ -6,11 +6,6 @@ use crate::{
 };
 use std::fmt;
 
-// Do I need transition types?
-// Do I neew variable types like measured, controlled and effect?
-// Do I want to implement a synthesis algorithm using some specifications, SCT?
-// Do I want to plug back in Z# as the planner and specification handling tool?
-
 #[derive(Debug, Clone, Eq, Hash, Serialize, Deserialize)]
 pub struct Transition {
     pub name: String,
@@ -19,34 +14,6 @@ pub struct Transition {
     pub actions: Vec<Action>,
     pub runner_actions: Vec<Action>,
 }
-
-// skip this for now, but will probably need it
-/// Transitions have the same formal semantics, but are separated due to their different uses. 
-/// Controlled transitions are taken when their guard condition is evaluated to be true, 
-/// only if they are also activated by the planning system. Automatic transitions are always 
-/// taken when their guard condition is evaluated to be true, regardless of if there are any 
-/// active plans or not. All automatic transitions are taken before any controlled transitions 
-/// can be taken. This ensures that automatic transitions can never be delayed by the planner.
-/// Effect transitions define how the measured state is updated, and as such, they are not
-/// used during control such as for the control transitions and automatic transitions. They 
-/// are important to keep track of, however, as they are needed for online planning and formal 
-/// verification algorithms. They are also used to determine if the plan is correctly 
-/// followed—if the expected effects do not occur, it can be due to an error.
-#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
-pub enum TransitionType {
-    Controlled,
-    Auto,
-    Effect,
-    // Runner, // not sure what these are for
-}
-
-// thanfully not used anywhere
-// #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
-// pub struct TransitionResult {
-//     pub new_state: State,
-//     pub success: bool,
-//     pub info: String
-// }
 
 impl Transition {
     pub fn new(
@@ -62,50 +29,6 @@ impl Transition {
             runner_guard,
             actions, 
             runner_actions
-            // guard: {
-            //     let variables = get_predicate_vars_runner(&guard);
-            //     for var in variables {
-            //         panic!(
-            //             "Runner type variable '{}' can't be in the non-runner guard.",
-            //             var.name
-            //         )
-            //     }
-            //     guard
-            // },
-            // runner_guard: {
-            //     let variables = get_predicate_vars_planner(&runner_guard);
-            //     for var in variables {
-            //         panic!(
-            //             "Planner type variable '{}' can't be in the runner guard.",
-            //             var.name
-            //         )
-            //     }
-            //     runner_guard
-            // },
-            // actions: {
-            //     for action in &actions {
-            //         match action.var.variable_type {
-            //             SPVariableType::Runner => panic!(
-            //                 "Runner type variable '{}' can't be in the non-runner action.",
-            //                 action.var.name
-            //             ),
-            //             _ => (),
-            //         }
-            //     }
-            //     actions
-            // },
-            // runner_actions: {
-            //     for action in &runner_actions {
-            //         match action.var.variable_type {
-            //             SPVariableType::Runner => (),
-            //             _ => panic!(
-            //                 "Planner type variable '{}' can't be in the runner action.",
-            //                 action.var.name
-            //             ),
-            //         }
-            //     }
-            //     runner_actions
-            // },
         }
     }
 
@@ -141,48 +64,6 @@ impl Transition {
         }
         new_state
     }
-
-    // pub fn take_planning(self, state: &State) -> TransitionResult {
-    //     let mut new_state = state.clone();
-    //     match self.clone().eval_planning(state) {
-    //         true => {
-    //             for a in self.actions {
-    //                 new_state = a.assign(&new_state)
-    //             }
-    //             TransitionResult {
-    //                 new_state,
-    //                 success: true,
-    //                 info: format!("Transition '{}' was taken.", self.name)
-    //             }
-    //         }
-    //         false => TransitionResult {
-    //             new_state,
-    //             success: false,
-    //             info: format!("Failed to take transition '{}'.", self.name)
-    //         },
-    //     }
-    // }
-
-    // pub fn take_running(self, state: &State) -> TransitionResult {
-    //     let mut new_state = state.clone();
-    //     match self.clone().eval_planning(state) && self.clone().eval_running(state) {
-    //         true => {
-    //             for a in self.actions {
-    //                 new_state = a.assign(&new_state)
-    //             }
-    //             TransitionResult {
-    //                 new_state,
-    //                 success: true,
-    //                 info: format!("Transition '{}' was taken.", self.name)
-    //             }
-    //         }
-    //         false => TransitionResult {
-    //             new_state,
-    //             success: false,
-    //             info: format!("Failed to take transition '{}'.", self.name)
-    //         },
-    //     }
-    // }
 }
 
 impl PartialEq for Transition {
@@ -305,19 +186,3 @@ impl fmt::Display for Transition {
         write!(fmtr, "{}: {} / [{}]", self.name, self.guard, action_string)
     }
 }
-
-// impl fmt::Display for Transition {
-//     fn fmt(&self, fmtr: &mut fmt::Formatter<'_>) -> fmt::Result {
-//         let k = match self.type_ {
-//             TransitionType::Auto => "a",
-//             TransitionType::Controlled => "c",
-//             TransitionType::Effect => "e",
-//             TransitionType::Runner => "r",
-//         };
-
-//         let s = format!("{}_{}: {}/{:?}[{:?}]", k, self.path(), self.guard,
-//                         self.actions, self.runner_actions);
-
-//         write!(fmtr, "{}", &s)
-//     }
-// }

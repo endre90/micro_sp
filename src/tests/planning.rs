@@ -255,8 +255,7 @@ fn test_operation_planner() {
             op_move_to_b.clone(),
             op_move_to_c.clone(),
             op_move_to_d.clone(),
-        ],
-        vec!()
+        ]
     );
 
     let goal = pred_parser::pred("var:ur_current_pose == d", &m.state).unwrap();

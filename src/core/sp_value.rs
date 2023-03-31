@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use std::fmt;
 use std::time::SystemTime;
 
-/// SPValue represent a variable value of a specific type.
+/// Represents a variable value of a specific type.
 #[derive(Debug, PartialEq, Clone, Hash, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum SPValue {
     Bool(bool),
@@ -28,6 +28,7 @@ pub enum SPValueType {
 }
 
 impl SPValue {
+    /// Checks whether the value is of the specified type.
     pub fn is_type(&self, t: SPValueType) -> bool {
         match self {
             SPValue::Bool(_) => SPValueType::Bool == t,
@@ -35,11 +36,12 @@ impl SPValue {
             SPValue::Int32(_) => SPValueType::Int32 == t,
             SPValue::String(_) => SPValueType::String == t,
             SPValue::Time(_) => SPValueType::Time == t,
-            SPValue::Array(at, _) => at == &t,
+            SPValue::Array(_, _) => SPValueType::Array == t,
             SPValue::Unknown => SPValueType::Unknown == t,
         }
     }
 
+    /// Returns the type of the `SPValue`.
     pub fn has_type(&self) -> SPValueType {
         match self {
             SPValue::Bool(_) => SPValueType::Bool,
@@ -52,6 +54,7 @@ impl SPValue {
         }
     }
 
+    /// Checks whether the value is of the array type.
     pub fn is_array(&self) -> bool {
         match self {
             SPValue::Array(_, _) => true,
@@ -59,6 +62,7 @@ impl SPValue {
         }
     }
 
+    /// Returns a `String` representation of the `SPValue`.
     pub fn to_string(&self) -> String {
         match self {
             SPValue::Bool(x) => x.to_string(),
@@ -78,6 +82,7 @@ impl SPValue {
     }
 }
 
+/// This trait defines a set of conversions from some Rust primitive types and containers to `SPValue`.
 pub trait ToSPValue {
     fn to_spvalue(&self) -> SPValue;
 }
@@ -143,6 +148,7 @@ impl ToSPValue for Vec<SPValue> {
     }
 }
 
+/// Displaying the value of an SPValue instance in a user-friendly way.
 impl fmt::Display for SPValue {
     fn fmt(&self, fmtr: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
@@ -158,6 +164,7 @@ impl fmt::Display for SPValue {
     }
 }
 
+/// Converting a SPValueType value to a human-readable string representation.
 impl fmt::Display for SPValueType {
     fn fmt(&self, fmtr: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {

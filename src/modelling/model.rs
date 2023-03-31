@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use crate::{Operation, State, Transition, Resource};
+use crate::{Operation, State, Transition};
 
 #[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
 pub struct Model {
@@ -8,7 +8,6 @@ pub struct Model {
     pub state: State,
     pub auto_transitions: Vec<Transition>,
     pub operations: Vec<Operation>,
-    pub resources: Vec<Resource>
 }
 
 impl Model {
@@ -17,7 +16,6 @@ impl Model {
         state: State,
         auto_transitions: Vec<Transition>,
         operations: Vec<Operation>,
-        resources: Vec<Resource>
     ) -> Model {
         // let mut state_with_op = state.clone();
         // for op in &operations {
@@ -44,8 +42,7 @@ impl Model {
             name: name.to_string(),
             state: state.clone(),
             auto_transitions,
-            operations,
-            resources
+            operations
         }
     }
 }

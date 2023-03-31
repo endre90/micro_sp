@@ -13,8 +13,6 @@ pub enum Predicate {
     OR(Vec<Predicate>),
     EQ(SPWrapped, SPWrapped),
     NEQ(SPWrapped, SPWrapped),
-    // TON(SPWrapped, SPWrapped),
-    // TOFF(SPWrapped, SPWrapped),
 }
 
 impl Predicate {

@@ -4,7 +4,6 @@ pub use crate::core::sp_state::*;
 pub use crate::core::sp_value::*;
 pub use crate::core::sp_variable::*;
 pub use crate::core::sp_wrapped::*;
-pub use crate::core::sharded_mutex::*;
 
 pub mod modelling;
 pub use crate::modelling::action::*;
@@ -13,7 +12,6 @@ pub use crate::modelling::predicate::*;
 pub use crate::modelling::operation::*;
 pub use crate::modelling::transition::*;
 pub use crate::modelling::model::*;
-pub use crate::modelling::resource::*;
 
 pub mod planning;
 pub use crate::planning::operation::*;
