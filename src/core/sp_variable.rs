@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use crate::{SPValue, SPValueType, ToSPValue};
 use std::fmt;
 
-/// An SPVariable is a named unit of data of type SPValueType that can be assigned a value from its finite domain.
+/// A SPVariable is a named unit of data of type SPValueType that can be assigned a value from its finite domain.
 #[derive(Debug, PartialEq, Clone, Hash, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct SPVariable {
     pub name: String,
@@ -12,6 +12,7 @@ pub struct SPVariable {
     pub domain: Vec<SPValue>,
 }
 
+/// An enum representing the different variable types which SPVariable can have
 #[derive(Debug, PartialEq, Clone, Hash, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum SPVariableType {
     Measured,
@@ -20,7 +21,6 @@ pub enum SPVariableType {
     Runner,
 }
 
-// Don't look at the domain if the variable is a Runner type
 impl SPVariable {
     pub fn new(
         name: &str,
@@ -72,11 +72,13 @@ impl SPVariable {
         SPVariable::new(name, variable_type, SPValueType::Array, domain)
     }
 
+    /// This is used to retrieve information about the type of the variable.
     pub fn has_type(&self) -> (SPVariableType, SPValueType) {
         (self.variable_type.clone(), self.value_type)
     }
 }
 
+/// Displaying the variable name in a user-friendly way.
 impl fmt::Display for SPVariable {
     fn fmt(&self, fmtr: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(fmtr, "{}", self.name.to_owned())
