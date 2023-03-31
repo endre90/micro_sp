@@ -10,6 +10,7 @@ pub enum SPWrapped {
     SPValue(SPValue),
 }
 
+/// This trait defines a set of conversions from some Rust primitive types and containers to `SPWrapped`.
 pub trait ToSPWrapped {
     fn wrap(&self) -> SPWrapped;
 }
@@ -50,6 +51,7 @@ impl ToSPWrapped for &str {
     }
 }
 
+/// This trait defines a set of conversions from `SPVariable` to `SPWrapped`.
 pub trait ToSPWrappedVar {
     fn wrap(&self) -> SPWrapped;
 }
@@ -60,6 +62,7 @@ impl ToSPWrappedVar for SPVariable {
     }
 }
 
+/// Displaying SPWrapped in a user-friendly way.
 impl fmt::Display for SPWrapped {
     fn fmt(&self, fmtr: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {

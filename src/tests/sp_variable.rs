@@ -124,52 +124,6 @@ fn test_has_type() {
 }
 
 // #[test]
-// fn test_new_var() {
-//     let int_var = SPVariable::new_integer(
-//         "counter",
-//         SPVariableType::Estimated,
-//         vec![1.to_spvalue(), 3.to_spvalue(), 5.to_spvalue()],
-//     );
-//     let bool_var = SPVariable::new_boolean("toggle", SPVariableType::Command);
-//     let float_var = SPVariable::new_float(
-//         "speed",
-//         SPVariableType::Measured,
-//         vec![0.1.to_spvalue(), 0.3.to_spvalue()],
-//     );
-//     let string_var = SPVariable::new_string(
-//         "position",
-//         SPVariableType::Measured,
-//         vec!["a".to_spvalue(), "b".to_spvalue(), "c".to_spvalue()],
-//     );
-//     let array_var = SPVariable::new_array("plan", SPVariableType::Runner, vec![]); // runner, flexible domain
-//     let string_var_2 = SPVariable::new_string("goal", SPVariableType::Runner, vec![]); // runner, flexible domain
-//     assert_eq!(
-//         (SPVariableType::Estimated, SPValueType::Int32),
-//         int_var.has_type()
-//     );
-//     assert_eq!(
-//         (SPVariableType::Command, SPValueType::Bool),
-//         bool_var.has_type()
-//     );
-//     assert_eq!(
-//         (SPVariableType::Measured, SPValueType::Float64),
-//         float_var.has_type()
-//     );
-//     assert_eq!(
-//         (SPVariableType::Measured, SPValueType::String),
-//         string_var.has_type()
-//     );
-//     assert_eq!(
-//         (SPVariableType::Runner, SPValueType::Array),
-//         array_var.has_type()
-//     );
-//     assert_eq!(
-//         (SPVariableType::Runner, SPValueType::String),
-//         string_var_2.has_type()
-//     );
-// }
-
-// #[test]
 // fn test_new_var_macros() {
 //     let string_var = v_estimated!("position", vec!("a", "b", "c"));
 //     let string_var_run = v_runner!("position");

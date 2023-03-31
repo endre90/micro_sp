@@ -2,14 +2,15 @@ use serde::{Deserialize, Serialize};
 
 use crate::{SPValue, SPValueType, SPVariable};
 
+/// Represents assigning a value to a variable.
 #[derive(Debug, PartialEq, Clone, Hash, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct SPAssignment {
     pub var: SPVariable,
     pub val: SPValue,
 }
 
-// Should be poossible to assign Unknown
 impl SPAssignment {
+    /// Creates a new `SPAssignment` instance with the given variable and value.
     pub fn new(var: SPVariable, val: SPValue) -> SPAssignment {
         match val.has_type() {
             SPValueType::Unknown => SPAssignment { var, val },
