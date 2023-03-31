@@ -16,6 +16,7 @@ pub enum Predicate {
 }
 
 impl Predicate {
+    /// Evaluate a predicate based on the given state.
     pub fn eval(self, state: &State) -> bool {
         match self {
             Predicate::TRUE => true,
@@ -50,7 +51,7 @@ impl Predicate {
         }
     }
 
-    // Keep only the variables in the predicate from the "only" list, might be good for emulator generation
+    /// Keep only the variables in the predicate from the `only` list.
     pub fn keep_only(&self, only: &Vec<String>) -> Option<Predicate> {
         match self {
             Predicate::TRUE => Some(Predicate::TRUE),
@@ -69,7 +70,7 @@ impl Predicate {
                 } else {
                     Some(Predicate::AND(new))
                 }
-            },
+            }
             Predicate::OR(x) => {
                 let mut new: Vec<_> = x.iter().flat_map(|p| p.clone().keep_only(only)).collect();
                 new.dedup();
@@ -80,7 +81,7 @@ impl Predicate {
                 } else {
                     Some(Predicate::OR(new))
                 }
-            },
+            }
             Predicate::EQ(x, y) | Predicate::NEQ(x, y) => {
                 let remove_x = match x {
                     SPWrapped::SPValue(_) => false,
@@ -90,7 +91,57 @@ impl Predicate {
                     SPWrapped::SPValue(_) => false,
                     SPWrapped::SPVariable(vy) => !only.contains(&vy.name),
                 };
-                    
+
+                if remove_x || remove_y {
+                    None
+                } else {
+                    Some(self.clone())
+                }
+            }
+        }
+    }
+
+    /// Remove the variables in the predicate from the `remove` list.
+    pub fn remove(&self, remove: &Vec<String>) -> Option<Predicate> {
+        match self {
+            Predicate::TRUE => Some(Predicate::TRUE),
+            Predicate::FALSE => Some(Predicate::FALSE),
+            Predicate::NOT(x) => match x.remove(remove) {
+                Some(x) => Some(Predicate::NOT(Box::new(x))),
+                None => None,
+            },
+            Predicate::AND(x) => {
+                let mut new: Vec<_> = x.iter().flat_map(|p| p.clone().remove(remove)).collect();
+                new.dedup();
+                if new.len() == 0 {
+                    None
+                } else if new.len() == 1 {
+                    Some(new[0].clone())
+                } else {
+                    Some(Predicate::AND(new))
+                }
+            }
+            Predicate::OR(x) => {
+                let mut new: Vec<_> = x.iter().flat_map(|p| p.clone().remove(remove)).collect();
+                new.dedup();
+                if new.len() == 0 {
+                    None
+                } else if new.len() == 1 {
+                    Some(new[0].clone())
+                } else {
+                    Some(Predicate::OR(new))
+                }
+            }
+            Predicate::EQ(x, y) | Predicate::NEQ(x, y) => {
+                let remove_x = match x {
+                    SPWrapped::SPValue(_) => false,
+                    SPWrapped::SPVariable(vx) => remove.contains(&vx.name),
+                };
+                let remove_y = match y {
+                    SPWrapped::SPValue(_) => false,
+                    SPWrapped::SPVariable(vy) => remove.contains(&vy.name),
+                };
+
                 if remove_x || remove_y {
                     None
                 } else {

@@ -1,14 +1,14 @@
 #![allow(unused_imports)]
 #![allow(dead_code)]
 use crate::{
-    av_command, av_estimated, av_measured, av_runner, bv_command, bv_estimated,
-    bv_measured, bv_runner, fv_command, fv_estimated, fv_measured, fv_runner, iv_command,
-    iv_estimated, iv_measured, iv_runner, t, t_plan, v_command, v_estimated, v_measured, v_runner,
+    and, assign, eq, get_predicate_vars_all, get_predicate_vars_planner, get_predicate_vars_runner,
+    neq, not, or, pred_parser, Predicate, SPAssignment, SPValue, SPValueType, SPVariable,
+    SPVariableType, State, ToSPValue, ToSPWrapped, ToSPWrappedVar, Transition,
 };
 use crate::{
-    get_predicate_vars_all, get_predicate_vars_planner, get_predicate_vars_runner, Predicate,
-    SPAssignment, SPValue, SPValueType, SPVariable, SPVariableType, State, ToSPValue, ToSPWrapped,
-    ToSPWrappedVar, neq, not, or, eq, and, assign, pred_parser, Transition
+    av_command, av_estimated, av_measured, av_runner, bv_command, bv_estimated, bv_measured,
+    bv_runner, fv_command, fv_estimated, fv_measured, fv_runner, iv_command, iv_estimated,
+    iv_measured, iv_runner, t, t_plan, v_command, v_estimated, v_measured, v_runner,
 };
 use std::collections::{HashMap, HashSet};
 
@@ -31,8 +31,14 @@ fn john_doe() -> Vec<(SPVariable, SPValue)> {
 #[test]
 fn test_predicate_eq() {
     let state = State::from_vec(&john_doe());
-    let eq1 = Predicate::EQ(v_estimated!("name", vec!("John", "Jack")).wrap(), "John".wrap());
-    let eq2 = Predicate::EQ(v_estimated!("name", vec!("John", "Jack")).wrap(), "Jack".wrap());
+    let eq1 = Predicate::EQ(
+        v_estimated!("name", vec!("John", "Jack")).wrap(),
+        "John".wrap(),
+    );
+    let eq2 = Predicate::EQ(
+        v_estimated!("name", vec!("John", "Jack")).wrap(),
+        "Jack".wrap(),
+    );
     assert!(eq1.eval(&state));
     assert_ne!(true, eq2.eval(&state));
 }
@@ -40,8 +46,14 @@ fn test_predicate_eq() {
 #[test]
 fn test_predicate_neq() {
     let state = State::from_vec(&john_doe());
-    let neq1 = Predicate::NEQ(v_estimated!("name", vec!("John", "Jack")).wrap(), "John".wrap());
-    let neq2 = Predicate::NEQ(v_estimated!("name", vec!("John", "Jack")).wrap(), "Jack".wrap());
+    let neq1 = Predicate::NEQ(
+        v_estimated!("name", vec!("John", "Jack")).wrap(),
+        "John".wrap(),
+    );
+    let neq2 = Predicate::NEQ(
+        v_estimated!("name", vec!("John", "Jack")).wrap(),
+        "Jack".wrap(),
+    );
     assert_ne!(true, neq1.eval(&state));
     assert!(neq2.eval(&state));
 }
@@ -50,7 +62,10 @@ fn test_predicate_neq() {
 #[should_panic]
 fn test_predicate_eq_panic_not_in_state() {
     let state = State::from_vec(&john_doe());
-    let eq1 = Predicate::EQ(v_estimated!("v1", vec!("John", "Jack")).wrap(), "John".wrap());
+    let eq1 = Predicate::EQ(
+        v_estimated!("v1", vec!("John", "Jack")).wrap(),
+        "John".wrap(),
+    );
     eq1.eval(&state);
 }
 
@@ -68,8 +83,14 @@ fn test_predicate_eq_wrong_var() {
 #[test]
 fn test_predicate_not() {
     let s1 = State::from_vec(&john_doe());
-    let not = Predicate::NOT(Box::new(Predicate::EQ(bv_estimated!("smart").wrap(), false.wrap())));
-    let notf = Predicate::NOT(Box::new(Predicate::EQ(bv_estimated!("smart").wrap(), true.wrap())));
+    let not = Predicate::NOT(Box::new(Predicate::EQ(
+        bv_estimated!("smart").wrap(),
+        false.wrap(),
+    )));
+    let notf = Predicate::NOT(Box::new(Predicate::EQ(
+        bv_estimated!("smart").wrap(),
+        true.wrap(),
+    )));
     assert!(not.eval(&s1));
     assert!(!notf.eval(&s1));
 }
@@ -79,8 +100,14 @@ fn test_predicate_and() {
     let john_doe = john_doe();
     let s1 = State::from_vec(&john_doe);
     let eq = Predicate::EQ(bv_estimated!("smart").wrap(), true.wrap());
-    let eq2 = Predicate::EQ(fv_estimated!("weight", vec!(80.0, 82.5, 85.0)).wrap(), 80.0.wrap());
-    let eqf = Predicate::EQ(iv_estimated!("height", vec!(180, 185, 190)).wrap(), 175.wrap());
+    let eq2 = Predicate::EQ(
+        fv_estimated!("weight", vec!(80.0, 82.5, 85.0)).wrap(),
+        80.0.wrap(),
+    );
+    let eqf = Predicate::EQ(
+        iv_estimated!("height", vec!(180, 185, 190)).wrap(),
+        175.wrap(),
+    );
     let and = Predicate::AND(vec![eq.clone(), eq2.clone()]);
     let andf = Predicate::AND(vec![eq, eq2, eqf]);
     assert!(and.eval(&s1));
@@ -92,8 +119,14 @@ fn test_predicate_or() {
     let john_doe = john_doe();
     let s1 = State::from_vec(&john_doe);
     let eq = Predicate::EQ(bv_estimated!("smart").wrap(), true.wrap());
-    let eq2 = Predicate::EQ(fv_estimated!("weight", vec!(80.0, 82.5, 85.0)).wrap(), 80.0.wrap());
-    let eqf = Predicate::EQ(iv_estimated!("height", vec!(180, 185, 190)).wrap(), 175.wrap());
+    let eq2 = Predicate::EQ(
+        fv_estimated!("weight", vec!(80.0, 82.5, 85.0)).wrap(),
+        80.0.wrap(),
+    );
+    let eqf = Predicate::EQ(
+        iv_estimated!("height", vec!(180, 185, 190)).wrap(),
+        175.wrap(),
+    );
     let or = Predicate::OR(vec![eq.clone(), eq2.clone()]);
     let or2 = Predicate::OR(vec![eq, eq2, eqf]);
     assert!(or.eval(&s1));
@@ -105,8 +138,14 @@ fn test_predicate_complex() {
     let john_doe = john_doe();
     let s1 = State::from_vec(&john_doe);
     let eq = Predicate::EQ(bv_estimated!("smart").wrap(), true.wrap());
-    let eq2 = Predicate::EQ(fv_estimated!("weight", vec!(80.0, 82.5, 85.0)).wrap(), 80.0.wrap());
-    let eqf = Predicate::EQ(iv_estimated!("height", vec!(180, 185, 190)).wrap(), 175.wrap());
+    let eq2 = Predicate::EQ(
+        fv_estimated!("weight", vec!(80.0, 82.5, 85.0)).wrap(),
+        80.0.wrap(),
+    );
+    let eqf = Predicate::EQ(
+        iv_estimated!("height", vec!(180, 185, 190)).wrap(),
+        175.wrap(),
+    );
     let and = Predicate::AND(vec![eq.clone(), eq2.clone()]);
     let andf = Predicate::AND(vec![eq.clone(), eq2.clone(), eqf.clone()]);
     let or = Predicate::OR(vec![eq.clone(), eq2.clone()]);
@@ -125,8 +164,14 @@ fn test_predicate_complex() {
 #[test]
 fn test_predicate_eq_macro() {
     let state = State::from_vec(&john_doe());
-    let eq1 = eq!(v_estimated!("name", vec!("John", "Jack")).wrap(), "John".wrap());
-    let eq2 = eq!(v_estimated!("name", vec!("John", "Jack")).wrap(), "Jack".wrap());
+    let eq1 = eq!(
+        v_estimated!("name", vec!("John", "Jack")).wrap(),
+        "John".wrap()
+    );
+    let eq2 = eq!(
+        v_estimated!("name", vec!("John", "Jack")).wrap(),
+        "Jack".wrap()
+    );
     assert!(eq1.eval(&state));
     assert_ne!(true, eq2.eval(&state));
 }
@@ -143,8 +188,14 @@ fn test_predicate_not_macro() {
 #[test]
 fn test_predicate_neq_macro() {
     let state = State::from_vec(&john_doe());
-    let neq1 = neq!(v_estimated!("name", vec!("John", "Jack")).wrap(), "John".wrap());
-    let neq2 = neq!(v_estimated!("name", vec!("John", "Jack")).wrap(), "Jack".wrap());
+    let neq1 = neq!(
+        v_estimated!("name", vec!("John", "Jack")).wrap(),
+        "John".wrap()
+    );
+    let neq2 = neq!(
+        v_estimated!("name", vec!("John", "Jack")).wrap(),
+        "Jack".wrap()
+    );
     assert_ne!(true, neq1.eval(&state));
     assert!(neq2.eval(&state));
 }
@@ -154,8 +205,14 @@ fn test_predicate_and_macro() {
     let john_doe = john_doe();
     let s1 = State::from_vec(&john_doe);
     let eq = eq!(bv_estimated!("smart").wrap(), true.wrap());
-    let eq2 = eq!(fv_estimated!("weight", vec!(80.0, 82.5, 85.0)).wrap(), 80.0.wrap());
-    let eqf = eq!(iv_estimated!("height", vec!(180, 185, 190)).wrap(), 175.wrap());
+    let eq2 = eq!(
+        fv_estimated!("weight", vec!(80.0, 82.5, 85.0)).wrap(),
+        80.0.wrap()
+    );
+    let eqf = eq!(
+        iv_estimated!("height", vec!(180, 185, 190)).wrap(),
+        175.wrap()
+    );
     let and = and!(vec![eq.clone(), eq2.clone()]);
     let andf = and!(vec![eq, eq2, eqf]);
     assert!(and.eval(&s1));
@@ -167,8 +224,14 @@ fn test_predicate_or_macro() {
     let john_doe = john_doe();
     let s1 = State::from_vec(&john_doe);
     let eq = eq!(bv_estimated!("smart").wrap(), true.wrap());
-    let eq2 = eq!(fv_estimated!("weight", vec!(80.0, 82.5, 85.0)).wrap(), 80.0.wrap());
-    let eqf = eq!(iv_estimated!("height", vec!(180, 185, 190)).wrap(), 175.wrap());
+    let eq2 = eq!(
+        fv_estimated!("weight", vec!(80.0, 82.5, 85.0)).wrap(),
+        80.0.wrap()
+    );
+    let eqf = eq!(
+        iv_estimated!("height", vec!(180, 185, 190)).wrap(),
+        175.wrap()
+    );
     let or = or!(vec![eq.clone(), eq2.clone()]);
     let or2 = or!(vec![eq, eq2, eqf]);
     assert!(or.eval(&s1));
@@ -264,7 +327,10 @@ fn test_predicate_get_runner_variables() {
         &state,
     ).unwrap();
     let vars = get_predicate_vars_runner(&pred);
-    let vars_init = vec![v_runner!("ur_action_state"), bv_runner!("ur_action_trigger")];
+    let vars_init = vec![
+        v_runner!("ur_action_state"),
+        bv_runner!("ur_action_trigger"),
+    ];
     assert_eq!(vars, vars_init)
 }
 
@@ -276,5 +342,16 @@ fn test_predicate_keep_only() {
         &state,
     ).unwrap();
     let new_pred = pred.keep_only(&vec!["ur_action_state".to_string()]);
+    println!("{:?}", new_pred)
+}
+
+#[test]
+fn test_predicate_remove() {
+    let state = make_robot_initial_state();
+    let pred = pred_parser::pred(
+        "var:ur_action_trigger == false && var:ur_action_state == initial || (var:ur_current_pose != a && var:ur_action_state == executing)",
+        &state,
+    ).unwrap();
+    let new_pred = pred.remove(&vec!["ur_action_state".to_string()]);
     println!("{:?}", new_pred)
 }
