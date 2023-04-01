@@ -63,4 +63,15 @@ impl Operation {
         state.get_value(&self.name) == "executing".to_spvalue()
             && self.postcondition.eval_running(&state)
     }
+
+    // TODO: test...
+    pub fn relax(self, vars: &Vec<String>) -> Operation {
+        let r_precondition = self.precondition.relax(vars);
+        let r_postcondition = self.postcondition.relax(vars);
+        Operation {
+            name: self.name,
+            precondition: r_precondition,
+            postcondition: r_postcondition,
+        }
+    }
 }

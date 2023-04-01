@@ -64,7 +64,34 @@ impl Transition {
         }
         new_state
     }
+
+    // TODO: test...
+    pub fn relax(self, vars: &Vec<String>) -> Transition {
+        let r_guard = self.guard.remove(vars);
+        let r_runner_guard = self.runner_guard.remove(vars);
+        let mut r_actions = vec!();
+        let mut r_runner_actions = vec!();
+        self.actions.iter().for_each(|x| {
+            match vars.contains(&x.var.name) {
+                false => r_actions.push(x.clone()),
+                true => ()
+            }
+        });
+        self.runner_actions.iter().for_each(|x| {
+            match vars.contains(&x.var.name) {
+                false => r_runner_actions.push(x.clone()),
+                true => ()
+            }
+        });
+        Transition { 
+            name: self.name,
+            guard: r_guard.unwrap(), 
+            runner_guard: r_runner_guard.unwrap(), 
+            actions: r_actions, 
+            runner_actions: r_runner_actions }
+    }
 }
+
 
 impl PartialEq for Transition {
     fn eq(&self, other: &Transition) -> bool {
