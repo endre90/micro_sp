@@ -85,8 +85,14 @@ impl Transition {
         });
         Transition { 
             name: self.name,
-            guard: r_guard.unwrap(), 
-            runner_guard: r_runner_guard.unwrap(), 
+            guard: match r_guard {
+                Some(x) => x,
+                None => Predicate::TRUE
+            }, 
+            runner_guard: match r_runner_guard {
+                Some(x) => x,
+                None => Predicate::TRUE
+            }, 
             actions: r_actions, 
             runner_actions: r_runner_actions }
     }

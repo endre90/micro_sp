@@ -352,6 +352,6 @@ fn test_predicate_remove() {
         "var:ur_action_trigger == false && var:ur_action_state == initial || (var:ur_current_pose != a && var:ur_action_state == executing)",
         &state,
     ).unwrap();
-    let new_pred = pred.remove(&vec!["ur_action_state".to_string()]);
+    let new_pred = pred.remove(&vec!["ur_action_state".to_string(), "ur_action_trigger".to_string(), "ur_current_pose".to_string()]);
     println!("{:?}", new_pred)
 }
