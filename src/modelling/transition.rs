@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     get_predicate_vars_all, get_predicate_vars_planner, get_predicate_vars_runner, Action,
-    Predicate, SPVariable, SPVariableType, State
+    Predicate, SPVariable, SPVariableType, State,
 };
 use std::fmt;
 
@@ -27,8 +27,8 @@ impl Transition {
             name: name.to_string(),
             guard,
             runner_guard,
-            actions, 
-            runner_actions
+            actions,
+            runner_actions,
         }
     }
 
@@ -53,13 +53,13 @@ impl Transition {
         for a in self.actions {
             match a.var.variable_type {
                 SPVariableType::Measured => (),
-                _ => new_state = a.assign(&new_state)
+                _ => new_state = a.assign(&new_state),
             }
         }
         for a in self.runner_actions {
             match a.var.variable_type {
                 SPVariableType::Measured => (),
-                _ => new_state = a.assign(&new_state)
+                _ => new_state = a.assign(&new_state),
             }
         }
         new_state
@@ -69,35 +69,46 @@ impl Transition {
     pub fn relax(self, vars: &Vec<String>) -> Transition {
         let r_guard = self.guard.remove(vars);
         let r_runner_guard = self.runner_guard.remove(vars);
-        let mut r_actions = vec!();
-        let mut r_runner_actions = vec!();
-        self.actions.iter().for_each(|x| {
-            match vars.contains(&x.var.name) {
+        let mut r_actions = vec![];
+        let mut r_runner_actions = vec![];
+        self.actions
+            .iter()
+            .for_each(|x| match vars.contains(&x.var.name) {
                 false => r_actions.push(x.clone()),
-                true => ()
-            }
-        });
-        self.runner_actions.iter().for_each(|x| {
-            match vars.contains(&x.var.name) {
+                true => (),
+            });
+        self.runner_actions
+            .iter()
+            .for_each(|x| match vars.contains(&x.var.name) {
                 false => r_runner_actions.push(x.clone()),
-                true => ()
-            }
-        });
-        Transition { 
+                true => (),
+            });
+        Transition {
             name: self.name,
             guard: match r_guard {
                 Some(x) => x,
-                None => Predicate::TRUE
-            }, 
+                None => Predicate::TRUE,
+            },
             runner_guard: match r_runner_guard {
                 Some(x) => x,
-                None => Predicate::TRUE
-            }, 
-            actions: r_actions, 
-            runner_actions: r_runner_actions }
+                None => Predicate::TRUE,
+            },
+            actions: r_actions,
+            runner_actions: r_runner_actions,
+        }
+    }
+    
+// TODO: test...
+    pub fn contains_planning(self, var: &String) -> bool {
+        let guard_vars: Vec<String> = get_predicate_vars_all(&self.guard)
+            .iter()
+            .map(|p| p.name.to_owned())
+            .collect();
+        let actions_vars: Vec<String> =
+            self.actions.iter().map(|a| a.var.name.to_owned()).collect();
+        guard_vars.contains(var) && actions_vars.contains(var)
     }
 }
-
 
 impl PartialEq for Transition {
     fn eq(&self, other: &Transition) -> bool {
