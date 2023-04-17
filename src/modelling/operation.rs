@@ -77,6 +77,6 @@ impl Operation {
 
 // TODO: test...
     pub fn contains_planning(self, var: &String) -> bool {
-        self.precondition.contains_planning(var) && self.postcondition.contains_planning(var)
+        self.precondition.contains_planning(var) || self.postcondition.contains_planning(var)
     }
 }

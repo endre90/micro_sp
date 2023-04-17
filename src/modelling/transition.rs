@@ -106,7 +106,7 @@ impl Transition {
             .collect();
         let actions_vars: Vec<String> =
             self.actions.iter().map(|a| a.var.name.to_owned()).collect();
-        guard_vars.contains(var) && actions_vars.contains(var)
+        guard_vars.contains(var) || actions_vars.contains(var)
     }
 }
 
