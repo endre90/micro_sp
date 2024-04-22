@@ -15,6 +15,7 @@ pub struct SPVariable {
 /// An enum representing the different variable types which SPVariable can have
 #[derive(Debug, PartialEq, Clone, Hash, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum SPVariableType {
+    Undefined,
     Measured,
     Estimated,
     Command,

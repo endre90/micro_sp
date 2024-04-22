@@ -51,6 +51,30 @@ macro_rules! v_runner {
 }
 
 #[macro_export]
+macro_rules! v {
+    ($a:expr) => {
+        SPVariable::new(
+            $a.clone(),
+            SPVariableType::Undefined,
+            SPValueType::String,
+            vec![],
+        )
+    };
+}
+
+#[macro_export]
+macro_rules! bv {
+    ($a:expr) => {
+        SPVariable::new(
+            $a.clone(),
+            SPVariableType::Undefined,
+            SPValueType::Bool,
+            vec![true.to_spvalue(), false.to_spvalue()],
+        )
+    };
+}
+
+#[macro_export]
 macro_rules! bv_command {
     ($a:expr) => {
         SPVariable::new(
@@ -111,6 +135,18 @@ macro_rules! iv_command {
 }
 
 #[macro_export]
+macro_rules! iv {
+    ($a:expr, $b:expr) => {
+        SPVariable::new(
+            $a.clone(),
+            SPVariableType::Undefined,
+            SPValueType::Int32,
+            $b.iter().map(|x| x.clone().to_spvalue()).collect(),
+        )
+    };
+}
+
+#[macro_export]
 macro_rules! iv_measured {
     ($a:expr, $b:expr) => {
         SPVariable::new(
@@ -164,6 +200,18 @@ macro_rules! fv_measured {
         SPVariable::new(
             $a.clone(),
             SPVariableType::Measured,
+            SPValueType::Float64,
+            $b.iter().map(|x| x.clone().to_spvalue()).collect(),
+        )
+    };
+}
+
+#[macro_export]
+macro_rules! fv {
+    ($a:expr, $b:expr) => {
+        SPVariable::new(
+            $a.clone(),
+            SPVariableType::Undefined,
             SPValueType::Float64,
             $b.iter().map(|x| x.clone().to_spvalue()).collect(),
         )
@@ -236,6 +284,18 @@ macro_rules! av_runner {
         SPVariable::new(
             $a.clone(),
             SPVariableType::Runner,
+            SPValueType::Array,
+            vec![],
+        )
+    };
+}
+
+#[macro_export]
+macro_rules! av {
+    ($a:expr) => {
+        SPVariable::new(
+            $a.clone(),
+            SPVariableType::Undefined,
             SPValueType::Array,
             vec![],
         )
