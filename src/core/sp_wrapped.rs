@@ -27,9 +27,9 @@ impl ToSPWrapped for bool {
     }
 }
 
-impl ToSPWrapped for i32 {
+impl ToSPWrapped for i64 {
     fn wrap(&self) -> SPWrapped {
-        SPWrapped::SPValue(SPValue::Int32(*self))
+        SPWrapped::SPValue(SPValue::Int64(*self))
     }
 }
 
@@ -70,11 +70,11 @@ impl fmt::Display for SPWrapped {
                 SPValue::Bool(b) if *b => write!(fmtr, "true"),
                 SPValue::Bool(_) => write!(fmtr, "false"),
                 SPValue::Float64(f) => write!(fmtr, "{}", f),
-                SPValue::Int32(i) => write!(fmtr, "{}", i),
+                SPValue::Int64(i) => write!(fmtr, "{}", i),
                 SPValue::String(s) => write!(fmtr, "{}", s),
                 SPValue::Time(t) => write!(fmtr, "{:?} s", t.elapsed().unwrap_or_default()),
                 SPValue::Array(_, a) => write!(fmtr, "{:?}", a),
-                SPValue::Unknown => write!(fmtr, "[unknown]"),
+                SPValue::UNDEFINED => write!(fmtr, "[UNDEFINED]"),
             },
             SPWrapped::SPVariable(var) => write!(fmtr, "{}", var.name.to_owned()),
         }

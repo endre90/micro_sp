@@ -122,7 +122,7 @@ impl State {
                         State { state }
                     }
                     false => match val {
-                        SPValue::Unknown => {
+                        SPValue::UNDEFINED => {
                             let mut state = self.state.clone();
                             state.insert(
                                 name.to_string(),

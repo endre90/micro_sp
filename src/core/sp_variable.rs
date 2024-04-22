@@ -3,6 +3,46 @@ use serde::{Deserialize, Serialize};
 use crate::{SPValue, SPValueType, ToSPValue};
 use std::fmt;
 
+/// An enum representing the different variable types which SPVariable can have.
+#[derive(Debug, PartialEq, Clone, Hash, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+pub enum SPVariableType {
+    Measured,
+    Estimated,
+    Command,
+    Runner,
+    UNDEFINED,
+}
+
+impl Default for SPVariableType {
+    fn default() -> Self {
+        SPVariableType::UNDEFINED
+    }
+}
+
+impl SPVariableType {
+    pub fn from_str(x: &str) -> SPVariableType {
+        match x {
+            "measured" => SPVariableType::Measured,
+            "estimated" => SPVariableType::Estimated,
+            "command" => SPVariableType::Command,
+            "runner" => SPVariableType::Runner,
+            _ => SPVariableType::UNDEFINED,
+        }
+    }
+}
+
+impl fmt::Display for SPVariableType {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            SPVariableType::Measured => write!(f, "measured"),
+            SPVariableType::Estimated => write!(f, "estimated"),
+            SPVariableType::Command => write!(f, "command"),
+            SPVariableType::Runner => write!(f, "runner"),
+            SPVariableType::UNDEFINED => write!(f, "[UNDEFINED]"),
+        }
+    }
+}
+
 /// A SPVariable is a named unit of data of type SPValueType that can be assigned a value from its finite domain.
 #[derive(Debug, PartialEq, Clone, Hash, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct SPVariable {
@@ -10,16 +50,6 @@ pub struct SPVariable {
     pub variable_type: SPVariableType,
     pub value_type: SPValueType,
     pub domain: Vec<SPValue>,
-}
-
-/// An enum representing the different variable types which SPVariable can have
-#[derive(Debug, PartialEq, Clone, Hash, Eq, PartialOrd, Ord, Serialize, Deserialize)]
-pub enum SPVariableType {
-    Undefined,
-    Measured,
-    Estimated,
-    Command,
-    Runner,
 }
 
 impl SPVariable {
@@ -49,7 +79,7 @@ impl SPVariable {
         variable_type: SPVariableType,
         domain: Vec<SPValue>,
     ) -> SPVariable {
-        SPVariable::new(name, variable_type, SPValueType::Int32, domain)
+        SPVariable::new(name, variable_type, SPValueType::Int64, domain)
     }
     pub fn new_float(
         name: &str,

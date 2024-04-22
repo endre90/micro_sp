@@ -164,7 +164,7 @@ macro_rules! iv_estimated {
         SPVariable::new(
             $a.clone(),
             SPVariableType::Estimated,
-            SPValueType::Int32,
+            SPValueType::Int64,
             $b.iter().map(|x| x.clone().to_spvalue()).collect(),
         )
     };
@@ -176,7 +176,7 @@ macro_rules! iv_runner {
         SPVariable::new(
             $a.clone(),
             SPVariableType::Runner,
-            SPValueType::Int32,
+            SPValueType::Int64,
             vec![],
         )
     };

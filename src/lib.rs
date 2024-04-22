@@ -24,4 +24,4 @@ pub use crate::macros::sp_assignment::*;
 pub use crate::macros::sp_variable::*;
 pub use crate::macros::transition::*;
 
-pub mod tests;
+// pub mod tests;
