@@ -10,17 +10,31 @@ macro_rules! v_command {
     };
 }
 
+// #[macro_export]
+// macro_rules! v_measured {
+//     ($a:expr, $b:expr) => {
+//         SPVariable::new(
+//             $a.clone(),
+//             SPVariableType::Measured, 
+//             SPValueType::String,
+//             $b.iter().map(|x| x.clone().to_spvalue()).collect(),
+//         )
+//     };
+// }
+
 #[macro_export]
 macro_rules! v_measured {
-    ($a:expr, $b:expr) => {
+    ($a:expr) => {
         SPVariable::new(
             $a.clone(),
             SPVariableType::Measured, 
             SPValueType::String,
-            $b.iter().map(|x| x.clone().to_spvalue()).collect(),
+            vec![],
+            // $b.iter().map(|x| x.clone().to_spvalue()).collect(),
         )
     };
 }
+
 
 #[macro_export]
 macro_rules! v_estimated {
@@ -51,7 +65,7 @@ macro_rules! v {
     ($a:expr) => {
         SPVariable::new(
             $a.clone(),
-            SPVariableType::Undefined,
+            SPVariableType::UNDEFINED,
             SPValueType::String,
             vec![],
         )
@@ -63,7 +77,7 @@ macro_rules! bv {
     ($a:expr) => {
         SPVariable::new(
             $a.clone(),
-            SPVariableType::Undefined,
+            SPVariableType::UNDEFINED,
             SPValueType::Bool,
             vec![true.to_spvalue(), false.to_spvalue()],
         )
@@ -135,7 +149,7 @@ macro_rules! iv {
     ($a:expr, $b:expr) => {
         SPVariable::new(
             $a.clone(),
-            SPVariableType::Undefined,
+            SPVariableType::UNDEFINED,
             SPValueType::Int64,
             $b.iter().map(|x| x.clone().to_spvalue()).collect(),
         )
@@ -207,7 +221,7 @@ macro_rules! fv {
     ($a:expr, $b:expr) => {
         SPVariable::new(
             $a.clone(),
-            SPVariableType::Undefined,
+            SPVariableType::UNDEFINED,
             SPValueType::Float64,
             $b.iter().map(|x| x.clone().to_spvalue()).collect(),
         )
@@ -291,7 +305,7 @@ macro_rules! av {
     ($a:expr) => {
         SPVariable::new(
             $a.clone(),
-            SPVariableType::Undefined,
+            SPVariableType::UNDEFINED,
             SPValueType::Array,
             vec![],
         )
