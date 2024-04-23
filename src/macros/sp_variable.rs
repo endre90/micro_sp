@@ -1,7 +1,3 @@
-// #![allow(unused_imports)]
-// #![allow(dead_code)]
-// use crate::{SPValue, SPValueType, SPVariable, SPVariableType, ToSPValue};
-
 #[macro_export]
 macro_rules! v_command {
     ($a:expr, $b:expr) => {
@@ -128,7 +124,7 @@ macro_rules! iv_command {
         SPVariable::new(
             $a.clone(),
             SPVariableType::Command,
-            SPValueType::Int32,
+            SPValueType::Int54,
             $b.iter().map(|x| x.clone().to_spvalue()).collect(),
         )
     };
@@ -140,7 +136,7 @@ macro_rules! iv {
         SPVariable::new(
             $a.clone(),
             SPVariableType::Undefined,
-            SPValueType::Int32,
+            SPValueType::Int64,
             $b.iter().map(|x| x.clone().to_spvalue()).collect(),
         )
     };
@@ -152,7 +148,7 @@ macro_rules! iv_measured {
         SPVariable::new(
             $a.clone(),
             SPVariableType::Measured,
-            SPValueType::Int32,
+            SPValueType::Int64,
             $b.iter().map(|x| x.clone().to_spvalue()).collect(),
         )
     };

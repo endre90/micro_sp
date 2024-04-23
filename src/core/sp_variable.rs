@@ -115,3 +115,125 @@ impl fmt::Display for SPVariable {
         write!(fmtr, "{}", self.name.to_owned())
     }
 }
+
+#[cfg(test)]
+mod tests {
+
+    use ordered_float::OrderedFloat;
+    use crate::{SPValue, SPValueType, SPVariable, SPVariableType, ToSPValue};
+
+    #[test]
+    fn test_new_spvariable() {
+        let name = "test_var";
+        let variable_type = SPVariableType::Measured;
+        let value_type = SPValueType::Float64;
+        let domain = vec![
+            SPValue::Float64(OrderedFloat(1.0)),
+            SPValue::Float64(OrderedFloat(2.0)),
+        ];
+        let spvar = SPVariable::new(name, variable_type.clone(), value_type, domain.clone());
+
+        assert_eq!(spvar.name, name);
+        assert_eq!(spvar.variable_type, variable_type);
+        assert_eq!(spvar.value_type, value_type);
+        assert_eq!(spvar.domain, domain);
+    }
+
+    #[test]
+    fn test_new_boolean() {
+        let variable = SPVariable::new_boolean("test_bool", SPVariableType::Measured);
+        assert_eq!(variable.name, "test_bool");
+        assert_eq!(variable.variable_type, SPVariableType::Measured);
+        assert_eq!(variable.value_type, SPValueType::Bool);
+        assert_eq!(variable.domain, vec![false.to_spvalue(), true.to_spvalue()]);
+    }
+
+    #[test]
+    fn test_new_integer() {
+        let domain = vec![0.to_spvalue(), 1.to_spvalue(), 2.to_spvalue()];
+        let variable =
+            SPVariable::new_integer("test_int", SPVariableType::Estimated, domain.clone());
+        assert_eq!(variable.name, "test_int");
+        assert_eq!(variable.variable_type, SPVariableType::Estimated);
+        assert_eq!(variable.value_type, SPValueType::Int64);
+        assert_eq!(variable.domain, domain);
+    }
+
+    #[test]
+    fn test_new_float() {
+        let domain = vec![0.0.to_spvalue(), 1.0.to_spvalue(), 2.0.to_spvalue()];
+        let variable = SPVariable::new_float("test_float", SPVariableType::Command, domain.clone());
+        assert_eq!(variable.name, "test_float");
+        assert_eq!(variable.variable_type, SPVariableType::Command);
+        assert_eq!(variable.value_type, SPValueType::Float64);
+        assert_eq!(variable.domain, domain);
+    }
+
+    #[test]
+    fn test_new_string() {
+        let domain = vec![
+            "test1".to_spvalue(),
+            "test2".to_spvalue(),
+            "test3".to_spvalue(),
+        ];
+        let variable =
+            SPVariable::new_string("test_string", SPVariableType::Runner, domain.clone());
+        assert_eq!(variable.name, "test_string");
+        assert_eq!(variable.variable_type, SPVariableType::Runner);
+        assert_eq!(variable.value_type, SPValueType::String);
+        assert_eq!(variable.domain, domain);
+    }
+
+    #[test]
+    fn test_new_array() {
+        let domain = vec![
+            SPValue::Array(
+                SPValueType::Bool,
+                vec![false.to_spvalue(), true.to_spvalue(), false.to_spvalue()],
+            ),
+            SPValue::Array(SPValueType::Int64, vec![0.to_spvalue(), 1.to_spvalue()]),
+        ];
+        let variable =
+            SPVariable::new_array("test_array", SPVariableType::Measured, domain.clone());
+        assert_eq!(variable.name, "test_array");
+        assert_eq!(variable.variable_type, SPVariableType::Measured);
+        assert_eq!(variable.value_type, SPValueType::Array);
+        assert_eq!(variable.domain, domain);
+    }
+
+    #[test]
+    fn test_has_type() {
+        let v1 = SPVariable::new_boolean("bool_var", SPVariableType::Measured);
+        assert_eq!(v1.has_type(), (SPVariableType::Measured, SPValueType::Bool));
+
+        let v2 = SPVariable::new_integer(
+            "int_var",
+            SPVariableType::Estimated,
+            vec![1.to_spvalue(), 2.to_spvalue(), 3.to_spvalue()],
+        );
+        assert_eq!(
+            v2.has_type(),
+            (SPVariableType::Estimated, SPValueType::Int64)
+        );
+
+        let v3 = SPVariable::new_float(
+            "float_var",
+            SPVariableType::Command,
+            vec![0.1.to_spvalue(), 0.2.to_spvalue()],
+        );
+        assert_eq!(
+            v3.has_type(),
+            (SPVariableType::Command, SPValueType::Float64)
+        );
+
+        let v4 = SPVariable::new_string(
+            "string_var",
+            SPVariableType::Runner,
+            vec![
+                String::from("hello").to_spvalue(),
+                String::from("world").to_spvalue(),
+            ],
+        );
+        assert_eq!(v4.has_type(), (SPVariableType::Runner, SPValueType::String));
+    }
+}

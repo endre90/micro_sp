@@ -18,10 +18,3 @@ pub use crate::planning::operation::*;
 pub use crate::planning::transition::*;
 
 pub mod macros;
-pub use crate::macros::action::*;
-pub use crate::macros::predicate::*;
-pub use crate::macros::sp_assignment::*;
-pub use crate::macros::sp_variable::*;
-pub use crate::macros::transition::*;
-
-// pub mod tests;

@@ -210,9 +210,8 @@ mod tests {
 
     use ordered_float::OrderedFloat;
 
-    use crate::{SPValue, SPValueType, SPVariable, ToSPValue};
-    use std::collections::{HashMap, HashSet};
-    use std::time::{Duration, SystemTime};
+    use crate::{SPValue, SPValueType, ToSPValue};
+    use std::time::SystemTime;
     
     #[test]
     fn test_is_type_bool() {
@@ -229,7 +228,7 @@ mod tests {
     }
     
     #[test]
-    fn test_is_type_Int64() {
+    fn test_is_type_int64() {
         let val = SPValue::Int64(42);
         assert!(val.is_type(SPValueType::Int64));
         assert!(!val.is_type(SPValueType::String));
@@ -279,7 +278,7 @@ mod tests {
     }
     
     #[test]
-    fn test_has_type_Int64() {
+    fn test_has_type_int64() {
         let value = SPValue::Int64(42);
         assert_eq!(value.has_type(), SPValueType::Int64);
     }
