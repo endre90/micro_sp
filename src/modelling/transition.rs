@@ -580,6 +580,133 @@ mod tests {
         assert_ne!(trans2, trans3);
     }
 
+    #[test]
+    fn test_asdf() {
+
+        let mut operations = vec!();
+        let competition_state = v_measured!("competition_state");
+
+        // Locations of AGVs, can be: kitting, assembly_front, assembly_back, warehouse, unknown
+        let agv_1_location = v_measured!("agv_1_location");
+        let agv_2_location = v_measured!("agv_2_location");
+        let agv_3_location = v_measured!("agv_3_location");
+        let agv_4_location = v_measured!("agv_4_location");
+    
+        let floor_robot_request_trigger = bv!("floor_robot_request_trigger");
+        let floor_robot_request_state = v!("floor_robot_request_state");
+        let floor_robot_fail_counter = iv!("floor_robot_fail_counter");
+        let floor_robot_health = bv_measured!("floor_robot_health");
+        let floor_robot_command = v!("floor_robot_command");
+        let floor_robot_current_position_name = v!("floor_robot_current_position_name");
+        // let floor_robot_command_position = v!("floor_robot_command");
+        let floor_robot_part_gripper_enabled = bv_measured!("floor_robot_part_gripper_enabled");
+        let floor_robot_part_gripper_attached = bv_measured!("floor_robot_part_gripper_attached");
+        let floor_robot_tray_gripper_enabled = bv_measured!("floor_robot_tray_gripper_enabled");
+        let floor_robot_tray_gripper_attached = bv_measured!("floor_robot_tray_gripper_attached");
+    
+        let floor_robot_gripper_request_trigger = bv!("floor_robot_gripper_request_trigger");
+        let floor_robot_gripper_request_state = v!("floor_robot_gripper_request_state");
+        let floor_robot_gripper_fail_counter = iv!("floor_robot_gripper_fail_counter");
+        let floor_robot_gripper_command = v!("floor_robot_gripper_command");
+    
+        // -----------------------------------------------------------------------
+    
+        let state = State::new();
+        let state = state.add(assign!(competition_state, "unknown".to_spvalue()));
+        
+        let state = state.add(assign!(agv_1_location, "unknown".to_spvalue()));
+        let state = state.add(assign!(agv_2_location, "unknown".to_spvalue()));
+        let state = state.add(assign!(agv_3_location, "unknown".to_spvalue()));
+        let state = state.add(assign!(agv_4_location, "unknown".to_spvalue()));
+    
+        let state = state.add(assign!(floor_robot_request_trigger, false.to_spvalue()));
+        let state = state.add(assign!(floor_robot_request_state, "initial".to_spvalue()));
+        let state = state.add(assign!(floor_robot_fail_counter, 0.to_spvalue()));
+        let state = state.add(assign!(floor_robot_health, false.to_spvalue()));
+        let state = state.add(assign!(floor_robot_command, "unknown".to_spvalue()));
+        let state = state.add(assign!(floor_robot_current_position_name, "unknown".to_spvalue()));
+    
+        let state = state.add(assign!(floor_robot_part_gripper_enabled, false.to_spvalue()));
+        let state = state.add(assign!(floor_robot_part_gripper_attached, false.to_spvalue()));
+        let state = state.add(assign!(floor_robot_tray_gripper_enabled, false.to_spvalue()));
+        let state = state.add(assign!(floor_robot_tray_gripper_attached, false.to_spvalue()));
+    
+        let state = state.add(assign!(floor_robot_gripper_request_trigger, false.to_spvalue()));
+        let state = state.add(assign!(floor_robot_gripper_request_state, "initial".to_spvalue()));
+        let state = state.add(assign!(floor_robot_gripper_fail_counter, 0.to_spvalue()));
+        let state = state.add(assign!(floor_robot_gripper_command, "unknown".to_spvalue()));
+    
+        // --------------------------------------------------------------------------
+    
+        let runner_goal = v!("floor_robot_runner_goal");
+        let runner_plan = av!("floor_robot_runner_plan");
+        let runner_plan_info = v!("floor_robot_runner_plan_info");
+        let runner_plan_state = v!("floor_robot_runner_plan_state");
+        let runner_plan_current_step = iv!("floor_robot_runner_plan_current_step");
+        let runner_replan = bv!("floor_robot_runner_replan");
+        let runner_replanned = bv!("floor_robot_runner_replanned");
+        let runner_replan_counter = iv!("floor_robot_runner_replan_counter");
+        let runner_replan_trigger = bv!("floor_robot_runner_replan_trigger");
+    
+        let state = state.add(assign!(runner_goal, SPValue::UNDEFINED));
+        let state = state.add(assign!(runner_plan, SPValue::UNDEFINED));
+        let state = state.add(assign!(runner_plan_info, SPValue::UNDEFINED));
+        let state = state.add(assign!(runner_plan_state, "empty".to_spvalue()));
+        let state = state.add(assign!(runner_plan_current_step, SPValue::UNDEFINED));
+        let state = state.add(assign!(runner_replan, false.to_spvalue()));
+        let state = state.add(assign!(runner_replanned, false.to_spvalue()));
+        let state = state.add(assign!(runner_replan_counter, 0.to_spvalue()));
+        let state = state.add(assign!(runner_replan_trigger, false.to_spvalue()));
+
+
+        for pos in vec![
+            "kitting_station_1",
+            "kitting_station_2",
+            "conveyor_belt"
+        ] {
+            operations.push(Operation::new(
+                &format!("op_floor_robot_direct_joint_move_to_{}", pos),
+                // precondition
+                t!(
+                    // name
+                    &format!("start_floor_robot_direct_joint_move_to_{}", pos).as_str(),
+                    // planner guard
+                    "var:floor_robot_request_state == initial && var:floor_robot_request_trigger == false && var:floor_robot_health == true",
+                    // runner guard
+                    "true",
+                    // planner actions
+                    vec!(
+                        &format!("var:floor_robot_command <- direct_joint_move_to_{pos}").as_str(),
+                        "var:robot_request_trigger <- true"
+                    ),
+                    //runner actions
+                    Vec::<&str>::new(),
+                    &state
+                ),
+                // postcondition
+                t!(
+                    // name
+                    &format!("complete_floor_robot_direct_joint_move_to_{}", pos).as_str(),
+                    // planner guard
+                    "true",
+                    // runner guard
+                    &format!("var:floor_robot_request_state == succeeded")
+                        .as_str(),
+                    // "true",
+                    // planner actions
+                    vec!(
+                        "var:floor_robot_request_trigger <- false",
+                        "var:floor_robot_request_state <- initial",
+                        &format!("var:floor_robot_current_position_name <- {pos}")
+                    ),
+                    //runner actions
+                    Vec::<&str>::new(),
+                    &state
+                ),
+            ));
+        }
+    }
+
     // #[test]
     // fn test_transition_get_vars_all() {
     //     let s = State::from_vec(&john_doe());

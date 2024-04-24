@@ -95,58 +95,78 @@ impl State {
     /// Updates the value of a variable in the state. If the variable is of type Runner, the value can be any.
     /// If the value is not in the variable's domain, the update is ignored, unless the value is "unknown".
     /// If the variable is not in the state, a panic occurs. Returns a new state with the updated value.
+    ///
+    /// Maybe this is not how we should do it...
+    //     pub fn update(&self, name: &str, val: SPValue) -> State {
+    //         match self.state.clone().get(name) {
+    //             Some(assignment) => match assignment.var.variable_type {
+    //                 SPVariableType::Runner => {
+    //                     let mut state = self.state.clone();
+    //                     state.insert(
+    //                         name.to_string(),
+    //                         SPAssignment {
+    //                             var: assignment.var.clone(),
+    //                             val: val.clone(),
+    //                         },
+    //                     );
+    //                     State { state }
+    //                 }
+    //                 _ => match assignment.var.domain.contains(&val) {
+    //                     true => {
+    //                         let mut state = self.state.clone();
+    //                         state.insert(
+    //                             name.to_string(),
+    //                             SPAssignment {
+    //                                 var: assignment.var.clone(),
+    //                                 val: val.clone(),
+    //                             },
+    //                         );
+    //                         State { state }
+    //                     }
+    //                     false => match val {
+    //                         SPValue::UNDEFINED => {
+    //                             let mut state = self.state.clone();
+    //                             state.insert(
+    //                                 name.to_string(),
+    //                                 SPAssignment {
+    //                                     var: assignment.var.clone(),
+    //                                     val: val.clone(),
+    //                                 },
+    //                             );
+    //                             State { state }
+    //                         }
+    //                         SPValue::String(x) => match x.as_str() {
+    //                             "unknown" => self.clone(),
+    //                             _ => {
+    //                                 println!("Value {} to update the variable {} is not in its domain. State not updated!", x, assignment.var.name);
+    //                                 self.clone()
+    //                             }
+    //                         },
+    //                         _ => {
+    //                             println!("Value {} to update the variable {} is not in its domain. State not updated!", val, assignment.var.name);
+    //                             self.clone()
+    //                         }
+    //                     },
+    //                 },
+    //             },
+    //             None => panic!("Variable {} not in state.", name),
+    //         }
+    //     }
+    // }
+
     pub fn update(&self, name: &str, val: SPValue) -> State {
         match self.state.clone().get(name) {
-            Some(assignment) => match assignment.var.variable_type {
-                SPVariableType::Runner => {
-                    let mut state = self.state.clone();
-                    state.insert(
-                        name.to_string(),
-                        SPAssignment {
-                            var: assignment.var.clone(),
-                            val: val.clone(),
-                        },
-                    );
-                    State { state }
-                }
-                _ => match assignment.var.domain.contains(&val) {
-                    true => {
-                        let mut state = self.state.clone();
-                        state.insert(
-                            name.to_string(),
-                            SPAssignment {
-                                var: assignment.var.clone(),
-                                val: val.clone(),
-                            },
-                        );
-                        State { state }
-                    }
-                    false => match val {
-                        SPValue::UNDEFINED => {
-                            let mut state = self.state.clone();
-                            state.insert(
-                                name.to_string(),
-                                SPAssignment {
-                                    var: assignment.var.clone(),
-                                    val: val.clone(),
-                                },
-                            );
-                            State { state }
-                        }
-                        SPValue::String(x) => match x.as_str() {
-                            "unknown" => self.clone(),
-                            _ => {
-                                println!("Value {} to update the variable {} is not in its domain. State not updated!", x, assignment.var.name);
-                                self.clone()
-                            }
-                        },
-                        _ => {
-                            println!("Value {} to update the variable {} is not in its domain. State not updated!", val, assignment.var.name);
-                            self.clone()
-                        }
+            Some(assignment) => {
+                let mut state = self.state.clone();
+                state.insert(
+                    name.to_string(),
+                    SPAssignment {
+                        var: assignment.var.clone(),
+                        val: val.clone(),
                     },
-                },
-            },
+                );
+                State { state }
+            }
             None => panic!("Variable {} not in state.", name),
         }
     }
