@@ -138,7 +138,7 @@ macro_rules! iv_command {
         SPVariable::new(
             $a.clone(),
             SPVariableType::Command,
-            SPValueType::Int54,
+            SPValueType::Int64,
             $b.iter().map(|x| x.clone().to_spvalue()).collect(),
         )
     };
@@ -151,7 +151,8 @@ macro_rules! iv {
             $a.clone(),
             SPVariableType::UNDEFINED,
             SPValueType::Int64,
-            $b.iter().map(|x| x.clone().to_spvalue()).collect(),
+            vec![],
+            // $b.iter().map(|x| x.clone().to_spvalue()).collect(),
         )
     };
 }
