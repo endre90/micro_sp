@@ -146,7 +146,7 @@ macro_rules! iv_command {
 
 #[macro_export]
 macro_rules! iv {
-    ($a:expr, $b:expr) => {
+    ($a:expr) => {
         SPVariable::new(
             $a.clone(),
             SPVariableType::UNDEFINED,
