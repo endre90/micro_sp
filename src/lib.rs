@@ -18,3 +18,4 @@ pub use crate::planning::operation::*;
 pub use crate::planning::transition::*;
 
 pub mod macros;
+pub use crate::macros::sp_variable::*;
