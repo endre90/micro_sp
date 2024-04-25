@@ -205,14 +205,27 @@ macro_rules! fv_command {
     };
 }
 
+// #[macro_export]
+// macro_rules! fv_measured {
+//     ($a:expr, $b:expr) => {
+//         SPVariable::new(
+//             $a.clone(),
+//             SPVariableType::Measured,
+//             SPValueType::Float64,
+//             $b.iter().map(|x| x.clone().to_spvalue()).collect(),
+//         )
+//     };
+// }
+
 #[macro_export]
 macro_rules! fv_measured {
-    ($a:expr, $b:expr) => {
+    ($a:expr) => {
         SPVariable::new(
             $a.clone(),
             SPVariableType::Measured,
             SPValueType::Float64,
-            $b.iter().map(|x| x.clone().to_spvalue()).collect(),
+            vec![],
+            // $b.iter().map(|x| x.clone().to_spvalue()).collect(),
         )
     };
 }
