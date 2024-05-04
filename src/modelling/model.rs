@@ -10,6 +10,7 @@ pub struct Model {
     pub state: State,
     pub auto_transitions: Vec<Transition>,
     pub operations: Vec<Operation>,
+    pub auto_operations: Vec<Operation>,
 }
 
 impl Model {
@@ -18,6 +19,7 @@ impl Model {
         state: State,
         auto_transitions: Vec<Transition>,
         operations: Vec<Operation>,
+        auto_operations: Vec<Operation>
     ) -> Model {
         // let mut state_with_op = state.clone();
         // for op in &operations {
@@ -45,6 +47,7 @@ impl Model {
             state: state.clone(),
             auto_transitions,
             operations,
+            auto_operations
         }
     }
 
@@ -56,6 +59,7 @@ impl Model {
             .iter()
             .map(|t| t.clone().relax(vars))
             .collect();
+        let r_auto_operations = self.auto_operations.iter().map(|op| op.clone().relax(vars)).collect();
         let mut r_state = HashMap::new();
         self.state
             .state
@@ -71,6 +75,7 @@ impl Model {
             state: State { state: r_state },
             auto_transitions: r_auto_transitions,
             operations: r_operations,
+            auto_operations: r_auto_operations
         }
     }
 }

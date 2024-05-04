@@ -205,7 +205,7 @@ mod tests {
     );
 
         // Adding the opeation states in the model
-        let m = Model::new("asdf", state.clone(), vec![], vec![op.clone()]);
+        let m = Model::new("asdf", state.clone(), vec![], vec![op.clone()], vec!());
         assert_eq!(op.eval_planning(&m.state), true)
     }
 
@@ -244,7 +244,7 @@ mod tests {
     );
 
         // Adding the opeation states in the model
-        let m = Model::new("asdf", state.clone(), vec![], vec![op.clone()]);
+        let m = Model::new("asdf", state.clone(), vec![], vec![op.clone()], vec!());
         assert_eq!(op.eval_planning(&m.state), true)
     }
 
@@ -282,7 +282,7 @@ mod tests {
     );
 
         // Adding the opeation states in the model
-        let m = Model::new("asdf", state.clone(), vec![], vec![op.clone()]);
+        let m = Model::new("asdf", state.clone(), vec![], vec![op.clone()], vec!());
         assert_eq!(op.eval_running(&m.state), true)
     }
 
@@ -321,7 +321,7 @@ mod tests {
     );
 
         // Adding the opeation states in the model
-        let m = Model::new("asdf", state.clone(), vec![], vec![op.clone()]);
+        let m = Model::new("asdf", state.clone(), vec![], vec![op.clone()], vec!());
         assert_eq!(op.eval_running(&m.state), true)
     }
 
@@ -359,7 +359,7 @@ mod tests {
     );
 
         // Adding the opeation states in the model
-        let m = Model::new("asdf", state.clone(), vec![], vec![op.clone()]);
+        let m = Model::new("asdf", state.clone(), vec![], vec![op.clone()], vec!());
         let new_state = match op.clone().eval_planning(&m.state) {
             true => op.take_planning(&m.state),
             false => m.state,
@@ -405,7 +405,7 @@ mod tests {
     );
 
         // Adding the opeation states in the model
-        let m = Model::new("asdf", state.clone(), vec![], vec![op.clone()]);
+        let m = Model::new("asdf", state.clone(), vec![], vec![op.clone()], vec!());
         let new_state = match op.clone().eval_running(&m.state) {
             true => op.start_running(&m.state),
             false => m.state,
@@ -455,7 +455,7 @@ mod tests {
     );
 
         // Adding the opeation states in the model
-        let m = Model::new("asdf", state.clone(), vec![], vec![op.clone()]);
+        let m = Model::new("asdf", state.clone(), vec![], vec![op.clone()], vec!());
         let new_state = match op.clone().eval_running(&m.state) {
             true => op.clone().start_running(&m.state),
             false => m.state,
