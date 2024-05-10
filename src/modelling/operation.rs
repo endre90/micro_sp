@@ -49,9 +49,29 @@ impl Operation {
         }
     }
 
+    // pub fn complete_running(self, state: &State) -> State {
+    //     let assignment = state.get_all(&self.name);
+    //     if assignment.val == "executing".to_spvalue() {
+    //         let action = Action::new(assignment.var, "initial".wrap());
+    //         self.postcondition.take_running(&action.assign(&state))
+    //     } else {
+    //         state.clone()
+    //     }
+    // }
+
     pub fn complete_running(self, state: &State) -> State {
         let assignment = state.get_all(&self.name);
         if assignment.val == "executing".to_spvalue() {
+            let action = Action::new(assignment.var, "completed".wrap());
+            self.postcondition.take_running(&action.assign(&state))
+        } else {
+            state.clone()
+        }
+    }
+
+    pub fn reset_running(self, state: &State) -> State {
+        let assignment = state.get_all(&self.name);
+        if assignment.val == "completed".to_spvalue() {
             let action = Action::new(assignment.var, "initial".wrap());
             self.postcondition.take_running(&action.assign(&state))
         } else {
