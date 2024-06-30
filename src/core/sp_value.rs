@@ -12,12 +12,12 @@ pub enum SPValue {
     String(String),
     Time(SystemTime),
     Array(SPValueType, Vec<SPValue>),
-    UNDEFINED,
+    UNKNOWN,
 }
 
 impl Default for SPValue {
     fn default() -> Self {
-        SPValue::UNDEFINED
+        SPValue::UNKNOWN
     }
 }
 
@@ -32,7 +32,7 @@ impl fmt::Display for SPValue {
             SPValue::String(s) => write!(fmtr, "{}", s),
             SPValue::Time(t) => write!(fmtr, "{:?}", t.elapsed().unwrap_or_default()),
             SPValue::Array(_, a) => write!(fmtr, "{:?}", a),
-            SPValue::UNDEFINED => write!(fmtr, "[UNDEFINED]"),
+            SPValue::UNKNOWN => write!(fmtr, "UNKNOWN"),
         }
     }
 }
@@ -46,12 +46,12 @@ pub enum SPValueType {
     String,
     Time,
     Array,
-    UNDEFINED,
+    UNKNOWN,
 }
 
 impl Default for SPValueType {
     fn default() -> Self {
-        SPValueType::UNDEFINED
+        SPValueType::UNKNOWN
     }
 }
 
@@ -64,7 +64,7 @@ impl SPValueType {
             "string" => SPValueType::String,
             "time" => SPValueType::Time,
             "array" => SPValueType::Array,
-            _ => SPValueType::UNDEFINED,
+            _ => SPValueType::UNKNOWN,
         }
     }
 }
@@ -78,7 +78,7 @@ impl fmt::Display for SPValueType {
             SPValueType::String => write!(fmtr, "string"),
             SPValueType::Time => write!(fmtr, "time"),
             SPValueType::Array => write!(fmtr, "array"),
-            SPValueType::UNDEFINED => write!(fmtr, "[UNDEFINED]"),
+            SPValueType::UNKNOWN => write!(fmtr, "UNKNOWN"),
         }
     }
 }
@@ -93,7 +93,7 @@ impl SPValue {
             SPValue::String(_) => SPValueType::String == t,
             SPValue::Time(_) => SPValueType::Time == t,
             SPValue::Array(_, _) => SPValueType::Array == t,
-            SPValue::UNDEFINED => SPValueType::UNDEFINED == t,
+            SPValue::UNKNOWN => SPValueType::UNKNOWN == t,
         }
     }
 
@@ -106,7 +106,7 @@ impl SPValue {
             SPValue::String(_) => SPValueType::String,
             SPValue::Time(_) => SPValueType::Time,
             SPValue::Array(_, _) => SPValueType::Array,
-            SPValue::UNDEFINED => SPValueType::UNDEFINED,
+            SPValue::UNKNOWN => SPValueType::UNKNOWN,
         }
     }
 
@@ -133,7 +133,7 @@ impl SPValue {
                     .collect::<Vec<String>>()
                     .join(", ")
             ),
-            SPValue::UNDEFINED => "[UNDEFINED]".to_string(),
+            SPValue::UNKNOWN => "UNKNOWN".to_string(),
         }
     }
 }
@@ -195,7 +195,7 @@ where
 impl ToSPValue for Vec<SPValue> {
     fn to_spvalue(&self) -> SPValue {
         if self.is_empty() {
-            SPValue::Array(SPValueType::UNDEFINED, self.clone())
+            SPValue::Array(SPValueType::UNKNOWN, self.clone())
         } else {
             let spvaltype = self[0].has_type();
             assert!(self.iter().all(|e| e.has_type() == spvaltype));
@@ -259,9 +259,9 @@ mod tests {
     }
     
     #[test]
-    fn test_is_type_undefined() {
-        let val = SPValue::UNDEFINED;
-        assert!(val.is_type(SPValueType::UNDEFINED));
+    fn test_is_type_UNKNOWN() {
+        let val = SPValue::UNKNOWN;
+        assert!(val.is_type(SPValueType::UNKNOWN));
         assert!(!val.is_type(SPValueType::Int64));
     }
     
@@ -305,9 +305,9 @@ mod tests {
     }
     
     #[test]
-    fn test_has_type_undefined() {
-        let value = SPValue::UNDEFINED;
-        assert_eq!(value.has_type(), SPValueType::UNDEFINED);
+    fn test_has_type_UNKNOWN() {
+        let value = SPValue::UNKNOWN;
+        assert_eq!(value.has_type(), SPValueType::UNKNOWN);
     }
     
     #[test]
@@ -336,8 +336,8 @@ mod tests {
         let time_value = SPValue::Time(SystemTime::UNIX_EPOCH);
         assert_eq!(time_value.is_array(), false);
     
-        let undefined_value = SPValue::UNDEFINED;
-        assert_eq!(undefined_value.is_array(), false);
+        let unknown_value = SPValue::UNKNOWN;
+        assert_eq!(unknown_value.is_array(), false);
     }
     
     #[test]
@@ -383,9 +383,9 @@ mod tests {
     }
     
     #[test]
-    fn test_to_string_returns_correct_string_for_undefined() {
-        let undefined_value = SPValue::UNDEFINED;
-        assert_eq!(undefined_value.to_string(), "[UNDEFINED]".to_string());
+    fn test_to_string_returns_correct_string_for_UNKNOWN() {
+        let UNKNOWN_value = SPValue::UNKNOWN;
+        assert_eq!(UNKNOWN_value.to_string(), "[UNKNOWN]".to_string());
     }
     
     #[test]
@@ -466,9 +466,9 @@ mod tests {
     }
     
     #[test]
-    fn test_display_undefined() {
-        let value = SPValue::UNDEFINED;
-        assert_eq!(format!("{}", value), "[UNDEFINED]");
+    fn test_display_UNKNOWN() {
+        let value = SPValue::UNKNOWN;
+        assert_eq!(format!("{}", value), "[UNKNOWN]");
     }
     
     #[test]
@@ -508,8 +508,8 @@ mod tests {
     }
     
     #[test]
-    fn test_display_type_undefined() {
-        let value_type = SPValueType::UNDEFINED;
-        assert_eq!(format!("{}", value_type), "[UNDEFINED]");
+    fn test_display_type_UNKNOWN() {
+        let value_type = SPValueType::UNKNOWN;
+        assert_eq!(format!("{}", value_type), "[UNKNOWN]");
     }
 }
