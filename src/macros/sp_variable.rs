@@ -229,14 +229,25 @@ macro_rules! iv {
 
 #[macro_export]
 macro_rules! fv {
-    ($a:expr, $b:expr) => {
+    ($a:expr) => {
         SPVariable::new(
             $a.clone(),
             SPValueType::Float64,
-            $b.iter().map(|x| x.clone().to_spvalue()).collect(),
+            vec![]
         )
     };
 }
+
+// #[macro_export]
+// macro_rules! fv {
+//     ($a:expr, $b:expr) => {
+//         SPVariable::new(
+//             $a.clone(),
+//             SPValueType::Float64,
+//             $b.iter().map(|x| x.clone().to_spvalue()).collect(),
+//         )
+//     };
+// }
 
 // #[macro_export]
 // macro_rules! fv_estimated {
