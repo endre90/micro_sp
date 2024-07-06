@@ -114,7 +114,7 @@ impl Operation {
         }
     }
 
-    pub fn start_reseting(self, state: &State) -> State {
+    pub fn start_resetting(self, state: &State) -> State {
         let assignment = state.get_all(&self.name);
         if assignment.val == "completed".to_spvalue() {
             let action = Action::new(assignment.var, "resetting".wrap());
@@ -124,7 +124,7 @@ impl Operation {
         }
     }
 
-    pub fn complete_reseting(self, state: &State) -> State {
+    pub fn complete_resetting(self, state: &State) -> State {
         let assignment = state.get_all(&self.name);
         if assignment.val == "resetting".to_spvalue() {
             let action = Action::new(assignment.var, "initial".wrap());
