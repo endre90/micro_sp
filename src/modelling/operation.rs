@@ -9,6 +9,7 @@ pub enum OperationState {
     Initial,
     Disabled,
     Executing,
+    Resetting,
     Timedout,
     Failed,
     Completed,
@@ -27,6 +28,7 @@ impl OperationState {
             "initial" => OperationState::Initial,
             "disabled" => OperationState::Disabled,
             "executing" => OperationState::Executing,
+            "resetting" => OperationState::Resetting,
             "timedout" => OperationState::Timedout,
             "failed" => OperationState::Failed,
             "completed" => OperationState::Completed,
@@ -44,6 +46,7 @@ impl fmt::Display for OperationState {
             OperationState::Initial => write!(f, "initial"),
             OperationState::Disabled => write!(f, "disabled"),
             OperationState::Executing => write!(f, "executing"),
+            OperationState::Resetting => write!(f, "resetting"),
             OperationState::Timedout => write!(f, "timedout"),
             OperationState::Failed => write!(f, "failed"),
             OperationState::Completed => write!(f, "completed"),
@@ -111,16 +114,35 @@ impl Operation {
         }
     }
 
-    pub fn reset_running(self, state: &State) -> State {
+    pub fn start_reseting(self, state: &State) -> State {
         let assignment = state.get_all(&self.name);
         if assignment.val == "completed".to_spvalue() {
+            let action = Action::new(assignment.var, "resetting".wrap());
+            self.postcondition.take_running(&action.assign(&state))
+        } else {
+            state.clone()
+        }
+    }
+
+    pub fn complete_reseting(self, state: &State) -> State {
+        let assignment = state.get_all(&self.name);
+        if assignment.val == "resetting".to_spvalue() {
             let action = Action::new(assignment.var, "initial".wrap());
-            // self.postcondition.take_running(&action.assign(&state))
             action.assign(&state)
         } else {
             state.clone()
         }
     }
+
+    // pub fn reset_running(self, state: &State) -> State {
+    //     let assignment = state.get_all(&self.name);
+    //     if assignment.val == "completed".to_spvalue() {
+    //         let action = Action::new(assignment.var, "initial".wrap());
+    //         self.postcondition.take_running(&action.assign(&state))
+    //     } else {
+    //         state.clone()
+    //     }
+    // }
 
     pub fn can_be_completed(self, state: &State) -> bool {
         state.get_value(&self.name) == "executing".to_spvalue()
@@ -213,9 +235,9 @@ impl Operation {
 //             "var:ur_action_trigger == false && var:ur_action_state == initial && var:ur_current_pose != b",
 //             "true",
 //             vec!(
-//                 "var:ur_command <- movej", 
-//                 "var:ur_action_trigger <- true", 
-//                 "var:ur_goal_feature_id <- b", 
+//                 "var:ur_command <- movej",
+//                 "var:ur_action_trigger <- true",
+//                 "var:ur_goal_feature_id <- b",
 //                 "var:ur_tcp_id <- svt_tcp"
 //             ),
 //             Vec::<&str>::new(),
@@ -226,7 +248,7 @@ impl Operation {
 //             "var:ur_action_state == done",
 //             "true",
 //             vec!(
-//                 "var:ur_action_trigger <- false", 
+//                 "var:ur_action_trigger <- false",
 //                 "var:ur_current_pose <- b"
 //             ),
 //             Vec::<&str>::new(),
@@ -247,9 +269,9 @@ impl Operation {
 //             "var:ur_action_trigger == false && var:ur_action_state == initial && var:ur_current_pose != b",
 //             "true",
 //             vec!(
-//                 "var:ur_command <- movej", 
-//                 "var:ur_action_trigger <- true", 
-//                 "var:ur_goal_feature_id <- b", 
+//                 "var:ur_command <- movej",
+//                 "var:ur_action_trigger <- true",
+//                 "var:ur_goal_feature_id <- b",
 //                 "var:ur_tcp_id <- svt_tcp"
 //             ),
 //             Vec::<&str>::new(),
@@ -260,7 +282,7 @@ impl Operation {
 //             "var:ur_action_state == done",
 //             "true",
 //             vec!(
-//                 "var:ur_action_trigger <- false", 
+//                 "var:ur_action_trigger <- false",
 //                 "var:ur_current_pose <- b"
 //             ),
 //             Vec::<&str>::new(),
@@ -286,9 +308,9 @@ impl Operation {
 //             "var:ur_action_trigger == false && var:ur_action_state == initial && var:ur_current_pose == b",
 //             "true",
 //             vec!(
-//                 "var:ur_command <- movej", 
-//                 "var:ur_action_trigger <- true", 
-//                 "var:ur_goal_feature_id <- b", 
+//                 "var:ur_command <- movej",
+//                 "var:ur_action_trigger <- true",
+//                 "var:ur_goal_feature_id <- b",
 //                 "var:ur_tcp_id <- svt_tcp"
 //             ),
 //             Vec::<&str>::new(),
@@ -299,7 +321,7 @@ impl Operation {
 //             "var:ur_action_state == done",
 //             "true",
 //             vec!(
-//                 "var:ur_action_trigger <- false", 
+//                 "var:ur_action_trigger <- false",
 //                 "var:ur_current_pose <- b"
 //             ),
 //             Vec::<&str>::new(),
@@ -324,9 +346,9 @@ impl Operation {
 //             "var:ur_action_trigger == false && var:ur_action_state == initial && var:ur_current_pose != b",
 //             "var:runner_replan == true",
 //             vec!(
-//                 "var:ur_command <- movej", 
-//                 "var:ur_action_trigger <- true", 
-//                 "var:ur_goal_feature_id <- b", 
+//                 "var:ur_command <- movej",
+//                 "var:ur_action_trigger <- true",
+//                 "var:ur_goal_feature_id <- b",
 //                 "var:ur_tcp_id <- svt_tcp"
 //             ),
 //             Vec::<&str>::new(),
@@ -337,7 +359,7 @@ impl Operation {
 //             "var:ur_action_state == done",
 //             "true",
 //             vec!(
-//                 "var:ur_action_trigger <- false", 
+//                 "var:ur_action_trigger <- false",
 //                 "var:ur_current_pose <- b"
 //             ),
 //             Vec::<&str>::new(),
@@ -363,9 +385,9 @@ impl Operation {
 //             "var:ur_action_trigger == false && var:ur_action_state == initial && var:ur_current_pose != b",
 //             "var:runner_replan == false",
 //             vec!(
-//                 "var:ur_command <- movej", 
-//                 "var:ur_action_trigger <- true", 
-//                 "var:ur_goal_feature_id <- b", 
+//                 "var:ur_command <- movej",
+//                 "var:ur_action_trigger <- true",
+//                 "var:ur_goal_feature_id <- b",
 //                 "var:ur_tcp_id <- svt_tcp"
 //             ),
 //             Vec::<&str>::new(),
@@ -376,7 +398,7 @@ impl Operation {
 //             "var:ur_action_state == done",
 //             "true",
 //             vec!(
-//                 "var:ur_action_trigger <- false", 
+//                 "var:ur_action_trigger <- false",
 //                 "var:ur_current_pose <- b"
 //             ),
 //             Vec::<&str>::new(),
@@ -401,9 +423,9 @@ impl Operation {
 //             "var:ur_action_trigger == false && var:ur_action_state == initial && var:ur_current_pose != b",
 //             "true",
 //             vec!(
-//                 "var:ur_command <- movej", 
-//                 "var:ur_action_trigger <- true", 
-//                 "var:ur_goal_feature_id <- b", 
+//                 "var:ur_command <- movej",
+//                 "var:ur_action_trigger <- true",
+//                 "var:ur_goal_feature_id <- b",
 //                 "var:ur_tcp_id <- svt_tcp"
 //             ),
 //             Vec::<&str>::new(),
@@ -414,7 +436,7 @@ impl Operation {
 //             "var:ur_action_state == done",
 //             "true",
 //             vec!(
-//                 "var:ur_action_trigger <- false", 
+//                 "var:ur_action_trigger <- false",
 //                 "var:ur_current_pose <- b"
 //             ),
 //             Vec::<&str>::new(),
@@ -447,9 +469,9 @@ impl Operation {
 //             "var:ur_action_trigger == false && var:ur_action_state == initial && var:ur_current_pose != b",
 //             "true",
 //             vec!(
-//                 "var:ur_command <- movej", 
-//                 "var:ur_action_trigger <- true", 
-//                 "var:ur_goal_feature_id <- b", 
+//                 "var:ur_command <- movej",
+//                 "var:ur_action_trigger <- true",
+//                 "var:ur_goal_feature_id <- b",
 //                 "var:ur_tcp_id <- svt_tcp"
 //             ),
 //             Vec::<&str>::new(),
@@ -460,7 +482,7 @@ impl Operation {
 //             "var:ur_action_state == done",
 //             "true",
 //             vec!(
-//                 "var:ur_action_trigger <- false", 
+//                 "var:ur_action_trigger <- false",
 //                 "var:ur_current_pose <- b"
 //             ),
 //             Vec::<&str>::new(),
@@ -497,9 +519,9 @@ impl Operation {
 //             "var:ur_action_trigger == false && var:ur_action_state == initial && var:ur_current_pose != b",
 //             "true",
 //             vec!(
-//                 "var:ur_command <- movej", 
-//                 "var:ur_action_trigger <- true", 
-//                 "var:ur_goal_feature_id <- b", 
+//                 "var:ur_command <- movej",
+//                 "var:ur_action_trigger <- true",
+//                 "var:ur_goal_feature_id <- b",
 //                 "var:ur_tcp_id <- svt_tcp"
 //             ),
 //             Vec::<&str>::new(),
@@ -510,7 +532,7 @@ impl Operation {
 //             "var:ur_action_state == done",
 //             "true",
 //             vec!(
-//                 "var:ur_action_trigger <- false", 
+//                 "var:ur_action_trigger <- false",
 //                 "var:ur_current_pose <- b"
 //             ),
 //             Vec::<&str>::new(),
