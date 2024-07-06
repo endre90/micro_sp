@@ -115,7 +115,8 @@ impl Operation {
         let assignment = state.get_all(&self.name);
         if assignment.val == "completed".to_spvalue() {
             let action = Action::new(assignment.var, "initial".wrap());
-            self.postcondition.take_running(&action.assign(&state))
+            // self.postcondition.take_running(&action.assign(&state))
+            action.assign(&state)
         } else {
             state.clone()
         }
