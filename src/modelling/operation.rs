@@ -9,10 +9,11 @@ pub enum OperationState {
     Initial,
     Disabled,
     Executing,
+    Waiting, // Waiting for other opertaions from the same step to finish executing
+    Completed,
     Resetting,
     Timedout,
     Failed,
-    Completed,
     UNKNOWN,
 }
 
@@ -28,6 +29,7 @@ impl OperationState {
             "initial" => OperationState::Initial,
             "disabled" => OperationState::Disabled,
             "executing" => OperationState::Executing,
+            "waiting" => OperationState::Waiting,
             "resetting" => OperationState::Resetting,
             "timedout" => OperationState::Timedout,
             "failed" => OperationState::Failed,
@@ -46,6 +48,7 @@ impl fmt::Display for OperationState {
             OperationState::Initial => write!(f, "initial"),
             OperationState::Disabled => write!(f, "disabled"),
             OperationState::Executing => write!(f, "executing"),
+            OperationState::Waiting => write!(f, "waiting"),
             OperationState::Resetting => write!(f, "resetting"),
             OperationState::Timedout => write!(f, "timedout"),
             OperationState::Failed => write!(f, "failed"),
@@ -71,6 +74,54 @@ impl Operation {
             precondition,
             postcondition,
         }
+    }
+
+    pub fn force_set_initial_state(self, state: &State) -> State {
+        let assignment = state.get_all(&self.name);
+        let action = Action::new(assignment.var, "initial".wrap());
+        action.assign(&state)
+    }
+
+    pub fn force_set_executing_state(self, state: &State) -> State {
+        let assignment = state.get_all(&self.name);
+        let action = Action::new(assignment.var, "executing".wrap());
+        action.assign(&state)
+    }
+
+    pub fn force_set_disabled_state(self, state: &State) -> State {
+        let assignment = state.get_all(&self.name);
+        let action = Action::new(assignment.var, "disabled".wrap());
+        action.assign(&state)
+    }
+
+    pub fn force_set_waiting_state(self, state: &State) -> State {
+        let assignment = state.get_all(&self.name);
+        let action = Action::new(assignment.var, "waiting".wrap());
+        action.assign(&state)
+    }
+
+    pub fn force_set_resetting_state(self, state: &State) -> State {
+        let assignment = state.get_all(&self.name);
+        let action = Action::new(assignment.var, "resetting".wrap());
+        action.assign(&state)
+    }
+
+    pub fn force_set_timedout_state(self, state: &State) -> State {
+        let assignment = state.get_all(&self.name);
+        let action = Action::new(assignment.var, "timedout".wrap());
+        action.assign(&state)
+    }
+
+    pub fn force_set_failed_state(self, state: &State) -> State {
+        let assignment = state.get_all(&self.name);
+        let action = Action::new(assignment.var, "failed".wrap());
+        action.assign(&state)
+    }
+
+    pub fn force_set_completed_state(self, state: &State) -> State {
+        let assignment = state.get_all(&self.name);
+        let action = Action::new(assignment.var, "completed".wrap());
+        action.assign(&state)
     }
 
     pub fn eval_planning(self, state: &State) -> bool {
