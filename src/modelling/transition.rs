@@ -130,6 +130,18 @@ impl PartialEq for Transition {
     }
 }
 
+impl Default for Transition {
+    fn default() -> Self {
+        Transition {
+            name: "unkown".to_string(),
+            guard: Predicate::TRUE,
+            runner_guard: Predicate::TRUE,
+            actions: vec!(),
+            runner_actions: vec!(),
+        }
+    }
+}
+
 // TODO: test
 pub fn get_transition_vars_all(trans: &Transition) -> Vec<SPVariable> {
     let mut s = Vec::new();
