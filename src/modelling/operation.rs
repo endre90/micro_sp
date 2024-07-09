@@ -212,6 +212,11 @@ impl Operation {
             && self.postcondition.eval_running(&state)
     }
 
+    pub fn can_be_reset(self, state: &State) -> bool {
+        state.get_value(&self.name) == "completed".to_spvalue()
+            && self.reset_transition.eval_running(&state)
+    }
+
     // TODO: test...
     pub fn relax(self, vars: &Vec<String>) -> Operation {
         let r_precondition = self.precondition.relax(vars);
