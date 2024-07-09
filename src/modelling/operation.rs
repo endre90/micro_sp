@@ -9,9 +9,9 @@ pub enum OperationState {
     Initial,
     Disabled,
     Executing,
-    Waiting, // Waiting for other opertaions from the same step to finish executing
+    // Waiting, // Waiting for other opertaions from the same step to finish executing
     Completed,
-    Resetting,
+    // Resetting,
     Timedout,
     Failed,
     UNKNOWN,
@@ -29,8 +29,8 @@ impl OperationState {
             "initial" => OperationState::Initial,
             "disabled" => OperationState::Disabled,
             "executing" => OperationState::Executing,
-            "waiting" => OperationState::Waiting,
-            "resetting" => OperationState::Resetting,
+            // "waiting" => OperationState::Waiting,
+            // "resetting" => OperationState::Resetting,
             "timedout" => OperationState::Timedout,
             "failed" => OperationState::Failed,
             "completed" => OperationState::Completed,
@@ -48,8 +48,8 @@ impl fmt::Display for OperationState {
             OperationState::Initial => write!(f, "initial"),
             OperationState::Disabled => write!(f, "disabled"),
             OperationState::Executing => write!(f, "executing"),
-            OperationState::Waiting => write!(f, "waiting"),
-            OperationState::Resetting => write!(f, "resetting"),
+            // OperationState::Waiting => write!(f, "waiting"),
+            // OperationState::Resetting => write!(f, "resetting"),
             OperationState::Timedout => write!(f, "timedout"),
             OperationState::Failed => write!(f, "failed"),
             OperationState::Completed => write!(f, "completed"),
@@ -64,65 +64,67 @@ pub struct Operation {
     pub state: OperationState,
     pub precondition: Transition,
     pub postcondition: Transition,
+    pub reset_transition: Transition
 }
 
 impl Operation {
-    pub fn new(name: &str, precondition: Transition, postcondition: Transition) -> Operation {
+    pub fn new(name: &str, precondition: Transition, postcondition: Transition, reset_transition: Transition) -> Operation {
         Operation {
             name: name.to_string(),
             state: OperationState::Initial,
             precondition,
             postcondition,
+            reset_transition
         }
     }
 
-    pub fn force_set_initial_state(self, state: &State) -> State {
-        let assignment = state.get_all(&self.name);
-        let action = Action::new(assignment.var, "initial".wrap());
-        action.assign(&state)
-    }
+    // pub fn force_set_initial_state(self, state: &State) -> State {
+    //     let assignment = state.get_all(&self.name);
+    //     let action = Action::new(assignment.var, "initial".wrap());
+    //     action.assign(&state)
+    // }
 
-    pub fn force_set_executing_state(self, state: &State) -> State {
-        let assignment = state.get_all(&self.name);
-        let action = Action::new(assignment.var, "executing".wrap());
-        action.assign(&state)
-    }
+    // pub fn force_set_executing_state(self, state: &State) -> State {
+    //     let assignment = state.get_all(&self.name);
+    //     let action = Action::new(assignment.var, "executing".wrap());
+    //     action.assign(&state)
+    // }
 
-    pub fn force_set_disabled_state(self, state: &State) -> State {
-        let assignment = state.get_all(&self.name);
-        let action = Action::new(assignment.var, "disabled".wrap());
-        action.assign(&state)
-    }
+    // pub fn force_set_disabled_state(self, state: &State) -> State {
+    //     let assignment = state.get_all(&self.name);
+    //     let action = Action::new(assignment.var, "disabled".wrap());
+    //     action.assign(&state)
+    // }
 
-    pub fn force_set_waiting_state(self, state: &State) -> State {
-        let assignment = state.get_all(&self.name);
-        let action = Action::new(assignment.var, "waiting".wrap());
-        action.assign(&state)
-    }
+    // pub fn force_set_waiting_state(self, state: &State) -> State {
+    //     let assignment = state.get_all(&self.name);
+    //     let action = Action::new(assignment.var, "waiting".wrap());
+    //     action.assign(&state)
+    // }
 
-    pub fn force_set_resetting_state(self, state: &State) -> State {
-        let assignment = state.get_all(&self.name);
-        let action = Action::new(assignment.var, "resetting".wrap());
-        action.assign(&state)
-    }
+    // pub fn force_set_resetting_state(self, state: &State) -> State {
+    //     let assignment = state.get_all(&self.name);
+    //     let action = Action::new(assignment.var, "resetting".wrap());
+    //     action.assign(&state)
+    // }
 
-    pub fn force_set_timedout_state(self, state: &State) -> State {
-        let assignment = state.get_all(&self.name);
-        let action = Action::new(assignment.var, "timedout".wrap());
-        action.assign(&state)
-    }
+    // pub fn force_set_timedout_state(self, state: &State) -> State {
+    //     let assignment = state.get_all(&self.name);
+    //     let action = Action::new(assignment.var, "timedout".wrap());
+    //     action.assign(&state)
+    // }
 
-    pub fn force_set_failed_state(self, state: &State) -> State {
-        let assignment = state.get_all(&self.name);
-        let action = Action::new(assignment.var, "failed".wrap());
-        action.assign(&state)
-    }
+    // pub fn force_set_failed_state(self, state: &State) -> State {
+    //     let assignment = state.get_all(&self.name);
+    //     let action = Action::new(assignment.var, "failed".wrap());
+    //     action.assign(&state)
+    // }
 
-    pub fn force_set_completed_state(self, state: &State) -> State {
-        let assignment = state.get_all(&self.name);
-        let action = Action::new(assignment.var, "completed".wrap());
-        action.assign(&state)
-    }
+    // pub fn force_set_completed_state(self, state: &State) -> State {
+    //     let assignment = state.get_all(&self.name);
+    //     let action = Action::new(assignment.var, "completed".wrap());
+    //     action.assign(&state)
+    // }
 
     pub fn eval_planning(self, state: &State) -> bool {
         if state.get_value(&self.name) == OperationState::Initial.to_spvalue() {
@@ -147,7 +149,7 @@ impl Operation {
 
     pub fn start_running(self, state: &State) -> State {
         let assignment = state.get_all(&self.name);
-        if assignment.val == OperationState::Initial.to_spvalue() {
+        if assignment.val == "initial".to_spvalue() {
             let action = Action::new(assignment.var, "executing".wrap());
             action.assign(&self.precondition.take_running(state))
         } else {
@@ -165,26 +167,35 @@ impl Operation {
         }
     }
 
-    pub fn start_resetting(self, state: &State) -> State {
+    pub fn reset_running(self, state: &State) -> State {
         let assignment = state.get_all(&self.name);
         if assignment.val == "completed".to_spvalue() {
-            let action = Action::new(assignment.var, "resetting".wrap());
-            action.assign(&state)
-        } else {
-            state.clone()
-        }
-    }
-
-    pub fn complete_resetting(self, state: &State) -> State {
-        let assignment = state.get_all(&self.name);
-        if assignment.val == "resetting".to_spvalue() {
             let action = Action::new(assignment.var, "initial".wrap());
-            self.postcondition.take_running(&action.assign(&state))
-            
+            self.reset_transition.take_running(&action.assign(&state))
         } else {
             state.clone()
         }
     }
+    // pub fn start_resetting(self, state: &State) -> State {
+    //     let assignment = state.get_all(&self.name);
+    //     if assignment.val == "completed".to_spvalue() {
+    //         let action = Action::new(assignment.var, "resetting".wrap());
+    //         action.assign(&state)
+    //     } else {
+    //         state.clone()
+    //     }
+    // }
+
+    // pub fn complete_resetting(self, state: &State) -> State {
+    //     let assignment = state.get_all(&self.name);
+    //     if assignment.val == "resetting".to_spvalue() {
+    //         let action = Action::new(assignment.var, "initial".wrap());
+    //         self.postcondition.take_running(&action.assign(&state))
+            
+    //     } else {
+    //         state.clone()
+    //     }
+    // }
 
     // pub fn reset_running(self, state: &State) -> State {
     //     let assignment = state.get_all(&self.name);
@@ -205,11 +216,13 @@ impl Operation {
     pub fn relax(self, vars: &Vec<String>) -> Operation {
         let r_precondition = self.precondition.relax(vars);
         let r_postcondition = self.postcondition.relax(vars);
+        let r_reset_transition = self.reset_transition.relax(vars);
         Operation {
             name: self.name,
             state: self.state,
             precondition: r_precondition,
             postcondition: r_postcondition,
+            reset_transition: r_reset_transition
         }
     }
 
