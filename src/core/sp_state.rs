@@ -10,7 +10,8 @@ pub struct State {
     pub state: HashMap<String, SPAssignment>,
 }
 
-/// The Hash trait is implemented on State in order to enable the comparison of different State instances using a hashing function.
+/// The Hash trait is implemented on State in order to enable the comparison 
+/// of different State instances using a hashing function.
 impl Hash for State {
     fn hash<H: Hasher>(&self, s: &mut H) {
         self.state
@@ -42,7 +43,8 @@ impl State {
         }
     }
 
-    /// The from_vec function creates a new State object from a vector of (SPVariable, SPValue) tuples.
+    /// The from_vec function creates a new State object from a vector of 
+    /// (SPVariable, SPValue) tuples.
     pub fn from_vec(vec: &Vec<(SPVariable, SPValue)>) -> State {
         let mut state = HashMap::new();
         vec.iter().for_each(|(var, val)| {
@@ -72,7 +74,8 @@ impl State {
         }
     }
 
-    /// Returns the value of the variable with the given name from the state, and panics if the variable is not in the state.
+    /// Returns the value of the variable with the given name from the state, 
+    /// and panics if the variable is not in the state.
     pub fn get_value(&self, name: &str) -> SPValue {
         match self.state.clone().get(name) {
             None => panic!("Variable {} not in state!", name),
@@ -80,7 +83,8 @@ impl State {
         }
     }
 
-    /// Returns the assignment of a variable in the state or panics if the variable is not found.
+    /// Returns the assignment of a variable in the state,
+    /// or panics if the variable is not found.
     pub fn get_all(&self, name: &str) -> SPAssignment {
         match self.state.clone().get(name) {
             None => panic!("Variable {} not in state!", name),
@@ -92,68 +96,6 @@ impl State {
     pub fn contains(&self, name: &str) -> bool {
         self.state.clone().contains_key(name)
     }
-
-    /// Updates the value of a variable in the state. If the variable is of type Runner, the value can be any.
-    /// If the value is not in the variable's domain, the update is ignored, unless the value is "unknown".
-    /// If the variable is not in the state, a panic occurs. Returns a new state with the updated value.
-    ///
-    /// Maybe this is not how we should do it...
-    //     pub fn update(&self, name: &str, val: SPValue) -> State {
-    //         match self.state.clone().get(name) {
-    //             Some(assignment) => match assignment.var.variable_type {
-    //                 SPVariableType::Runner => {
-    //                     let mut state = self.state.clone();
-    //                     state.insert(
-    //                         name.to_string(),
-    //                         SPAssignment {
-    //                             var: assignment.var.clone(),
-    //                             val: val.clone(),
-    //                         },
-    //                     );
-    //                     State { state }
-    //                 }
-    //                 _ => match assignment.var.domain.contains(&val) {
-    //                     true => {
-    //                         let mut state = self.state.clone();
-    //                         state.insert(
-    //                             name.to_string(),
-    //                             SPAssignment {
-    //                                 var: assignment.var.clone(),
-    //                                 val: val.clone(),
-    //                             },
-    //                         );
-    //                         State { state }
-    //                     }
-    //                     false => match val {
-    //                         SPValue::UNDEFINED => {
-    //                             let mut state = self.state.clone();
-    //                             state.insert(
-    //                                 name.to_string(),
-    //                                 SPAssignment {
-    //                                     var: assignment.var.clone(),
-    //                                     val: val.clone(),
-    //                                 },
-    //                             );
-    //                             State { state }
-    //                         }
-    //                         SPValue::String(x) => match x.as_str() {
-    //                             "unknown" => self.clone(),
-    //                             _ => {
-    //                                 println!("Value {} to update the variable {} is not in its domain. State not updated!", x, assignment.var.name);
-    //                                 self.clone()
-    //                             }
-    //                         },
-    //                         _ => {
-    //                             println!("Value {} to update the variable {} is not in its domain. State not updated!", val, assignment.var.name);
-    //                             self.clone()
-    //                         }
-    //                     },
-    //                 },
-    //             },
-    //             None => panic!("Variable {} not in state.", name),
-    //         }
-    //     }
-    // }
 
     pub fn update(&self, name: &str, val: SPValue) -> State {
         match self.state.clone().get(name) {
@@ -203,141 +145,141 @@ impl fmt::Display for State {
     }
 }
 
-// #[cfg(test)]
-// mod tests {
+#[cfg(test)]
+mod tests {
 
-//     use crate::{assign, bv_estimated, fv_estimated, iv_estimated, v_estimated};
-//     use crate::{SPAssignment, SPValue, SPValueType, SPVariable, SPVariableType, State, ToSPValue};
+    use crate::{assign, bv, fv, iv, v};
+    use crate::{SPAssignment, SPValue, SPVariable, State, ToSPValue};
 
-//     fn john_doe() -> Vec<(SPVariable, SPValue)> {
-//         let name = v_estimated!("name", vec!("John", "Jack"));
-//         let surname = v_estimated!("surname", vec!("Doe", "Crawford"));
-//         let height = iv_estimated!("height", vec!(180, 185, 190));
-//         let weight = fv_estimated!("weight", vec!(80.0, 82.5, 85.0));
-//         let smart = bv_estimated!("smart");
+    fn john_doe() -> Vec<(SPVariable, SPValue)> {
+        let name = v!("name");
+        let surname = v!("surname");
+        let height = iv!("height");
+        let weight = fv!("weight");
+        let smart = bv!("smart");
 
-//         vec![
-//             (name, "John".to_spvalue()),
-//             (surname, "Doe".to_spvalue()),
-//             (height, 185.to_spvalue()),
-//             (weight, 80.0.to_spvalue()),
-//             (smart, true.to_spvalue()),
-//         ]
-//     }
+        vec![
+            (name, "John".to_spvalue()),
+            (surname, "Doe".to_spvalue()),
+            (height, 185.to_spvalue()),
+            (weight, 80.0.to_spvalue()),
+            (smart, true.to_spvalue()),
+        ]
+    }
 
-//     fn _john_doe_faulty() -> Vec<(SPVariable, SPValue)> {
-//         let name = v_estimated!("name", vec!("John", "Jack"));
-//         let surname = v_estimated!("surname", vec!("Doe", "Crawford"));
-//         let height = iv_estimated!("height", vec!(180, 185, 190));
-//         let weight = fv_estimated!("weight", vec!(80.0, 82.5, 85.0));
-//         let smart = bv_estimated!("smart");
+    fn _john_doe_faulty() -> Vec<(SPVariable, SPValue)> {
+        let name = v!("name");
+        let surname = v!("surname");
+        let height = iv!("height");
+        let weight = fv!("weight");
+        let smart = bv!("smart");
 
-//         vec![
-//             (name, "John".to_spvalue()),
-//             (surname, "Doe".to_spvalue()),
-//             (height, 185.to_spvalue()),
-//             (weight, 81.0.to_spvalue()),
-//             (smart, true.to_spvalue()),
-//         ]
-//     }
+        vec![
+            (name, "John".to_spvalue()),
+            (surname, "Doe".to_spvalue()),
+            (height, 185.to_spvalue()),
+            (weight, 81.0.to_spvalue()),
+            (smart, true.to_spvalue()),
+        ]
+    }
 
-//     #[test]
-//     fn test_state_new() {
-//         let new_state = State::new();
-//         assert_eq!(new_state.state.len(), 0)
-//     }
+    #[test]
+    fn test_state_new() {
+        let new_state = State::new();
+        assert_eq!(new_state.state.len(), 0)
+    }
 
-//     #[test]
-//     fn test_state_from_vec() {
-//         let john_doe = john_doe();
-//         let new_state = State::from_vec(&john_doe);
-//         assert_eq!(new_state.state.len(), 5)
-//     }
+    #[test]
+    fn test_state_from_vec() {
+        let john_doe = john_doe();
+        let new_state = State::from_vec(&john_doe);
+        assert_eq!(new_state.state.len(), 5)
+    }
 
-//     #[test]
-//     fn test_state_display() {
-//         let john_doe = john_doe();
-//         let new_state = State::from_vec(&john_doe);
-//         print!("{}", new_state)
-//     }
+    #[test]
+    fn test_state_display() {
+        let john_doe = john_doe();
+        let new_state = State::from_vec(&john_doe);
+        print!("{}", new_state)
+    }
 
-//     #[test]
-//     #[should_panic]
-//     fn test_state_from_vec_panic() {
-//         let john_doe = john_doe();
-//         let new_state = State::from_vec(&john_doe);
-//         assert_eq!(new_state.state.len(), 6)
-//     }
+    #[test]
+    #[should_panic]
+    fn test_state_from_vec_panic() {
+        let john_doe = john_doe();
+        let new_state = State::from_vec(&john_doe);
+        assert_eq!(new_state.state.len(), 6)
+    }
 
-//     #[test]
-//     fn test_state_get_value() {
-//         let john_doe = john_doe();
-//         let state = State::from_vec(&john_doe);
-//         assert_eq!(185.to_spvalue(), state.get_value("height"));
-//         assert_ne!(186.to_spvalue(), state.get_value("height"));
-//     }
+    #[test]
+    fn test_state_get_value() {
+        let john_doe = john_doe();
+        let state = State::from_vec(&john_doe);
+        assert_eq!(185.to_spvalue(), state.get_value("height"));
+        assert_ne!(186.to_spvalue(), state.get_value("height"));
+    }
 
-//     #[test]
-//     fn test_state_get_all() {
-//         let john_doe = john_doe();
-//         let state = State::from_vec(&john_doe);
-//         assert_eq!(
-//             SPAssignment {
-//                 var: iv_estimated!("height", vec!(180, 185, 190)),
-//                 val: 185.to_spvalue()
-//             },
-//             state.get_all("height")
-//         );
-//         assert_ne!(
-//             SPAssignment {
-//                 var: iv_estimated!("height", vec!(180, 185, 190)),
-//                 val: 186.to_spvalue()
-//             },
-//             state.get_all("height")
-//         );
-//     }
+    #[test]
+    fn test_state_get_all() {
+        let john_doe = john_doe();
+        let state = State::from_vec(&john_doe);
+        assert_eq!(
+            SPAssignment {
+                var: iv!("height"),
+                val: 185.to_spvalue()
+            },
+            state.get_all("height")
+        );
+        assert_ne!(
+            SPAssignment {
+                var: iv!("height"),
+                val: 186.to_spvalue()
+            },
+            state.get_all("height")
+        );
+    }
 
-//     #[test]
-//     fn test_state_contains() {
-//         let john_doe = john_doe();
-//         let state = State::from_vec(&john_doe);
-//         assert_eq!(true, state.contains("height"));
-//         assert_ne!(true, state.contains("wealth"));
-//     }
+    #[test]
+    fn test_state_contains() {
+        let john_doe = john_doe();
+        let state = State::from_vec(&john_doe);
+        assert_eq!(true, state.contains("height"));
+        assert_ne!(true, state.contains("wealth"));
+    }
 
-//     #[test]
-//     fn test_state_add_not_mutable() {
-//         let john_doe = john_doe();
-//         let state = State::from_vec(&john_doe);
-//         let wealth = iv_estimated!("wealth", vec!(1000, 2000));
-//         state.add(assign!(wealth, 2000.to_spvalue()));
-//         assert_ne!(state.state.len(), 6)
-//     }
+    #[test]
+    fn test_state_add_not_mutable() {
+        let john_doe = john_doe();
+        let state = State::from_vec(&john_doe);
+        let wealth = iv!("wealth");
+        state.add(assign!(wealth, 2000.to_spvalue()));
+        assert_ne!(state.state.len(), 6)
+    }
 
-//     #[test]
-//     fn test_state_add() {
-//         let john_doe = john_doe();
-//         let state = State::from_vec(&john_doe);
-//         let wealth = iv_estimated!("wealth", vec!(1000, 2000));
-//         let state = state.add(assign!(wealth, 2000.to_spvalue()));
-//         assert_eq!(state.state.len(), 6)
-//     }
+    #[test]
+    fn test_state_add() {
+        let john_doe = john_doe();
+        let state = State::from_vec(&john_doe);
+        let wealth = iv!("wealth");
+        let state = state.add(assign!(wealth, 2000.to_spvalue()));
+        assert_eq!(state.state.len(), 6)
+    }
 
-//     #[test]
-//     #[should_panic]
-//     fn test_state_add_already_exists() {
-//         let john_doe = john_doe();
-//         let state = State::from_vec(&john_doe);
-//         let wealth = iv_estimated!("height", vec!(1000, 2000));
-//         let state = state.add(assign!(wealth, 2000.to_spvalue()));
-//         assert_eq!(state.state.len(), 6)
-//     }
+    #[test]
+    #[should_panic]
+    fn test_state_add_already_exists() {
+        let john_doe = john_doe();
+        let state = State::from_vec(&john_doe);
+        let wealth = iv!("height");
+        let state = state.add(assign!(wealth, 2000.to_spvalue()));
+        assert_eq!(state.state.len(), 6)
+    }
 
-//     #[test]
-//     fn test_state_update() {
-//         let john_doe = john_doe();
-//         let state = State::from_vec(&john_doe);
-//         let state = state.update("height", 190.to_spvalue());
-//         assert_eq!(state.get_value("height"), 190.to_spvalue())
-//     }
-// }
+    #[test]
+    fn test_state_update() {
+        let john_doe = john_doe();
+        let state = State::from_vec(&john_doe);
+        let state = state.update("height", 190.to_spvalue());
+        assert_eq!(state.get_value("height"), 190.to_spvalue())
+    }
+}

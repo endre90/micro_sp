@@ -9,8 +9,7 @@ pub struct Model {
     pub name: String,
     pub state: State,
     pub auto_transitions: Vec<Transition>,
-    pub operations: Vec<Operation>,
-    pub auto_operations: Vec<Operation>,
+    pub operations: Vec<Operation>
 }
 
 impl Model {
@@ -19,47 +18,27 @@ impl Model {
         state: State,
         auto_transitions: Vec<Transition>,
         operations: Vec<Operation>,
-        auto_operations: Vec<Operation>
     ) -> Model {
-        // let mut state_with_op = state.clone();
-        // for op in &operations {
-        //     match state.contains(&op.name) {
-        //         false => {
-        //             state_with_op.state.insert(
-        //                 op.name.clone(),
-        //                 SPAssignment::new(
-        //                     SPVariable::new(
-        //                         &op.name,
-        //                         SPVariableType::Runner,
-        //                         crate::SPValueType::String,
-        //                         vec!["initial".to_spvalue(), "executing".to_spvalue()],
-        //                     ),
-        //                     "initial".to_spvalue(),
-        //                 ),
-        //             );
-        //         }
-        //         true => panic!("A variable already named as the operation '{}' exists.", op.name),
-        //     }
-        // }
-
         Model {
             name: name.to_string(),
             state: state.clone(),
             auto_transitions,
             operations,
-            auto_operations
         }
     }
 
-    // TODO: test...
+    // TODO: test relax function
     pub fn relax(self, vars: &Vec<String>) -> Model {
-        let r_operations = self.operations.iter().map(|op| op.clone().relax(vars)).collect();
+        let r_operations = self
+            .operations
+            .iter()
+            .map(|op| op.clone().relax(vars))
+            .collect();
         let r_auto_transitions = self
             .auto_transitions
             .iter()
             .map(|t| t.clone().relax(vars))
             .collect();
-        let r_auto_operations = self.auto_operations.iter().map(|op| op.clone().relax(vars)).collect();
         let mut r_state = HashMap::new();
         self.state
             .state
@@ -74,8 +53,7 @@ impl Model {
             name: self.name,
             state: State { state: r_state },
             auto_transitions: r_auto_transitions,
-            operations: r_operations,
-            auto_operations: r_auto_operations
+            operations: r_operations
         }
     }
 }

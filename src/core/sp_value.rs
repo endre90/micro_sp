@@ -259,7 +259,7 @@ mod tests {
     }
     
     #[test]
-    fn test_is_type_UNKNOWN() {
+    fn test_is_type_unknown() {
         let val = SPValue::UNKNOWN;
         assert!(val.is_type(SPValueType::UNKNOWN));
         assert!(!val.is_type(SPValueType::Int64));
@@ -305,7 +305,7 @@ mod tests {
     }
     
     #[test]
-    fn test_has_type_UNKNOWN() {
+    fn test_has_type_unknown() {
         let value = SPValue::UNKNOWN;
         assert_eq!(value.has_type(), SPValueType::UNKNOWN);
     }
@@ -383,9 +383,9 @@ mod tests {
     }
     
     #[test]
-    fn test_to_string_returns_correct_string_for_UNKNOWN() {
-        let UNKNOWN_value = SPValue::UNKNOWN;
-        assert_eq!(UNKNOWN_value.to_string(), "[UNKNOWN]".to_string());
+    fn test_to_string_returns_correct_string_for_unknown() {
+        let unknown_value = SPValue::UNKNOWN;
+        assert_eq!(unknown_value.to_string(), "UNKNOWN".to_string());
     }
     
     #[test]
@@ -466,9 +466,9 @@ mod tests {
     }
     
     #[test]
-    fn test_display_UNKNOWN() {
+    fn test_display_unknown() {
         let value = SPValue::UNKNOWN;
-        assert_eq!(format!("{}", value), "[UNKNOWN]");
+        assert_eq!(format!("{}", value), "UNKNOWN");
     }
     
     #[test]
@@ -508,8 +508,8 @@ mod tests {
     }
     
     #[test]
-    fn test_display_type_UNKNOWN() {
+    fn test_display_type_unknown() {
         let value_type = SPValueType::UNKNOWN;
-        assert_eq!(format!("{}", value_type), "[UNKNOWN]");
+        assert_eq!(format!("{}", value_type), "UNKNOWN");
     }
 }
