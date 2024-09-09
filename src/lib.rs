@@ -18,13 +18,13 @@ pub use crate::planning::operation::*;
 pub use crate::planning::transition::*;
 
 pub mod macros;
-// #[allow(unused_imports)]
+#[allow(unused_imports)]
 pub use crate::macros::sp_variable::*;
-// #[allow(unused_imports)]
+#[allow(unused_imports)]
 pub use crate::macros::action::*;
-// #[allow(unused_imports)]
+#[allow(unused_imports)]
 pub use crate::macros::sp_assignment::*;
-// #[allow(unused_imports)]
+#[allow(unused_imports)]
 pub use crate::macros::transition::*;
-// #[allow(unused_imports)]
+#[allow(unused_imports)]
 pub use crate::macros::predicate::*;

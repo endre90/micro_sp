@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
 
-use crate::{SPVariable, SPWrapped, State};
+// use crate::{SPVariable, SPWrapped, State};
+use crate::*;
 use std::fmt;
 
 /// Actions update the assignments of the state variables.

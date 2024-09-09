@@ -1,5 +1,5 @@
-use crate::{Action, Predicate, SPValue, SPVariable, SPWrapped, State, ToSPValue, ToSPWrapped};
-
+// use crate::{Action, Predicate, SPValue, SPVariable, SPWrapped, State, ToSPValue, ToSPWrapped};
+use crate::*;
 peg::parser!(pub grammar pred_parser() for str {
 
     rule _() =  quiet!{[' ' | '\t']*}

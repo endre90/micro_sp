@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
 
-use crate::{SPVariable, SPWrapped, State};
+// use crate::{SPVariable, SPWrapped, State};
+use crate::*;
 use std::fmt;
 
 /// A predicate is an equality logical formula that can evaluate to either true or false.

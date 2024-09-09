@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
 
-use crate::{SPValue, SPValueType, ToSPValue};
+// use crate::{SPValue, SPValueType, ToSPValue};
+use crate::*;
 use std::fmt;
 
 /// A SPVariable is a named unit of data of type SPValueType that can be assigned a value from its finite domain.
@@ -21,7 +22,6 @@ impl SPVariable {
     }
     pub fn new_boolean(
         name: &str,
-        // variable_type: SPVariableType
     ) -> SPVariable {
         SPVariable::new(
             name,

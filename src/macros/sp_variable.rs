@@ -1,12 +1,9 @@
-
-// use crate::SPVariable
-
 #[macro_export]
 macro_rules! v {
     ($a:expr) => {
-        crate::SPVariable::new(
+        SPVariable::new(
             $a.clone(),
-            crate::SPValueType::String,
+            SPValueType::String,
             vec![],
         )
     };
@@ -15,9 +12,9 @@ macro_rules! v {
 #[macro_export]
 macro_rules! bv {
     ($a:expr) => {
-        crate::SPVariable::new(
+        SPVariable::new(
             $a.clone(),
-            crate::SPValueType::Bool,
+            SPValueType::Bool,
             vec![true.to_spvalue(), false.to_spvalue()],
         )
     };
@@ -26,9 +23,9 @@ macro_rules! bv {
 #[macro_export]
 macro_rules! iv {
     ($a:expr) => {
-        crate::SPVariable::new(
+        SPVariable::new(
             $a.clone(),
-            crate::SPValueType::Int64,
+            SPValueType::Int64,
             vec![],
             // $b.iter().map(|x| x.clone().to_spvalue()).collect(),
         )
@@ -38,9 +35,9 @@ macro_rules! iv {
 #[macro_export]
 macro_rules! fv {
     ($a:expr) => {
-        crate::SPVariable::new(
+        SPVariable::new(
             $a.clone(),
-            crate::SPValueType::Float64,
+            SPValueType::Float64,
             vec![]
         )
     };
@@ -49,9 +46,9 @@ macro_rules! fv {
 #[macro_export]
 macro_rules! av {
     ($a:expr) => {
-        crate::SPVariable::new(
+        SPVariable::new(
             $a.clone(),
-            crate::SPValueType::Array,
+            SPValueType::Array,
             vec![],
         )
     };
