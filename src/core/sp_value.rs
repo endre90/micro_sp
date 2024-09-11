@@ -210,7 +210,7 @@ mod tests {
 
     use ordered_float::OrderedFloat;
 
-    use crate::{SPValue, SPValueType, ToSPValue};
+    use crate::*;
     use std::time::SystemTime;
     
     #[test]

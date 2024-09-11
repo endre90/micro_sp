@@ -1,5 +1,6 @@
 pub mod operation;
 pub mod transition;
+pub mod structs;
 
 #[cfg(test)]
 mod tests {

@@ -30,9 +30,7 @@ impl SPAssignment {
 #[cfg(test)]
 mod tests {
 
-    use crate::{
-        SPAssignment, SPValue, SPValueType, SPVariable, ToSPValue,
-    };
+    use crate::*;
 
     #[test]
     fn test_new_assignment() {

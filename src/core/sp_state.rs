@@ -149,8 +149,7 @@ impl fmt::Display for State {
 #[cfg(test)]
 mod tests {
 
-    use crate::{assign, bv, fv, iv, v};
-    use crate::{SPAssignment, SPValue, SPVariable, State, ToSPValue};
+    use crate::*;
 
     fn john_doe() -> Vec<(SPVariable, SPValue)> {
         let name = v!("name");

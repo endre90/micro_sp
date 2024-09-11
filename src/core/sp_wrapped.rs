@@ -85,14 +85,8 @@ impl fmt::Display for SPWrapped {
 #[cfg(test)]
 mod tests {
 
-    // use crate::{
-    //     bv_estimated, bv_runner, fv_estimated, fv_runner, iv_estimated, iv_runner, v_estimated,
-    //     v_runner,
-    // };
-    use crate::{
-        SPValue, SPWrapped, ToSPValue, ToSPWrapped, ToSPWrappedVar, v, iv, fv, bv
-    };
-
+    use crate::*;
+    
     #[test]
     fn test_wrap_values() {
         let int = 123;

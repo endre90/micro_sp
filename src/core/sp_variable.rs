@@ -58,7 +58,7 @@ impl fmt::Display for SPVariable {
 #[cfg(test)]
 mod tests {
 
-    use crate::{SPValue, SPValueType, SPVariable, ToSPValue};
+    use crate::*;
     use ordered_float::OrderedFloat;
 
     #[test]
