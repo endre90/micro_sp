@@ -18,9 +18,6 @@ pub use crate::planning::operation::*;
 pub use crate::planning::transition::*;
 pub use crate::planning::structs::*;
 
-pub mod runner;
-pub use crate::runner::operation::*;
-
 pub mod macros;
 #[allow(unused_imports)]
 pub use crate::macros::sp_variable::*;
