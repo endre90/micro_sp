@@ -1,5 +1,6 @@
 use std::fmt;
 
+use ordered_float::OrderedFloat;
 use serde::{Deserialize, Serialize};
 
 // use crate::{Action, SPValue, State, ToSPValue, ToSPWrapped, Transition};
@@ -64,16 +65,21 @@ impl fmt::Display for OperationState {
 pub struct Operation {
     pub name: String,
     pub state: OperationState,
+    pub deadline: Option<OrderedFloat<f64>>,
     pub precondition: Transition,
     pub postcondition: Transition,
     pub reset_transition: Transition
 }
 
 impl Operation {
-    pub fn new(name: &str, precondition: Transition, postcondition: Transition, reset_transition: Transition) -> Operation {
+    pub fn new(name: &str, deadline: Option<f64>, precondition: Transition, postcondition: Transition, reset_transition: Transition) -> Operation {
         Operation {
             name: name.to_string(),
-            state: OperationState::Initial,
+            state: OperationState::UNKNOWN,
+            deadline: match deadline {
+                None => Some(OrderedFloat::from(MAX_ALLOWED_OPERATION_DURATION)),
+                Some(x) => Some(OrderedFloat::from(x))
+            },
             precondition,
             postcondition,
             reset_transition
@@ -149,6 +155,7 @@ impl Operation {
         Operation {
             name: self.name,
             state: self.state,
+            deadline: self.deadline,
             precondition: r_precondition,
             postcondition: r_postcondition,
             reset_transition: r_reset_transition
@@ -224,6 +231,7 @@ mod tests {
         let state = make_initial_state();
         Operation::new(
         "op_move_to_b",
+        None,
         t!(
             "start_moving_to_b",
             "var:ur_action_trigger == false && var:ur_action_state == initial && var:ur_current_pose != b",
@@ -259,6 +267,7 @@ mod tests {
         let state = state.add(assign!(op_move_to_b, "initial".to_spvalue()));
         let op = Operation::new(
         "op_move_to_b",
+        None,
         t!(
             "start_moving_to_b",
             "var:ur_action_trigger == false && var:ur_action_state == initial && var:ur_current_pose != b",
@@ -299,6 +308,7 @@ mod tests {
         let state = state.add(assign!(op_move_to_b, "initial".to_spvalue()));
         let op = Operation::new(
         "op_move_to_b",
+        None,
         t!(
             "start_moving_to_b",
             "var:ur_action_trigger == false && var:ur_action_state == initial && var:ur_current_pose == b",
@@ -338,6 +348,7 @@ mod tests {
         let state = state.add(assign!(op_move_to_b, "initial".to_spvalue()));
         let op = Operation::new(
         "op_move_to_b",
+        None,
         t!(
             "start_moving_to_b",
             "var:ur_action_trigger == false && var:ur_action_state == initial && var:ur_current_pose != b",
@@ -378,6 +389,7 @@ mod tests {
         let state = state.add(assign!(op_move_to_b, "initial".to_spvalue()));
         let op = Operation::new(
         "op_move_to_b",
+        None,
         t!(
             "start_moving_to_b",
             "var:ur_action_trigger == false && var:ur_action_state == initial && var:ur_current_pose != b",
@@ -417,6 +429,7 @@ mod tests {
         let state = state.add(assign!(op_move_to_b, "initial".to_spvalue()));
         let op = Operation::new(
         "op_move_to_b",
+        None,
         t!(
             "start_moving_to_b",
             "var:ur_action_trigger == false && var:ur_action_state == initial && var:ur_current_pose != b",
@@ -464,6 +477,7 @@ mod tests {
         let state = state.add(assign!(op_move_to_b, "initial".to_spvalue()));
         let op = Operation::new(
         "op_move_to_b",
+        None,
         t!(
             "start_moving_to_b",
             "var:ur_action_trigger == false && var:ur_action_state == initial && var:ur_current_pose != b",
@@ -515,6 +529,7 @@ mod tests {
         let state = state.add(assign!(op_move_to_b, "initial".to_spvalue()));
         let op = Operation::new(
         "op_move_to_b",
+        None,
         t!(
             "start_moving_to_b",
             "var:ur_action_trigger == false && var:ur_action_state == initial && var:ur_current_pose != b",

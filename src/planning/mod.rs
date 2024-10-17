@@ -141,6 +141,7 @@ mod tests {
         let state = state.add(assign!(op_move_to_d, "initial".to_spvalue()));
         let op_move_to_b = Operation::new(
         "op_move_to_b",
+        None,
         t!(
             "start_moving_to_b",
             "var:ur_action_trigger == false && var:ur_action_state == initial && var:ur_current_pose != b",
@@ -170,6 +171,7 @@ mod tests {
 
         let op_move_to_c = Operation::new(
         "op_move_to_c",
+        None,
         t!(
             "start_moving_to_c",
             "var:ur_action_trigger == false && var:ur_action_state == initial && var:ur_current_pose == b",
@@ -199,6 +201,7 @@ mod tests {
 
         let op_move_to_d = Operation::new(
         "op_move_to_d",
+        None,
         t!(
             "start_moving_to_d",
             "var:ur_action_trigger == false && var:ur_action_state == initial && var:ur_current_pose == c",

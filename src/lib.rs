@@ -1,3 +1,5 @@
+pub static MAX_ALLOWED_OPERATION_DURATION: f64 = 3600.0; // seconds
+
 pub mod core;
 pub use crate::core::sp_assignment::*;
 pub use crate::core::sp_state::*;
