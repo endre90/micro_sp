@@ -60,7 +60,7 @@ impl State {
         State { state }
     }
 
-    /// Adds an SPAssignment to the State, returning a new State instance.
+    /// Adds an SPAssignment to the State, returning a new State
     pub fn add(&self, assignment: SPAssignment) -> State {
         match self.state.clone().get(&assignment.var.name) {
             Some(_) => panic!(
@@ -98,6 +98,7 @@ impl State {
         self.state.clone().contains_key(name)
     }
 
+    /// Updates the value of a variable
     pub fn update(&self, name: &str, val: SPValue) -> State {
         match self.state.clone().get(name) {
             Some(assignment) => {
@@ -112,6 +113,23 @@ impl State {
                 State { state }
             }
             None => panic!("Variable {} not in state.", name),
+        }
+    }
+
+    /// Extend the state. If variables already exist, either keep
+    /// the existing values or overwrite them
+    pub fn extend(&self, other: State, overwrite_existing: bool) -> State {
+        let existing = self.state.clone();
+        let extension = other.state;
+        let mut state = HashMap::<String, SPAssignment>::new();
+        if overwrite_existing {
+            existing.iter().for_each(|(k, v)| {state.insert(k.clone(), v.clone());});
+            extension.iter().for_each(|(k, v)| {state.insert(k.clone(), v.clone());});
+            State { state }
+        } else {
+            extension.iter().for_each(|(k, v)| {state.insert(k.clone(), v.clone());});
+            existing.iter().for_each(|(k, v)| {state.insert(k.clone(), v.clone());});
+            State { state }
         }
     }
 }
