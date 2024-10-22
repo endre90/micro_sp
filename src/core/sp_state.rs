@@ -105,7 +105,7 @@ impl State {
 
     /// Updates the value of a variable
     pub fn update(&self, name: &str, val: SPValue) -> State {
-        match self.state.clone().get(name) {
+        match self.state.get(name) {
             Some(assignment) => {
                 let mut state = self.state.clone();
                 state.insert(

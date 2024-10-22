@@ -1,13 +1,13 @@
 use crate::*;
 
-use std::fmt;
+use std::fmt::{self};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum RunnerState {
     Idle,
-    Executing,
+    Running,
     Paused,
-    Planning,
+    Stopped,
     UNKNOWN,
 }
 
@@ -21,18 +21,19 @@ impl RunnerState {
     pub fn from_str(x: &str) -> RunnerState {
         match x {
             "idle" => RunnerState::Idle,
-            "executing" => RunnerState::Executing,
+            "running" => RunnerState::Running,
             "paused" => RunnerState::Paused,
-            "planning" => RunnerState::Planning,
+            "stopped" => RunnerState::Stopped,
+
             _ => RunnerState::UNKNOWN,
         }
     }
     pub fn to_spvalue(self) -> SPValue {
         match self {
-            RunnerState::Idle => "idle".to_spvalue(),
-            RunnerState::Executing => "executing".to_spvalue(),
+            RunnerState::Running => "running".to_spvalue(),
             RunnerState::Paused => "paused".to_spvalue(),
-            RunnerState::Planning => "planning".to_spvalue(),
+            RunnerState::Stopped => "stopped".to_spvalue(),
+            RunnerState::Idle => "idle".to_spvalue(),
             RunnerState::UNKNOWN => "UNKNOWN".to_spvalue(),
         }
     }
@@ -42,10 +43,11 @@ impl fmt::Display for RunnerState {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             RunnerState::UNKNOWN => write!(f, "UNKNOWN"),
-            RunnerState::Idle => write!(f, "idle"),
-            RunnerState::Executing => write!(f, "executing"),
+            RunnerState::Running => write!(f, "running"),
             RunnerState::Paused => write!(f, "paused"),
-            RunnerState::Planning => write!(f, "planning"),
+            
+            RunnerState::Stopped => write!(f, "stopped"),
+            RunnerState::Idle => write!(f, "idle"),
         }
     }
 }

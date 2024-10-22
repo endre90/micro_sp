@@ -10,35 +10,37 @@ pub fn generate_runner_state_variables(
     let mut state = State::new();
 
     let runner_state = v!(&&format!("{}_runner_state", name));
-    let runner_goal = v!(&&format!("{}_runner_goal", name));
-    let runner_plan = av!(&&format!("{}_runner_plan", name));
-    let runner_plan_counter = av!(&&format!("{}_runner_plan_counter", name)); // How many times in total has a planner been called
-    let runner_plan_exists = bv!(&&format!("{}_runner_plan_exists", name));
-    let runner_plan_name = v!(&&format!("{}_runner_plan_name", name));
-    let runner_plan_state = v!(&&format!("{}_runner_plan_state", name));
-    let runner_plan_duration = fv!(&&format!("{}_runner_plan_duration", name));
-    let runner_plan_current_step = iv!(&&format!("{}_runner_plan_current_step", name));
-    let runner_replanned = bv!(&&format!("{}_runner_replanned", name));
-    let runner_replan_counter = iv!(&&format!("{}_runner_replan_counter", name)); // How many times has the planner tried to replan for the same problem
-    let runner_replan_fail_counter = iv!(&&format!("{}_runner_replan_fail_counter", name));
-    let runner_replan_trigger = bv!(&&format!("{}_runner_replan_trigger", name));
+    let goal = v!(&&format!("{}_goal", name));
+    let goal_exists = bv!(&&format!("{}_goal_exists", name));
+    let plan = av!(&&format!("{}_plan", name));
+    let plan_counter = iv!(&&format!("{}_plan_counter", name)); // How many times in total has a planner been called
+    let plan_exists = bv!(&&format!("{}_plan_exists", name));
+    let plan_name = v!(&&format!("{}_plan_name", name));
+    let plan_state = v!(&&format!("{}_plan_state", name));
+    let plan_duration = fv!(&&format!("{}_plan_duration", name));
+    let plan_current_step = iv!(&&format!("{}_plan_current_step", name));
+    let replanned = bv!(&&format!("{}_replanned", name));
+    let replan_counter = iv!(&&format!("{}_replan_counter", name)); // How many times has the planner tried to replan for the same problem
+    let replan_fail_counter = iv!(&&format!("{}_replan_fail_counter", name));
+    let replan_trigger = bv!(&&format!("{}_replan_trigger", name));
 
     state = state.add(assign!(runner_state, SPValue::UNKNOWN));
-    state = state.add(assign!(runner_goal, SPValue::UNKNOWN));
+    state = state.add(assign!(goal, SPValue::UNKNOWN));
+    state = state.add(assign!(goal_exists, SPValue::UNKNOWN));
     state = state.add(assign!(
-        runner_plan,
+        plan,
         SPValue::Array(SPValueType::String, vec!())
     ));
-    state = state.add(assign!(runner_plan_exists, false.to_spvalue()));
-    state = state.add(assign!(runner_plan_name, SPValue::UNKNOWN));
-    state = state.add(assign!(runner_plan_state, "initial".to_spvalue()));
-    state = state.add(assign!(runner_plan_duration, 0.0.to_spvalue()));
-    state = state.add(assign!(runner_plan_current_step, SPValue::Int64(0)));
-    state = state.add(assign!(runner_replanned, SPValue::Bool(false)));
-    state = state.add(assign!(runner_replan_counter, SPValue::Int64(0)));
-    state = state.add(assign!(runner_plan_counter, SPValue::Int64(0)));
-    state = state.add(assign!(runner_replan_fail_counter, SPValue::Int64(0)));
-    state = state.add(assign!(runner_replan_trigger, SPValue::Bool(false)));
+    state = state.add(assign!(plan_exists, SPValue::UNKNOWN));
+    state = state.add(assign!(plan_name, SPValue::UNKNOWN));
+    state = state.add(assign!(plan_state, SPValue::UNKNOWN));
+    state = state.add(assign!(plan_duration, SPValue::UNKNOWN));
+    state = state.add(assign!(plan_current_step, SPValue::UNKNOWN));
+    state = state.add(assign!(replanned, SPValue::UNKNOWN));
+    state = state.add(assign!(replan_counter, SPValue::UNKNOWN));
+    state = state.add(assign!(plan_counter, SPValue::UNKNOWN));
+    state = state.add(assign!(replan_fail_counter, SPValue::UNKNOWN));
+    state = state.add(assign!(replan_trigger, SPValue::UNKNOWN));
 
     // operations should be put in the initial state once they are part of the plan
     for operation in &model.operations {
@@ -100,3 +102,15 @@ pub fn reset_all_operations(state: &State) -> State {
 //         .collect();
 //     mut_op
 // }
+
+#[cfg(test)]
+mod tests {
+
+    use crate::*;
+
+    #[test]
+    fn test_model() {
+        let model = Model::new("ASDF", vec!(), vec!());
+        let _ = generate_runner_state_variables(&model, "ASDF", false);
+    }
+}
