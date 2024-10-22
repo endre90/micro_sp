@@ -86,11 +86,16 @@ impl State {
 
     /// Returns the assignment of a variable in the state,
     /// or panics if the variable is not found.
-    pub fn get_all(&self, name: &str) -> SPAssignment {
+    pub fn get_assignment(&self, name: &str) -> SPAssignment {
         match self.state.clone().get(name) {
             None => panic!("Variable {} not in state!", name),
             Some(x) => x.clone(),
         }
+    }
+
+    /// Returns all variables from the state
+    pub fn get_all_vars(&self) -> Vec<SPVariable> {
+        self.state.iter().map(|(_, assignment)| assignment.var.clone()).collect()
     }
 
     /// Checks whether a variable with the given name is contained in the state.
@@ -246,14 +251,14 @@ mod tests {
                 var: iv!("height"),
                 val: 185.to_spvalue()
             },
-            state.get_all("height")
+            state.get_assignment("height")
         );
         assert_ne!(
             SPAssignment {
                 var: iv!("height"),
                 val: 186.to_spvalue()
             },
-            state.get_all("height")
+            state.get_assignment("height")
         );
     }
 

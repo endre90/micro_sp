@@ -108,7 +108,7 @@ impl Operation {
     }
 
     pub fn start_running(self, state: &State) -> State {
-        let assignment = state.get_all(&self.name);
+        let assignment = state.get_assignment(&self.name);
         if assignment.val == "initial".to_spvalue() {
             let action = Action::new(assignment.var, "executing".wrap());
             action.assign(&self.precondition.take_running(state))
@@ -118,7 +118,7 @@ impl Operation {
     }
 
     pub fn complete_running(self, state: &State) -> State {
-        let assignment = state.get_all(&self.name);
+        let assignment = state.get_assignment(&self.name);
         if assignment.val == "executing".to_spvalue() {
             let action = Action::new(assignment.var, "completed".wrap());
             self.postcondition.take_running(&action.assign(&state))
@@ -128,7 +128,7 @@ impl Operation {
     }
 
     pub fn reset_running(self, state: &State) -> State {
-        let assignment = state.get_all(&self.name);
+        let assignment = state.get_assignment(&self.name);
         if assignment.val == "completed".to_spvalue() {
             let action = Action::new(assignment.var, "initial".wrap());
             self.reset_transition.take_running(&action.assign(&state))
