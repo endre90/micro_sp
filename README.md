@@ -1,1 +1,1 @@
-Todo: maybe extend each domain with and UNKNOWN, so that unititialized vars are unknown rather that not in state
+# Micro SP (SequencePlanner)

@@ -71,6 +71,17 @@ pub fn generate_runner_state_variables(
     state
 }
 
+pub fn reset_all_operations(state: &State) -> State {
+    let state = state.clone();
+    let mut mut_state = state.clone();
+    state.state.iter().for_each(|(k, _)| {
+        if k.starts_with("op_") {
+            mut_state = mut_state.update(&k, "initial".to_spvalue());
+        }
+    });
+    mut_state
+}
+
 // If an operation has to be generated per item or per order
 // fn fill_operation_parameters(op: Operation, parameter: &str, replacement: &str) -> Operation {
 //     let mut mut_op = op.clone();

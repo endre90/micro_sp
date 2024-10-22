@@ -296,8 +296,8 @@ mod tests {
     );
 
         // Adding the opeation states in the model
-        let m = Model::new("asdf", state.clone(), vec![], vec![op.clone()]);
-        assert_eq!(op.eval_planning(&m.state), true)
+        // let m = Model::new("asdf", vec![], vec![op.clone()]);
+        assert_eq!(op.eval_planning(&state), true)
     }
 
     #[should_panic]
@@ -337,8 +337,8 @@ mod tests {
     );
 
         // Adding the opeation states in the model
-        let m = Model::new("asdf", state.clone(), vec![], vec![op.clone()]);
-        assert_eq!(op.eval_planning(&m.state), true)
+        // let m = Model::new("asdf", vec![], vec![op.clone()]);
+        assert_eq!(op.eval_planning(&state), true)
     }
 
     #[test]
@@ -377,8 +377,8 @@ mod tests {
     );
 
         // Adding the opeation states in the model
-        let m = Model::new("asdf", state.clone(), vec![], vec![op.clone()]);
-        assert_eq!(op.eval_running(&m.state), true)
+        // let m = Model::new("asdf", vec![], vec![op.clone()]);
+        assert_eq!(op.eval_running(&state), true)
     }
 
     #[should_panic]
@@ -418,8 +418,8 @@ mod tests {
     );
 
         // Adding the opeation states in the model
-        let m = Model::new("asdf", state.clone(), vec![], vec![op.clone()]);
-        assert_eq!(op.eval_running(&m.state), true)
+        // let m = Model::new("asdf", vec![], vec![op.clone()]);
+        assert_eq!(op.eval_running(&state), true)
     }
 
     #[test]
@@ -458,10 +458,10 @@ mod tests {
     );
 
         // Adding the opeation states in the model
-        let m = Model::new("asdf", state.clone(), vec![], vec![op.clone()]);
-        let new_state = match op.clone().eval_planning(&m.state) {
-            true => op.take_planning(&m.state),
-            false => m.state,
+        // let m = Model::new("asdf", vec![], vec![op.clone()]);
+        let new_state = match op.clone().eval_planning(&state) {
+            true => op.take_planning(&state),
+            false => state,
         };
         assert_eq!(new_state.get_value("ur_current_pose"), "b".to_spvalue());
         assert_eq!(new_state.get_value("ur_action_trigger"), false.to_spvalue());
@@ -506,10 +506,10 @@ mod tests {
     );
 
         // Adding the opeation states in the model
-        let m = Model::new("asdf", state.clone(), vec![], vec![op.clone()]);
-        let new_state = match op.clone().eval_running(&m.state) {
-            true => op.start_running(&m.state),
-            false => m.state,
+        // let m = Model::new("asdf", vec![], vec![op.clone()]);
+        let new_state = match op.clone().eval_running(&state) {
+            true => op.start_running(&state),
+            false => state,
         };
         assert_eq!(new_state.get_value("ur_current_pose"), "a".to_spvalue());
         assert_eq!(new_state.get_value("ur_action_trigger"), true.to_spvalue());
@@ -558,10 +558,10 @@ mod tests {
     );
 
         // Adding the opeation states in the model
-        let m = Model::new("asdf", state.clone(), vec![], vec![op.clone()]);
-        let new_state = match op.clone().eval_running(&m.state) {
-            true => op.clone().start_running(&m.state),
-            false => m.state,
+        // let m = Model::new("asdf", vec![], vec![op.clone()]);
+        let new_state = match op.clone().eval_running(&state) {
+            true => op.clone().start_running(&state),
+            false => state,
         };
         assert_eq!(new_state.get_value("ur_current_pose"), "a".to_spvalue());
         assert_eq!(new_state.get_value("ur_action_trigger"), true.to_spvalue());

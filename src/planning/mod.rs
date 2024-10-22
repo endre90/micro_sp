@@ -232,7 +232,6 @@ mod tests {
         // Adding the opeation states in the model
         let m = Model::new(
             "asdf",
-            state.clone(),
             vec![],
             vec![
                 op_move_to_b.clone(),
@@ -241,8 +240,8 @@ mod tests {
             ],
         );
 
-        let goal = pred_parser::pred("var:ur_current_pose == d", &m.state).unwrap();
-        let result = bfs_operation_planner(m.state, goal, m.operations, 30);
+        let goal = pred_parser::pred("var:ur_current_pose == d", &state).unwrap();
+        let result = bfs_operation_planner(state, goal, m.operations, 30);
         assert_eq!(
             vec!("op_move_to_b", "op_move_to_c", "op_move_to_d"),
             result.plan

@@ -24,7 +24,7 @@ pub async fn simple_operation_runner(
         for t in &model.auto_transitions {
             if t.clone().eval_running(&shared_state_local) {
                 let shared_state_local = shared_state.lock().unwrap().clone();
-                let mut updated_state = t.clone().take_running(&shared_state_local);
+                let mut updated_state  = t.clone().take_running(&shared_state_local);
                 log::info!(target: &&format!("{}_runner", name), "Executed auto transition: '{}'.", t.name);
                 if coverability_tracking {
                     let taken_auto_counter =
@@ -272,6 +272,7 @@ pub async fn planner_ticker(
                         (runner_replan_counter + 1).to_spvalue(),
                     )
                     .update(&&format!("{}_runner_state", name), "planning".to_spvalue());
+                let updated_state = reset_all_operations(&updated_state);
                 *shared_state.lock().unwrap() = updated_state.clone();
                 let new_plan = bfs_operation_planner(
                     updated_state.clone(),
