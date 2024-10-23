@@ -189,7 +189,7 @@ pub async fn simple_operation_runner(
 }
 
 pub fn extract_goal_from_state(name: String, state: &State) -> Predicate {
-    match state.state.get(&format!("{}_runner_goal", name)) {
+    match state.state.get(&format!("{}_goal", name)) {
         Some(g_spvalue) => match &g_spvalue.val {
             SPValue::String(g_value) => match pred_parser::pred(&g_value, &state) {
                 Ok(goal_predicate) => goal_predicate,
