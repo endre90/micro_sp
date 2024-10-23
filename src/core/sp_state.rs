@@ -84,6 +84,60 @@ impl State {
         }
     }
 
+    // fn get_or_default_bool(&self, name: &str) -> bool {
+    //     match self.get_value(name) {
+    //         SPValue::Bool(value) => value,
+    //         _ => {
+    //             log::error!("Executed auto transition: '{}'.", name);
+    //             r2r::log_error!(
+    //                 NODE_ID,
+    //                 "Couldn't get '{}' from the shared state.", name
+    //             );
+    //             false
+    //         }
+    //     }
+    // }
+    
+    // fn get_or_default_i64(&self, name: &str) -> i64 {
+    //     match self.get_value(name) {
+    //         SPValue::Int64(value) => value,
+    //         _ => {
+    //             log_error!(
+    //                 NODE_ID,
+    //                 "Couldn't get '{}' from the shared state.", name
+    //             );
+    //             0
+    //         }
+    //     }
+    // }
+    
+    // fn get_or_default_f64(&self, name: &str) -> f64 {
+    //     match self.get_value(name) {
+    //         SPValue::Float64(value) => value.into_inner(),
+    //         _ => {
+    //             r2r::log_error!(
+    //                 NODE_ID,
+    //                 "Couldn't get '{}' from the shared state.", name
+    //             );
+    //             0.0
+    //         }
+    //     }
+    // }
+    
+    // fn get_or_default_string(name: &str, state: &State) -> String {
+    //     match state.get_value(name) {
+    //         micro_sp::SPValue::String(value) => value,
+    //         _ => {
+    //             r2r::log_error!(
+    //                 NODE_ID,
+    //                 "Couldn't get '{}' from the shared state.", name
+    //             );
+    //             "unknown".to_string()
+    //         }
+    //     }
+    // }
+    
+
     /// Returns the assignment of a variable in the state,
     /// or panics if the variable is not found.
     pub fn get_assignment(&self, name: &str) -> SPAssignment {
