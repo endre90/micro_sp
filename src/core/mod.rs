@@ -1,3 +1,4 @@
+pub mod structs;
 pub mod sp_assignment;
 pub mod sp_state;
 pub mod sp_value;

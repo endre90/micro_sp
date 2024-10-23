@@ -2,6 +2,7 @@ pub static MAX_ALLOWED_OPERATION_DURATION: f64 = 3600.0; // seconds
 pub static MAX_REPLAN_RETRIES: u64 = 3;
 
 pub mod core;
+pub use crate::core::structs::*;
 pub use crate::core::sp_assignment::*;
 pub use crate::core::sp_state::*;
 pub use crate::core::sp_value::*;
@@ -19,12 +20,10 @@ pub use crate::modelling::model::*;
 pub mod planning;
 pub use crate::planning::operation::*;
 pub use crate::planning::transition::*;
-pub use crate::planning::structs::*;
 
 pub mod running;
 pub use crate::running::utils::*;
 pub use crate::running::runner::*;
-pub use crate::running::structs::*;
 
 pub mod macros;
 #[allow(unused_imports)]
