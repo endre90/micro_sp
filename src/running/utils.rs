@@ -44,7 +44,7 @@ pub fn generate_runner_state_variables(
 
     // operations should be put in the initial state once they are part of the plan
     for operation in &model.operations {
-        let operation_state = v!(&&format!("{}_state", operation.name));
+        let operation_state = v!(&&format!("{}", operation.name));
         let operation_duration = fv!(&&format!("{}_duration", operation.name));
         state = state.add(assign!(operation_state, "initial".to_spvalue()));
         state = state.add(assign!(operation_duration, 0.0.to_spvalue()));
