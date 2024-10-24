@@ -210,6 +210,8 @@ pub async fn planner_ticker(
     let model = model.clone();
 
     loop {
+        log::info!(target: &&format!("{}_planner_ticker", name), 
+            "asdf");
         let shared_state_local = shared_state.lock().unwrap().clone();
         // let runner_replan_trigger = bv!(&&format!("{}_runner_replan_trigger", name));
         let runner_replan_trigger =
