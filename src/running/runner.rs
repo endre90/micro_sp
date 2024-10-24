@@ -181,7 +181,7 @@ pub async fn simple_operation_runner(
             PlanState::NotFound => todo!(),
             PlanState::Completed => todo!(),
             PlanState::Cancelled => todo!(),
-            PlanState::UNKNOWN => todo!(),
+            PlanState::UNKNOWN => {},
         }
 
         interval.tick().await;
