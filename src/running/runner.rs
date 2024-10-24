@@ -176,12 +176,12 @@ pub async fn simple_operation_runner(
                 "Completed plan: '{}'.", runner_plan_name);
                 }
             }
-            PlanState::Paused => todo!(),
-            PlanState::Failed => todo!(),
-            PlanState::NotFound => todo!(),
-            PlanState::Completed => todo!(),
-            PlanState::Cancelled => todo!(),
-            PlanState::UNKNOWN => {},
+            PlanState::Paused => {log::info!(target: &&format!("{}_runner", name), "Current state of plan '{}': Paused.", runner_plan_name)},,
+            PlanState::Failed => {log::info!(target: &&format!("{}_runner", name), "Current state of plan '{}': Failed.", runner_plan_name)},,
+            PlanState::NotFound => {log::info!(target: &&format!("{}_runner", name), "Current state of plan '{}': NotFound.", runner_plan_name)},,
+            PlanState::Completed => {log::info!(target: &&format!("{}_runner", name), "Current state of plan '{}': Completed.", runner_plan_name)},,
+            PlanState::Cancelled => {log::info!(target: &&format!("{}_runner", name), "Current state of plan '{}': Cancelled.", runner_plan_name)},,
+            PlanState::UNKNOWN => {log::info!(target: &&format!("{}_runner", name), "Current state of plan '{}': Unknown.", runner_plan_name)},
         }
 
         interval.tick().await;
@@ -253,14 +253,19 @@ pub async fn planner_ticker(
             };
 
         let updated_state = match (runner_replan_trigger, runner_replanned) {
-            (true, true) => shared_state_local
+            (true, true) => {
+                log::info!(target: &&format!("{}_planner_ticker", name), 
+            "replan = true, replanned = true");
+                shared_state_local
                 .update(
                     &&format!("{}_replan_trigger", name),
                     false.to_spvalue(),
                 )
                 .update(&&format!("{}_replanned", name), false.to_spvalue())
-                .update(&&format!("{}_replan_counter", name), 0.to_spvalue()),
+                .update(&&format!("{}_replan_counter", name), 0.to_spvalue())},
             (true, false) => {
+                log::info!(target: &&format!("{}_planner_ticker", name), 
+            "replan = true, replanned = false");
                 let goal = extract_goal_from_state(name.to_string(), &shared_state_local);
                 let updated_state = shared_state_local
                     .update(
@@ -311,7 +316,11 @@ pub async fn planner_ticker(
                 }
                 // *shared_state.lock().unwrap() = updated_state;
             }
-            (false, _) => shared_state_local.update(&&format!("{}_replanned", name), false.to_spvalue()),
+            (false, _) => {
+                log::info!(target: &&format!("{}_planner_ticker", name), 
+            "replan = false, replanned = _");
+                shared_state_local.update(&&format!("{}_replanned", name), false.to_spvalue())
+            }
         };
 
         *shared_state.lock().unwrap() = updated_state.clone();
