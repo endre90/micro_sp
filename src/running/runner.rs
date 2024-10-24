@@ -318,7 +318,7 @@ pub async fn planner_ticker(
                             .update(
                                 &&format!("{}_plan_state", name),
                                 "initial".to_spvalue(),
-                            )
+                            ).update(&&format!("{}_replanned", name), true.to_spvalue())
                     }
                 }
                 // *shared_state.lock().unwrap() = updated_state;
