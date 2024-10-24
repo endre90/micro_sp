@@ -95,7 +95,7 @@ pub async fn simple_operation_runner(
                     match shared_state_local.get_value(&&format!("{}_plan_current_step", name)) {
                         SPValue::Int64(value) => value,
                         SPValue::UNKNOWN => {
-                            log::warn!("ADSFASDFASDFASDF");
+                            log::error!("ADSFASDFASDFASDF");
                             0},
                         _ => {
                             log::error!(target: &&format!("{}_runner", name), 
