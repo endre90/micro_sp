@@ -94,6 +94,9 @@ pub async fn simple_operation_runner(
                 let runner_plan_current_step =
                     match shared_state_local.get_value(&&format!("{}_plan_current_step", name)) {
                         SPValue::Int64(value) => value,
+                        SPValue::UNKNOWN => {
+                            log::warn!("ADSFASDFASDFASDF");
+                            0},
                         _ => {
                             log::error!(target: &&format!("{}_runner", name), 
                 "Couldn't get '{}_plan_current_step' from the shared state.", name);
@@ -325,6 +328,7 @@ pub async fn planner_ticker(
                             .update(&&format!("{}_plan", name), new_plan.plan.to_spvalue())
                             .update(&&format!("{}_plan_state", name), "initial".to_spvalue())
                             .update(&&format!("{}_replanned", name), true.to_spvalue())
+                            .update(&&format!("{}_plan_current_step", name), 0.to_spvalue())
                     }
                 }
                 // *shared_state.lock().unwrap() = updated_state;
