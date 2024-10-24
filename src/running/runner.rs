@@ -67,6 +67,7 @@ pub async fn simple_operation_runner(
 
         match PlanState::from_str(&runner_plan_state) {
             PlanState::Initial => {
+                println!("Current state of plan '{}': Initial.", runner_plan_name);
                 log::info!(target: &&format!("{}_runner", name), "Current state of plan '{}': Initial.", runner_plan_name);
                 let shared_state_local = shared_state.lock().unwrap().clone();
                 let updated_state = shared_state_local.update(
@@ -77,6 +78,7 @@ pub async fn simple_operation_runner(
                 *shared_state.lock().unwrap() = updated_state;
             }
             PlanState::Executing => {
+                println!("Current state of plan '{}': Executing.", runner_plan_name);
                 log::info!(target: &&format!("{}_runner", name), "Current state of plan '{}': Executing.", runner_plan_name);
                 let runner_plan =
                     match shared_state_local.get_value(&&format!("{}_plan", name)) {
@@ -212,7 +214,7 @@ pub async fn planner_ticker(
     loop {
         log::info!(target: &&format!("{}_planner_ticker", name), 
             "asdf");
-            println!("planner_ticker: asdf");
+            // println!("planner_ticker: asdf");
         let shared_state_local = shared_state.lock().unwrap().clone();
         // let runner_replan_trigger = bv!(&&format!("{}_runner_replan_trigger", name));
         let runner_replan_trigger =
