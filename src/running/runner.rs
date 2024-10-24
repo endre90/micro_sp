@@ -1,6 +1,6 @@
 use crate::*;
-use tokio::time::{interval, Duration};
 use std::sync::{Arc, Mutex};
+use tokio::time::{interval, Duration};
 
 pub async fn simple_operation_runner(
     name: &str,
@@ -24,7 +24,7 @@ pub async fn simple_operation_runner(
         for t in &model.auto_transitions {
             if t.clone().eval_running(&shared_state_local) {
                 let shared_state_local = shared_state.lock().unwrap().clone();
-                let mut updated_state  = t.clone().take_running(&shared_state_local);
+                let mut updated_state = t.clone().take_running(&shared_state_local);
                 log::info!(target: &&format!("{}_runner", name), "Executed auto transition: '{}'.", t.name);
                 if coverability_tracking {
                     let taken_auto_counter =
@@ -49,21 +49,21 @@ pub async fn simple_operation_runner(
         //     match shared_state_local.get_value(&&format!("{}_plan_name", name)) {
         //         SPValue::String(value) => value,
         //         _ => {
-        //             log::error!(target: &&format!("{}_runner", name), 
+        //             log::error!(target: &&format!("{}_runner", name),
         //     "Couldn't get '{}_plan_name' from the shared state.", name);
         //             "unknown".to_string()
         //         }
         //     };
 
-        let runner_plan_state =
-            match shared_state_local.get_value(&&format!("{}_plan_state", name)) {
-                SPValue::String(value) => value,
-                _ => {
-                    log::error!(target: &&format!("{}_runner", name), 
+        let runner_plan_state = match shared_state_local.get_value(&&format!("{}_plan_state", name))
+        {
+            SPValue::String(value) => value,
+            _ => {
+                log::error!(target: &&format!("{}_runner", name), 
                 "Couldn't get '{}_plan_state' from the shared state.", name);
-                    "unknown".to_string()
-                }
-            };
+                "unknown".to_string()
+            }
+        };
 
         match PlanState::from_str(&runner_plan_state) {
             PlanState::Initial => {
@@ -79,29 +79,27 @@ pub async fn simple_operation_runner(
             }
             PlanState::Executing => {
                 println!("Current state of plan '{}': Executing.", name);
-                
-                log::info!(target: &&format!("{}_runner", name), "Current state of plan '{}': Executing.", name);
-                let runner_plan =
-                    match shared_state_local.get_value(&&format!("{}_plan", name)) {
-                        SPValue::Array(_sp_value_type, value_array) => value_array,
-                        _ => {
-                            log::error!(target: &&format!("{}_runner", name), 
-                "Couldn't get '{}_plan' from the shared state.", name);
-                            vec![]
-                        }
-                    };
 
-                 println!("Current plan '{:?}'.", runner_plan);
-                let runner_plan_current_step = match shared_state_local
-                    .get_value(&&format!("{}_current_step", name))
-                {
-                    SPValue::Int64(value) => value,
+                log::info!(target: &&format!("{}_runner", name), "Current state of plan '{}': Executing.", name);
+                let runner_plan = match shared_state_local.get_value(&&format!("{}_plan", name)) {
+                    SPValue::Array(_sp_value_type, value_array) => value_array,
                     _ => {
                         log::error!(target: &&format!("{}_runner", name), 
-                "Couldn't get '{}_current_step' from the shared state.", name);
-                        0
+                "Couldn't get '{}_plan' from the shared state.", name);
+                        vec![]
                     }
                 };
+
+                println!("Current plan '{:?}'.", runner_plan);
+                let runner_plan_current_step =
+                    match shared_state_local.get_value(&&format!("{}_plan_current_step", name)) {
+                        SPValue::Int64(value) => value,
+                        _ => {
+                            log::error!(target: &&format!("{}_runner", name), 
+                "Couldn't get '{}_plan_current_step' from the shared state.", name);
+                            0
+                        }
+                    };
                 if runner_plan.len() > runner_plan_current_step as usize {
                     let current_model_operation = model
                         .operations
@@ -181,12 +179,30 @@ pub async fn simple_operation_runner(
                 "Completed plan: '{}'.", name);
                 }
             }
-            PlanState::Paused => {println!("Current state of plan '{}': Paused.", name); log::info!(target: &&format!("{}_runner", name), "Current state of plan '{}': Paused.", name)},
-            PlanState::Failed => {println!("Current state of plan '{}': Failed.", name);log::info!(target: &&format!("{}_runner", name), "Current state of plan '{}': Failed.", name)},
-            PlanState::NotFound => {println!("Current state of plan '{}': NotFound.", name);log::info!(target: &&format!("{}_runner", name), "Current state of plan '{}': NotFound.", name)},
-            PlanState::Completed => {println!("Current state of plan '{}': Completed.", name);log::info!(target: &&format!("{}_runner", name), "Current state of plan '{}': Completed.", name)},
-            PlanState::Cancelled => {println!("Current state of plan '{}': Cancelled.", name);log::info!(target: &&format!("{}_runner", name), "Current state of plan '{}': Cancelled.", name)},
-            PlanState::UNKNOWN => {println!("Current state of plan '{}': UNKNOWN.", name);log::info!(target: &&format!("{}_runner", name), "Current state of plan '{}': Unknown.", name)},
+            PlanState::Paused => {
+                println!("Current state of plan '{}': Paused.", name);
+                log::info!(target: &&format!("{}_runner", name), "Current state of plan '{}': Paused.", name)
+            }
+            PlanState::Failed => {
+                println!("Current state of plan '{}': Failed.", name);
+                log::info!(target: &&format!("{}_runner", name), "Current state of plan '{}': Failed.", name)
+            }
+            PlanState::NotFound => {
+                println!("Current state of plan '{}': NotFound.", name);
+                log::info!(target: &&format!("{}_runner", name), "Current state of plan '{}': NotFound.", name)
+            }
+            PlanState::Completed => {
+                println!("Current state of plan '{}': Completed.", name);
+                log::info!(target: &&format!("{}_runner", name), "Current state of plan '{}': Completed.", name)
+            }
+            PlanState::Cancelled => {
+                println!("Current state of plan '{}': Cancelled.", name);
+                log::info!(target: &&format!("{}_runner", name), "Current state of plan '{}': Cancelled.", name)
+            }
+            PlanState::UNKNOWN => {
+                println!("Current state of plan '{}': UNKNOWN.", name);
+                log::info!(target: &&format!("{}_runner", name), "Current state of plan '{}': Unknown.", name)
+            }
         }
 
         interval.tick().await;
@@ -217,7 +233,7 @@ pub async fn planner_ticker(
     loop {
         log::info!(target: &&format!("{}_planner_ticker", name), 
             "asdf");
-            // println!("planner_ticker: asdf");
+        // println!("planner_ticker: asdf");
         let shared_state_local = shared_state.lock().unwrap().clone();
         // let runner_replan_trigger = bv!(&&format!("{}_runner_replan_trigger", name));
         let runner_replan_trigger =
@@ -230,15 +246,14 @@ pub async fn planner_ticker(
                 }
             };
 
-        let runner_replanned =
-            match shared_state_local.get_value(&&format!("{}_replanned", name)) {
-                SPValue::Bool(value) => value,
-                _ => {
-                    log::error!(target: &&format!("{}_runner", name), 
+        let runner_replanned = match shared_state_local.get_value(&&format!("{}_replanned", name)) {
+            SPValue::Bool(value) => value,
+            _ => {
+                log::error!(target: &&format!("{}_runner", name), 
             "Couldn't get '{}_replanned' from the shared state.", name);
-                    false
-                }
-            };
+                false
+            }
+        };
 
         let runner_plan_counter =
             match shared_state_local.get_value(&&format!("{}_plan_counter", name)) {
@@ -264,18 +279,16 @@ pub async fn planner_ticker(
             (true, true) => {
                 log::info!(target: &&format!("{}_planner_ticker", name), 
             "replan = true, replanned = true");
-            println!("planner_ticker: replan = true, replanned = true");
+                println!("planner_ticker: replan = true, replanned = true");
                 shared_state_local
-                .update(
-                    &&format!("{}_replan_trigger", name),
-                    false.to_spvalue(),
-                )
-                .update(&&format!("{}_replanned", name), false.to_spvalue())
-                .update(&&format!("{}_replan_counter", name), 0.to_spvalue())},
+                    .update(&&format!("{}_replan_trigger", name), false.to_spvalue())
+                    .update(&&format!("{}_replanned", name), false.to_spvalue())
+                    .update(&&format!("{}_replan_counter", name), 0.to_spvalue())
+            }
             (true, false) => {
                 log::info!(target: &&format!("{}_planner_ticker", name), 
             "replan = true, replanned = false");
-            println!("planner_ticker: replan = true, replanned = false");
+                println!("planner_ticker: replan = true, replanned = false");
                 let goal = extract_goal_from_state(name.to_string(), &shared_state_local);
                 let updated_state = shared_state_local
                     .update(
@@ -286,7 +299,7 @@ pub async fn planner_ticker(
                         &&format!("{}_replan_counter", name),
                         (runner_replan_counter + 1).to_spvalue(),
                     );
-                    // .update(&&format!("{}_runner_state", name), "planning".to_spvalue());
+                // .update(&&format!("{}_runner_state", name), "planning".to_spvalue());
                 let updated_state = reset_all_operations(&updated_state);
                 *shared_state.lock().unwrap() = updated_state.clone();
                 let new_plan = bfs_operation_planner(
@@ -297,31 +310,21 @@ pub async fn planner_ticker(
                 );
                 if !new_plan.found {
                     log::error!(target: &&format!("{}_runner", name), "No plan was found");
-                    updated_state.update(
-                        &&format!("{}_plan_state", name),
-                        "not_found".to_spvalue(),
-                    )
+                    updated_state.update(&&format!("{}_plan_state", name), "not_found".to_spvalue())
                 } else {
                     if new_plan.length == 0 {
                         log::info!(target: &&format!("{}_runner", name), "We are already in the goal.");
-                        updated_state.update(
-                            &&format!("{}_plan_state", name),
-                            "completed".to_spvalue(),
-                        )
+                        updated_state
+                            .update(&&format!("{}_plan_state", name), "completed".to_spvalue())
                     } else {
                         log::info!(target: &&format!("{}_runner", name), "A new plan was found:");
                         for step in &new_plan.plan {
                             log::info!(target: &&format!("{}_runner", name), "  {}", step);
                         }
                         updated_state
-                            .update(
-                                &&format!("{}_plan", name),
-                                new_plan.plan.to_spvalue(),
-                            )
-                            .update(
-                                &&format!("{}_plan_state", name),
-                                "initial".to_spvalue(),
-                            ).update(&&format!("{}_replanned", name), true.to_spvalue())
+                            .update(&&format!("{}_plan", name), new_plan.plan.to_spvalue())
+                            .update(&&format!("{}_plan_state", name), "initial".to_spvalue())
+                            .update(&&format!("{}_replanned", name), true.to_spvalue())
                     }
                 }
                 // *shared_state.lock().unwrap() = updated_state;
@@ -329,7 +332,7 @@ pub async fn planner_ticker(
             (false, _) => {
                 log::info!(target: &&format!("{}_planner_ticker", name), 
             "replan = false, replanned = _");
-            println!("planner_ticker: replan = false, replanned = _");
+                println!("planner_ticker: replan = false, replanned = _");
                 shared_state_local.update(&&format!("{}_replanned", name), false.to_spvalue())
             }
         };
