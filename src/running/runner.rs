@@ -311,7 +311,7 @@ pub async fn planner_ticker(
                 }
                 // *shared_state.lock().unwrap() = updated_state;
             }
-            (false, _) => shared_state_local.update("replanned", false.to_spvalue()),
+            (false, _) => shared_state_local.update(&&format!("{}_replanned", name), false.to_spvalue()),
         };
 
         *shared_state.lock().unwrap() = updated_state.clone();
