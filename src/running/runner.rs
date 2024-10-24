@@ -45,15 +45,15 @@ pub async fn simple_operation_runner(
             }
         }
 
-        let runner_plan_name =
-            match shared_state_local.get_value(&&format!("{}_plan_name", name)) {
-                SPValue::String(value) => value,
-                _ => {
-                    log::error!(target: &&format!("{}_runner", name), 
-            "Couldn't get '{}_runner_plan_name' from the shared state.", name);
-                    "unknown".to_string()
-                }
-            };
+        // let name =
+        //     match shared_state_local.get_value(&&format!("{}_plan_name", name)) {
+        //         SPValue::String(value) => value,
+        //         _ => {
+        //             log::error!(target: &&format!("{}_runner", name), 
+        //     "Couldn't get '{}_plan_name' from the shared state.", name);
+        //             "unknown".to_string()
+        //         }
+        //     };
 
         let runner_plan_state =
             match shared_state_local.get_value(&&format!("{}_plan_state", name)) {
@@ -67,19 +67,20 @@ pub async fn simple_operation_runner(
 
         match PlanState::from_str(&runner_plan_state) {
             PlanState::Initial => {
-                println!("Current state of plan '{}': Initial.", runner_plan_name);
-                log::info!(target: &&format!("{}_runner", name), "Current state of plan '{}': Initial.", runner_plan_name);
+                println!("Current state of plan '{}': Initial.", name);
+                log::info!(target: &&format!("{}_runner", name), "Current state of plan '{}': Initial.", name);
                 let shared_state_local = shared_state.lock().unwrap().clone();
                 let updated_state = shared_state_local.update(
                     &&format!("{}_plan_state", name),
                     PlanState::Executing.to_spvalue(),
                 );
-                log::info!(target: &&format!("{}_runner", name), "Starting plan: '{}'.", runner_plan_name);
+                log::info!(target: &&format!("{}_runner", name), "Starting plan: '{}'.", name);
                 *shared_state.lock().unwrap() = updated_state;
             }
             PlanState::Executing => {
-                println!("Current state of plan '{}': Executing.", runner_plan_name);
-                log::info!(target: &&format!("{}_runner", name), "Current state of plan '{}': Executing.", runner_plan_name);
+                println!("Current state of plan '{}': Executing.", name);
+                
+                log::info!(target: &&format!("{}_runner", name), "Current state of plan '{}': Executing.", name);
                 let runner_plan =
                     match shared_state_local.get_value(&&format!("{}_plan", name)) {
                         SPValue::Array(_sp_value_type, value_array) => value_array,
@@ -89,8 +90,10 @@ pub async fn simple_operation_runner(
                             vec![]
                         }
                     };
+
+                 println!("Current plan '{:?}'.", runner_plan);
                 let runner_plan_current_step = match shared_state_local
-                    .get_value(&&format!("{}_plan_current_step", name))
+                    .get_value(&&format!("{}_current_step", name))
                 {
                     SPValue::Int64(value) => value,
                     _ => {
@@ -175,15 +178,15 @@ pub async fn simple_operation_runner(
                     }
                 } else {
                     log::info!(target: &&format!("{}_runner", name), 
-                "Completed plan: '{}'.", runner_plan_name);
+                "Completed plan: '{}'.", name);
                 }
             }
-            PlanState::Paused => {println!("Current state of plan '{}': Paused.", runner_plan_name); log::info!(target: &&format!("{}_runner", name), "Current state of plan '{}': Paused.", runner_plan_name)},
-            PlanState::Failed => {println!("Current state of plan '{}': Failed.", runner_plan_name);log::info!(target: &&format!("{}_runner", name), "Current state of plan '{}': Failed.", runner_plan_name)},
-            PlanState::NotFound => {println!("Current state of plan '{}': NotFound.", runner_plan_name);log::info!(target: &&format!("{}_runner", name), "Current state of plan '{}': NotFound.", runner_plan_name)},
-            PlanState::Completed => {println!("Current state of plan '{}': Completed.", runner_plan_name);log::info!(target: &&format!("{}_runner", name), "Current state of plan '{}': Completed.", runner_plan_name)},
-            PlanState::Cancelled => {println!("Current state of plan '{}': Cancelled.", runner_plan_name);log::info!(target: &&format!("{}_runner", name), "Current state of plan '{}': Cancelled.", runner_plan_name)},
-            PlanState::UNKNOWN => {println!("Current state of plan '{}': UNKNOWN.", runner_plan_name);log::info!(target: &&format!("{}_runner", name), "Current state of plan '{}': Unknown.", runner_plan_name)},
+            PlanState::Paused => {println!("Current state of plan '{}': Paused.", name); log::info!(target: &&format!("{}_runner", name), "Current state of plan '{}': Paused.", name)},
+            PlanState::Failed => {println!("Current state of plan '{}': Failed.", name);log::info!(target: &&format!("{}_runner", name), "Current state of plan '{}': Failed.", name)},
+            PlanState::NotFound => {println!("Current state of plan '{}': NotFound.", name);log::info!(target: &&format!("{}_runner", name), "Current state of plan '{}': NotFound.", name)},
+            PlanState::Completed => {println!("Current state of plan '{}': Completed.", name);log::info!(target: &&format!("{}_runner", name), "Current state of plan '{}': Completed.", name)},
+            PlanState::Cancelled => {println!("Current state of plan '{}': Cancelled.", name);log::info!(target: &&format!("{}_runner", name), "Current state of plan '{}': Cancelled.", name)},
+            PlanState::UNKNOWN => {println!("Current state of plan '{}': UNKNOWN.", name);log::info!(target: &&format!("{}_runner", name), "Current state of plan '{}': Unknown.", name)},
         }
 
         interval.tick().await;
