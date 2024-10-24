@@ -176,11 +176,11 @@ pub async fn simple_operation_runner(
                 "Completed plan: '{}'.", runner_plan_name);
                 }
             }
-            PlanState::Paused => {log::info!(target: &&format!("{}_runner", name), "Current state of plan '{}': Paused.", runner_plan_name)},,
-            PlanState::Failed => {log::info!(target: &&format!("{}_runner", name), "Current state of plan '{}': Failed.", runner_plan_name)},,
-            PlanState::NotFound => {log::info!(target: &&format!("{}_runner", name), "Current state of plan '{}': NotFound.", runner_plan_name)},,
-            PlanState::Completed => {log::info!(target: &&format!("{}_runner", name), "Current state of plan '{}': Completed.", runner_plan_name)},,
-            PlanState::Cancelled => {log::info!(target: &&format!("{}_runner", name), "Current state of plan '{}': Cancelled.", runner_plan_name)},,
+            PlanState::Paused => {log::info!(target: &&format!("{}_runner", name), "Current state of plan '{}': Paused.", runner_plan_name)},
+            PlanState::Failed => {log::info!(target: &&format!("{}_runner", name), "Current state of plan '{}': Failed.", runner_plan_name)},
+            PlanState::NotFound => {log::info!(target: &&format!("{}_runner", name), "Current state of plan '{}': NotFound.", runner_plan_name)},
+            PlanState::Completed => {log::info!(target: &&format!("{}_runner", name), "Current state of plan '{}': Completed.", runner_plan_name)},
+            PlanState::Cancelled => {log::info!(target: &&format!("{}_runner", name), "Current state of plan '{}': Cancelled.", runner_plan_name)},
             PlanState::UNKNOWN => {log::info!(target: &&format!("{}_runner", name), "Current state of plan '{}': Unknown.", runner_plan_name)},
         }
 
