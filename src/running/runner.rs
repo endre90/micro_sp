@@ -46,7 +46,7 @@ pub async fn operation_runner(
     shared_state: &Arc<Mutex<State>>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let name = &model.name;
-    let mut interval = interval(Duration::from_millis(100));
+    let mut interval = interval(Duration::from_millis(50));
     let model = model.clone();
 
     loop {
@@ -184,7 +184,7 @@ pub async fn planner_ticker(
     shared_state: &Arc<Mutex<State>>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let name = &model.name;
-    let mut interval = interval(Duration::from_millis(100));
+    let mut interval = interval(Duration::from_millis(50));
     let model = model.clone();
 
     loop {
