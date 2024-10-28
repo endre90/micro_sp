@@ -44,7 +44,6 @@ use tokio::time::{interval, Duration};
 pub async fn operation_runner(
     model: &Model,
     shared_state: &Arc<Mutex<State>>,
-    coverability_tracking: bool,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let name = &model.name;
     let mut interval = interval(Duration::from_millis(100));
@@ -167,6 +166,15 @@ pub async fn operation_runner(
             }
         }
 
+        let updated_state = state
+            .update(&format!("{}_plan_state", name), plan_state.to_spvalue())
+            .update(
+                &format!("{}_plan_current_step", name),
+                plan_current_step.to_spvalue(),
+            )
+            .update(&format!("{}_plan", name), plan.to_spvalue());
+
+        *shared_state.lock().unwrap() = updated_state.clone();
         interval.tick().await;
     }
 }
