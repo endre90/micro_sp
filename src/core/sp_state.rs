@@ -98,6 +98,20 @@ impl State {
         }
     }
 
+    pub fn get_bool(&self, target: &str, name: &str) -> Option<bool> {
+        match self.get_value(name) {
+            SPValue::Bool(value) => Some(value),
+            SPValue::UNKNOWN => {
+                log::warn!(target: target, "Value for boolean '{}' is UNKNOWN, resulting to None.", name);
+                None
+            }
+            _ => {
+                log::error!(target: target, "Couldn't get boolean '{}' from the state, resulting to None.", name);
+                None
+            }
+        }
+    }
+
     pub fn get_or_default_i64(&self, target: &str, name: &str) -> i64 {
         match self.get_value(name) {
             SPValue::Int64(value) => value,
