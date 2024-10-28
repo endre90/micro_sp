@@ -10,7 +10,7 @@ pub fn generate_runner_state_variables(
     let mut state = State::new();
 
     let runner_state = v!(&&format!("{}_runner_state", name));
-    let runner_ref_count = iv!(&&format!("{}_runner_ref_count", name));
+    let runner_ref_counter = iv!(&&format!("{}_runner_ref_counter", name));
     let goal = v!(&&format!("{}_goal", name));
     let goal_exists = bv!(&&format!("{}_goal_exists", name));
     let plan = av!(&&format!("{}_plan", name));
@@ -20,14 +20,14 @@ pub fn generate_runner_state_variables(
     let plan_state = v!(&&format!("{}_plan_state", name));
     let plan_duration = fv!(&&format!("{}_plan_duration", name));
     let plan_current_step = iv!(&&format!("{}_plan_current_step", name));
-    let planner_ref_count = iv!(&&format!("{}_planner_ref_count", name));
+    let planner_ref_counter = iv!(&&format!("{}_planner_ref_counter", name));
     let replanned = bv!(&&format!("{}_replanned", name));
     let replan_counter = iv!(&&format!("{}_replan_counter", name)); // How many times has the planner tried to replan for the same problem
     let replan_fail_counter = iv!(&&format!("{}_replan_fail_counter", name));
     let replan_trigger = bv!(&&format!("{}_replan_trigger", name));
 
     state = state.add(assign!(runner_state, SPValue::UNKNOWN));
-    state = state.add(assign!(runner_ref_count, 1.to_spvalue()));
+    state = state.add(assign!(runner_ref_counter, 1.to_spvalue()));
     state = state.add(assign!(goal, SPValue::UNKNOWN));
     state = state.add(assign!(goal_exists, SPValue::UNKNOWN));
     state = state.add(assign!(
@@ -39,7 +39,7 @@ pub fn generate_runner_state_variables(
     state = state.add(assign!(plan_state, SPValue::UNKNOWN));
     state = state.add(assign!(plan_duration, SPValue::UNKNOWN));
     state = state.add(assign!(plan_current_step, SPValue::UNKNOWN));
-    state = state.add(assign!(planner_ref_count, 1.to_spvalue()));
+    state = state.add(assign!(planner_ref_counter, 1.to_spvalue()));
     state = state.add(assign!(replanned, SPValue::UNKNOWN));
     state = state.add(assign!(replan_counter, SPValue::UNKNOWN));
     state = state.add(assign!(plan_counter, SPValue::UNKNOWN));
