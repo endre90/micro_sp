@@ -49,132 +49,151 @@ pub async fn operation_runner(
     let mut interval = interval(Duration::from_millis(50));
     let model = model.clone();
 
+    let mut ref_count: i64 = 0;
+
     loop {
         let mut state = shared_state.lock().unwrap().clone();
-
-        let mut plan_state = state.get_or_default_string(
-            &format!("{}_planner_ticker", name),
-            &format!("{}_plan_state", name),
+        let ref_counter = state.get_or_default_i64(
+            &format!("{}_operation_runner", name),
+            &format!("{}_runner_ref_counter", name),
         );
-        let mut plan_current_step = state.get_or_default_i64(
-            &format!("{}_planner_ticker", name),
-            &format!("{}_plan_current_step", name),
-        );
-        let mut plan = state.get_or_default_array_of_strings(
-            &format!("{}_planner_ticker", name),
-            &format!("{}_plan", name),
-        );
+        if ref_counter > ref_count {
+            ref_count = ref_counter;
 
-        match PlanState::from_str(&plan_state) {
-            PlanState::Initial => {
-                log::info!(target: &&format!("{}_operation_runner", name), "Current state of plan '{}': Initial.", name);
-                log::info!(target: &&format!("{}_operation_runner", name), "Starting plan: '{:?}'.", plan);
-                plan_state = PlanState::Executing.to_string();
-            }
-            PlanState::Executing => {
-                log::info!(target: &&format!("{}_operation_runner", name), "Current state of plan '{}': Executing.", name);
-                log::info!(target: &&format!("{}_operation_runner", name), "Executing plan: '{:?}'.", plan);
+            let mut plan_state = state.get_or_default_string(
+                &format!("{}_operation_runner", name),
+                &format!("{}_plan_state", name),
+            );
+            let mut plan_current_step = state.get_or_default_i64(
+                &format!("{}_operation_runner", name),
+                &format!("{}_plan_current_step", name),
+            );
+            let plan = state.get_or_default_array_of_strings(
+                &format!("{}_operation_runner", name),
+                &format!("{}_plan", name),
+            );
 
-                if plan.len() > plan_current_step as usize {
-                    let operation = model
-                        .operations
-                        .iter()
-                        .find(|op| op.name == plan[plan_current_step as usize].to_string())
-                        .unwrap()
-                        .to_owned();
+            match PlanState::from_str(&plan_state) {
+                PlanState::Initial => {
+                    log::info!(target: &&format!("{}_operation_runner", name), "Current state of plan '{}': Initial.", name);
+                    log::info!(target: &&format!("{}_operation_runner", name), "Starting plan: '{:?}'.", plan);
+                    plan_state = PlanState::Executing.to_string();
+                }
+                PlanState::Executing => {
+                    log::info!(target: &&format!("{}_operation_runner", name), "Current state of plan '{}': Executing.", name);
+                    log::info!(target: &&format!("{}_operation_runner", name), "Executing plan: '{:?}'.", plan);
 
-                    let operation_state = state.get_or_default_string(
-                        &format!("{}_operation_runner", name),
-                        &format!("{}", operation.name),
-                    );
+                    if plan.len() > plan_current_step as usize {
+                        let operation = model
+                            .operations
+                            .iter()
+                            .find(|op| op.name == plan[plan_current_step as usize].to_string())
+                            .unwrap()
+                            .to_owned();
 
-                    match OperationState::from_str(&operation_state) {
-                        OperationState::Initial => {
-                            log::info!(target: &&format!("{}_operation_runner", name), 
+                        let operation_state = state.get_or_default_string(
+                            &format!("{}_operation_runner", name),
+                            &format!("{}", operation.name),
+                        );
+
+                        match OperationState::from_str(&operation_state) {
+                            OperationState::Initial => {
+                                log::info!(target: &&format!("{}_operation_runner", name), 
                                 "Current state of operation '{}': Initial.", operation.name);
-                            if operation.eval_running(&state) {
-                                log::info!(target: &&format!("{}_operation_runner", name), 
+                                if operation.eval_running(&state) {
+                                    log::info!(target: &&format!("{}_operation_runner", name), 
                                     "Starting operation: '{}'.", operation.name);
-                                state = operation.start_running(&state);
+                                    state = operation.start_running(&state);
+                                }
                             }
-                        }
-                        OperationState::Disabled => todo!(),
-                        OperationState::Executing => {
-                            log::info!(target: &&format!("{}_operation_runner", name), 
+                            OperationState::Disabled => todo!(),
+                            OperationState::Executing => {
+                                log::info!(target: &&format!("{}_operation_runner", name), 
                             "Current state of operation '{}': Executing.", operation.name);
-                            if operation.can_be_completed(&state) {
-                                state = operation.clone().complete_running(&state);
-                                log::info!(target: &&format!("{}_operation_runner", name), 
+                                if operation.can_be_completed(&state) {
+                                    state = operation.clone().complete_running(&state);
+                                    log::info!(target: &&format!("{}_operation_runner", name), 
                                     "Completing operation: '{}'.", operation.name);
-                            } else {
-                                log::info!(target: &&format!("{}_operation_runner", name), 
+                                } else {
+                                    log::info!(target: &&format!("{}_operation_runner", name), 
                                     "Waiting for operation: '{}' to be completed.", operation.name);
+                                }
                             }
-                        }
-                        OperationState::Completed => {
-                            log::info!(target: &&format!("{}_runner", name), 
+                            OperationState::Completed => {
+                                log::info!(target: &&format!("{}_runner", name), 
                                 "Current state of operation '{}': Completed.", operation.name);
-                            plan_current_step = plan_current_step + 1;
-                            // let current_model_operation = model
-                            //     .operations
-                            //     .iter()
-                            //     .find(|op| op.name == current_model_operation.name)
-                            //     .unwrap()
-                            //     .to_owned();
+                                plan_current_step = plan_current_step + 1;
+                                // let current_model_operation = model
+                                //     .operations
+                                //     .iter()
+                                //     .find(|op| op.name == current_model_operation.name)
+                                //     .unwrap()
+                                //     .to_owned();
 
-                            //             if current_model_operation
-                            //                 .clone()
-                            //                 .can_be_reset(&shared_state_local)
-                            //             {
-                            //                 log::info!(target: &&format!("{}_runner", name),
-                            // "Reseting operation: '{}'.", current_model_operation.name);
+                                //             if current_model_operation
+                                //                 .clone()
+                                //                 .can_be_reset(&shared_state_local)
+                                //             {
+                                //                 log::info!(target: &&format!("{}_runner", name),
+                                // "Reseting operation: '{}'.", current_model_operation.name);
 
-                            //                 let shared_state_local = shared_state.lock().unwrap().clone();
-                            //                 let updated_state = current_model_operation
-                            //                     .clone()
-                            //                     .reset_running(&shared_state_local);
-                            //                 *shared_state.lock().unwrap() = updated_state.clone();
-                            //             }
+                                //                 let shared_state_local = shared_state.lock().unwrap().clone();
+                                //                 let updated_state = current_model_operation
+                                //                     .clone()
+                                //                     .reset_running(&shared_state_local);
+                                //                 *shared_state.lock().unwrap() = updated_state.clone();
+                                //             }
+                            }
+                            OperationState::Timedout => todo!(),
+                            OperationState::Failed => todo!(),
+                            OperationState::UNKNOWN => (),
                         }
-                        OperationState::Timedout => todo!(),
-                        OperationState::Failed => todo!(),
-                        OperationState::UNKNOWN => (),
-                    }
-                } else {
-                    log::info!(target: &&format!("{}_operation_runner", name), 
+                    } else {
+                        log::info!(target: &&format!("{}_operation_runner", name), 
                 "Completed plan: '{}'.", name);
-                    plan_state = PlanState::Completed.to_string();
+                        plan_state = PlanState::Completed.to_string();
+                    }
+                }
+                PlanState::Paused => {
+                    log::info!(target: &&format!("{}_runner", name), "Current state of plan '{}': Paused.", name)
+                }
+                PlanState::Failed => {
+                    log::info!(target: &&format!("{}_runner", name), "Current state of plan '{}': Failed.", name)
+                }
+                PlanState::NotFound => {
+                    log::info!(target: &&format!("{}_runner", name), "Current state of plan '{}': NotFound.", name)
+                }
+                PlanState::Completed => {
+                    log::info!(target: &&format!("{}_runner", name), "Current state of plan '{}': Completed.", name)
+                }
+                PlanState::Cancelled => {
+                    log::info!(target: &&format!("{}_runner", name), "Current state of plan '{}': Cancelled.", name)
+                }
+                PlanState::UNKNOWN => {
+                    log::info!(target: &&format!("{}_runner", name), "Current state of plan '{}': UNKNOWN.", name)
                 }
             }
-            PlanState::Paused => {
-                log::info!(target: &&format!("{}_runner", name), "Current state of plan '{}': Paused.", name)
-            }
-            PlanState::Failed => {
-                log::info!(target: &&format!("{}_runner", name), "Current state of plan '{}': Failed.", name)
-            }
-            PlanState::NotFound => {
-                log::info!(target: &&format!("{}_runner", name), "Current state of plan '{}': NotFound.", name)
-            }
-            PlanState::Completed => {
-                log::info!(target: &&format!("{}_runner", name), "Current state of plan '{}': Completed.", name)
-            }
-            PlanState::Cancelled => {
-                log::info!(target: &&format!("{}_runner", name), "Current state of plan '{}': Cancelled.", name)
-            }
-            PlanState::UNKNOWN => {
-                log::info!(target: &&format!("{}_runner", name), "Current state of plan '{}': UNKNOWN.", name)
-            }
+
+            let updated_state = state
+                .update(&format!("{}_plan_state", name), plan_state.to_spvalue())
+                .update(
+                    &format!("{}_plan_current_step", name),
+                    plan_current_step.to_spvalue(),
+                )
+                .update(&format!("{}_plan", name), plan.to_spvalue())
+                .update(
+                    &format!("{}_runner_ref_counter", name),
+                    (ref_counter + 1).to_spvalue(),
+                );
+
+            *shared_state.lock().unwrap() = updated_state.clone();
+        } else {
+            let updated_state = state.update(
+                &format!("{}_runner_ref_counter", name),
+                (ref_counter + 1).to_spvalue(),
+            );
+            *shared_state.lock().unwrap() = updated_state.clone();
         }
-
-        let updated_state = state
-            .update(&format!("{}_plan_state", name), plan_state.to_spvalue())
-            .update(
-                &format!("{}_plan_current_step", name),
-                plan_current_step.to_spvalue(),
-            )
-            .update(&format!("{}_plan", name), plan.to_spvalue());
-
-        *shared_state.lock().unwrap() = updated_state.clone();
         interval.tick().await;
     }
 }
@@ -187,8 +206,16 @@ pub async fn planner_ticker(
     let mut interval = interval(Duration::from_millis(50));
     let model = model.clone();
 
+    let mut ref_count: i64 = 0;
+
     loop {
         let state = shared_state.lock().unwrap().clone();
+        let ref_counter = state.get_or_default_i64(
+            &format!("{}_planner_ticker", name),
+            &format!("{}_planner_ref_counter", name),
+        );
+        if ref_counter > ref_count {
+            ref_count = ref_counter;
         let mut replan_trigger = state.get_or_default_bool(
             &format!("{}_planner_ticker", name),
             &format!("{}_replan_trigger", name),
@@ -274,9 +301,20 @@ pub async fn planner_ticker(
                 &format!("{}_plan_current_step", name),
                 plan_current_step.to_spvalue(),
             )
-            .update(&format!("{}_plan", name), plan.to_spvalue());
+            .update(&format!("{}_plan", name), plan.to_spvalue())
+            .update(
+                &format!("{}_planner_ref_counter", name),
+                (ref_counter + 1).to_spvalue(),
+            );
 
         *shared_state.lock().unwrap() = updated_state.clone();
+        } else {
+            let updated_state = state.update(
+                &format!("{}_planner_ref_counter", name),
+                (ref_counter + 1).to_spvalue(),
+            );
+            *shared_state.lock().unwrap() = updated_state.clone();
+        }
         interval.tick().await;
     }
 }
