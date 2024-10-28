@@ -11,7 +11,7 @@ pub struct State {
     pub state: HashMap<String, SPAssignment>,
 }
 
-/// The Hash trait is implemented on State in order to enable the comparison 
+/// The Hash trait is implemented on State in order to enable the comparison
 /// of different State instances using a hashing function.
 impl Hash for State {
     fn hash<H: Hasher>(&self, s: &mut H) {
@@ -44,7 +44,7 @@ impl State {
         }
     }
 
-    /// The from_vec function creates a new State object from a vector of 
+    /// The from_vec function creates a new State object from a vector of
     /// (SPVariable, SPValue) tuples.
     pub fn from_vec(vec: &Vec<(SPVariable, SPValue)>) -> State {
         let mut state = HashMap::new();
@@ -75,7 +75,7 @@ impl State {
         }
     }
 
-    /// Returns the value of the variable with the given name from the state, 
+    /// Returns the value of the variable with the given name from the state,
     /// and panics if the variable is not in the state.
     pub fn get_value(&self, name: &str) -> SPValue {
         match self.state.clone().get(name) {
@@ -84,59 +84,67 @@ impl State {
         }
     }
 
-    // fn get_or_default_bool(&self, name: &str) -> bool {
-    //     match self.get_value(name) {
-    //         SPValue::Bool(value) => value,
-    //         _ => {
-    //             log::error!("Executed auto transition: '{}'.", name);
-    //             r2r::log_error!(
-    //                 NODE_ID,
-    //                 "Couldn't get '{}' from the shared state.", name
-    //             );
-    //             false
-    //         }
-    //     }
-    // }
-    
-    // fn get_or_default_i64(&self, name: &str) -> i64 {
-    //     match self.get_value(name) {
-    //         SPValue::Int64(value) => value,
-    //         _ => {
-    //             log_error!(
-    //                 NODE_ID,
-    //                 "Couldn't get '{}' from the shared state.", name
-    //             );
-    //             0
-    //         }
-    //     }
-    // }
-    
-    // fn get_or_default_f64(&self, name: &str) -> f64 {
-    //     match self.get_value(name) {
-    //         SPValue::Float64(value) => value.into_inner(),
-    //         _ => {
-    //             r2r::log_error!(
-    //                 NODE_ID,
-    //                 "Couldn't get '{}' from the shared state.", name
-    //             );
-    //             0.0
-    //         }
-    //     }
-    // }
-    
-    // fn get_or_default_string(name: &str, state: &State) -> String {
-    //     match state.get_value(name) {
-    //         micro_sp::SPValue::String(value) => value,
-    //         _ => {
-    //             r2r::log_error!(
-    //                 NODE_ID,
-    //                 "Couldn't get '{}' from the shared state.", name
-    //             );
-    //             "unknown".to_string()
-    //         }
-    //     }
-    // }
-    
+    pub fn get_or_default_bool(&self, target: &str, name: &str) -> bool {
+        match self.get_value(name) {
+            SPValue::Bool(value) => value,
+            SPValue::UNKNOWN => {
+                log::warn!(target: target, "Value for boolean '{}' is UNKNOWN, resulting to FALSE.", name);
+                false
+            }
+            _ => {
+                log::error!(target: target, "Couldn't get boolean '{}' from the state, resulting to FALSE.", name);
+                false
+            }
+        }
+    }
+
+    pub fn get_or_default_i64(&self, target: &str, name: &str) -> i64 {
+        match self.get_value(name) {
+            SPValue::Int64(value) => value,
+            SPValue::UNKNOWN => {
+                log::warn!(target: target, "Value for Int64 '{}' is UNKNOWN, resulting to 0.", name);
+                0
+            }
+            _ => {
+                log::error!(target: target, "Couldn't get Int64 '{}' from the state, resulting to 0.", name);
+                0
+            }
+        }
+    }
+
+
+    pub fn get_or_default_string(&self, target: &str, name: &str) -> String {
+        match self.get_value(name) {
+            SPValue::String(value) => value,
+            SPValue::UNKNOWN => {
+                log::warn!(target: target, "Value for String '{}' is UNKNOWN, resulting to ''.", name);
+                "".to_string()
+            }
+            _ => {
+                log::error!(target: target, "Couldn't get String '{}' from the state, resulting to ''.", name);
+                "".to_string()
+            }
+        }
+    }
+
+    pub fn get_or_default_array_of_strings(&self, target: &str, name: &str) -> Vec<String> {
+        match self.get_value(name) {
+            SPValue::Array(SPValueType::String, arr) => arr.iter()
+            .map(|x| match x {
+                SPValue::String(value) => value.clone(),
+                _ => "".to_string(),
+            })
+            .collect(),
+            SPValue::UNKNOWN => {
+                log::warn!(target: target, "Value for Array<String> '{}' is UNKNOWN, resulting to [].", name);
+                vec!()
+            }
+            _ => {
+                log::error!(target: target, "Couldn't get Array<String> '{}' from the state, resulting to [].", name);
+                vec!()
+            }
+        }
+    }
 
     /// Returns the assignment of a variable in the state,
     /// or panics if the variable is not found.
@@ -149,7 +157,10 @@ impl State {
 
     /// Returns all variables from the state
     pub fn get_all_vars(&self) -> Vec<SPVariable> {
-        self.state.iter().map(|(_, assignment)| assignment.var.clone()).collect()
+        self.state
+            .iter()
+            .map(|(_, assignment)| assignment.var.clone())
+            .collect()
     }
 
     /// Checks whether a variable with the given name is contained in the state.
@@ -182,15 +193,37 @@ impl State {
         let extension = other.state;
         let mut state = HashMap::<String, SPAssignment>::new();
         if overwrite_existing {
-            existing.iter().for_each(|(k, v)| {state.insert(k.clone(), v.clone());});
-            extension.iter().for_each(|(k, v)| {state.insert(k.clone(), v.clone());});
+            existing.iter().for_each(|(k, v)| {
+                state.insert(k.clone(), v.clone());
+            });
+            extension.iter().for_each(|(k, v)| {
+                state.insert(k.clone(), v.clone());
+            });
             State { state }
         } else {
-            extension.iter().for_each(|(k, v)| {state.insert(k.clone(), v.clone());});
-            existing.iter().for_each(|(k, v)| {state.insert(k.clone(), v.clone());});
+            extension.iter().for_each(|(k, v)| {
+                state.insert(k.clone(), v.clone());
+            });
+            existing.iter().for_each(|(k, v)| {
+                state.insert(k.clone(), v.clone());
+            });
             State { state }
         }
     }
+
+    pub fn extract_goal(&self, name: &str) -> Predicate {
+        match self.state.get(&format!("{}_goal", name)) {
+            Some(g_spvalue) => match &g_spvalue.val {
+                SPValue::String(g_value) => match pred_parser::pred(&g_value, &self) {
+                    Ok(goal_predicate) => goal_predicate,
+                    Err(_) => Predicate::TRUE,
+                },
+                _ => Predicate::TRUE,
+            },
+            None => Predicate::TRUE,
+        }
+    }
+
 }
 
 /// Displaying the State in a user-friendly way.
