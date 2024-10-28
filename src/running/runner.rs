@@ -299,7 +299,7 @@ pub async fn planner_ticker(
             "replan = true, replanned = false");
                 println!("planner_ticker: replan = true, replanned = false");
                 let goal = extract_goal_from_state(name.to_string(), &shared_state_local);
-                let updated_state = shared_state_local
+                let mut updated_state = shared_state_local
                     .update(
                         &&format!("{}_plan_counter", name),
                         (runner_plan_counter + 1).to_spvalue(),
@@ -309,8 +309,8 @@ pub async fn planner_ticker(
                         (runner_replan_counter + 1).to_spvalue(),
                     );
                 // .update(&&format!("{}_runner_state", name), "planning".to_spvalue());
-                let updated_state = reset_all_operations(&updated_state);
-                *shared_state.lock().unwrap() = updated_state.clone();
+                // let updated_state = reset_all_operations(&updated_state);
+                // *shared_state.lock().unwrap() = updated_state.clone();
                 let new_plan = bfs_operation_planner(
                     updated_state.clone(),
                     goal,
@@ -319,22 +319,25 @@ pub async fn planner_ticker(
                 );
                 if !new_plan.found {
                     log::error!(target: &&format!("{}_runner", name), "No plan was found");
-                    updated_state.update(&&format!("{}_plan_state", name), "not_found".to_spvalue())
+                    updated_state = updated_state.update(&&format!("{}_plan_state", name), "not_found".to_spvalue());
+                    updated_state
                 } else {
                     if new_plan.length == 0 {
                         log::info!(target: &&format!("{}_runner", name), "We are already in the goal.");
+                        updated_state = updated_state
+                            .update(&&format!("{}_plan_state", name), "completed".to_spvalue());
                         updated_state
-                            .update(&&format!("{}_plan_state", name), "completed".to_spvalue())
                     } else {
                         log::info!(target: &&format!("{}_runner", name), "A new plan was found:");
                         for step in &new_plan.plan {
                             log::info!(target: &&format!("{}_runner", name), "  {}", step);
                         }
-                        updated_state
+                        updated_state = updated_state
                             .update(&&format!("{}_plan", name), new_plan.plan.to_spvalue())
                             .update(&&format!("{}_plan_state", name), "initial".to_spvalue())
                             .update(&&format!("{}_replanned", name), true.to_spvalue())
-                            .update(&&format!("{}_plan_current_step", name), 0.to_spvalue())
+                            .update(&&format!("{}_plan_current_step", name), 0.to_spvalue());
+                        updated_state
                     }
                 }
                 // *shared_state.lock().unwrap() = updated_state;
