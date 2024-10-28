@@ -29,8 +29,8 @@ pub fn generate_runner_state_variables(
     state = state.add(assign!(goal_exists, SPValue::UNKNOWN));
     state = state.add(assign!(
         plan,
-        SPValue::Array(SPValueType::String, vec!())
-    ));
+        SPValue::UNKNOWN)
+    );
     state = state.add(assign!(plan_exists, SPValue::UNKNOWN));
     state = state.add(assign!(plan_name, SPValue::UNKNOWN));
     state = state.add(assign!(plan_state, SPValue::UNKNOWN));
