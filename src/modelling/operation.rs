@@ -86,65 +86,65 @@ impl Operation {
         }
     }
 
-    pub fn eval_planning(self, state: &State) -> bool {
+    pub fn eval_planning(&self, state: &State) -> bool {
         if state.get_value(&self.name) == OperationState::Initial.to_spvalue() {
-            self.precondition.eval_planning(state)
+            self.clone().precondition.eval_planning(state)
         } else {
             false
         }
     }
 
-    pub fn eval_running(self, state: &State) -> bool {
+    pub fn eval_running(&self, state: &State) -> bool {
         if state.get_value(&self.name) == OperationState::Initial.to_spvalue() {
-            self.precondition.eval_running(state)
+            self.clone().precondition.eval_running(state)
         } else {
             false
         }
     }
 
-    pub fn take_planning(self, state: &State) -> State {
-        self.postcondition
-            .take_planning(&self.precondition.take_planning(state))
+    pub fn take_planning(&self, state: &State) -> State {
+        self.clone().postcondition
+            .take_planning(&self.clone().precondition.take_planning(state))
     }
 
-    pub fn start_running(self, state: &State) -> State {
+    pub fn start_running(&self, state: &State) -> State {
         let assignment = state.get_assignment(&self.name);
         if assignment.val == "initial".to_spvalue() {
             let action = Action::new(assignment.var, "executing".wrap());
-            action.assign(&self.precondition.take_running(state))
+            action.assign(&self.clone().precondition.take_running(state))
         } else {
             state.clone()
         }
     }
 
-    pub fn complete_running(self, state: &State) -> State {
+    pub fn complete_running(&self, state: &State) -> State {
         let assignment = state.get_assignment(&self.name);
         if assignment.val == "executing".to_spvalue() {
             let action = Action::new(assignment.var, "completed".wrap());
-            self.postcondition.take_running(&action.assign(&state))
+            self.clone().postcondition.take_running(&action.assign(&state))
         } else {
             state.clone()
         }
     }
 
-    pub fn reset_running(self, state: &State) -> State {
+    pub fn reset_running(&self, state: &State) -> State {
         let assignment = state.get_assignment(&self.name);
         if assignment.val == "completed".to_spvalue() {
             let action = Action::new(assignment.var, "initial".wrap());
-            self.reset_transition.take_running(&action.assign(&state))
+            self.clone().reset_transition.take_running(&action.assign(&state))
         } else {
             state.clone()
         }
     }
 
-    pub fn can_be_completed(self, state: &State) -> bool {
+    pub fn can_be_completed(&self, state: &State) -> bool {
         state.get_value(&self.name) == "executing".to_spvalue()
-            && self.postcondition.eval_running(&state)
+            && self.clone().postcondition.eval_running(&state)
     }
 
-    pub fn can_be_reset(self, state: &State) -> bool {
+    pub fn can_be_reset(&self, state: &State) -> bool {
         state.get_value(&self.name) == "completed".to_spvalue()
-            && self.reset_transition.eval_running(&state)
+            && self.clone().reset_transition.eval_running(&state)
     }
 
     // TODO: test relax function

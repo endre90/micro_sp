@@ -2,169 +2,126 @@ use crate::*;
 use std::sync::{Arc, Mutex};
 use tokio::time::{interval, Duration};
 
-pub async fn simple_operation_runner(
-    name: &str,
+// pub async fn auto_transition_runner(
+//     name: &str,
+//     model: &Model,
+//     shared_state: &Arc<Mutex<State>>,
+//     coverability_tracking: bool,
+// ) -> Result<(), Box<dyn std::error::Error>> {
+//     let mut interval = interval(Duration::from_millis(100));
+//     let model = model.clone();
+//     loop {
+//         let state = shared_state.lock().unwrap().clone();
+
+//         // Auto transitions should be taken as soon as guard becomas true
+//         for t in &model.auto_transitions {
+//             if t.clone().eval_running(&state) {
+//                 let state = shared_state.lock().unwrap().clone();
+//                 let mut updated_state = t.clone().take_running(&state);
+//                 log::info!(target: &&format!("{}_runner", name), "Executed auto transition: '{}'.", t.name);
+//                 if coverability_tracking {
+//                     let taken_auto_counter =
+//                         match state.get_value(&&format!("{}_taken", name)) {
+//                             SPValue::Int64(value) => value,
+//                             _ => {
+//                                 log::error!(target: &&format!("{}_runner", name),
+//                     "Couldn't get '{}_taken' from the shared state.", name);
+//                                 0
+//                             }
+//                         };
+//                     updated_state = updated_state.update(
+//                         &format!("{}_taken", t.name),
+//                         (taken_auto_counter + 1).to_spvalue(),
+//                     );
+//                 }
+//                 *shared_state.lock().unwrap() = updated_state;
+//             }
+//         }
+//         interval.tick().await;
+//     }
+// }
+
+pub async fn operation_runner(
     model: &Model,
     shared_state: &Arc<Mutex<State>>,
     coverability_tracking: bool,
 ) -> Result<(), Box<dyn std::error::Error>> {
+    let name = &model.name;
     let mut interval = interval(Duration::from_millis(100));
     let model = model.clone();
 
-    // Add the variables that keep track of the runner state
-    let planner_state_vars = generate_runner_state_variables(&model, name, coverability_tracking);
-    let shared_state_local = shared_state.lock().unwrap().clone();
-    let updated_state = shared_state_local.extend(planner_state_vars, true);
-    *shared_state.lock().unwrap() = updated_state.clone();
-
     loop {
-        let shared_state_local = shared_state.lock().unwrap().clone();
+        let mut state = shared_state.lock().unwrap().clone();
 
-        // Auto transitions should be taken as soon as guard becomas true
-        for t in &model.auto_transitions {
-            if t.clone().eval_running(&shared_state_local) {
-                let shared_state_local = shared_state.lock().unwrap().clone();
-                let mut updated_state = t.clone().take_running(&shared_state_local);
-                log::info!(target: &&format!("{}_runner", name), "Executed auto transition: '{}'.", t.name);
-                if coverability_tracking {
-                    let taken_auto_counter =
-                        match shared_state_local.get_value(&&format!("{}_taken", name)) {
-                            SPValue::Int64(value) => value,
-                            _ => {
-                                log::error!(target: &&format!("{}_runner", name), 
-                    "Couldn't get '{}_taken' from the shared state.", name);
-                                0
-                            }
-                        };
-                    updated_state = updated_state.update(
-                        &format!("{}_taken", t.name),
-                        (taken_auto_counter + 1).to_spvalue(),
-                    );
-                }
-                *shared_state.lock().unwrap() = updated_state;
-            }
-        }
+        let mut plan_state = state.get_or_default_string(
+            &format!("{}_planner_ticker", name),
+            &format!("{}_plan_state", name),
+        );
+        let mut plan_current_step = state.get_or_default_i64(
+            &format!("{}_planner_ticker", name),
+            &format!("{}_plan_current_step", name),
+        );
+        let mut plan = state.get_or_default_array_of_strings(
+            &format!("{}_planner_ticker", name),
+            &format!("{}_plan", name),
+        );
 
-        // let name =
-        //     match shared_state_local.get_value(&&format!("{}_plan_name", name)) {
-        //         SPValue::String(value) => value,
-        //         _ => {
-        //             log::error!(target: &&format!("{}_runner", name),
-        //     "Couldn't get '{}_plan_name' from the shared state.", name);
-        //             "unknown".to_string()
-        //         }
-        //     };
-
-        let mut runner_plan_state =
-            match shared_state_local.get_value(&&format!("{}_plan_state", name)) {
-                SPValue::String(value) => value,
-                _ => {
-                    log::error!(target: &&format!("{}_runner", name), 
-                "Couldn't get '{}_plan_state' from the shared state.", name);
-                    "unknown".to_string()
-                }
-            };
-
-        match PlanState::from_str(&runner_plan_state) {
+        match PlanState::from_str(&plan_state) {
             PlanState::Initial => {
-                println!("Current state of plan '{}': Initial.", name);
-                log::info!(target: &&format!("{}_runner", name), "Current state of plan '{}': Initial.", name);
-                // let shared_state_local = shared_state.lock().unwrap().clone();
-                // let updated_state = shared_state_local.update(
-                //     &&format!("{}_plan_state", name),
-                //     PlanState::Executing.to_spvalue(),
-                // );
-                log::info!(target: &&format!("{}_runner", name), "Starting plan: '{}'.", name);
-                // *shared_state.lock().unwrap() = updated_state;
-                runner_plan_state = PlanState::Executing.to_string();
+                log::info!(target: &&format!("{}_operation_runner", name), "Current state of plan '{}': Initial.", name);
+                log::info!(target: &&format!("{}_operation_runner", name), "Starting plan: '{:?}'.", plan);
+                plan_state = PlanState::Executing.to_string();
             }
             PlanState::Executing => {
-                println!("Current state of plan '{}': Executing.", name);
+                log::info!(target: &&format!("{}_operation_runner", name), "Current state of plan '{}': Executing.", name);
+                log::info!(target: &&format!("{}_operation_runner", name), "Executing plan: '{:?}'.", plan);
 
-                log::info!(target: &&format!("{}_runner", name), "Current state of plan '{}': Executing.", name);
-                let runner_plan = match shared_state_local.get_value(&&format!("{}_plan", name)) {
-                    SPValue::Array(_sp_value_type, value_array) => value_array,
-                    _ => {
-                        log::error!(target: &&format!("{}_runner", name), 
-                "Couldn't get '{}_plan' from the shared state.", name);
-                        vec![]
-                    }
-                };
-
-                println!("Current plan '{:?}'.", runner_plan);
-                let runner_plan_current_step =
-                    match shared_state_local.get_value(&&format!("{}_plan_current_step", name)) {
-                        SPValue::Int64(value) => value,
-                        // SPValue::UNKNOWN => {
-                        //     log::error!("ADSFASDFASDFASDF");
-                        //     0},
-                        _ => {
-                            log::error!(target: &&format!("{}_runner", name), 
-                "Couldn't get '{}_plan_current_step' from the shared state.", name);
-                            0
-                        }
-                    };
-                if runner_plan.len() > runner_plan_current_step as usize {
-                    let current_model_operation = model
+                if plan.len() > plan_current_step as usize {
+                    let operation = model
                         .operations
                         .iter()
-                        .find(|op| {
-                            op.name == runner_plan[runner_plan_current_step as usize].to_string()
-                        })
+                        .find(|op| op.name == plan[plan_current_step as usize].to_string())
                         .unwrap()
                         .to_owned();
-                    let shared_state_local = shared_state.lock().unwrap().clone();
-                    match OperationState::from_str(
-                        &shared_state_local
-                            .get_value(&current_model_operation.name)
-                            .to_string(),
-                    ) {
+
+                    let operation_state = state.get_or_default_string(
+                        &format!("{}_operation_runner", name),
+                        &format!("{}", operation.name),
+                    );
+
+                    match OperationState::from_str(&operation_state) {
                         OperationState::Initial => {
-                            log::info!(target: &&format!("{}_runner", name), "Current state of operation '{}': Initial.", current_model_operation.name);
-                            if current_model_operation
-                                .clone()
-                                .eval_running(&shared_state_local)
-                            {
-                                let shared_state_local = shared_state.lock().unwrap().clone();
-                                log::info!(target: &&format!("{}_runner", name), "Starting operation: '{}'.", current_model_operation.name);
-                                let updated_state =
-                                    current_model_operation.start_running(&shared_state_local);
-                                *shared_state.lock().unwrap() = updated_state.clone();
+                            log::info!(target: &&format!("{}_operation_runner", name), 
+                                "Current state of operation '{}': Initial.", operation.name);
+                            if operation.eval_running(&state) {
+                                log::info!(target: &&format!("{}_operation_runner", name), 
+                                    "Starting operation: '{}'.", operation.name);
+                                state = operation.start_running(&state);
                             }
                         }
                         OperationState::Disabled => todo!(),
                         OperationState::Executing => {
-                            log::info!(target: &&format!("{}_runner", name), "Current state of operation '{}': Executing.", current_model_operation.name);
-                            if current_model_operation
-                                .clone()
-                                .can_be_completed(&shared_state_local)
-                            {
-                                let shared_state_local = shared_state.lock().unwrap().clone();
-                                let updated_state = current_model_operation
-                                    .clone()
-                                    .complete_running(&shared_state_local);
-                                log::info!(target: &&format!("{}_runner", name), 
-                "Completing operation: '{}'.", current_model_operation.name);
-                                *shared_state.lock().unwrap() = updated_state.clone();
+                            log::info!(target: &&format!("{}_operation_runner", name), 
+                            "Current state of operation '{}': Executing.", operation.name);
+                            if operation.can_be_completed(&state) {
+                                state = operation.clone().complete_running(&state);
+                                log::info!(target: &&format!("{}_operation_runner", name), 
+                                    "Completing operation: '{}'.", operation.name);
                             } else {
-                                log::info!(target: &&format!("{}_runner", name), 
-                "Waiting for operation: '{}' to be completed.", current_model_operation.name);
+                                log::info!(target: &&format!("{}_operation_runner", name), 
+                                    "Waiting for operation: '{}' to be completed.", operation.name);
                             }
                         }
                         OperationState::Completed => {
-                            log::info!(target: &&format!("{}_runner", name), "Current state of operation '{}': Completed.", current_model_operation.name);
+                            log::info!(target: &&format!("{}_runner", name), 
+                                "Current state of operation '{}': Completed.", operation.name);
+                            plan_current_step = plan_current_step + 1;
                             // let current_model_operation = model
                             //     .operations
                             //     .iter()
                             //     .find(|op| op.name == current_model_operation.name)
                             //     .unwrap()
                             //     .to_owned();
-
-                            let updated_state = updated_state.update(
-                                &&format!("{}_plan_current_step", name),
-                                (runner_plan_current_step + 1).to_spvalue(),
-                            );
-                            *shared_state.lock().unwrap() = updated_state.clone();
 
                             //             if current_model_operation
                             //                 .clone()
@@ -185,33 +142,28 @@ pub async fn simple_operation_runner(
                         OperationState::UNKNOWN => (),
                     }
                 } else {
-                    log::info!(target: &&format!("{}_runner", name), 
+                    log::info!(target: &&format!("{}_operation_runner", name), 
                 "Completed plan: '{}'.", name);
+                    plan_state = PlanState::Completed.to_string();
                 }
             }
             PlanState::Paused => {
-                println!("Current state of plan '{}': Paused.", name);
                 log::info!(target: &&format!("{}_runner", name), "Current state of plan '{}': Paused.", name)
             }
             PlanState::Failed => {
-                println!("Current state of plan '{}': Failed.", name);
                 log::info!(target: &&format!("{}_runner", name), "Current state of plan '{}': Failed.", name)
             }
             PlanState::NotFound => {
-                println!("Current state of plan '{}': NotFound.", name);
                 log::info!(target: &&format!("{}_runner", name), "Current state of plan '{}': NotFound.", name)
             }
             PlanState::Completed => {
-                println!("Current state of plan '{}': Completed.", name);
                 log::info!(target: &&format!("{}_runner", name), "Current state of plan '{}': Completed.", name)
             }
             PlanState::Cancelled => {
-                println!("Current state of plan '{}': Cancelled.", name);
                 log::info!(target: &&format!("{}_runner", name), "Current state of plan '{}': Cancelled.", name)
             }
             PlanState::UNKNOWN => {
-                println!("Current state of plan '{}': UNKNOWN.", name);
-                log::info!(target: &&format!("{}_runner", name), "Current state of plan '{}': Unknown.", name)
+                log::info!(target: &&format!("{}_runner", name), "Current state of plan '{}': UNKNOWN.", name)
             }
         }
 
@@ -220,10 +172,10 @@ pub async fn simple_operation_runner(
 }
 
 pub async fn planner_ticker(
-    name: &str,
     model: &Model,
     shared_state: &Arc<Mutex<State>>,
 ) -> Result<(), Box<dyn std::error::Error>> {
+    let name = &model.name;
     let mut interval = interval(Duration::from_millis(100));
     let model = model.clone();
 
