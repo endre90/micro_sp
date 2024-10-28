@@ -129,7 +129,7 @@ impl State {
 
     pub fn get_or_default_array_of_strings(&self, target: &str, name: &str) -> Vec<String> {
         match self.get_value(name) {
-            SPValue::Array(SPValueType::String, arr) => arr.iter()
+            SPValue::Array(_, arr) => arr.iter()
             .map(|x| match x {
                 SPValue::String(value) => value.clone(),
                 _ => "".to_string(),
