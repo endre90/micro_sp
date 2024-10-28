@@ -112,6 +112,20 @@ impl State {
         }
     }
 
+    pub fn get_or_default_f64(&self, target: &str, name: &str) -> f64 {
+        match self.get_value(name) {
+            SPValue::Float64(value) => value.into_inner(),
+            SPValue::UNKNOWN => {
+                log::warn!(target: target, "Value for Float64 '{}' is UNKNOWN, resulting to 0.0.", name);
+                0.0
+            }
+            _ => {
+                log::error!(target: target, "Couldn't get Float64 '{}' from the state, resulting to 0.0.", name);
+                0.0
+            }
+        }
+    }
+
 
     pub fn get_or_default_string(&self, target: &str, name: &str) -> String {
         match self.get_value(name) {
