@@ -149,6 +149,15 @@ impl ToSPValue for bool {
     }
 }
 
+impl ToSPValue for Option<bool> {
+    fn to_spvalue(&self) -> SPValue {
+        match self {
+            Some(value) => SPValue::Bool(*value),
+            None => SPValue::UNKNOWN
+        }
+    }
+}
+
 impl ToSPValue for i64 {
     fn to_spvalue(&self) -> SPValue {
         SPValue::Int64(*self)
