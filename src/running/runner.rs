@@ -227,7 +227,7 @@ pub async fn planner_ticker(
 
         if current_local_version != last_known_local_version {
             println!(
-                "operation_runner: {} - {}",
+                "planner_ticker: {} - {}",
                 current_local_version, last_known_local_version
             );
             // state has been updated by the "gantry_interface" task
