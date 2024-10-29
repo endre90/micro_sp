@@ -3,9 +3,7 @@ use crate::*;
 // If coverability_tracking is true, generate variables to track how many
 // times an operation has entered its different running states
 pub fn generate_runner_state_variables(
-    model: &Model,
     name: &str,
-    coverability_tracking: bool,
 ) -> State {
     let mut state = State::new();
 
@@ -30,10 +28,7 @@ pub fn generate_runner_state_variables(
     state = state.add(assign!(runner_ref_counter, 1.to_spvalue()));
     state = state.add(assign!(goal, SPValue::UNKNOWN));
     state = state.add(assign!(goal_exists, SPValue::UNKNOWN));
-    state = state.add(assign!(
-        plan,
-        SPValue::UNKNOWN)
-    );
+    state = state.add(assign!(plan, SPValue::UNKNOWN));
     state = state.add(assign!(plan_exists, SPValue::UNKNOWN));
     state = state.add(assign!(plan_name, SPValue::UNKNOWN));
     state = state.add(assign!(plan_state, SPValue::UNKNOWN));
@@ -46,6 +41,14 @@ pub fn generate_runner_state_variables(
     state = state.add(assign!(replan_fail_counter, SPValue::UNKNOWN));
     state = state.add(assign!(replan_trigger, SPValue::UNKNOWN));
 
+    state
+}
+
+pub fn generate_operation_state_variables(
+    model: &Model,
+    coverability_tracking: bool,
+) -> State {
+    let mut state = State::new();
     // operations should be put in the initial state once they are part of the plan
     for operation in &model.operations {
         let operation_state = v!(&&format!("{}", operation.name));
@@ -114,7 +117,7 @@ mod tests {
 
     #[test]
     fn test_model() {
-        let model = Model::new("ASDF", vec!(), vec!());
-        let _ = generate_runner_state_variables(&model, "ASDF", false);
+        // let model = Model::new("ASDF", vec![], vec![]);
+        let _ = generate_runner_state_variables("asdf");
     }
 }
