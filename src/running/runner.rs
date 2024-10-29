@@ -49,16 +49,16 @@ pub async fn operation_runner(
     let mut interval = interval(Duration::from_millis(100));
     let model = model.clone();
 
-    let mut ref_count: i64 = 0;
+    // let mut ref_count: i64 = 0;
 
     loop {
         let mut state = shared_state.lock().unwrap().clone();
-        let ref_counter = state.get_or_default_i64(
-            &format!("{}_operation_runner", name),
-            &format!("{}_runner_ref_counter", name),
-        );
-        if ref_counter > ref_count {
-            ref_count = ref_counter;
+        // let ref_counter = state.get_or_default_i64(
+        //     &format!("{}_operation_runner", name),
+        //     &format!("{}_runner_ref_counter", name),
+        // );
+        // if ref_counter > ref_count {
+        //     ref_count = ref_counter;
 
             let mut plan_state = state.get_or_default_string(
                 &format!("{}_operation_runner", name),
@@ -180,20 +180,20 @@ pub async fn operation_runner(
                     &format!("{}_plan_current_step", name),
                     plan_current_step.to_spvalue(),
                 )
-                .update(&format!("{}_plan", name), plan.to_spvalue())
-                .update(
-                    &format!("{}_runner_ref_counter", name),
-                    (ref_counter + 1).to_spvalue(),
-                );
+                .update(&format!("{}_plan", name), plan.to_spvalue());
+                // .update(
+                //     &format!("{}_runner_ref_counter", name),
+                //     (ref_counter + 1).to_spvalue(),
+                // );
 
             *shared_state.lock().unwrap() = updated_state.clone();
-        } else {
-            let updated_state = state.update(
-                &format!("{}_runner_ref_counter", name),
-                (ref_counter + 1).to_spvalue(),
-            );
-            *shared_state.lock().unwrap() = updated_state.clone();
-        }
+        // } else {
+        //     let updated_state = state.update(
+        //         &format!("{}_runner_ref_counter", name),
+        //         (ref_counter + 1).to_spvalue(),
+        //     );
+        //     *shared_state.lock().unwrap() = updated_state.clone();
+        // }
         interval.tick().await;
     }
 }
@@ -206,16 +206,16 @@ pub async fn planner_ticker(
     let mut interval = interval(Duration::from_millis(100));
     let model = model.clone();
 
-    let mut ref_count: i64 = 0;
+    // let mut ref_count: i64 = 0;
 
     loop {
         let state = shared_state.lock().unwrap().clone();
-        let ref_counter = state.get_or_default_i64(
-            &format!("{}_planner_ticker", name),
-            &format!("{}_planner_ref_counter", name),
-        );
-        if ref_counter > ref_count {
-            ref_count = ref_counter;
+        // let ref_counter = state.get_or_default_i64(
+        //     &format!("{}_planner_ticker", name),
+        //     &format!("{}_planner_ref_counter", name),
+        // );
+        // if ref_counter > ref_count {
+        //     ref_count = ref_counter;
         let mut replan_trigger = state.get_or_default_bool(
             &format!("{}_planner_ticker", name),
             &format!("{}_replan_trigger", name),
@@ -301,20 +301,20 @@ pub async fn planner_ticker(
                 &format!("{}_plan_current_step", name),
                 plan_current_step.to_spvalue(),
             )
-            .update(&format!("{}_plan", name), plan.to_spvalue())
-            .update(
-                &format!("{}_planner_ref_counter", name),
-                (ref_counter + 1).to_spvalue(),
-            );
+            .update(&format!("{}_plan", name), plan.to_spvalue());
+            // .update(
+            //     &format!("{}_planner_ref_counter", name),
+            //     (ref_counter + 1).to_spvalue(),
+            // );
 
         *shared_state.lock().unwrap() = updated_state.clone();
-        } else {
-            let updated_state = state.update(
-                &format!("{}_planner_ref_counter", name),
-                (ref_counter + 1).to_spvalue(),
-            );
-            *shared_state.lock().unwrap() = updated_state.clone();
-        }
+        // } else {
+        //     let updated_state = state.update(
+        //         &format!("{}_planner_ref_counter", name),
+        //         (ref_counter + 1).to_spvalue(),
+        //     );
+        //     *shared_state.lock().unwrap() = updated_state.clone();
+        // }
         interval.tick().await;
     }
 }
