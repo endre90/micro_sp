@@ -165,7 +165,7 @@ mod tests {
             Vec::<&str>::new(),
             &state
         ),
-        Transition::empty()
+        Transition::empty(), Transition::empty()
     );
 
         let op_move_to_c = Operation::new(
@@ -195,7 +195,7 @@ mod tests {
             Vec::<&str>::new(),
             &state
         ),
-        Transition::empty()
+        Transition::empty(), Transition::empty()
     );
 
         let op_move_to_d = Operation::new(
@@ -225,7 +225,7 @@ mod tests {
             Vec::<&str>::new(),
             &state
         ),
-        Transition::empty()
+        Transition::empty(), Transition::empty()
     );
 
         // Adding the opeation states in the model

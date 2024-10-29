@@ -6,7 +6,6 @@ use serde::{Deserialize, Serialize};
 // use crate::{Action, SPValue, State, ToSPValue, ToSPWrapped, Transition};
 use crate::*;
 
-
 #[derive(Debug, PartialEq, Clone, Eq, Hash, Serialize, Deserialize)]
 pub enum OperationState {
     Initial,
@@ -68,21 +67,31 @@ pub struct Operation {
     pub deadline: Option<OrderedFloat<f64>>,
     pub precondition: Transition,
     pub postcondition: Transition,
-    pub reset_transition: Transition
+    pub fail_transition: Transition, // pub fail_transitions: Vec<Transition>, one option to solve this
+    // pub deadline_transition: Transition,
+    pub reset_transition: Transition,
 }
 
 impl Operation {
-    pub fn new(name: &str, deadline: Option<f64>, precondition: Transition, postcondition: Transition, reset_transition: Transition) -> Operation {
+    pub fn new(
+        name: &str,
+        deadline: Option<f64>,
+        precondition: Transition,
+        postcondition: Transition,
+        fail_transition: Transition,
+        reset_transition: Transition,
+    ) -> Operation {
         Operation {
             name: name.to_string(),
             state: OperationState::UNKNOWN,
             deadline: match deadline {
                 None => Some(OrderedFloat::from(MAX_ALLOWED_OPERATION_DURATION)),
-                Some(x) => Some(OrderedFloat::from(x))
+                Some(x) => Some(OrderedFloat::from(x)),
             },
             precondition,
             postcondition,
-            reset_transition
+            fail_transition,
+            reset_transition,
         }
     }
 
@@ -103,7 +112,8 @@ impl Operation {
     }
 
     pub fn take_planning(&self, state: &State) -> State {
-        self.clone().postcondition
+        self.clone()
+            .postcondition
             .take_planning(&self.clone().precondition.take_planning(state))
     }
 
@@ -121,17 +131,31 @@ impl Operation {
         let assignment = state.get_assignment(&self.name);
         if assignment.val == "executing".to_spvalue() {
             let action = Action::new(assignment.var, "completed".wrap());
-            self.clone().postcondition.take_running(&action.assign(&state))
+            self.clone()
+                .postcondition
+                .take_running(&action.assign(&state))
         } else {
             state.clone()
         }
     }
 
+    // pub fn fail_running(&self, state: &State) -> State {
+    //     let assignment = state.get_assignment(&self.name);
+    //     if assignment.val == "executing".to_spvalue() {
+    //         let action = Action::new(assignment.var, "failed".wrap());
+    //         self.clone().postcondition.take_running(&action.assign(&state))
+    //     } else {
+    //         state.clone()
+    //     }
+    // }
+
     pub fn reset_running(&self, state: &State) -> State {
         let assignment = state.get_assignment(&self.name);
         if assignment.val == "completed".to_spvalue() {
             let action = Action::new(assignment.var, "initial".wrap());
-            self.clone().reset_transition.take_running(&action.assign(&state))
+            self.clone()
+                .reset_transition
+                .take_running(&action.assign(&state))
         } else {
             state.clone()
         }
@@ -142,25 +166,32 @@ impl Operation {
             && self.clone().postcondition.eval_running(&state)
     }
 
+    // NOTE: for now only one fail transition per opertion but
+    // it should be vector because it can fail multiple ways
+    pub fn can_be_failed(&self, state: &State) -> bool {
+        state.get_value(&self.name) == "executing".to_spvalue()
+            && self.clone().fail_transition.eval_running(&state)
+    }
+
     pub fn can_be_reset(&self, state: &State) -> bool {
         state.get_value(&self.name) == "completed".to_spvalue()
             && self.clone().reset_transition.eval_running(&state)
     }
 
-    // TODO: test relax function
-    pub fn relax(self, vars: &Vec<String>) -> Operation {
-        let r_precondition = self.precondition.relax(vars);
-        let r_postcondition = self.postcondition.relax(vars);
-        let r_reset_transition = self.reset_transition.relax(vars);
-        Operation {
-            name: self.name,
-            state: self.state,
-            deadline: self.deadline,
-            precondition: r_precondition,
-            postcondition: r_postcondition,
-            reset_transition: r_reset_transition
-        }
-    }
+    // // TODO: test relax function
+    // pub fn relax(self, vars: &Vec<String>) -> Operation {
+    //     let r_precondition = self.precondition.relax(vars);
+    //     let r_postcondition = self.postcondition.relax(vars);
+    //     let r_reset_transition = self.reset_transition.relax(vars);
+    //     Operation {
+    //         name: self.name,
+    //         state: self.state,
+    //         deadline: self.deadline,
+    //         precondition: r_precondition,
+    //         postcondition: r_postcondition,
+    //         reset_transition: r_reset_transition,
+    //     }
+    // }
 
     // TODO: contains planning function
     pub fn contains_planning(self, var: &String) -> bool {
@@ -183,10 +214,7 @@ mod tests {
             av!("runner_plan"),
             Vec::<String>::new().to_spvalue(),
         ));
-        let state = state.add(SPAssignment::new(
-            bv!("runner_replan"),
-            true.to_spvalue(),
-        ));
+        let state = state.add(SPAssignment::new(bv!("runner_replan"), true.to_spvalue()));
         let state = state.add(SPAssignment::new(
             bv!("runner_replanned"),
             false.to_spvalue(),
@@ -199,30 +227,15 @@ mod tests {
             v!("ur_action_state"),
             "initial".to_spvalue(),
         ));
-        let state = state.add(SPAssignment::new(
-            v!("ur_current_pose"),
-            "a".to_spvalue(),
-        ));
-        let state = state.add(SPAssignment::new(
-            v!("ur_command"),
-            "movej".to_spvalue(),
-        ));
-        let state = state.add(SPAssignment::new(
-            fv!("ur_velocity"),
-            0.2.to_spvalue(),
-        ));
-        let state = state.add(SPAssignment::new(
-            fv!("ur_acceleration"),
-            0.4.to_spvalue(),
-        ));
+        let state = state.add(SPAssignment::new(v!("ur_current_pose"), "a".to_spvalue()));
+        let state = state.add(SPAssignment::new(v!("ur_command"), "movej".to_spvalue()));
+        let state = state.add(SPAssignment::new(fv!("ur_velocity"), 0.2.to_spvalue()));
+        let state = state.add(SPAssignment::new(fv!("ur_acceleration"), 0.4.to_spvalue()));
         let state = state.add(SPAssignment::new(
             v!("ur_goal_feature_id"),
             "a".to_spvalue(),
         ));
-        let state = state.add(SPAssignment::new(
-            v!("ur_tcp_id"),
-            "svt_tcp".to_spvalue(),
-        ));
+        let state = state.add(SPAssignment::new(v!("ur_tcp_id"), "svt_tcp".to_spvalue()));
         state
     }
 
@@ -256,7 +269,7 @@ mod tests {
             Vec::<&str>::new(),
             &state
         ),
-        Transition::empty()
+        Transition::empty(),Transition::empty()
     );
     }
 
@@ -292,7 +305,7 @@ mod tests {
             Vec::<&str>::new(),
             &state
         ),
-        Transition::empty()
+        Transition::empty(), Transition::empty()
     );
 
         // Adding the opeation states in the model
@@ -333,7 +346,7 @@ mod tests {
             Vec::<&str>::new(),
             &state
         ),
-        Transition::empty()
+        Transition::empty(), Transition::empty()
     );
 
         // Adding the opeation states in the model
@@ -373,7 +386,7 @@ mod tests {
             Vec::<&str>::new(),
             &state
         ),
-        Transition::empty()
+        Transition::empty(), Transition::empty()
     );
 
         // Adding the opeation states in the model
@@ -414,7 +427,7 @@ mod tests {
             Vec::<&str>::new(),
             &state
         ),
-        Transition::empty()
+        Transition::empty(), Transition::empty()
     );
 
         // Adding the opeation states in the model
@@ -454,7 +467,7 @@ mod tests {
             Vec::<&str>::new(),
             &state
         ),
-        Transition::empty()
+        Transition::empty(), Transition::empty()
     );
 
         // Adding the opeation states in the model
@@ -502,7 +515,7 @@ mod tests {
             Vec::<&str>::new(),
             &state
         ),
-        Transition::empty()
+        Transition::empty(), Transition::empty()
     );
 
         // Adding the opeation states in the model
@@ -554,7 +567,7 @@ mod tests {
             Vec::<&str>::new(),
             &state
         ),
-        Transition::empty()
+        Transition::empty(), Transition::empty()
     );
 
         // Adding the opeation states in the model
