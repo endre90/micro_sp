@@ -139,15 +139,15 @@ impl Operation {
         }
     }
 
-    // pub fn fail_running(&self, state: &State) -> State {
-    //     let assignment = state.get_assignment(&self.name);
-    //     if assignment.val == "executing".to_spvalue() {
-    //         let action = Action::new(assignment.var, "failed".wrap());
-    //         self.clone().postcondition.take_running(&action.assign(&state))
-    //     } else {
-    //         state.clone()
-    //     }
-    // }
+    pub fn fail_running(&self, state: &State) -> State {
+        let assignment = state.get_assignment(&self.name);
+        if assignment.val == "executing".to_spvalue() {
+            let action = Action::new(assignment.var, "failed".wrap());
+            self.clone().fail_transition.take_running(&action.assign(&state))
+        } else {
+            state.clone()
+        }
+    }
 
     pub fn reset_running(&self, state: &State) -> State {
         let assignment = state.get_assignment(&self.name);

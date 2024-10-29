@@ -126,6 +126,10 @@ pub async fn operation_runner(
                                     state = operation.clone().complete_running(&state);
                                     log::info!(target: &&format!("{}_operation_runner", name), 
                                     "Completing operation: '{}'.", operation.name);
+                                } else if operation.can_be_failed(&state) {
+                                        state = operation.clone().fail_running(&state);
+                                        log::error!(target: &&format!("{}_operation_runner", name), 
+                                        "Failing operation: '{}'.", operation.name);
                                 } else {
                                     log::info!(target: &&format!("{}_operation_runner", name), 
                                     "Waiting for operation: '{}' to be completed.", operation.name);
@@ -157,7 +161,10 @@ pub async fn operation_runner(
                                 //             }
                             }
                             OperationState::Timedout => todo!(),
-                            OperationState::Failed => todo!(),
+                            OperationState::Failed => {
+                                // here we can do retries before replanning and keep track how many retries we have made
+                                todo!()
+                            },
                             OperationState::UNKNOWN => (),
                         }
                     } else {
