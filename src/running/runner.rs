@@ -2,44 +2,44 @@ use crate::*;
 use std::sync::{atomic::{AtomicUsize, Ordering}, Arc, Mutex};
 use tokio::time::{interval, Duration};
 
-// pub async fn auto_transition_runner(
-//     name: &str,
-//     model: &Model,
-//     shared_state: &Arc<Mutex<State>>,
-//     coverability_tracking: bool,
-// ) -> Result<(), Box<dyn std::error::Error>> {
-//     let mut interval = interval(Duration::from_millis(100));
-//     let model = model.clone();
-//     loop {
-//         let state = shared_state.lock().unwrap().clone();
+pub async fn auto_transition_runner(
+    name: &str,
+    model: &Model,
+    shared_state: &Arc<(Mutex<State>, Vec<AtomicUsize>)>, //HashMap<String, AtomicUsize>)>,
+    coverability_tracking: bool,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let mut interval = interval(Duration::from_millis(100));
+    let model = model.clone();
+    loop {
+        let mut state = shared_state.0.lock().unwrap().clone();
 
-//         // Auto transitions should be taken as soon as guard becomas true
-//         for t in &model.auto_transitions {
-//             if t.clone().eval_running(&state) {
-//                 let state = shared_state.lock().unwrap().clone();
-//                 let mut updated_state = t.clone().take_running(&state);
-//                 log::info!(target: &&format!("{}_runner", name), "Executed auto transition: '{}'.", t.name);
-//                 if coverability_tracking {
-//                     let taken_auto_counter =
-//                         match state.get_value(&&format!("{}_taken", name)) {
-//                             SPValue::Int64(value) => value,
-//                             _ => {
-//                                 log::error!(target: &&format!("{}_runner", name),
-//                     "Couldn't get '{}_taken' from the shared state.", name);
-//                                 0
-//                             }
-//                         };
-//                     updated_state = updated_state.update(
-//                         &format!("{}_taken", t.name),
-//                         (taken_auto_counter + 1).to_spvalue(),
-//                     );
-//                 }
-//                 *shared_state.lock().unwrap() = updated_state;
-//             }
-//         }
-//         interval.tick().await;
-//     }
-// }
+        // Auto transitions should be taken as soon as guard becomas true
+        for t in &model.auto_transitions {
+            // let state_clone = state.clone();
+            if t.clone().eval_running(&state) {
+                state = t.clone().take_running(&state);
+                log::info!(target: &&format!("{}_auto_runner", name), "Executed auto transition: '{}'.", t.name);
+                if coverability_tracking {
+                    let taken_auto_counter =
+                        match state.get_value(&&format!("{}_taken", name)) {
+                            SPValue::Int64(value) => value,
+                            _ => {
+                                log::error!(target: &&format!("{}_runner", name),
+                    "Couldn't get '{}_taken' from the shared state.", name);
+                                0
+                            }
+                        };
+                    state = state.update(
+                        &format!("{}_taken", t.name),
+                        (taken_auto_counter + 1).to_spvalue(),
+                    );
+                }
+                *shared_state.0.lock().unwrap() = state.clone();
+            }
+        }
+        interval.tick().await;
+    }
+}
 
 pub async fn operation_runner(
     model: &Model,
