@@ -56,12 +56,12 @@ pub async fn operation_runner(
         let mut current_local_version = shared_state.1[2].load(Ordering::SeqCst);
 
         if current_local_version != last_known_local_version {
-            println!(
-                "operation_runner: {} - {}",
-                current_local_version, last_known_local_version
-            );
+            // println!(
+            //     "operation_runner: {} - {}",
+            //     current_local_version, last_known_local_version
+            // );
             // state has been updated by the "gantry_interface" task
-            log::warn!(target: &&format!("{}_operation_runner", name), "state has been updated by the 'operation_runner' task");
+            // log::warn!(target: &&format!("{}_operation_runner", name), "state has been updated by the 'operation_runner' task");
             last_known_local_version = current_local_version;
 
             let mut state = shared_state.0.lock().unwrap().clone();
@@ -226,12 +226,12 @@ pub async fn planner_ticker(
         let mut current_local_version = shared_state.1[3].load(Ordering::SeqCst);
 
         if current_local_version != last_known_local_version {
-            println!(
-                "planner_ticker: {} - {}",
-                current_local_version, last_known_local_version
-            );
+            // println!(
+            //     "planner_ticker: {} - {}",
+            //     current_local_version, last_known_local_version
+            // );
             // state has been updated by the "gantry_interface" task
-            log::warn!(target: &&format!("{}_operation_runner", name), "state has been updated by the 'operation_runner' task");
+            // log::warn!(target: &&format!("{}_operation_runner", name), "state has been updated by the 'operation_runner' task");
             last_known_local_version = current_local_version;
 
             let state = shared_state.0.lock().unwrap().clone();
