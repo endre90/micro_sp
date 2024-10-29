@@ -197,7 +197,7 @@ pub async fn operation_runner(
             //     &format!("{}_runner_ref_counter", name),
             //     (ref_counter + 1).to_spvalue(),
             // );
-
+            shared_state.1[2].fetch_add(1, Ordering::SeqCst);
             *shared_state.0.lock().unwrap() = updated_state.clone();
             // } else {
             //     let updated_state = state.update(
@@ -331,7 +331,7 @@ pub async fn planner_ticker(
             //     &format!("{}_planner_ref_counter", name),
             //     (ref_counter + 1).to_spvalue(),
             // );
-
+            shared_state.1[3].fetch_add(1, Ordering::SeqCst);
             *shared_state.0.lock().unwrap() = updated_state.clone();
             // } else {
             //     let updated_state = state.update(
