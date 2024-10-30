@@ -158,7 +158,7 @@ impl Operation {
     pub fn retry_running(&self, state: &State) -> State {
         let assignment = state.get_assignment(&self.name);
         if assignment.val == "failed".to_spvalue() {
-            let action = Action::new(assignment.var, "executing".wrap());
+            let action = Action::new(assignment.var, "initial".wrap());
             action.assign(&state)
         } else {
             state.clone()
