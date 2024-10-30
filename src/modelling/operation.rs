@@ -65,6 +65,7 @@ pub struct Operation {
     pub name: String,
     pub state: OperationState,
     pub deadline: Option<OrderedFloat<f64>>,
+    pub retries: i64,
     pub precondition: Transition,
     pub postcondition: Transition,
     pub fail_transition: Transition, // pub fail_transitions: Vec<Transition>, one option to solve this
@@ -76,6 +77,7 @@ impl Operation {
     pub fn new(
         name: &str,
         deadline: Option<f64>,
+        retries: Option<i64>,
         precondition: Transition,
         postcondition: Transition,
         fail_transition: Transition,
@@ -87,6 +89,10 @@ impl Operation {
             deadline: match deadline {
                 None => Some(OrderedFloat::from(MAX_ALLOWED_OPERATION_DURATION)),
                 Some(x) => Some(OrderedFloat::from(x)),
+            },
+            retries: match retries {
+                Some(x) => x,
+                None => 0
             },
             precondition,
             postcondition,
@@ -144,6 +150,16 @@ impl Operation {
         if assignment.val == "executing".to_spvalue() {
             let action = Action::new(assignment.var, "failed".wrap());
             self.clone().fail_transition.take_running(&action.assign(&state))
+        } else {
+            state.clone()
+        }
+    }
+
+    pub fn retry_running(&self, state: &State) -> State {
+        let assignment = state.get_assignment(&self.name);
+        if assignment.val == "failed".to_spvalue() {
+            let action = Action::new(assignment.var, "executing".wrap());
+            action.assign(&state)
         } else {
             state.clone()
         }
@@ -245,6 +261,7 @@ mod tests {
         Operation::new(
         "op_move_to_b",
         None,
+        None,
         t!(
             "start_moving_to_b",
             "var:ur_action_trigger == false && var:ur_action_state == initial && var:ur_current_pose != b",
@@ -280,6 +297,7 @@ mod tests {
         let state = state.add(assign!(op_move_to_b, "initial".to_spvalue()));
         let op = Operation::new(
         "op_move_to_b",
+        None,
         None,
         t!(
             "start_moving_to_b",
@@ -322,6 +340,7 @@ mod tests {
         let op = Operation::new(
         "op_move_to_b",
         None,
+        None,
         t!(
             "start_moving_to_b",
             "var:ur_action_trigger == false && var:ur_action_state == initial && var:ur_current_pose == b",
@@ -361,6 +380,7 @@ mod tests {
         let state = state.add(assign!(op_move_to_b, "initial".to_spvalue()));
         let op = Operation::new(
         "op_move_to_b",
+        None,
         None,
         t!(
             "start_moving_to_b",
@@ -403,6 +423,7 @@ mod tests {
         let op = Operation::new(
         "op_move_to_b",
         None,
+        None,
         t!(
             "start_moving_to_b",
             "var:ur_action_trigger == false && var:ur_action_state == initial && var:ur_current_pose != b",
@@ -442,6 +463,7 @@ mod tests {
         let state = state.add(assign!(op_move_to_b, "initial".to_spvalue()));
         let op = Operation::new(
         "op_move_to_b",
+        None,
         None,
         t!(
             "start_moving_to_b",
@@ -490,6 +512,7 @@ mod tests {
         let state = state.add(assign!(op_move_to_b, "initial".to_spvalue()));
         let op = Operation::new(
         "op_move_to_b",
+        None,
         None,
         t!(
             "start_moving_to_b",
@@ -542,6 +565,7 @@ mod tests {
         let state = state.add(assign!(op_move_to_b, "initial".to_spvalue()));
         let op = Operation::new(
         "op_move_to_b",
+        None,
         None,
         t!(
             "start_moving_to_b",

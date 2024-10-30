@@ -53,8 +53,10 @@ pub fn generate_operation_state_variables(
     for operation in &model.operations {
         let operation_state = v!(&&format!("{}", operation.name));
         let operation_duration = fv!(&&format!("{}_duration", operation.name));
+        let operation_retry_counter = iv!(&&format!("{}_retry_counter", operation.name));
         state = state.add(assign!(operation_state, "initial".to_spvalue()));
         state = state.add(assign!(operation_duration, 0.0.to_spvalue()));
+        state = state.add(assign!(operation_retry_counter, 0.to_spvalue()));
 
         if coverability_tracking {
             let initial = iv!(&&format!("{}_visited_initial", operation.name));

@@ -1,5 +1,8 @@
 use crate::*;
-use std::sync::{atomic::{AtomicUsize, Ordering}, Arc, Mutex};
+use std::sync::{
+    atomic::{AtomicUsize, Ordering},
+    Arc, Mutex,
+};
 use tokio::time::{interval, Duration};
 
 pub async fn auto_transition_runner(
@@ -20,15 +23,14 @@ pub async fn auto_transition_runner(
                 state = t.clone().take_running(&state);
                 log::info!(target: &&format!("{}_auto_runner", name), "Executed auto transition: '{}'.", t.name);
                 if coverability_tracking {
-                    let taken_auto_counter =
-                        match state.get_value(&&format!("{}_taken", name)) {
-                            SPValue::Int64(value) => value,
-                            _ => {
-                                log::error!(target: &&format!("{}_runner", name),
+                    let taken_auto_counter = match state.get_value(&&format!("{}_taken", name)) {
+                        SPValue::Int64(value) => value,
+                        _ => {
+                            log::error!(target: &&format!("{}_runner", name),
                     "Couldn't get '{}_taken' from the shared state.", name);
-                                0
-                            }
-                        };
+                            0
+                        }
+                    };
                     state = state.update(
                         &format!("{}_taken", t.name),
                         (taken_auto_counter + 1).to_spvalue(),
@@ -127,8 +129,8 @@ pub async fn operation_runner(
                                     log::info!(target: &&format!("{}_operation_runner", name), 
                                     "Completing operation: '{}'.", operation.name);
                                 } else if operation.can_be_failed(&state) {
-                                        state = operation.clone().fail_running(&state);
-                                        log::error!(target: &&format!("{}_operation_runner", name), 
+                                    state = operation.clone().fail_running(&state);
+                                    log::error!(target: &&format!("{}_operation_runner", name), 
                                         "Failing operation: '{}'.", operation.name);
                                 } else {
                                     log::info!(target: &&format!("{}_operation_runner", name), 
@@ -162,9 +164,26 @@ pub async fn operation_runner(
                             }
                             OperationState::Timedout => todo!(),
                             OperationState::Failed => {
-                                // here we can do retries before replanning and keep track how many retries we have made
-                                todo!()
-                            },
+                                log::error!(target: &&format!("{}_operation_runner", name), 
+                                        "Operation: '{}' has failed.", operation.name);
+                                let mut operation_retry_counter = state.get_or_default_i64(
+                                    &format!("{}_operation_runner", name),
+                                    &format!("{}_retry_counter", name),
+                                );
+                                if operation_retry_counter < operation.retries {
+                                    operation_retry_counter = operation_retry_counter + 1;
+                                    log::error!(target: &&format!("{}_operation_runner", name), 
+                                    "Retrying operation: '{}'. Retry nr. {} out of {}.", operation.name, operation_retry_counter, operation.retries);
+                                    state = operation.clone().retry_running(&state);
+                                    state = state.update(&format!("{}_retry_counter", operation.name), operation_retry_counter.to_spvalue());
+                                } else {
+                                    operation_retry_counter = 0;
+                                    state = state.update(&format!("{}_retry_counter", operation.name), operation_retry_counter.to_spvalue());
+                                    log::error!(target: &&format!("{}_operation_runner", name), 
+                                        "Failing the plan '{} : {:?}'.", name, plan);
+                                    plan_state = PlanState::Failed.to_string();
+                                }
+                            }
                             OperationState::UNKNOWN => (),
                         }
                     } else {
@@ -177,7 +196,8 @@ pub async fn operation_runner(
                     log::info!(target: &&format!("{}_runner", name), "Current state of plan '{}': Paused.", name)
                 }
                 PlanState::Failed => {
-                    log::info!(target: &&format!("{}_runner", name), "Current state of plan '{}': Failed.", name)
+                    log::info!(target: &&format!("{}_runner", name), "Current state of plan '{}': Failed.", name);
+                    // if operation has retried enough times it is time to fail and scrap the complete plan
                 }
                 PlanState::NotFound => {
                     log::info!(target: &&format!("{}_runner", name), "Current state of plan '{}': NotFound.", name)

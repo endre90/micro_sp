@@ -141,6 +141,7 @@ mod tests {
         let op_move_to_b = Operation::new(
         "op_move_to_b",
         None,
+        None,
         t!(
             "start_moving_to_b",
             "var:ur_action_trigger == false && var:ur_action_state == initial && var:ur_current_pose != b",
@@ -171,6 +172,7 @@ mod tests {
         let op_move_to_c = Operation::new(
         "op_move_to_c",
         None,
+        None,
         t!(
             "start_moving_to_c",
             "var:ur_action_trigger == false && var:ur_action_state == initial && var:ur_current_pose == b",
@@ -200,6 +202,7 @@ mod tests {
 
         let op_move_to_d = Operation::new(
         "op_move_to_d",
+        None,
         None,
         t!(
             "start_moving_to_d",
