@@ -168,7 +168,7 @@ pub async fn operation_runner(
                                         "Operation: '{}' has failed.", operation.name);
                                 let mut operation_retry_counter = state.get_or_default_i64(
                                     &format!("{}_operation_runner", name),
-                                    &format!("{}_retry_counter", name),
+                                    &format!("{}_retry_counter", operation.name),
                                 );
                                 if operation_retry_counter < operation.retries {
                                     operation_retry_counter = operation_retry_counter + 1;
