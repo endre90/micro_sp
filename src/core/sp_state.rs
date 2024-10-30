@@ -88,7 +88,7 @@ impl State {
         match self.get_value(name) {
             SPValue::Bool(value) => value,
             SPValue::UNKNOWN => {
-                log::warn!(target: target, "Value for boolean '{}' is UNKNOWN, resulting to FALSE.", name);
+                log::info!(target: target, "Value for boolean '{}' is UNKNOWN, resulting to FALSE.", name);
                 false
             }
             _ => {
@@ -102,7 +102,7 @@ impl State {
         match self.get_value(name) {
             SPValue::Bool(value) => Some(value),
             SPValue::UNKNOWN => {
-                log::warn!(target: target, "Value for boolean '{}' is UNKNOWN, resulting to None.", name);
+                log::info!(target: target, "Value for boolean '{}' is UNKNOWN, resulting to None.", name);
                 None
             }
             _ => {
@@ -116,7 +116,7 @@ impl State {
         match self.get_value(name) {
             SPValue::Int64(value) => value,
             SPValue::UNKNOWN => {
-                log::warn!(target: target, "Value for Int64 '{}' is UNKNOWN, resulting to 0.", name);
+                log::info!(target: target, "Value for Int64 '{}' is UNKNOWN, resulting to 0.", name);
                 0
             }
             _ => {
@@ -130,7 +130,7 @@ impl State {
         match self.get_value(name) {
             SPValue::Float64(value) => value.into_inner(),
             SPValue::UNKNOWN => {
-                log::warn!(target: target, "Value for Float64 '{}' is UNKNOWN, resulting to 0.0.", name);
+                log::info!(target: target, "Value for Float64 '{}' is UNKNOWN, resulting to 0.0.", name);
                 0.0
             }
             _ => {
@@ -145,7 +145,7 @@ impl State {
         match self.get_value(name) {
             SPValue::String(value) => value,
             SPValue::UNKNOWN => {
-                log::warn!(target: target, "Value for String '{}' is UNKNOWN, resulting to ''.", name);
+                log::info!(target: target, "Value for String '{}' is UNKNOWN, resulting to ''.", name);
                 "".to_string()
             }
             _ => {
@@ -164,7 +164,7 @@ impl State {
             })
             .collect(),
             SPValue::UNKNOWN => {
-                log::warn!(target: target, "Value for Array<String> '{}' is UNKNOWN, resulting to [].", name);
+                log::info!(target: target, "Value for Array<String> '{}' is UNKNOWN, resulting to [].", name);
                 vec!()
             }
             _ => {

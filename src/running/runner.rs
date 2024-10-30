@@ -110,6 +110,11 @@ pub async fn operation_runner(
                             &format!("{}", operation.name),
                         );
 
+                        let mut operation_retry_counter = state.get_or_default_i64(
+                            &format!("{}_operation_runner", name),
+                            &format!("{}_retry_counter", operation.name),
+                        );
+
                         match OperationState::from_str(&operation_state) {
                             OperationState::Initial => {
                                 log::info!(target: &&format!("{}_operation_runner", name), 
@@ -140,6 +145,8 @@ pub async fn operation_runner(
                             OperationState::Completed => {
                                 log::info!(target: &&format!("{}_runner", name), 
                                 "Current state of operation '{}': Completed.", operation.name);
+                                operation_retry_counter = 0;
+                                state = state.update(&format!("{}_retry_counter", operation.name), operation_retry_counter.to_spvalue());
                                 plan_current_step = plan_current_step + 1;
                                 // let current_model_operation = model
                                 //     .operations
@@ -166,10 +173,7 @@ pub async fn operation_runner(
                             OperationState::Failed => {
                                 log::error!(target: &&format!("{}_operation_runner", name), 
                                         "Operation: '{}' has failed.", operation.name);
-                                let mut operation_retry_counter = state.get_or_default_i64(
-                                    &format!("{}_operation_runner", name),
-                                    &format!("{}_retry_counter", operation.name),
-                                );
+                                
                                 if operation_retry_counter < operation.retries {
                                     operation_retry_counter = operation_retry_counter + 1;
                                     log::error!(target: &&format!("{}_operation_runner", name), 
@@ -196,14 +200,14 @@ pub async fn operation_runner(
                     log::info!(target: &&format!("{}_runner", name), "Current state of plan '{}': Paused.", name)
                 }
                 PlanState::Failed => {
-                    log::info!(target: &&format!("{}_runner", name), "Current state of plan '{}': Failed.", name);
+                    log::error!(target: &&format!("{}_runner", name), "Current state of plan '{}': Failed.", name);
                     // if operation has retried enough times it is time to fail and scrap the complete plan
                 }
                 PlanState::NotFound => {
                     log::info!(target: &&format!("{}_runner", name), "Current state of plan '{}': NotFound.", name)
                 }
                 PlanState::Completed => {
-                    log::info!(target: &&format!("{}_runner", name), "Current state of plan '{}': Completed.", name)
+                    log::warn!(target: &&format!("{}_runner", name), "Current state of plan '{}': Completed.", name)
                 }
                 PlanState::Cancelled => {
                     log::info!(target: &&format!("{}_runner", name), "Current state of plan '{}': Cancelled.", name)
