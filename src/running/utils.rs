@@ -7,22 +7,22 @@ pub fn generate_runner_state_variables(
 ) -> State {
     let mut state = State::new();
 
-    let runner_state = v!(&&format!("{}_runner_state", name));
-    let runner_ref_counter = iv!(&&format!("{}_runner_ref_counter", name));
-    let goal = v!(&&format!("{}_goal", name));
-    let goal_exists = bv!(&&format!("{}_goal_exists", name));
-    let plan = av!(&&format!("{}_plan", name));
+    let runner_state = v!(&&format!("{}_runner_state", name)); // does nothing for now
+    let runner_ref_counter = iv!(&&format!("{}_runner_ref_counter", name)); // does nothing for now
+    let goal = v!(&&format!("{}_goal", name)); // goal as a string predicate
+    let goal_exists = bv!(&&format!("{}_goal_exists", name)); // does nothing for now
+    let plan = av!(&&format!("{}_plan", name)); // plan as array of string
     let plan_counter = iv!(&&format!("{}_plan_counter", name)); // How many times in total has a planner been called
-    let plan_exists = bv!(&&format!("{}_plan_exists", name));
-    let plan_name = v!(&&format!("{}_plan_name", name));
-    let plan_state = v!(&&format!("{}_plan_state", name));
-    let plan_duration = fv!(&&format!("{}_plan_duration", name));
-    let plan_current_step = iv!(&&format!("{}_plan_current_step", name));
-    let planner_ref_counter = iv!(&&format!("{}_planner_ref_counter", name));
-    let replanned = bv!(&&format!("{}_replanned", name));
+    let plan_exists = bv!(&&format!("{}_plan_exists", name)); // does nothing for now
+    let plan_name = v!(&&format!("{}_plan_name", name)); // same as model name, should add nanoid!
+    let plan_state = v!(&&format!("{}_plan_state", name)); // Initial, Executing, Failed, Completed, Unknown
+    let plan_duration = fv!(&&format!("{}_plan_duration", name)); // does nothing for now
+    let plan_current_step = iv!(&&format!("{}_plan_current_step", name)); // Index of the currently exec. operation in the plan
+    let planner_ref_counter = iv!(&&format!("{}_planner_ref_counter", name)); // does nothing
+    let replanned = bv!(&&format!("{}_replanned", name)); // boolean for tracking the planner triggering
     let replan_counter = iv!(&&format!("{}_replan_counter", name)); // How many times has the planner tried to replan for the same problem
-    let replan_fail_counter = iv!(&&format!("{}_replan_fail_counter", name));
-    let replan_trigger = bv!(&&format!("{}_replan_trigger", name));
+    let replan_fail_counter = iv!(&&format!("{}_replan_fail_counter", name)); // How many times has the planner failed in 
+    let replan_trigger = bv!(&&format!("{}_replan_trigger", name)); // boolean for tracking the planner triggering
 
     state = state.add(assign!(runner_state, SPValue::UNKNOWN));
     state = state.add(assign!(runner_ref_counter, 1.to_spvalue()));
@@ -51,14 +51,14 @@ pub fn generate_operation_state_variables(
     let mut state = State::new();
     // operations should be put in the initial state once they are part of the plan
     for operation in &model.operations {
-        let operation_state = v!(&&format!("{}", operation.name));
-        let operation_duration = fv!(&&format!("{}_duration", operation.name));
-        let operation_retry_counter = iv!(&&format!("{}_retry_counter", operation.name));
+        let operation_state = v!(&&format!("{}", operation.name)); // Initial, Executing, Failed, Completed, Unknown
+        let operation_duration = fv!(&&format!("{}_duration", operation.name)); // does nothing for now
+        let operation_retry_counter = iv!(&&format!("{}_retry_counter", operation.name)); // without scraping the current plan, how many times has an operation retried
         state = state.add(assign!(operation_state, "initial".to_spvalue()));
         state = state.add(assign!(operation_duration, 0.0.to_spvalue()));
         state = state.add(assign!(operation_retry_counter, 0.to_spvalue()));
 
-        if coverability_tracking {
+        if coverability_tracking { // coverability tracking does nothing for now
             let initial = iv!(&&format!("{}_visited_initial", operation.name));
             let executing = iv!(&&format!("{}_visited_executing", operation.name));
             let timedout = iv!(&&format!("{}_visited_timedout", operation.name)); // Operation should have optional deadline field
