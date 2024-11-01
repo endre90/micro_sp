@@ -2,9 +2,7 @@ use crate::*;
 
 // If coverability_tracking is true, generate variables to track how many
 // times an operation has entered its different running states
-pub fn generate_runner_state_variables(
-    name: &str,
-) -> State {
+pub fn generate_runner_state_variables(name: &str) -> State {
     let mut state = State::new();
 
     let runner_state = v!(&&format!("{}_runner_state", name)); // does nothing for now
@@ -21,7 +19,7 @@ pub fn generate_runner_state_variables(
     let planner_ref_counter = iv!(&&format!("{}_planner_ref_counter", name)); // does nothing
     let replanned = bv!(&&format!("{}_replanned", name)); // boolean for tracking the planner triggering
     let replan_counter = iv!(&&format!("{}_replan_counter", name)); // How many times has the planner tried to replan for the same problem
-    let replan_fail_counter = iv!(&&format!("{}_replan_fail_counter", name)); // How many times has the planner failed in 
+    let replan_fail_counter = iv!(&&format!("{}_replan_fail_counter", name)); // How many times has the planner failed in
     let replan_trigger = bv!(&&format!("{}_replan_trigger", name)); // boolean for tracking the planner triggering
 
     state = state.add(assign!(runner_state, SPValue::UNKNOWN));
@@ -44,11 +42,9 @@ pub fn generate_runner_state_variables(
     state
 }
 
-pub fn generate_operation_state_variables(
-    model: &Model,
-    coverability_tracking: bool,
-) -> State {
+pub fn generate_operation_state_variables(model: &Model, coverability_tracking: bool) -> State {
     let mut state = State::new();
+    log::info!(target: &&format!("{}_utils", &model.name), "Auto_operations: '{:?}'.", &model.auto_operations.iter().map(|x| x.name.to_string()).collect::<Vec<String>>());
     // operations should be put in the initial state once they are part of the plan
     for operation in &model.operations {
         let operation_state = v!(&&format!("{}", operation.name)); // Initial, Executing, Failed, Completed, Unknown
@@ -58,7 +54,8 @@ pub fn generate_operation_state_variables(
         state = state.add(assign!(operation_duration, 0.0.to_spvalue()));
         state = state.add(assign!(operation_retry_counter, 0.to_spvalue()));
 
-        if coverability_tracking { // coverability tracking does nothing for now
+        if coverability_tracking {
+            // coverability tracking does nothing for now
             let initial = iv!(&&format!("{}_visited_initial", operation.name));
             let executing = iv!(&&format!("{}_visited_executing", operation.name));
             let timedout = iv!(&&format!("{}_visited_timedout", operation.name)); // Operation should have optional deadline field
