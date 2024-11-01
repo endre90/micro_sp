@@ -32,6 +32,29 @@ impl Transition {
         }
     }
 
+    pub fn parse(
+        name: &str,
+        guard: &str,
+        runner_guard: &str,
+        actions: Vec<&str>,
+        runner_actions: Vec<&str>,
+        state: &State
+    ) -> Transition {
+        Transition::new(
+            name,
+            pred_parser::pred(guard, state).unwrap(),
+            pred_parser::pred(runner_guard, state).unwrap(),
+            actions
+                .iter()
+                .map(|action| pred_parser::action(action, state).unwrap())
+                .collect::<Vec<Action>>(),
+            runner_actions
+                .iter()
+                .map(|action| pred_parser::action(action, state).unwrap())
+                .collect::<Vec<Action>>(),
+        )
+    }
+
     pub fn empty() -> Transition {
         Transition::new(
             "empty", Predicate::FALSE, Predicate::FALSE, vec!(), vec!())
