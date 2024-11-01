@@ -7,20 +7,21 @@ pub struct Model {
     pub name: String,
     // pub state: State,
     pub auto_transitions: Vec<Transition>,
+    pub auto_operations: Vec<Operation>,
     pub operations: Vec<Operation>
 }
 
 impl Model {
     pub fn new(
         name: &str,
-        // state: State,
         auto_transitions: Vec<Transition>,
+        auto_operations: Vec<Operation>,
         operations: Vec<Operation>,
     ) -> Model {
         Model {
             name: name.to_string(),
-            // state: state.clone(),
             auto_transitions,
+            auto_operations,
             operations,
         }
     }

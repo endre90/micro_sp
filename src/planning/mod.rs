@@ -235,11 +235,12 @@ mod tests {
         let m = Model::new(
             "asdf",
             vec![],
+            vec![],
             vec![
                 op_move_to_b.clone(),
                 op_move_to_c.clone(),
                 op_move_to_d.clone(),
-            ],
+            ]
         );
 
         let goal = pred_parser::pred("var:ur_current_pose == d", &state).unwrap();
