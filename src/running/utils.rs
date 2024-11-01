@@ -79,14 +79,14 @@ pub fn generate_operation_state_variables(
         }
     }
 
-    // for operation in &model.auto_operations {
-    //     let operation_state = v!(&&format!("{}", operation.name));
-    //     state = state.add(assign!(operation_state, "initial".to_spvalue()));
-    //     if coverability_tracking {
-    //         let taken = iv!(&&format!("{}_taken", operation.name));
-    //         state = state.add(assign!(taken, 0.to_spvalue()))
-    //     }
-    // }
+    for operation in &model.auto_operations {
+        let operation_state = v!(&&format!("{}", operation.name));
+        state = state.add(assign!(operation_state, "initial".to_spvalue()));
+        if coverability_tracking {
+            let taken = iv!(&&format!("{}_taken", operation.name));
+            state = state.add(assign!(taken, 0.to_spvalue()))
+        }
+    }
 
     state
 }
