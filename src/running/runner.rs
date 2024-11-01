@@ -18,7 +18,6 @@ pub async fn auto_transition_runner(
 
         // Auto transitions should be taken as soon as guard becomas true
         for t in &model.auto_transitions {
-            // let state_clone = state.clone();
             if t.clone().eval_running(&state) {
                 state = t.clone().take_running(&state);
                 log::info!(target: &&format!("{}_auto_runner", name), "Executed auto transition: '{}'.", t.name);
@@ -39,6 +38,33 @@ pub async fn auto_transition_runner(
                 *shared_state.0.lock().unwrap() = state.clone();
             }
         }
+        interval.tick().await;
+    }
+}
+
+pub async fn auto_operation_runner(
+    name: &str,
+    model: &Model,
+    shared_state: &Arc<(Mutex<State>, Vec<AtomicUsize>)>, //HashMap<String, AtomicUsize>)>,
+    coverability_tracking: bool,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let mut interval = interval(Duration::from_millis(100));
+    let model = model.clone();
+    loop {
+        let mut state = shared_state.0.lock().unwrap().clone();
+
+        // Auto operations should be taken as soon as guard becomas true
+        for o in &model.auto_operations {
+            if o.eval_running(&state) {
+                state = o.start_running(&state);
+                log::info!(target: &&format!("{}_auto_runner", name), "Started auto operation: '{}'.", o.name);
+            } else if o.can_be_completed(&state) {
+                state = o.complete_running(&state);
+                log::info!(target: &&format!("{}_auto_runner", name), "Completed auto operation: '{}'.", o.name);
+            }
+            *shared_state.0.lock().unwrap() = state.clone();
+        }
+
         interval.tick().await;
     }
 }
@@ -146,7 +172,10 @@ pub async fn operation_runner(
                                 log::info!(target: &&format!("{}_runner", name), 
                                 "Current state of operation '{}': Completed.", operation.name);
                                 operation_retry_counter = 0;
-                                state = state.update(&format!("{}_retry_counter", operation.name), operation_retry_counter.to_spvalue());
+                                state = state.update(
+                                    &format!("{}_retry_counter", operation.name),
+                                    operation_retry_counter.to_spvalue(),
+                                );
                                 plan_current_step = plan_current_step + 1;
                                 // let current_model_operation = model
                                 //     .operations
@@ -173,16 +202,22 @@ pub async fn operation_runner(
                             OperationState::Failed => {
                                 log::error!(target: &&format!("{}_operation_runner", name), 
                                         "Operation: '{}' has failed.", operation.name);
-                                
+
                                 if operation_retry_counter < operation.retries {
                                     operation_retry_counter = operation_retry_counter + 1;
                                     log::error!(target: &&format!("{}_operation_runner", name), 
                                     "Retrying operation: '{}'. Retry nr. {} out of {}.", operation.name, operation_retry_counter, operation.retries);
                                     state = operation.clone().retry_running(&state);
-                                    state = state.update(&format!("{}_retry_counter", operation.name), operation_retry_counter.to_spvalue());
+                                    state = state.update(
+                                        &format!("{}_retry_counter", operation.name),
+                                        operation_retry_counter.to_spvalue(),
+                                    );
                                 } else {
                                     operation_retry_counter = 0;
-                                    state = state.update(&format!("{}_retry_counter", operation.name), operation_retry_counter.to_spvalue());
+                                    state = state.update(
+                                        &format!("{}_retry_counter", operation.name),
+                                        operation_retry_counter.to_spvalue(),
+                                    );
                                     log::error!(target: &&format!("{}_operation_runner", name), 
                                         "Failing the plan '{} : {:?}'.", name, plan);
                                     plan_state = PlanState::Failed.to_string();
