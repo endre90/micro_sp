@@ -60,6 +60,17 @@ impl State {
         State { state }
     }
 
+    pub fn get_diff(&self, new_state: &State) -> HashMap<String, (SPValue, SPValue)> {
+        let mut modified = HashMap::new();
+        for (key, new_assignment) in &new_state.state {
+            let old_value = self.get_value(&key);
+            if old_value != new_assignment.val {
+                modified.insert(key.clone(), (old_value.clone(), new_assignment.val.clone()));
+            }
+        }
+        modified
+    }
+
     /// Adds an SPAssignment to the State, returning a new State
     pub fn add(&self, assignment: SPAssignment) -> State {
         match self.state.clone().get(&assignment.var.name) {
@@ -140,7 +151,6 @@ impl State {
         }
     }
 
-
     pub fn get_or_default_string(&self, target: &str, name: &str) -> String {
         match self.get_value(name) {
             SPValue::String(value) => value,
@@ -157,19 +167,20 @@ impl State {
 
     pub fn get_or_default_array_of_strings(&self, target: &str, name: &str) -> Vec<String> {
         match self.get_value(name) {
-            SPValue::Array(_, arr) => arr.iter()
-            .map(|x| match x {
-                SPValue::String(value) => value.clone(),
-                _ => "".to_string(),
-            })
-            .collect(),
+            SPValue::Array(_, arr) => arr
+                .iter()
+                .map(|x| match x {
+                    SPValue::String(value) => value.clone(),
+                    _ => "".to_string(),
+                })
+                .collect(),
             SPValue::UNKNOWN => {
                 log::info!(target: target, "Value for Array<String> '{}' is UNKNOWN, resulting to [].", name);
-                vec!()
+                vec![]
             }
             _ => {
                 log::error!(target: target, "Couldn't get Array<String> '{}' from the state, resulting to [].", name);
-                vec!()
+                vec![]
             }
         }
     }
@@ -251,7 +262,6 @@ impl State {
             None => Predicate::TRUE,
         }
     }
-
 }
 
 /// Displaying the State in a user-friendly way.
