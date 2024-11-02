@@ -10,7 +10,7 @@ pub fn generate_runner_state_variables(name: &str) -> State {
     let goal = v!(&&format!("{}_goal", name)); // goal as a string predicate
     let goal_exists = bv!(&&format!("{}_goal_exists", name)); // does nothing for now
     let plan = av!(&&format!("{}_plan", name)); // plan as array of string
-    let plan_counter = iv!(&&format!("{}_plan_counter", name)); // How many times in total has a planner been called
+    let plan_counter = iv!(&&format!("{}_plan_counter", name)); // How many times has a plan been found
     let plan_exists = bv!(&&format!("{}_plan_exists", name)); // does nothing for now
     let plan_name = v!(&&format!("{}_plan_name", name)); // same as model name, should add nanoid!
     let plan_state = v!(&&format!("{}_plan_state", name)); // Initial, Executing, Failed, Completed, Unknown
@@ -18,6 +18,7 @@ pub fn generate_runner_state_variables(name: &str) -> State {
     let plan_current_step = iv!(&&format!("{}_plan_current_step", name)); // Index of the currently exec. operation in the plan
     let planner_ref_counter = iv!(&&format!("{}_planner_ref_counter", name)); // does nothing
     let replanned = bv!(&&format!("{}_replanned", name)); // boolean for tracking the planner triggering
+    let replan_counter_total = iv!(&&format!("{}_replan_counter_total", name)); // How many times has the planner been called
     let replan_counter = iv!(&&format!("{}_replan_counter", name)); // How many times has the planner tried to replan for the same problem
     let replan_fail_counter = iv!(&&format!("{}_replan_fail_counter", name)); // How many times has the planner failed in
     let replan_trigger = bv!(&&format!("{}_replan_trigger", name)); // boolean for tracking the planner triggering
@@ -35,6 +36,7 @@ pub fn generate_runner_state_variables(name: &str) -> State {
     state = state.add(assign!(planner_ref_counter, 1.to_spvalue()));
     state = state.add(assign!(replanned, SPValue::UNKNOWN));
     state = state.add(assign!(replan_counter, SPValue::UNKNOWN));
+    state = state.add(assign!(replan_counter_total, SPValue::UNKNOWN));
     state = state.add(assign!(plan_counter, SPValue::UNKNOWN));
     state = state.add(assign!(replan_fail_counter, SPValue::UNKNOWN));
     state = state.add(assign!(replan_trigger, SPValue::UNKNOWN));

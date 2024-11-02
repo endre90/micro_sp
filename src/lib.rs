@@ -1,5 +1,5 @@
 pub static MAX_ALLOWED_OPERATION_DURATION: f64 = 3600.0; // seconds
-pub static MAX_REPLAN_RETRIES: u64 = 3;
+pub static MAX_REPLAN_RETRIES: i64 = 3;
 
 pub mod core;
 pub use crate::core::structs::*;
