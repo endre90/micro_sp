@@ -19,7 +19,8 @@ pub async fn operation_runner(
 
         let (response_tx, response_rx) = oneshot::channel();
         command_sender.send(Command::GetState(response_tx)).await?; // TODO: maybe we can just ask for values from the guard
-        let mut state = response_rx.await?;
+        let state = response_rx.await?;
+        let mut new_state = state.clone();
 
         let mut plan_state = state.get_or_default_string(
             &format!("{}_operation_runner", name),
@@ -69,7 +70,7 @@ pub async fn operation_runner(
                             if operation.eval_running(&state) {
                                 log::info!(target: &&format!("{}_operation_runner", name), 
                                     "Starting operation: '{}'.", operation.name);
-                                state = operation.start_running(&state);
+                                    new_state = operation.start_running(&new_state);
                             }
                         }
                         OperationState::Disabled => todo!(),
@@ -77,11 +78,11 @@ pub async fn operation_runner(
                             log::info!(target: &&format!("{}_operation_runner", name), 
                             "Current state of operation '{}': Executing.", operation.name);
                             if operation.can_be_completed(&state) {
-                                state = operation.clone().complete_running(&state);
+                                new_state = operation.clone().complete_running(&new_state);
                                 log::info!(target: &&format!("{}_operation_runner", name), 
                                     "Completing operation: '{}'.", operation.name);
                             } else if operation.can_be_failed(&state) {
-                                state = operation.clone().fail_running(&state);
+                                new_state = operation.clone().fail_running(&new_state);
                                 log::error!(target: &&format!("{}_operation_runner", name), 
                                         "Failing operation: '{}'.", operation.name);
                             } else {
@@ -93,7 +94,7 @@ pub async fn operation_runner(
                             log::info!(target: &&format!("{}_runner", name), 
                                 "Current state of operation '{}': Completed.", operation.name);
                             operation_retry_counter = 0;
-                            state = state.update(
+                            new_state = new_state.update(
                                 &format!("{}_retry_counter", operation.name),
                                 operation_retry_counter.to_spvalue(),
                             );
@@ -128,14 +129,14 @@ pub async fn operation_runner(
                                 operation_retry_counter = operation_retry_counter + 1;
                                 log::error!(target: &&format!("{}_operation_runner", name), 
                                     "Retrying operation: '{}'. Retry nr. {} out of {}.", operation.name, operation_retry_counter, operation.retries);
-                                state = operation.clone().retry_running(&state);
-                                state = state.update(
+                                    new_state = operation.clone().retry_running(&new_state);
+                                    new_state = new_state.update(
                                     &format!("{}_retry_counter", operation.name),
                                     operation_retry_counter.to_spvalue(),
                                 );
                             } else {
                                 operation_retry_counter = 0;
-                                state = state.update(
+                                new_state = new_state.update(
                                     &format!("{}_retry_counter", operation.name),
                                     operation_retry_counter.to_spvalue(),
                                 );
@@ -173,7 +174,7 @@ pub async fn operation_runner(
             }
         }
 
-        let new_state = state
+        let new_state = new_state
             .update(&format!("{}_plan_state", name), plan_state.to_spvalue())
             .update(
                 &format!("{}_plan_current_step", name),
