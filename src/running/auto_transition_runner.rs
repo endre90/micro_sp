@@ -8,7 +8,6 @@ pub async fn auto_transition_runner(
     name: &str,
     model: &Model,
     command_sender: mpsc::Sender<Command>,
-
 ) -> Result<(), Box<dyn std::error::Error>> {
     let mut interval = interval(Duration::from_millis(100));
     let model = model.clone();
@@ -27,10 +26,10 @@ pub async fn auto_transition_runner(
                 let new_state = t.clone().take_running(&state);
                 log::info!(target: &&format!("{}_auto_runner", name), "Executed auto transition: '{}'.", t.name);
 
-                let modified = state.get_diff(&new_state);
-                for x in modified {
-                    command_sender.send(Command::Set((x.0, x.1 .1))).await?;
-                }
+                let modified_state = state.get_diff_partial_state(&new_state);
+                command_sender
+                    .send(Command::SetPartialState(modified_state))
+                    .await?;
             }
         }
         interval.tick().await;

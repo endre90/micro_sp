@@ -181,10 +181,10 @@ pub async fn operation_runner(
             )
             .update(&format!("{}_plan", name), plan.to_spvalue());
 
-        let modified = state.get_diff(&new_state);
-        for x in modified {
-            command_sender.send(Command::Set((x.0, x.1 .1))).await?;
-        }
+        let modified_state = state.get_diff_partial_state(&new_state);
+        command_sender
+            .send(Command::SetPartialState(modified_state))
+            .await?;
 
         interval.tick().await;
     }

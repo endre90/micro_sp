@@ -60,15 +60,28 @@ impl State {
         State { state }
     }
 
-    pub fn get_diff(&self, new_state: &State) -> HashMap<String, (SPValue, SPValue)> {
+    pub fn get_diff(&self, new_state: &State) -> HashMap<SPVariable, (SPValue, SPValue)> {
         let mut modified = HashMap::new();
         for (key, new_assignment) in &new_state.state {
             let old_value = self.get_value(&key);
             if old_value != new_assignment.val {
-                modified.insert(key.clone(), (old_value.clone(), new_assignment.val.clone()));
+                modified.insert(new_assignment.var.clone(), (old_value.clone(), new_assignment.val.clone()));
             }
         }
         modified
+    }
+
+    pub fn get_diff_partial_state(&self, new_state: &State) -> State {
+        let mut modified = HashMap::new();
+        for (key, new_assignment) in &new_state.state {
+            let old_value = self.get_value(&key);
+            if old_value != new_assignment.val {
+                modified.insert(new_assignment.var.name.clone(), new_assignment.clone());
+            }
+        }
+        State {
+            state: modified
+        }
     }
 
     /// Adds an SPAssignment to the State, returning a new State

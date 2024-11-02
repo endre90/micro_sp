@@ -26,17 +26,17 @@ pub async fn auto_operation_runner(
                 let new_state = o.start_running(&state);
                 log::info!(target: &&format!("{}_auto_runner", name), "Started auto operation: '{}'.", o.name);
 
-                let modified = state.get_diff(&new_state);
-                for x in modified {
-                    command_sender.send(Command::Set((x.0, x.1 .1))).await?;
-                }
+                let modified_state = state.get_diff_partial_state(&new_state);
+                command_sender
+                    .send(Command::SetPartialState(modified_state))
+                    .await?;
             } else if o.can_be_completed(&state) {
                 let new_state = o.complete_running(&state);
                 log::info!(target: &&format!("{}_auto_runner", name), "Completed auto operation: '{}'.", o.name);
-                let modified = state.get_diff(&new_state);
-                for x in modified {
-                    command_sender.send(Command::Set((x.0, x.1 .1))).await?;
-                }
+                let modified_state = state.get_diff_partial_state(&new_state);
+                command_sender
+                    .send(Command::SetPartialState(modified_state))
+                    .await?;
             }
         }
         interval.tick().await;
