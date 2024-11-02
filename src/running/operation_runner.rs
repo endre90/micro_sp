@@ -4,6 +4,10 @@ use tokio::{
     time::{interval, Duration},
 };
 
+/// A runner is an algorithm which executes the plan P based on the model
+/// M, the current state of the system S, and a goal predicate G. While
+/// running, both the planning and running components of guards and actions
+/// of operation pre- and postconditions are evaluated and taken.
 pub async fn operation_runner(
     model: &Model,
     command_sender: mpsc::Sender<Command>,
@@ -13,12 +17,8 @@ pub async fn operation_runner(
     let model = model.clone();
 
     loop {
-        // current try:
-        // read the whole state, take the transition to produce a new state
-        // then take the diff from the new state compared to the old state and send a request to change only those values
-
         let (response_tx, response_rx) = oneshot::channel();
-        command_sender.send(Command::GetState(response_tx)).await?; // TODO: maybe we can just ask for values from the guard
+        command_sender.send(Command::GetState(response_tx)).await?;
         let state = response_rx.await?;
         let mut new_state = state.clone();
 
@@ -70,7 +70,7 @@ pub async fn operation_runner(
                             if operation.eval_running(&state) {
                                 log::info!(target: &&format!("{}_operation_runner", name), 
                                     "Starting operation: '{}'.", operation.name);
-                                    new_state = operation.start_running(&new_state);
+                                new_state = operation.start_running(&new_state);
                             }
                         }
                         OperationState::Disabled => todo!(),
@@ -129,8 +129,8 @@ pub async fn operation_runner(
                                 operation_retry_counter = operation_retry_counter + 1;
                                 log::error!(target: &&format!("{}_operation_runner", name), 
                                     "Retrying operation: '{}'. Retry nr. {} out of {}.", operation.name, operation_retry_counter, operation.retries);
-                                    new_state = operation.clone().retry_running(&new_state);
-                                    new_state = new_state.update(
+                                new_state = operation.clone().retry_running(&new_state);
+                                new_state = new_state.update(
                                     &format!("{}_retry_counter", operation.name),
                                     operation_retry_counter.to_spvalue(),
                                 );

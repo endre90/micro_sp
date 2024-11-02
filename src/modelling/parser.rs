@@ -1,5 +1,6 @@
 // use crate::{Action, Predicate, SPValue, SPVariable, SPWrapped, State, ToSPValue, ToSPWrapped};
 use crate::*;
+
 peg::parser!(pub grammar pred_parser() for str {
 
     rule _() =  quiet!{[' ' | '\t']*}
@@ -84,7 +85,6 @@ peg::parser!(pub grammar pred_parser() for str {
     / p1:variable(&state) _ "<-" _ p2:value(&state) { Action::new(p1, p2) }
 });
 
-
 #[cfg(test)]
 mod tests {
 
@@ -97,7 +97,7 @@ mod tests {
         let weight = fv!("weight");
         let smart = bv!("smart");
         let alive = bv!("alive");
-    
+
         vec![
             (name, "John".to_spvalue()),
             (surname, "Doe".to_spvalue()),
@@ -107,7 +107,7 @@ mod tests {
             (alive, true.to_spvalue()),
         ]
     }
-    
+
     #[test]
     fn parse_values() {
         let s = State::new();
@@ -144,7 +144,7 @@ mod tests {
             Ok(SPWrapped::SPValue(SPValue::UNKNOWN))
         );
     }
-    
+
     #[test]
     fn parse_variables() {
         let s = State::from_vec(&john_doe());
@@ -153,55 +153,55 @@ mod tests {
             Ok(s.get_assignment("height").var)
         );
     }
-    
+
     #[test]
     #[should_panic]
     fn parse_variables_panic() {
         let s = State::from_vec(&john_doe());
         let _ = pred_parser::variable("var: wealth", &s);
     }
-    
+
     #[test]
     fn parse_predicates() {
         let s = State::from_vec(&john_doe());
         let and = "TRUE && TRUE";
         let and2 = AND(vec![TRUE, TRUE]);
         assert_eq!(pred_parser::pred(and, &s), Ok(and2));
-    
+
         let and = "TRUE  && TRUE && FALSE ";
         let and2 = AND(vec![TRUE, TRUE, FALSE]);
         assert_eq!(pred_parser::pred(and, &s), Ok(and2));
-    
+
         let or = "TRUE || TRUE || FALSE";
         let or2 = OR(vec![TRUE, TRUE, FALSE]);
         assert_eq!(pred_parser::pred(or, &s), Ok(or2));
-    
+
         let not_or = "TRUE || ! ( TRUE || FALSE && TRUE)";
         let not_or2 = OR(vec![
             TRUE,
             NOT(Box::new(OR(vec![TRUE, AND(vec![FALSE, TRUE])]))),
         ]);
         assert_eq!(pred_parser::pred(not_or, &s), Ok(not_or2));
-    
+
         let eq1 = "TRUE == TRUE";
         let eq2 = EQ(
             SPWrapped::SPValue(true.to_spvalue()),
             SPWrapped::SPValue(true.to_spvalue()),
         );
         assert_eq!(pred_parser::eq(eq1, &s), Ok(eq2));
-    
+
         let eq1 = "var:smart == FALSE";
         let eq2 = EQ(bv!("smart").wrap(), false.wrap());
         assert_eq!(pred_parser::eq(eq1, &s), Ok(eq2));
-    
+
         let eq1 = "var:smart == true";
         let eq2 = EQ(bv!("smart").wrap(), true.wrap());
         assert_eq!(pred_parser::eq(eq1, &s), Ok(eq2));
-        
+
         let neq1 = "var:smart != true";
         let neq2 = NEQ(bv!("smart").wrap(), true.wrap());
         assert_eq!(pred_parser::eq(neq1, &s), Ok(neq2));
-    
+
         let eq1 = "TRUE == TRUE || FALSE != FALSE";
         let eq2 = EQ(
             SPWrapped::SPValue(true.to_spvalue()),
@@ -213,7 +213,7 @@ mod tests {
         );
         let or = OR(vec![eq2, eq3]);
         assert_eq!(pred_parser::pred(eq1, &s), Ok(or));
-    
+
         let eq1 = "TRUE == TRUE || !(FALSE != FALSE)";
         let eq2 = EQ(
             SPWrapped::SPValue(true.to_spvalue()),
@@ -225,14 +225,14 @@ mod tests {
         );
         let or = OR(vec![eq2, NOT(Box::new(eq3))]);
         assert_eq!(pred_parser::pred(eq1, &s), Ok(or));
-    
+
         let eq1 = "var:smart == TRUE || !(FALSE != var:smart)";
         let hej = s.get_assignment("smart").var.wrap();
         let eq2 = EQ(hej.clone(), true.to_spvalue().wrap());
         let eq3 = NEQ(false.to_spvalue().wrap(), hej);
         let or = OR(vec![eq2, NOT(Box::new(eq3))]);
         assert_eq!(pred_parser::pred(eq1, &s), Ok(or));
-    
+
         let impl1 = " var:smart == TRUE ->  var:alive == FALSE || TRUE  ";
         let hej = s.get_assignment("smart").var.wrap();
         let hopp = s.get_assignment("alive").var.wrap();
@@ -243,7 +243,7 @@ mod tests {
         let impl1 = "var:smart == TRUE -> (var:alive == FALSE || TRUE)";
         assert_eq!(pred_parser::pred(impl1, &s), Ok(impl2));
     }
-    
+
     #[test]
     fn parse_actions() {
         let s = State::from_vec(&john_doe());
@@ -253,7 +253,9 @@ mod tests {
         let a1 = a!(weight.clone(), 82.5.wrap());
         let a2 = a!(weight.clone(), 85.0.wrap());
         assert_eq!(pred_parser::action("var:weight <- 82.5", &s), Ok(a1));
-        assert_eq!(pred_parser::action("var:weight <- var:weight_2", &s_new), Ok(a2));
+        assert_eq!(
+            pred_parser::action("var:weight <- var:weight_2", &s_new),
+            Ok(a2)
+        );
     }
-
 }

@@ -1,11 +1,28 @@
-use serde::{Deserialize, Serialize};
 use crate::*;
+use serde::{Deserialize, Serialize};
 // use crate::{
 //     get_predicate_vars_all, Action,
 //     Predicate, SPVariable, State,
 // };
 use std::fmt;
 
+/// A planning transition T contains a guard predicate G : S → {false, true},
+/// and a set of action functions A, where ∀a ∈ A, a : S → S models
+/// the updates of the state variables. If the guard predicate evaluates to
+/// true, the transition can occur, after which the actions of the transition
+/// describe how the variables are updated. The notation we use to represent
+/// a planning transition is T : G/A.
+///
+/// A running transition Tr extends the planning transition with an additional
+/// running guard Gr and additional running action Ar. We write
+/// running transitions as Tr : G / Gr / A / Ar , where g and gr are both guard
+/// predicates and G ∧ Gr : S → {false, true}, and A and Ar are both action
+/// functions, where ∀a ∈ A ∪ Ar , a : S → S model the updates of the values
+/// of the state variables. While planning, only G and A are considered, i.e.
+/// the running transition is evaluated and taken as a planning transition.
+/// When the execution engine is running the plan, it is considering all
+/// components of Tr, i.e. the running transition guard becomes G ∧ Gr and the
+/// set of transition actions becomes A ∪ Ar.
 #[derive(Debug, Clone, Eq, Hash, Serialize, Deserialize)]
 pub struct Transition {
     pub name: String,
@@ -16,6 +33,7 @@ pub struct Transition {
 }
 
 impl Transition {
+    /// Define a new transition. Use parse() instead.
     pub fn new(
         name: &str,
         guard: Predicate,
@@ -32,13 +50,14 @@ impl Transition {
         }
     }
 
+    /// Define a new transition using strings.
     pub fn parse(
         name: &str,
         guard: &str,
         runner_guard: &str,
         actions: Vec<&str>,
         runner_actions: Vec<&str>,
-        state: &State
+        state: &State,
     ) -> Transition {
         Transition::new(
             name,
@@ -55,10 +74,10 @@ impl Transition {
         )
     }
 
+    ///
     pub fn empty() -> Transition {
-        Transition::new(
-            "empty", Predicate::FALSE, Predicate::FALSE, vec!(), vec!())
-    } 
+        Transition::new("empty", Predicate::FALSE, Predicate::FALSE, vec![], vec![])
+    }
 
     pub fn eval_planning(self, state: &State) -> bool {
         self.guard.eval(state)
@@ -146,8 +165,8 @@ impl Default for Transition {
             name: "unkown".to_string(),
             guard: Predicate::TRUE,
             runner_guard: Predicate::TRUE,
-            actions: vec!(),
-            runner_actions: vec!(),
+            actions: vec![],
+            runner_actions: vec![],
         }
     }
 }
@@ -562,7 +581,7 @@ mod tests {
     //     let agv_2_location = v!("agv_2_location");
     //     let agv_3_location = v!("agv_3_location");
     //     let agv_4_location = v!("agv_4_location");
-    
+
     //     let floor_robot_request_trigger = bv!("floor_robot_request_trigger");
     //     let floor_robot_request_state = v!("floor_robot_request_state");
     //     let floor_robot_fail_counter = iv!("floor_robot_fail_counter");
@@ -574,41 +593,41 @@ mod tests {
     //     let floor_robot_part_gripper_attached = bv!("floor_robot_part_gripper_attached");
     //     let floor_robot_tray_gripper_enabled = bv!("floor_robot_tray_gripper_enabled");
     //     let floor_robot_tray_gripper_attached = bv!("floor_robot_tray_gripper_attached");
-    
+
     //     let floor_robot_gripper_request_trigger = bv!("floor_robot_gripper_request_trigger");
     //     let floor_robot_gripper_request_state = v!("floor_robot_gripper_request_state");
     //     let floor_robot_gripper_fail_counter = iv!("floor_robot_gripper_fail_counter");
     //     let floor_robot_gripper_command = v!("floor_robot_gripper_command");
-    
+
     //     // -----------------------------------------------------------------------
-    
+
     //     let state = State::new();
     //     let state = state.add(assign!(competition_state, SPValue::UNKNOWN));
-        
+
     //     let state = state.add(assign!(agv_1_location, SPValue::UNKNOWN));
     //     let state = state.add(assign!(agv_2_location, SPValue::UNKNOWN));
     //     let state = state.add(assign!(agv_3_location, SPValue::UNKNOWN));
     //     let state = state.add(assign!(agv_4_location, SPValue::UNKNOWN));
-    
+
     //     let state = state.add(assign!(floor_robot_request_trigger, false.to_spvalue()));
     //     let state = state.add(assign!(floor_robot_request_state, "initial".to_spvalue()));
     //     let state = state.add(assign!(floor_robot_fail_counter, 0.to_spvalue()));
     //     let state = state.add(assign!(floor_robot_health, false.to_spvalue()));
     //     let state = state.add(assign!(floor_robot_command, SPValue::UNKNOWN));
     //     let state = state.add(assign!(floor_robot_current_position_name, SPValue::UNKNOWN));
-    
+
     //     let state = state.add(assign!(floor_robot_part_gripper_enabled, false.to_spvalue()));
     //     let state = state.add(assign!(floor_robot_part_gripper_attached, false.to_spvalue()));
     //     let state = state.add(assign!(floor_robot_tray_gripper_enabled, false.to_spvalue()));
     //     let state = state.add(assign!(floor_robot_tray_gripper_attached, false.to_spvalue()));
-    
+
     //     let state = state.add(assign!(floor_robot_gripper_request_trigger, false.to_spvalue()));
     //     let state = state.add(assign!(floor_robot_gripper_request_state, "initial".to_spvalue()));
     //     let state = state.add(assign!(floor_robot_gripper_fail_counter, 0.to_spvalue()));
     //     let state = state.add(assign!(floor_robot_gripper_command, SPValue::UNKNOWN));
-    
+
     //     // --------------------------------------------------------------------------
-    
+
     //     let runner_goal = v!("floor_robot_runner_goal");
     //     let runner_plan = av!("floor_robot_runner_plan");
     //     let runner_plan_info = v!("floor_robot_runner_plan_info");
@@ -618,7 +637,7 @@ mod tests {
     //     let runner_replanned = bv!("floor_robot_runner_replanned");
     //     let runner_replan_counter = iv!("floor_robot_runner_replan_counter");
     //     let runner_replan_trigger = bv!("floor_robot_runner_replan_trigger");
-    
+
     //     let state = state.add(assign!(runner_goal, SPValue::UNKNOWN));
     //     let state = state.add(assign!(runner_plan, SPValue::UNKNOWN));
     //     let state = state.add(assign!(runner_plan_info, SPValue::UNKNOWN));
@@ -628,7 +647,6 @@ mod tests {
     //     let state = state.add(assign!(runner_replanned, false.to_spvalue()));
     //     let state = state.add(assign!(runner_replan_counter, 0.to_spvalue()));
     //     let state = state.add(assign!(runner_replan_trigger, false.to_spvalue()));
-
 
     //     for pos in vec![
     //         "kitting_station_1",
@@ -738,7 +756,6 @@ mod tests {
     //         } else {
     //             prop_assert!(!start_gripper_close.eval_planning(&state));
     //         }
-
 
     //         // 2.  Every condition in a decision in the program has taken all possible outcomes at least once.
     //         // => During running, the guard "var:gripper_ref != closed" has to be true at least once.

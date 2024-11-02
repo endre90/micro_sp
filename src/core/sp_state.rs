@@ -1,6 +1,4 @@
-// use crate::{SPAssignment, SPValue, SPVariable, SPVariableType};
 use crate::*;
-// use crate::{SPAssignment, SPValue, SPVariable};
 use serde::{Deserialize, Serialize};
 use std::hash::{Hash, Hasher};
 use std::{collections::HashMap, fmt};
@@ -37,15 +35,14 @@ impl Hash for State {
 }
 
 impl State {
-    /// Creates and returns a new State instance.
+    /// Create and returns a new State instance.
     pub fn new() -> State {
         State {
             state: HashMap::new(),
         }
     }
 
-    /// The from_vec function creates a new State object from a vector of
-    /// (SPVariable, SPValue) tuples.
+    /// Create a new State from a vector of (SPVariable, SPValue) tuples.
     pub fn from_vec(vec: &Vec<(SPVariable, SPValue)>) -> State {
         let mut state = HashMap::new();
         vec.iter().for_each(|(var, val)| {
@@ -60,17 +57,22 @@ impl State {
         State { state }
     }
 
+    /// Get the updated values between two states.
     pub fn get_diff(&self, new_state: &State) -> HashMap<SPVariable, (SPValue, SPValue)> {
         let mut modified = HashMap::new();
         for (key, new_assignment) in &new_state.state {
             let old_value = self.get_value(&key);
             if old_value != new_assignment.val {
-                modified.insert(new_assignment.var.clone(), (old_value.clone(), new_assignment.val.clone()));
+                modified.insert(
+                    new_assignment.var.clone(),
+                    (old_value.clone(), new_assignment.val.clone()),
+                );
             }
         }
         modified
     }
 
+    /// Make a new partial state that only consists of updates.
     pub fn get_diff_partial_state(&self, new_state: &State) -> State {
         let mut modified = HashMap::new();
         for (key, new_assignment) in &new_state.state {
@@ -79,12 +81,10 @@ impl State {
                 modified.insert(new_assignment.var.name.clone(), new_assignment.clone());
             }
         }
-        State {
-            state: modified
-        }
+        State { state: modified }
     }
 
-    /// Adds an SPAssignment to the State, returning a new State
+    /// Add an SPAssignment to the State, returning a new State.
     pub fn add(&self, assignment: SPAssignment) -> State {
         match self.state.clone().get(&assignment.var.name) {
             Some(_) => panic!(
@@ -99,8 +99,8 @@ impl State {
         }
     }
 
-    /// Returns the value of the variable with the given name from the state,
-    /// and panics if the variable is not in the state.
+    /// Returns the SPValue of the variable with the given name from the state.
+    /// Panics if the variable is not in the state.
     pub fn get_value(&self, name: &str) -> SPValue {
         match self.state.clone().get(name) {
             None => panic!("Variable {} not in state!", name),
@@ -198,8 +198,8 @@ impl State {
         }
     }
 
-    /// Returns the assignment of a variable in the state,
-    /// or panics if the variable is not found.
+    /// Get the assignment of a variable in the state,
+    /// or panic if the variable is not found.
     pub fn get_assignment(&self, name: &str) -> SPAssignment {
         match self.state.clone().get(name) {
             None => panic!("Variable {} not in state!", name),
@@ -207,7 +207,7 @@ impl State {
         }
     }
 
-    /// Returns all variables from the state
+    /// Get all variables from the state.
     pub fn get_all_vars(&self) -> Vec<SPVariable> {
         self.state
             .iter()
@@ -215,12 +215,12 @@ impl State {
             .collect()
     }
 
-    /// Checks whether a variable with the given name is contained in the state.
+    /// Check whether a variable with the given name is contained in the state.
     pub fn contains(&self, name: &str) -> bool {
         self.state.clone().contains_key(name)
     }
 
-    /// Updates the value of a variable
+    /// Update the value of a variable and return a new State.
     pub fn update(&self, name: &str, val: SPValue) -> State {
         match self.state.get(name) {
             Some(assignment) => {
@@ -239,7 +239,7 @@ impl State {
     }
 
     /// Extend the state. If variables already exist, either keep
-    /// the existing values or overwrite them
+    /// the existing values or overwrite them.
     pub fn extend(&self, other: State, overwrite_existing: bool) -> State {
         let existing = self.state.clone();
         let extension = other.state;
@@ -263,6 +263,7 @@ impl State {
         }
     }
 
+    /// Extract the goal predicate from the String value.
     pub fn extract_goal(&self, name: &str) -> Predicate {
         match self.state.get(&format!("{}_goal", name)) {
             Some(g_spvalue) => match &g_spvalue.val {

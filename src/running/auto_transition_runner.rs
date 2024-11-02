@@ -4,6 +4,7 @@ use tokio::{
     time::{interval, Duration},
 };
 
+/// Automatic transitions should be taken as soon as their guard becomes true.
 pub async fn auto_transition_runner(
     name: &str,
     model: &Model,
@@ -12,15 +13,10 @@ pub async fn auto_transition_runner(
     let mut interval = interval(Duration::from_millis(100));
     let model = model.clone();
     loop {
-        // current try:
-        // read the whole state, take the transition to produce a new state
-        // then take the diff from the new state compared to the old state and send a request to change only those values
-
         let (response_tx, response_rx) = oneshot::channel();
-        command_sender.send(Command::GetState(response_tx)).await?; // TODO: maybe we can just ask for values from the guard
+        command_sender.send(Command::GetState(response_tx)).await?;
         let state = response_rx.await?;
 
-        // Auto transitions should be taken as soon as guard becomas true
         for t in &model.auto_transitions {
             if t.clone().eval_running(&state) {
                 let new_state = t.clone().take_running(&state);

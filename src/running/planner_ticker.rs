@@ -4,6 +4,13 @@ use tokio::{
     time::{interval, Duration},
 };
 
+/// An operation planner is an algorithm which given a planning problem Ψ,
+/// returns a sequence of operations that takes the system from its current
+/// state to a state where the goal predicate is satisfied. While planning,
+/// the operation planner is avoiding the running guards gr and the running
+/// actions Ar, treating operation preconditions and postconditions as
+/// planning transitions. This function triggers the planner based on the
+/// current state of the system.
 pub async fn planner_ticker(
     model: &Model,
     command_sender: mpsc::Sender<Command>,
@@ -13,12 +20,8 @@ pub async fn planner_ticker(
     let model = model.clone();
 
     loop {
-        // current try:
-        // read the whole state, take the transition to produce a new state
-        // then take the diff from the new state compared to the old state and send a request to change only those values
-
         let (response_tx, response_rx) = oneshot::channel();
-        command_sender.send(Command::GetState(response_tx)).await?; // TODO: maybe we can just ask for values from the guard
+        command_sender.send(Command::GetState(response_tx)).await?;
         let state = response_rx.await?;
 
         let mut replan_trigger = state.get_or_default_bool(
@@ -103,7 +106,7 @@ pub async fn planner_ticker(
             }
         };
 
-        // Instead of doing this, maybe just directly change the state with individual messages? 
+        // Instead of doing this, maybe just directly change the state with individual messages?
         let new_state = state
             .update(
                 &format!("{}_replan_trigger", name),
@@ -127,7 +130,9 @@ pub async fn planner_ticker(
             );
 
         let modified_state = state.get_diff_partial_state(&new_state);
-        command_sender.send(Command::SetPartialState(modified_state)).await?;
+        command_sender
+            .send(Command::SetPartialState(modified_state))
+            .await?;
 
         interval.tick().await;
     }

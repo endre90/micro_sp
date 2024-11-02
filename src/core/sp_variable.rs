@@ -1,10 +1,11 @@
 use serde::{Deserialize, Serialize};
 
-// use crate::{SPValue, SPValueType, ToSPValue};
 use crate::*;
 use std::fmt;
 
 /// A SPVariable is a named unit of data of type SPValueType that can be assigned a value from its finite domain.
+/// Current version of micro_sp doesn't support formal methods, thus domain specification is optional.
+/// Use the macros v!, iv!, fv!, bv!, and av! to define new variables instead of SPVariable::new().
 #[derive(Debug, PartialEq, Clone, Hash, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct SPVariable {
     pub name: String,
@@ -13,6 +14,7 @@ pub struct SPVariable {
 }
 
 impl SPVariable {
+    /// Use the macros v!, iv!, fv!, bv!, and av! instead.
     pub fn new(name: &str, value_type: SPValueType, domain: Vec<SPValue>) -> SPVariable {
         SPVariable {
             name: name.to_owned(),
@@ -20,24 +22,27 @@ impl SPVariable {
             domain,
         }
     }
-    pub fn new_boolean(
-        name: &str,
-    ) -> SPVariable {
+    /// Use the macro bv! instead.
+    pub fn new_boolean(name: &str) -> SPVariable {
         SPVariable::new(
             name,
             SPValueType::Bool,
             vec![false.to_spvalue(), true.to_spvalue()],
         )
     }
+    /// Use the macro iv! instead.
     pub fn new_integer(name: &str, domain: Vec<SPValue>) -> SPVariable {
         SPVariable::new(name, SPValueType::Int64, domain)
     }
+    /// Use the macro fv! instead.
     pub fn new_float(name: &str, domain: Vec<SPValue>) -> SPVariable {
         SPVariable::new(name, SPValueType::Float64, domain)
     }
+    /// Use the macro v! instead.
     pub fn new_string(name: &str, domain: Vec<SPValue>) -> SPVariable {
         SPVariable::new(name, SPValueType::String, domain)
     }
+    /// Use the macro av! instead.
     pub fn new_array(name: &str, domain: Vec<SPValue>) -> SPVariable {
         SPVariable::new(name, SPValueType::Array, domain)
     }
@@ -87,8 +92,7 @@ mod tests {
     #[test]
     fn test_new_integer() {
         let domain = vec![0.to_spvalue(), 1.to_spvalue(), 2.to_spvalue()];
-        let variable =
-            SPVariable::new_integer("test_int", domain.clone());
+        let variable = SPVariable::new_integer("test_int", domain.clone());
         assert_eq!(variable.name, "test_int");
         assert_eq!(variable.value_type, SPValueType::Int64);
         assert_eq!(variable.domain, domain);
@@ -110,8 +114,7 @@ mod tests {
             "test2".to_spvalue(),
             "test3".to_spvalue(),
         ];
-        let variable =
-            SPVariable::new_string("test_string", domain.clone());
+        let variable = SPVariable::new_string("test_string", domain.clone());
         assert_eq!(variable.name, "test_string");
         assert_eq!(variable.value_type, SPValueType::String);
         assert_eq!(variable.domain, domain);
@@ -126,8 +129,7 @@ mod tests {
             ),
             SPValue::Array(SPValueType::Int64, vec![0.to_spvalue(), 1.to_spvalue()]),
         ];
-        let variable =
-            SPVariable::new_array("test_array", domain.clone());
+        let variable = SPVariable::new_array("test_array", domain.clone());
         assert_eq!(variable.name, "test_array");
         assert_eq!(variable.value_type, SPValueType::Array);
         assert_eq!(variable.domain, domain);
@@ -142,19 +144,10 @@ mod tests {
             "int_var",
             vec![1.to_spvalue(), 2.to_spvalue(), 3.to_spvalue()],
         );
-        assert_eq!(
-            v2.has_type(),
-            SPValueType::Int64
-        );
+        assert_eq!(v2.has_type(), SPValueType::Int64);
 
-        let v3 = SPVariable::new_float(
-            "float_var",
-            vec![0.1.to_spvalue(), 0.2.to_spvalue()],
-        );
-        assert_eq!(
-            v3.has_type(),
-            SPValueType::Float64
-        );
+        let v3 = SPVariable::new_float("float_var", vec![0.1.to_spvalue(), 0.2.to_spvalue()]);
+        assert_eq!(v3.has_type(), SPValueType::Float64);
 
         let v4 = SPVariable::new_string(
             "string_var",

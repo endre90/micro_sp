@@ -86,7 +86,7 @@ impl fmt::Display for SPWrapped {
 mod tests {
 
     use crate::*;
-    
+
     #[test]
     fn test_wrap_values() {
         let int = 123;
@@ -130,10 +130,7 @@ mod tests {
         let bool_var = bv!("toggle");
         let float_var = fv!("speed");
         assert_eq!(SPWrapped::SPVariable(string_var.clone()), string_var.wrap());
-        assert_eq!(
-            SPWrapped::SPVariable(string_var.clone()),
-            string_var.wrap()
-        );
+        assert_eq!(SPWrapped::SPVariable(string_var.clone()), string_var.wrap());
         assert_eq!(SPWrapped::SPVariable(int_var.clone()), int_var.wrap());
         assert_eq!(SPWrapped::SPVariable(bool_var.clone()), bool_var.wrap());
         assert_eq!(SPWrapped::SPVariable(float_var.clone()), float_var.wrap());

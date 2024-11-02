@@ -1,14 +1,13 @@
 use serde::{Deserialize, Serialize};
 
-// use crate::{Operation, State, Transition};
+/// A model contains behavior that defines what a system is capable of doing.
 use crate::*;
 #[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
 pub struct Model {
     pub name: String,
-    // pub state: State,
     pub auto_transitions: Vec<Transition>,
     pub auto_operations: Vec<Operation>,
-    pub operations: Vec<Operation>
+    pub operations: Vec<Operation>,
 }
 
 impl Model {

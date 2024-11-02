@@ -9,7 +9,7 @@ pub struct Plan {
     pub plan: Vec<Operation>,
     pub time_step: u32,
     pub state: PlanState,
-    pub time: std::time::Duration
+    pub time: std::time::Duration,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -44,7 +44,7 @@ impl PlanState {
         }
     }
     pub fn to_spvalue(self) -> SPValue {
-        match  self {
+        match self {
             PlanState::Initial => "initial".to_spvalue(),
             PlanState::Executing => "executing".to_spvalue(),
             PlanState::Paused => "paused".to_spvalue(),
@@ -115,7 +115,7 @@ impl fmt::Display for RunnerState {
             RunnerState::UNKNOWN => write!(f, "UNKNOWN"),
             RunnerState::Running => write!(f, "running"),
             RunnerState::Paused => write!(f, "paused"),
-            
+
             RunnerState::Stopped => write!(f, "stopped"),
             RunnerState::Idle => write!(f, "idle"),
         }

@@ -3,9 +3,9 @@ use std::{
     time::{Duration, Instant},
 };
 
-// use crate::{Predicate, State, Transition};
 use crate::*;
 
+/// Information about result of a planning attempt.
 #[derive(PartialEq, Eq, Clone, Debug, PartialOrd, Ord, Default)]
 pub struct PlanningResult {
     pub found: bool,
@@ -14,6 +14,7 @@ pub struct PlanningResult {
     pub time: Duration,
 }
 
+/// Minimal Breadth First Search algorithm for sequencing transitions.
 pub fn bfs_transition_planner(
     state: State,
     goal: Predicate,

@@ -3,17 +3,21 @@ use std::fmt;
 use ordered_float::OrderedFloat;
 use serde::{Deserialize, Serialize};
 
-// use crate::{Action, SPValue, State, ToSPValue, ToSPWrapped, Transition};
 use crate::*;
 
+/// Initial:   The operation planned and ready to be executed.
+/// Disabled:  The operation is ready for execution, but the precondition guard is not yet enabled.
+/// Executing: The precondition guard is enabled and the actions of the precondition are taken.
+/// Completed: The postcondition guard is enabled and the actions of the postcondition are taken.
+///            The operation is successfully completed.
+/// Timedout:  The operation was in the executing state for more time than its deadline allows.
+/// Failed:    The operations has failed due to an error.
 #[derive(Debug, PartialEq, Clone, Eq, Hash, Serialize, Deserialize)]
 pub enum OperationState {
     Initial,
     Disabled,
     Executing,
-    // Waiting,
     Completed,
-    // Resetting,
     Timedout,
     Failed,
     UNKNOWN,
@@ -31,8 +35,6 @@ impl OperationState {
             "initial" => OperationState::Initial,
             "disabled" => OperationState::Disabled,
             "executing" => OperationState::Executing,
-            // "waiting" => OperationState::Waiting,
-            // "resetting" => OperationState::Resetting,
             "timedout" => OperationState::Timedout,
             "failed" => OperationState::Failed,
             "completed" => OperationState::Completed,
@@ -50,8 +52,6 @@ impl fmt::Display for OperationState {
             OperationState::Initial => write!(f, "initial"),
             OperationState::Disabled => write!(f, "disabled"),
             OperationState::Executing => write!(f, "executing"),
-            // OperationState::Waiting => write!(f, "waiting"),
-            // OperationState::Resetting => write!(f, "resetting"),
             OperationState::Timedout => write!(f, "timedout"),
             OperationState::Failed => write!(f, "failed"),
             OperationState::Completed => write!(f, "completed"),
@@ -60,6 +60,16 @@ impl fmt::Display for OperationState {
     }
 }
 
+/// An operation O captures the behavior of tasks that can take some time
+/// to complete, and it is a convenient modeling abstraction for both planning
+/// and execution. A model of an operation can be in its initial (init)
+/// or executing (exec) state, nominally (look at OperationState for info
+/// about all the states and operacion can be in). The precondition is a running
+/// transition associated with the start of the operation, switching it to the
+/// executing state. The operation will be in its executing state until the
+/// guard of the postcondition running transition is satisfied. The satisfac-
+/// tion of the postcondition implies that the operation is completed and
+/// can return to the initial state.
 #[derive(Debug, PartialEq, Clone, Eq, Hash, Serialize, Deserialize)]
 pub struct Operation {
     pub name: String,
@@ -92,7 +102,7 @@ impl Operation {
             },
             retries: match retries {
                 Some(x) => x,
-                None => 0
+                None => 0,
             },
             precondition,
             postcondition,
@@ -101,6 +111,7 @@ impl Operation {
         }
     }
 
+    /// Check the guard of the planning precondidion transition.
     pub fn eval_planning(&self, state: &State) -> bool {
         if state.get_value(&self.name) == OperationState::Initial.to_spvalue() {
             self.clone().precondition.eval_planning(state)
@@ -109,6 +120,7 @@ impl Operation {
         }
     }
 
+    /// Check the guard of the running precondidion transition.
     pub fn eval_running(&self, state: &State) -> bool {
         if state.get_value(&self.name) == OperationState::Initial.to_spvalue() {
             self.clone().precondition.eval_running(state)
@@ -117,12 +129,14 @@ impl Operation {
         }
     }
 
+    /// Execute the planing actions of both the pre and post conditions.
     pub fn take_planning(&self, state: &State) -> State {
         self.clone()
             .postcondition
             .take_planning(&self.clone().precondition.take_planning(state))
     }
 
+    /// Start executing the operation. Check for eval_running() first.
     pub fn start_running(&self, state: &State) -> State {
         let assignment = state.get_assignment(&self.name);
         if assignment.val == "initial".to_spvalue() {
@@ -133,6 +147,7 @@ impl Operation {
         }
     }
 
+    /// Complete executing the operation. Check for can_be_completed() first.
     pub fn complete_running(&self, state: &State) -> State {
         let assignment = state.get_assignment(&self.name);
         if assignment.val == "executing".to_spvalue() {
@@ -145,16 +160,20 @@ impl Operation {
         }
     }
 
+    /// Fail the executing operation. Check for can_be_failed() first.
     pub fn fail_running(&self, state: &State) -> State {
         let assignment = state.get_assignment(&self.name);
         if assignment.val == "executing".to_spvalue() {
             let action = Action::new(assignment.var, "failed".wrap());
-            self.clone().fail_transition.take_running(&action.assign(&state))
+            self.clone()
+                .fail_transition
+                .take_running(&action.assign(&state))
         } else {
             state.clone()
         }
     }
 
+    /// Retry the execution of the operation, allows for retries without immediate replanning.
     pub fn retry_running(&self, state: &State) -> State {
         let assignment = state.get_assignment(&self.name);
         if assignment.val == "failed".to_spvalue() {
@@ -165,6 +184,7 @@ impl Operation {
         }
     }
 
+    /// Reset the completed operation. Check for can_be_reset() first.
     pub fn reset_running(&self, state: &State) -> State {
         let assignment = state.get_assignment(&self.name);
         if assignment.val == "completed".to_spvalue() {
@@ -177,18 +197,19 @@ impl Operation {
         }
     }
 
+    /// Check the running postondition guard.
     pub fn can_be_completed(&self, state: &State) -> bool {
         state.get_value(&self.name) == "executing".to_spvalue()
             && self.clone().postcondition.eval_running(&state)
     }
 
-    // NOTE: for now only one fail transition per opertion but
-    // it should be vector because it can fail multiple ways
+    /// Check the running fail_transition guard.
     pub fn can_be_failed(&self, state: &State) -> bool {
         state.get_value(&self.name) == "executing".to_spvalue()
             && self.clone().fail_transition.eval_running(&state)
     }
 
+    /// Check the running reset_transition guard.
     pub fn can_be_reset(&self, state: &State) -> bool {
         state.get_value(&self.name) == "completed".to_spvalue()
             && self.clone().reset_transition.eval_running(&state)

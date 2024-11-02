@@ -1,11 +1,8 @@
-use std::{
-    collections::HashSet,
-    time::Instant,
-};
+use std::{collections::HashSet, time::Instant};
 
-// use crate::{Operation, Predicate, State, PlanningResult};
 use crate::*;
 
+/// Minimal Breadth First Search algorithm for sequencing operations.
 pub fn bfs_operation_planner(
     state: State,
     goal: Predicate,
