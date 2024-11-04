@@ -90,7 +90,7 @@ pub async fn planner_ticker(
                             plan = new_plan.plan;
                             plan_state = PlanState::Initial.to_string();
                             replanned = true;
-                            plan_current_step = 0;
+                            // plan_current_step = 0;
                             plan_counter = plan_counter + 1;
                         }
                     }

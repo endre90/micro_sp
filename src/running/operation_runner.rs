@@ -40,6 +40,7 @@ pub async fn operation_runner(
                 log::info!(target: &&format!("{}_operation_runner", name), "Current state of plan '{}': Initial.", name);
                 log::info!(target: &&format!("{}_operation_runner", name), "Starting plan: '{:?}'.", plan);
                 plan_state = PlanState::Executing.to_string();
+                plan_current_step = 0;
             }
             PlanState::Executing => {
                 log::info!(target: &&format!("{}_operation_runner", name), "Current state of plan '{}': Executing.", name);
