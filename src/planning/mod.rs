@@ -142,7 +142,7 @@ mod tests {
         "op_move_to_b",
         None,
         None,
-        t!(
+        vec!(t!(
             "start_moving_to_b",
             "var:ur_action_trigger == false && var:ur_action_state == initial && var:ur_current_pose != b",
             "true",
@@ -154,8 +154,8 @@ mod tests {
             ),
             Vec::<&str>::new(),
             &state
-        ),
-        t!(
+        )),
+        vec!(t!(
             "complete_moving_to_b",
             "var:ur_action_state == done",
             "true",
@@ -165,15 +165,17 @@ mod tests {
             ),
             Vec::<&str>::new(),
             &state
-        ),
-        Transition::empty(), Transition::empty()
+        )),
+        vec!(),
+        vec!(),
+        vec!(),
     );
 
         let op_move_to_c = Operation::new(
         "op_move_to_c",
         None,
         None,
-        t!(
+        vec!(t!(
             "start_moving_to_c",
             "var:ur_action_trigger == false && var:ur_action_state == initial && var:ur_current_pose == b",
             "true",
@@ -185,8 +187,8 @@ mod tests {
             ),
             Vec::<&str>::new(),
             &state
-        ),
-        t!(
+        )),
+        vec!(t!(
             "complete_moving_to_c",
             "var:ur_action_state == done",
             "true",
@@ -196,15 +198,17 @@ mod tests {
             ),
             Vec::<&str>::new(),
             &state
-        ),
-        Transition::empty(), Transition::empty()
+        )),
+        vec!(),
+        vec!(),
+        vec!(),
     );
 
         let op_move_to_d = Operation::new(
         "op_move_to_d",
         None,
         None,
-        t!(
+        vec!(t!(
             "start_moving_to_d",
             "var:ur_action_trigger == false && var:ur_action_state == initial && var:ur_current_pose == c",
             "true",
@@ -216,8 +220,8 @@ mod tests {
             ),
             Vec::<&str>::new(),
             &state
-        ),
-        t!(
+        )),
+        vec!(t!(
             "complete_moving_to_d",
             "var:ur_action_state == done",
             "true",
@@ -227,8 +231,10 @@ mod tests {
             ),
             Vec::<&str>::new(),
             &state
-        ),
-        Transition::empty(), Transition::empty()
+        )),
+        vec!(),
+        vec!(),
+        vec!(),
     );
 
         // Adding the opeation states in the model
