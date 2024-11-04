@@ -66,6 +66,7 @@ pub async fn planner_ticker(
                 replanned = false;
             }
             (true, false) => {
+                plan_current_step = 0;
                 if replan_counter < MAX_REPLAN_RETRIES {
                     let goal = state.extract_goal(name);
                     replan_counter = replan_counter + 1;
@@ -90,7 +91,6 @@ pub async fn planner_ticker(
                             plan = new_plan.plan;
                             plan_state = PlanState::Initial.to_string();
                             replanned = true;
-                            // plan_current_step = 0;
                             plan_counter = plan_counter + 1;
                         }
                     }
