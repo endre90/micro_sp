@@ -8,11 +8,11 @@ pub struct FlexOperation {
     pub name: String,
     pub state: OperationState,
     pub timeout: Option<OrderedFloat<f64>>,
-    pub timeout_transitions: Vec<Transition>,
     pub retries: i64,
     pub preconditions: Vec<Transition>,
     pub postconditions: Vec<Transition>,
     pub fail_transitions: Vec<Transition>,
+    pub timeout_transitions: Vec<Transition>,
     pub reset_transitions: Vec<Transition>,
 }
 
@@ -20,11 +20,11 @@ impl FlexOperation {
     pub fn new(
         name: &str,
         timeout: Option<f64>,
-        timeout_transitions: Vec<Transition>,
         retries: Option<i64>,
         preconditions: Vec<Transition>,
         postconditions: Vec<Transition>,
         fail_transitions: Vec<Transition>,
+        timeout_transitions: Vec<Transition>,
         reset_transitions: Vec<Transition>,
     ) -> FlexOperation {
         FlexOperation {
