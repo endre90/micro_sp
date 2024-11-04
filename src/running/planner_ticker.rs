@@ -57,9 +57,11 @@ pub async fn planner_ticker(
             &format!("{}_plan", name),
         );
 
+        log::info!(target: &format!("{}_planner_ticker", name), "Plan current_step: {plan_current_step}.");
+
         match (replan_trigger, replanned) {
             (true, true) => {
-                log::info!(target: &&format!("{}_planner_ticker", name), "Planner triggered and (re)planned.");
+                log::info!(target: &format!("{}_planner_ticker", name), "Planner triggered and (re)planned.");
                 replan_trigger = false;
                 replanned = false;
             }
@@ -68,23 +70,23 @@ pub async fn planner_ticker(
                     let goal = state.extract_goal(name);
                     replan_counter = replan_counter + 1;
                     replan_counter_total = replan_counter_total + 1;
-                    log::info!(target: &&format!("{name}_planner_ticker"), 
+                    log::info!(target: &format!("{name}_planner_ticker"), 
                         "Planner triggered, initiating (re)planning, try {replan_counter} out of {MAX_REPLAN_RETRIES}.");
                     let state_clone = state.clone();
                     let new_plan =
                         bfs_operation_planner(state_clone, goal, model.operations.clone(), 30);
                     if !new_plan.found {
-                        log::error!(target: &&format!("{}_planner_ticker", name), "No plan was found");
+                        log::error!(target: &format!("{}_planner_ticker", name), "No plan was found");
                         plan_state = PlanState::NotFound.to_string();
                         replan_counter = replan_counter + 1;
                     } else {
                         replan_counter = 0;
                         if new_plan.length == 0 {
-                            log::info!(target: &&format!("{}_planner_ticker", name), "We are already in the goal.");
+                            log::info!(target: &format!("{}_planner_ticker", name), "We are already in the goal.");
                             plan_state = PlanState::Completed.to_string();
                         } else {
-                            log::info!(target: &&format!("{}_planner_ticker", name), "A new plan was found:");
-                            log::info!(target: &&format!("{}_planner_ticker", name), "Plan: {:?}", new_plan.plan);
+                            log::info!(target: &format!("{}_planner_ticker", name), "A new plan was found:");
+                            log::info!(target: &format!("{}_planner_ticker", name), "Plan: {:?}", new_plan.plan);
                             plan = new_plan.plan;
                             plan_state = PlanState::Initial.to_string();
                             replanned = true;
@@ -93,14 +95,14 @@ pub async fn planner_ticker(
                         }
                     }
                 } else {
-                    log::error!(target: &&format!("{}_planner_ticker", name), "Max allowed replan retries reached.");
+                    log::error!(target: &format!("{}_planner_ticker", name), "Max allowed replan retries reached.");
                     replan_trigger = false;
                     replanned = false;
                 }
             }
 
             (false, _) => {
-                log::info!(target: &&format!("{}_planner_ticker", name), 
+                log::info!(target: &format!("{}_planner_ticker", name), 
             "Planner is not triggered.");
                 replanned = false;
             }
