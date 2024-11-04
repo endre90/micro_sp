@@ -1,13 +1,38 @@
 use serde::{Deserialize, Serialize};
+use crate::*;
 
 /// A model contains behavior that defines what a system is capable of doing.
-use crate::*;
 #[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
 pub struct Model {
     pub name: String,
     pub auto_transitions: Vec<Transition>,
     pub auto_operations: Vec<Operation>,
     pub operations: Vec<Operation>,
+}
+
+/// A model contains behavior that defines what a system is capable of doing.
+#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
+pub struct FlexModel {
+    pub name: String,
+    pub auto_transitions: Vec<Transition>,
+    pub auto_operations: Vec<Operation>,
+    pub flex_operations: Vec<FlexOperation>,
+}
+
+impl FlexModel {
+    pub fn new(
+        name: &str,
+        auto_transitions: Vec<Transition>,
+        auto_operations: Vec<Operation>,
+        flex_operations: Vec<FlexOperation>,
+    ) -> FlexModel {
+        FlexModel {
+            name: name.to_string(),
+            auto_transitions,
+            auto_operations,
+            flex_operations,
+        }
+    }
 }
 
 impl Model {

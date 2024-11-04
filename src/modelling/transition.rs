@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 //     get_predicate_vars_all, Action,
 //     Predicate, SPVariable, State,
 // };
-use std::fmt;
+use std::{fmt, hash::Hash};
 
 /// A planning transition T contains a guard predicate G : S → {false, true},
 /// and a set of action functions A, where ∀a ∈ A, a : S → S models
@@ -31,6 +31,31 @@ pub struct Transition {
     pub actions: Vec<Action>,
     pub runner_actions: Vec<Action>,
 }
+
+// impl Hash for Transition {
+//     fn hash<H: Hasher>(&self, s: &mut H) {
+//         self.guard.hash(s);
+//         self.runner_guard.hash(s);
+//         self.actions
+//         //     .keys()
+//         //     .into_iter()
+//         //     .map(|x| x.to_owned())
+//         //     .collect::<Vec<String>>()
+//         //     .hash(s);
+//         // self.state
+//         //     .values()
+//         //     .into_iter()
+//         //     .map(|x| x.var.to_owned())
+//         //     .collect::<Vec<SPVariable>>()
+//         //     .hash(s);
+//         // self.state
+//         //     .values()
+//         //     .into_iter()
+//         //     .map(|x| x.val.to_owned())
+//         //     .collect::<Vec<SPValue>>()
+//         //     .hash(s);
+//     }
+// }
 
 impl Transition {
     /// Define a new transition. Use parse() instead.
