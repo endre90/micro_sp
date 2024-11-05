@@ -169,11 +169,11 @@ impl State {
             SPValue::String(value) => value,
             SPValue::UNKNOWN => {
                 log::debug!(target: target, "Value for String '{}' is UNKNOWN, resulting to ''.", name);
-                "".to_string()
+                "UNKNOWN".to_string()
             }
             _ => {
                 log::error!(target: target, "Couldn't get String '{}' from the state, resulting to ''.", name);
-                "".to_string()
+                "UNKNOWN".to_string()
             }
         }
     }
