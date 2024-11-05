@@ -37,15 +37,12 @@ pub async fn operation_runner(
 
         match PlanState::from_str(&plan_state) {
             PlanState::Initial => {
-                log::info!(target: &&format!("{}_operation_runner", name), "Current state of plan '{}': Initial.", name);
-                log::info!(target: &&format!("{}_operation_runner", name), "Starting plan: '{:?}'.", plan);
+                log::info!(target: &&format!("{}_operation_runner", name), "Current state of plan '{:?}': Initial. Starting.", plan);
                 plan_state = PlanState::Executing.to_string();
                 plan_current_step = 0;
             }
             PlanState::Executing => {
-                log::info!(target: &&format!("{}_operation_runner", name), "Current state of plan '{}': Executing.", name);
-                log::info!(target: &&format!("{}_operation_runner", name), "Executing plan: '{:?}'.", plan);
-
+                log::info!(target: &&format!("{}_operation_runner", name), "Current state of plan '{:?}': Executing.", plan);
                 if plan.len() > plan_current_step as usize {
                     let operation = model
                         .operations
@@ -128,7 +125,7 @@ pub async fn operation_runner(
 
                             if operation_retry_counter < operation.retries {
                                 operation_retry_counter = operation_retry_counter + 1;
-                                log::error!(target: &&format!("{}_operation_runner", name), 
+                                log::info!(target: &&format!("{}_operation_runner", name), 
                                     "Retrying operation: '{}'. Retry nr. {} out of {}.", operation.name, operation_retry_counter, operation.retries);
                                 new_state = operation.clone().retry_running(&new_state);
                                 new_state = new_state.update(
@@ -142,7 +139,7 @@ pub async fn operation_runner(
                                     operation_retry_counter.to_spvalue(),
                                 );
                                 log::error!(target: &&format!("{}_operation_runner", name), 
-                                        "Failing the plan '{} : {:?}'.", name, plan);
+                                        "Failing the plan '{:?}'.", plan);
                                 plan_state = PlanState::Failed.to_string();
                             }
                         }

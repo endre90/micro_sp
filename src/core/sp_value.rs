@@ -172,7 +172,11 @@ impl ToSPValue for f64 {
 
 impl ToSPValue for String {
     fn to_spvalue(&self) -> SPValue {
-        SPValue::String(self.clone())
+        if self == "Unknown" || self == "unknown" || self == "UNKNOWN" {
+            SPValue::UNKNOWN
+        } else {
+            SPValue::String(self.clone())
+        }
     }
 }
 
