@@ -166,23 +166,23 @@ pub async fn operation_runner(
                 }
             }
             PlanState::Paused => {
-                log::info!(target: &&format!("{}_runner", name), "Current state of plan '{}': Paused.", name)
+                // log::info!(target: &&format!("{}_runner", name), "Current state of plan '{}': Paused.", name)
             }
             PlanState::Failed => {
-                log::error!(target: &&format!("{}_runner", name), "Current state of plan '{}': Failed.", name);
+                // log::error!(target: &&format!("{}_runner", name), "Current state of plan '{}': Failed.", name);
                 // if operation has retried enough times it is time to fail and scrap the complete plan
             }
             PlanState::NotFound => {
-                log::info!(target: &&format!("{}_runner", name), "Current state of plan '{}': NotFound.", name)
+                // log::info!(target: &&format!("{}_runner", name), "Current state of plan '{}': NotFound.", name)
             }
             PlanState::Completed => {
-                log::warn!(target: &&format!("{}_runner", name), "Current state of plan '{}': Completed.", name)
+                // log::warn!(target: &&format!("{}_runner", name), "Current state of plan '{}': Completed.", name)
             }
             PlanState::Cancelled => {
-                log::info!(target: &&format!("{}_runner", name), "Current state of plan '{}': Cancelled.", name)
+                // log::info!(target: &&format!("{}_runner", name), "Current state of plan '{}': Cancelled.", name)
             }
             PlanState::UNKNOWN => {
-                log::info!(target: &&format!("{}_runner", name), "Current state of plan '{}': UNKNOWN.", name)
+                // log::info!(target: &&format!("{}_runner", name), "Current state of plan '{}': UNKNOWN.", name)
             }
         }
 

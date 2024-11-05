@@ -78,8 +78,16 @@ pub async fn planner_ticker(
         }
 
         if plan_old != plan {
-            log::info!(target: &format!("{}_planner_ticker", name), 
-                "Current plan: \n{:?}", plan.iter().map(|step| format!("    {step}\n")).collect::<String>());
+            log::info!(
+                target: &format!("{}_planner_ticker", name), 
+                "Current plan:\n{}",
+                plan.iter()
+                    .map(|step| format!("    {step}"))
+                    .collect::<Vec<String>>() // Collect into a vector of strings
+                    .join("\n") // Join each element with a newline
+            );
+            // log::info!(target: &format!("{}_planner_ticker", name), 
+            //     "Current plan: \n{:?}", plan.iter().map(|step| format!("    {step}\n")).collect::<String>());
             plan_old = plan.clone()
         }
 
@@ -100,8 +108,7 @@ pub async fn planner_ticker(
                         bfs_operation_planner(state_clone, goal, model.operations.clone(), 30);
                     if !new_plan.found {
                         planner_information = format!(
-                            "Planner triggered (try {replan_counter}/{MAX_REPLAN_RETRIES}): /
-                            No plan was found."
+                            "Planner triggered (try {replan_counter}/{MAX_REPLAN_RETRIES}): No plan was found."
                         );
                         plan_state = PlanState::NotFound.to_string();
                         replan_counter = replan_counter + 1;
@@ -132,8 +139,7 @@ pub async fn planner_ticker(
             }
 
             (false, _) => {
-                log::info!(target: &format!("{}_planner_ticker", name), 
-            "Planner is not triggered.");
+                planner_information = "Planner is not triggered".to_string();
                 replanned = false;
             }
         };
