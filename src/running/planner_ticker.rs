@@ -63,7 +63,7 @@ pub async fn planner_ticker(
         );
         let mut planner_information = state.get_or_default_string(
             &format!("{}_planner_ticker", name),
-            &format!("{}_plan", name),
+            &format!("{}_planner_information", name),
         );
 
         // Log only when something changes and not every tick
@@ -78,7 +78,8 @@ pub async fn planner_ticker(
         }
 
         if plan_old != plan {
-            log::info!(target: &format!("{}_planner_ticker", name), "Plan current: {:?}", plan);
+            log::info!(target: &format!("{}_planner_ticker", name), 
+                "Current plan: \n{:?}", plan.iter().map(|step| format!("    {step}\n")).collect::<String>());
             plan_old = plan.clone()
         }
 
@@ -98,19 +99,25 @@ pub async fn planner_ticker(
                     let new_plan =
                         bfs_operation_planner(state_clone, goal, model.operations.clone(), 30);
                     if !new_plan.found {
-                        planner_information = format!("Planner triggered (try {replan_counter}/{MAX_REPLAN_RETRIES}): /
-                            No plan was found.");
+                        planner_information = format!(
+                            "Planner triggered (try {replan_counter}/{MAX_REPLAN_RETRIES}): /
+                            No plan was found."
+                        );
                         plan_state = PlanState::NotFound.to_string();
                         replan_counter = replan_counter + 1;
                     } else {
                         replan_counter = 0;
                         if new_plan.length == 0 {
-                            planner_information = format!("Planner triggered (try {replan_counter}/{MAX_REPLAN_RETRIES}): /
-                                We are already in the goal, no action will be taken.");
+                            planner_information = format!(
+                                "Planner triggered (try {replan_counter}/{MAX_REPLAN_RETRIES}): /
+                                We are already in the goal, no action will be taken."
+                            );
                             plan_state = PlanState::Completed.to_string();
                         } else {
-                            planner_information = format!("Planner triggered (try {replan_counter}/{MAX_REPLAN_RETRIES}): /
-                                A new plan was found.");
+                            planner_information = format!(
+                                "Planner triggered (try {replan_counter}/{MAX_REPLAN_RETRIES}): /
+                                A new plan was found."
+                            );
                             plan = new_plan.plan;
                             plan_state = PlanState::Initial.to_string();
                             replanned = true;
@@ -149,7 +156,10 @@ pub async fn planner_ticker(
                 plan_current_step.to_spvalue(),
             )
             .update(&format!("{}_plan", name), plan.to_spvalue())
-            .update(&format!("{}_planner_information", name), planner_information.to_spvalue())
+            .update(
+                &format!("{}_planner_information", name),
+                planner_information.to_spvalue(),
+            )
             .update(
                 &format!("{}_replan_counter_total", name),
                 replan_counter_total.to_spvalue(),

@@ -16,6 +16,10 @@ pub async fn operation_runner(
     let mut interval = interval(Duration::from_millis(100));
     let model = model.clone();
 
+    // For nicer logging
+    let mut plan_state_old = "".to_string();
+    let mut operation_state_old = "".to_string();
+
     loop {
         let (response_tx, response_rx) = oneshot::channel();
         command_sender.send(Command::GetState(response_tx)).await?;
@@ -35,14 +39,18 @@ pub async fn operation_runner(
             &format!("{}_plan", name),
         );
 
+        // Log only when something changes and not every tick
+        if plan_state_old != plan_state {
+            log::info!(target: &format!("{}_operation_runner", name), "Plan current state: {plan_state}.");
+            plan_state_old = plan_state.clone()
+        }
+
         match PlanState::from_str(&plan_state) {
             PlanState::Initial => {
-                log::info!(target: &&format!("{}_operation_runner", name), "Current state of plan '{:?}': Initial. Starting.", plan);
                 plan_state = PlanState::Executing.to_string();
                 plan_current_step = 0;
             }
             PlanState::Executing => {
-                log::info!(target: &&format!("{}_operation_runner", name), "Current state of plan '{:?}': Executing.", plan);
                 if plan.len() > plan_current_step as usize {
                     let operation = model
                         .operations
@@ -61,20 +69,26 @@ pub async fn operation_runner(
                         &format!("{}_retry_counter", operation.name),
                     );
 
+                    // Log only when something changes and not every tick
+                    if operation_state_old != operation_state {
+                        log::info!(target: &format!("{}_operation_runner", name), "Current state of operation {}: {}.", operation.name, operation_state);
+                        operation_state_old = operation_state.clone()
+                    }
+
                     match OperationState::from_str(&operation_state) {
                         OperationState::Initial => {
-                            log::info!(target: &&format!("{}_operation_runner", name), 
-                                "Current state of operation '{}': Initial.", operation.name);
+                            // log::info!(target: &&format!("{}_operation_runner", name), 
+                            //     "Current state of operation '{}': Initial.", operation.name);
                             if operation.eval_running(&state) {
-                                log::info!(target: &&format!("{}_operation_runner", name), 
-                                    "Starting operation: '{}'.", operation.name);
+                                // log::info!(target: &&format!("{}_operation_runner", name), 
+                                //     "Starting operation: '{}'.", operation.name);
                                 new_state = operation.start_running(&new_state);
                             }
                         }
                         OperationState::Disabled => todo!(),
                         OperationState::Executing => {
-                            log::info!(target: &&format!("{}_operation_runner", name), 
-                            "Current state of operation '{}': Executing.", operation.name);
+                            // log::info!(target: &&format!("{}_operation_runner", name), 
+                            // "Current state of operation '{}': Executing.", operation.name);
                             if operation.can_be_completed(&state) {
                                 new_state = operation.clone().complete_running(&new_state);
                                 log::info!(target: &&format!("{}_operation_runner", name), 
@@ -89,8 +103,8 @@ pub async fn operation_runner(
                             }
                         }
                         OperationState::Completed => {
-                            log::info!(target: &&format!("{}_runner", name), 
-                                "Current state of operation '{}': Completed.", operation.name);
+                            // log::info!(target: &&format!("{}_runner", name), 
+                            //     "Current state of operation '{}': Completed.", operation.name);
                             operation_retry_counter = 0;
                             new_state = new_state.update(
                                 &format!("{}_retry_counter", operation.name),
@@ -120,8 +134,8 @@ pub async fn operation_runner(
                         }
                         OperationState::Timedout => todo!(),
                         OperationState::Failed => {
-                            log::error!(target: &&format!("{}_operation_runner", name), 
-                                        "Operation: '{}' has failed.", operation.name);
+                            // log::error!(target: &&format!("{}_operation_runner", name), 
+                            //             "Operation: '{}' has failed.", operation.name);
 
                             if operation_retry_counter < operation.retries {
                                 operation_retry_counter = operation_retry_counter + 1;

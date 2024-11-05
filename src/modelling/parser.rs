@@ -89,7 +89,7 @@ peg::parser!(pub grammar pred_parser() for str {
 #[cfg(test)]
 mod tests {
 
-    use ordered_float::OrderedFloat;
+    // use ordered_float::OrderedFloat;
 
     use crate::{Predicate::*, *};
 
