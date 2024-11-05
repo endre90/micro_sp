@@ -89,6 +89,8 @@ peg::parser!(pub grammar pred_parser() for str {
 #[cfg(test)]
 mod tests {
 
+    use ordered_float::OrderedFloat;
+
     use crate::{Predicate::*, *};
 
     fn john_doe() -> Vec<(SPVariable, SPValue)> {
@@ -252,11 +254,23 @@ mod tests {
         let weight_2 = fv!("weight_2");
         let s_new = s.add(SPAssignment::new(weight_2, 85.0.to_spvalue()));
         let a1 = a!(weight.clone(), 82.5.wrap());
-        let a2 = a!(weight.clone(), 85.0.wrap());
+        let _a2 = a!(weight.clone(), 85.0.wrap());
         assert_eq!(pred_parser::action("var:weight <- 82.5", &s), Ok(a1));
         assert_eq!(
             pred_parser::action("var:weight <- var:weight_2", &s_new),
-            Ok(a2)
+            Ok(Action {
+                var: SPVariable {
+                    name: "weight".to_string(),
+                    value_type: SPValueType::Float64,
+                    domain: [].to_vec()
+                },
+                var_or_val: SPVariable {
+                    name: "weight_2".to_string(),
+                    value_type: SPValueType::Float64,
+                    domain: vec!()
+                }
+                .wrap()
+            })
         );
     }
 }

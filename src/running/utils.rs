@@ -17,6 +17,7 @@ pub fn generate_runner_state_variables(name: &str) -> State {
     let plan_duration = fv!(&&format!("{}_plan_duration", name)); // does nothing for now
     let plan_current_step = iv!(&&format!("{}_plan_current_step", name)); // Index of the currently exec. operation in the plan
     let planner_ref_counter = iv!(&&format!("{}_planner_ref_counter", name)); // does nothing
+    let planner_information = v!(&&format!("{}_planner_information", name)); // current information about the plan
     let replanned = bv!(&&format!("{}_replanned", name)); // boolean for tracking the planner triggering
     let replan_counter_total = iv!(&&format!("{}_replan_counter_total", name)); // How many times has the planner been called
     let replan_counter = iv!(&&format!("{}_replan_counter", name)); // How many times has the planner tried to replan for the same problem
@@ -34,6 +35,7 @@ pub fn generate_runner_state_variables(name: &str) -> State {
     state = state.add(assign!(plan_duration, SPValue::UNKNOWN));
     state = state.add(assign!(plan_current_step, SPValue::UNKNOWN));
     state = state.add(assign!(planner_ref_counter, 1.to_spvalue()));
+    state = state.add(assign!(planner_information, SPValue::UNKNOWN));
     state = state.add(assign!(replanned, SPValue::UNKNOWN));
     state = state.add(assign!(replan_counter, SPValue::UNKNOWN));
     state = state.add(assign!(replan_counter_total, SPValue::UNKNOWN));
