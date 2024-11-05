@@ -19,6 +19,9 @@ pub async fn planner_ticker(
     let mut interval = interval(Duration::from_millis(100));
     let model = model.clone();
 
+    // For nicer logging
+    let mut plan_current_step_old = 0;
+
     loop {
         let (response_tx, response_rx) = oneshot::channel();
         command_sender.send(Command::GetState(response_tx)).await?;
@@ -57,8 +60,11 @@ pub async fn planner_ticker(
             &format!("{}_plan", name),
         );
 
-        log::info!(target: &format!("{}_planner_ticker", name), "Plan current_step: {plan_current_step}.");
-
+        if plan_current_step_old != plan_current_step {
+            log::info!(target: &format!("{}_planner_ticker", name), "Plan current step: {plan_current_step}.");
+            plan_current_step_old = plan_current_step
+        }
+        
         match (replan_trigger, replanned) {
             (true, true) => {
                 log::info!(target: &format!("{}_planner_ticker", name), "Planner triggered and (re)planned.");
