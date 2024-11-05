@@ -81,7 +81,8 @@ peg::parser!(pub grammar pred_parser() for str {
     }
 
     pub rule action(state: &State) -> Action
-    = p1:variable(&state) _ "<-" _ p2:variable(&state) { Action::new(p1, state.get_value(&p2.name).wrap()) }
+    // = p1:variable(&state) _ "<-" _ p2:variable(&state) { Action::new(p1, state.get_value(&p2.name).wrap()) }
+    = p1:variable(&state) _ "<-" _ p2:variable(&state) { Action::new(p1, p2.wrap()) }
     / p1:variable(&state) _ "<-" _ p2:value(&state) { Action::new(p1, p2) }
 });
 
