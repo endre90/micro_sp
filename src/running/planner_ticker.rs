@@ -80,14 +80,13 @@ pub async fn planner_ticker(
         if plan_old != plan {
             log::info!(
                 target: &format!("{}_planner_ticker", name), 
-                "Current plan:\n{}",
+                "Got a plan:\n{}",
                 plan.iter()
-                    .map(|step| format!("    {step}"))
-                    .collect::<Vec<String>>() // Collect into a vector of strings
-                    .join("\n") // Join each element with a newline
+                    .enumerate()
+                    .map(|(index, step)| format!("    {} -> {}", index, step))
+                    .collect::<Vec<String>>()
+                    .join("\n")
             );
-            // log::info!(target: &format!("{}_planner_ticker", name), 
-            //     "Current plan: \n{:?}", plan.iter().map(|step| format!("    {step}\n")).collect::<String>());
             plan_old = plan.clone()
         }
 
@@ -111,19 +110,16 @@ pub async fn planner_ticker(
                             "Planner triggered (try {replan_counter}/{MAX_REPLAN_RETRIES}): No plan was found."
                         );
                         plan_state = PlanState::NotFound.to_string();
-                        replan_counter = replan_counter + 1;
                     } else {
                         replan_counter = 0;
                         if new_plan.length == 0 {
                             planner_information = format!(
-                                "Planner triggered (try {replan_counter}/{MAX_REPLAN_RETRIES}): /
-                                We are already in the goal, no action will be taken."
+                                "Planner triggered (try {replan_counter}/{MAX_REPLAN_RETRIES}): We are already in the goal, no action will be taken."
                             );
                             plan_state = PlanState::Completed.to_string();
                         } else {
                             planner_information = format!(
-                                "Planner triggered (try {replan_counter}/{MAX_REPLAN_RETRIES}): /
-                                A new plan was found."
+                                "Planner triggered (try {replan_counter}/{MAX_REPLAN_RETRIES}): A new plan was found."
                             );
                             plan = new_plan.plan;
                             plan_state = PlanState::Initial.to_string();

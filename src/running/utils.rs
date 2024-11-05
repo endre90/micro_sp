@@ -48,7 +48,6 @@ pub fn generate_runner_state_variables(name: &str) -> State {
 
 pub fn generate_operation_state_variables(model: &Model, coverability_tracking: bool) -> State {
     let mut state = State::new();
-    log::error!(target: &&format!("{}_utils", &model.name), "Auto_operations: '{:?}'.", &model.auto_operations.iter().map(|x| x.name.to_string()).collect::<Vec<String>>());
     // operations should be put in the initial state once they are part of the plan
     for operation in &model.operations {
         let operation_state = v!(&&format!("{}", operation.name)); // Initial, Executing, Failed, Completed, Unknown
