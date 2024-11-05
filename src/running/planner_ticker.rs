@@ -83,7 +83,7 @@ pub async fn planner_ticker(
                 "Got a plan:\n{}",
                 plan.iter()
                     .enumerate()
-                    .map(|(index, step)| format!("    {} -> {}", index, step))
+                    .map(|(index, step)| format!("       {} -> {}", index + 1, step))
                     .collect::<Vec<String>>()
                     .join("\n")
             );
