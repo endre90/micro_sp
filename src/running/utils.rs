@@ -51,9 +51,11 @@ pub fn generate_operation_state_variables(model: &Model, coverability_tracking: 
     // operations should be put in the initial state once they are part of the plan
     for operation in &model.operations {
         let operation_state = v!(&&format!("{}", operation.name)); // Initial, Executing, Failed, Completed, Unknown
+        let operation_information = v!(&&format!("{}_information", operation.name));
         let operation_duration = fv!(&&format!("{}_duration", operation.name)); // does nothing for now
-        let operation_retry_counter = iv!(&&format!("{}_retry_counter", operation.name)); // without scraping the current plan, how many times has an operation retried
+        let operation_retry_counter = iv!(&&format!("{}_retry_counter", operation.name)); // without scrapping the current plan, how many times has an operation retried
         state = state.add(assign!(operation_state, "initial".to_spvalue()));
+        state = state.add(assign!(operation_information, SPValue::UNKNOWN));
         state = state.add(assign!(operation_duration, 0.0.to_spvalue()));
         state = state.add(assign!(operation_retry_counter, 0.to_spvalue()));
 

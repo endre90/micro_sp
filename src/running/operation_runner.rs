@@ -71,7 +71,7 @@ pub async fn operation_runner(
 
                     let mut operation_information = state.get_or_default_string(
                         &format!("{}_operation_runner", name),
-                        &format!("{}_operation_information", operation.name),
+                        &format!("{}_information", operation.name),
                     );
 
                     let mut operation_retry_counter = state.get_or_default_i64(
@@ -144,7 +144,7 @@ pub async fn operation_runner(
                     }
 
                     new_state = new_state.update(
-                        &format!("{}_operation_information", operation.name),
+                        &format!("{}_information", operation.name),
                         operation_information.to_spvalue(),
                     );
                 } else {
