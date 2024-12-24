@@ -47,6 +47,12 @@ impl SPVariable {
         SPVariable::new(name, SPValueType::Array, domain)
     }
 
+    // Maybe actually we can only use the float64 and do something like instant.to_64()
+    // /// Use the macro tv! instead.
+    // pub fn new_timer(name: &str) -> SPVariable {
+    //     SPVariable::new(name, SPValueType::Time, vec!())
+    // }
+
     /// This is used to retrieve information about the type of the variable.
     pub fn has_type(&self) -> SPValueType {
         self.value_type

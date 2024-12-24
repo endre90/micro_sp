@@ -1,3 +1,5 @@
+use std::time::{Instant, SystemTime};
+
 use crate::*;
 use tokio::{
     sync::{mpsc, oneshot},
@@ -79,6 +81,11 @@ pub async fn operation_runner(
                         &format!("{}_retry_counter", operation.name),
                     );
 
+                    let mut operation_start_time = state.get_or_default_f64(
+                        &format!("{}_operation_runner", name),
+                        &format!("{}_start_time", operation.name),
+                    );
+
                     // Log only when something changes and not every tick
                     if operation_state_old != operation_state {
                         log::info!(target: &format!("{}_operation_runner", name), "Current state of operation {}: {}.", operation.name, operation_state);
@@ -86,7 +93,7 @@ pub async fn operation_runner(
                     }
 
                     if operation_information_old != operation_information {
-                        log::info!(target: &format!("{}_operation_runner", name), "Current operation '{}' info: {}.", operation.name, operation_state);
+                        log::info!(target: &format!("{}_operation_runner", name), "Current operation '{}' info: {}.", operation.name, operation_information);
                         operation_information_old = operation_information.clone()
                     }
 
@@ -94,6 +101,7 @@ pub async fn operation_runner(
                         OperationState::Initial => {
                             if operation.eval_running(&state) {
                                 new_state = operation.start_running(&new_state);
+                                operation_start_time = Instant::now().duration_since(0).as_micros() as f64;
                             }
                         }
                         OperationState::Disabled => todo!(),
