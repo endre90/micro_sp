@@ -1,4 +1,4 @@
-use std::time::{Instant, SystemTime};
+// use std::time::{Instant, SystemTime};
 
 use crate::*;
 use tokio::{
@@ -81,10 +81,10 @@ pub async fn operation_runner(
                         &format!("{}_retry_counter", operation.name),
                     );
 
-                    let mut operation_start_time = state.get_or_default_f64(
-                        &format!("{}_operation_runner", name),
-                        &format!("{}_start_time", operation.name),
-                    );
+                    // let mut _operation_start_time = state.get_or_default_f64(
+                    //     &format!("{}_operation_runner", name),
+                    //     &format!("{}_start_time", operation.name),
+                    // );
 
                     // Log only when something changes and not every tick
                     if operation_state_old != operation_state {
@@ -99,9 +99,10 @@ pub async fn operation_runner(
 
                     match OperationState::from_str(&operation_state) {
                         OperationState::Initial => {
+                            // let now = Instant::now();
                             if operation.eval_running(&state) {
                                 new_state = operation.start_running(&new_state);
-                                operation_start_time = Instant::now().duration_since(0).as_micros() as f64;
+                                // _operation_start_time = Instant::now().duration_since(now).as_micros() as f64;
                             }
                         }
                         OperationState::Disabled => todo!(),
