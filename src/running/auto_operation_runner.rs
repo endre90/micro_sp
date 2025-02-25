@@ -8,13 +8,13 @@ use tokio::{
 pub async fn auto_operation_runner(
     name: &str,
     model: &Model,
-    command_sender: mpsc::Sender<Command>,
+    command_sender: mpsc::Sender<StateManagement>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let mut interval = interval(Duration::from_millis(100));
     let model = model.clone();
     loop {
         let (response_tx, response_rx) = oneshot::channel();
-        command_sender.send(Command::GetState(response_tx)).await?;
+        command_sender.send(StateManagement::GetState(response_tx)).await?;
         let state = response_rx.await?;
 
         for o in &model.auto_operations {
@@ -24,14 +24,14 @@ pub async fn auto_operation_runner(
 
                 let modified_state = state.get_diff_partial_state(&new_state);
                 command_sender
-                    .send(Command::SetPartialState(modified_state))
+                    .send(StateManagement::SetPartialState(modified_state))
                     .await?;
             } else if o.can_be_completed(&state) {
                 let new_state = o.complete_running(&state);
                 log::info!(target: &&format!("{}_auto_runner", name), "Completed auto operation: '{}'.", o.name);
                 let modified_state = state.get_diff_partial_state(&new_state);
                 command_sender
-                    .send(Command::SetPartialState(modified_state))
+                    .send(StateManagement::SetPartialState(modified_state))
                     .await?;
             }
         }

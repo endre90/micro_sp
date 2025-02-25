@@ -12,7 +12,7 @@ use tokio::{
 /// of operation pre- and postconditions are evaluated and taken.
 pub async fn operation_runner(
     model: &Model,
-    command_sender: mpsc::Sender<Command>,
+    command_sender: mpsc::Sender<StateManagement>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let name = &model.name;
     let mut interval = interval(Duration::from_millis(100));
@@ -29,7 +29,7 @@ pub async fn operation_runner(
 
     loop {
         let (response_tx, response_rx) = oneshot::channel();
-        command_sender.send(Command::GetState(response_tx)).await?;
+        command_sender.send(StateManagement::GetState(response_tx)).await?;
         let state = response_rx.await?;
         let mut new_state = state.clone();
 
@@ -178,7 +178,7 @@ pub async fn operation_runner(
 
         let modified_state = state.get_diff_partial_state(&new_state);
         command_sender
-            .send(Command::SetPartialState(modified_state))
+            .send(StateManagement::SetPartialState(modified_state))
             .await?;
 
         interval.tick().await;

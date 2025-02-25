@@ -13,7 +13,7 @@ use tokio::{
 /// current state of the system.
 pub async fn planner_ticker(
     model: &Model,
-    command_sender: mpsc::Sender<Command>,
+    command_sender: mpsc::Sender<StateManagement>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let name = &model.name;
     let mut interval = interval(Duration::from_millis(100));
@@ -26,7 +26,7 @@ pub async fn planner_ticker(
 
     loop {
         let (response_tx, response_rx) = oneshot::channel();
-        command_sender.send(Command::GetState(response_tx)).await?;
+        command_sender.send(StateManagement::GetState(response_tx)).await?;
         let state = response_rx.await?;
 
         let mut replan_trigger = state.get_or_default_bool(
@@ -169,7 +169,7 @@ pub async fn planner_ticker(
 
         let modified_state = state.get_diff_partial_state(&new_state);
         command_sender
-            .send(Command::SetPartialState(modified_state))
+            .send(StateManagement::SetPartialState(modified_state))
             .await?;
 
         interval.tick().await;
