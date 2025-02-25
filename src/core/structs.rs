@@ -161,6 +161,7 @@ impl fmt::Display for ServiceRequestState {
 pub enum ActionRequestState {
     UNKNOWN,
     Initial,
+    Executing,
     Succeeded,
     Failed,
 }
@@ -175,6 +176,7 @@ impl ActionRequestState {
     pub fn from_str(x: &str) -> ActionRequestState {
         match x {
             "initial" => ActionRequestState::Initial,
+            "executing" => ActionRequestState::Executing,
             "succeeded" => ActionRequestState::Succeeded,
             "failed" => ActionRequestState::Failed,
             _ => ActionRequestState::UNKNOWN,
@@ -186,6 +188,7 @@ impl fmt::Display for ActionRequestState {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             ActionRequestState::Initial => write!(f, "initial"),
+            ActionRequestState::Executing => write!(f, "executing"),
             ActionRequestState::Succeeded => write!(f, "succeeded"),
             ActionRequestState::Failed => write!(f, "failed"),
             ActionRequestState::UNKNOWN => write!(f, "UNKNOWN"),
