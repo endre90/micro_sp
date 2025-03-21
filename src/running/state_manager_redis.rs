@@ -91,7 +91,7 @@ pub async fn redis_state_manager(
     // First populate the redis DB with the state.
     for (var, assignment) in state.state.clone() {
         if let Err(e) = con
-            .hset::<_, _, _, ()>(&var, "asdf", assignment.val_to_string())
+            .set::<_, String, String>(&var, assignment.val_to_string())
             .await
         {
             eprintln!("Failed to hset boolean {}: {:?}", var, e);
@@ -167,7 +167,7 @@ pub async fn redis_state_manager(
             StateManagement::SetPartialState(partial_state) => {
                 for (var, assignment) in partial_state.state {
                     if let Err(e) = con
-                        .hset::<_, _, _, ()>(&var, &var, assignment.val_to_string())
+                        .set::<_, String, String>(&var, assignment.val_to_string())
                         .await
                     {
                         eprintln!("Failed to hset {}: {:?}", var, e);
@@ -179,7 +179,7 @@ pub async fn redis_state_manager(
 
             StateManagement::Set((var, assignment)) => {
                 if let Err(e) = con
-                    .hset::<_, _, _, ()>(&var, &var, assignment.val_to_string())
+                    .set::<_, String, String>(&var, assignment.val_to_string())
                     .await
                 {
                     eprintln!("Failed to hset {}: {:?}", var, e);
