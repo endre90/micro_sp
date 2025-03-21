@@ -91,7 +91,7 @@ pub async fn redis_state_manager(
     // First populate the redis DB with the state.
     for (var, assignment) in state.state.clone() {
         if let Err(e) = con
-            .hset::<_, _, _, ()>("my_state", &var, assignment.val_to_string())
+            .hset::<_, _, _, ()>(&var, "asdf", assignment.val_to_string())
             .await
         {
             eprintln!("Failed to hset boolean {}: {:?}", var, e);
@@ -147,7 +147,7 @@ pub async fn redis_state_manager(
             }
 
             StateManagement::Get((var, response_sender)) => {
-                match con.hget::<_, _, Option<String>>("my_state", &var).await {
+                match con.hget::<_, _, Option<String>>(&var, &var).await {
                     Ok(val) => {
                         match val {
                             Some(redis_value) => {
@@ -159,6 +159,7 @@ pub async fn redis_state_manager(
                     }
                     Err(e) => {
                         eprintln!("Failed to hget {}: {:?}", var, e);
+                        panic!("Var doesn't exist!")
                     }
                 }
             }
@@ -166,10 +167,11 @@ pub async fn redis_state_manager(
             StateManagement::SetPartialState(partial_state) => {
                 for (var, assignment) in partial_state.state {
                     if let Err(e) = con
-                        .hset::<_, _, _, ()>("my_state", &var, assignment.val_to_string())
+                        .hset::<_, _, _, ()>(&var, &var, assignment.val_to_string())
                         .await
                     {
-                        eprintln!("Failed to hset boolean {}: {:?}", var, e);
+                        eprintln!("Failed to hset {}: {:?}", var, e);
+                        panic!("!")
                     }
                     state = state.update(&var, assignment.val)
                 }
@@ -177,10 +179,11 @@ pub async fn redis_state_manager(
 
             StateManagement::Set((var, assignment)) => {
                 if let Err(e) = con
-                    .hset::<_, _, _, ()>("my_state", &var, assignment.val_to_string())
+                    .hset::<_, _, _, ()>(&var, &var, assignment.val_to_string())
                     .await
                 {
-                    eprintln!("Failed to hset boolean {}: {:?}", var, e);
+                    eprintln!("Failed to hset {}: {:?}", var, e);
+                    panic!("!")
                 }
                 state = state.update(&var, assignment.val)
             }
