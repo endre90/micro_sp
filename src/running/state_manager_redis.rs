@@ -130,7 +130,7 @@ pub async fn redis_state_manager(
                                         key.clone(),
                                         SPAssignment::new(
                                             old_state.get_assignment(key).var,
-                                            val.to_spvalue(),
+                                            SPValue::from_string(val),
                                         ),
                                     )
                                 })
@@ -151,7 +151,7 @@ pub async fn redis_state_manager(
                     Ok(val) => {
                         match val {
                             Some(redis_value) => {
-                                let _ = response_sender.send(redis_value.to_spvalue());
+                                let _ = response_sender.send(SPValue::from_string(&redis_value));
                             }
                             None => panic!("Var doesn't exist!"),
                         }
