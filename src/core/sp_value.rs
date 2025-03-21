@@ -123,7 +123,7 @@ impl SPValue {
         match self {
             SPValue::Bool(b) => format!("bool:{}", b),
             SPValue::Int64(i) => format!("int:{}", i),
-            SPValue::Float64(f) => format!("float:{}", f),
+            SPValue::Float64(f) => format!("float:{}", f.into_inner()),
             SPValue::String(s) => format!("string:{}", s),
             SPValue::Time(x) => format!("time:{:?}", x.elapsed().unwrap_or_default()),
             SPValue::Array(_, arr) => {
@@ -161,14 +161,14 @@ impl SPValue {
             "bool" => match value_str {
                 "true" => SPValue::Bool(true),
                 "false" => SPValue::Bool(false),
-                _ => SPValue::UNKNOWN,
+                _ => panic!("{value_str} unknown") //SPValue::UNKNOWN,
             },
 
             "int" => {
                 if let Ok(i) = value_str.parse::<i64>() {
                     SPValue::Int64(i)
                 } else {
-                    SPValue::UNKNOWN
+                    panic!("{value_str} unknown") //SPValue::UNKNOWN
                 }
             }
 
@@ -176,7 +176,7 @@ impl SPValue {
                 if let Ok(f) = value_str.parse::<f64>() {
                     SPValue::Float64(OrderedFloat(f))
                 } else {
-                    SPValue::UNKNOWN
+                    panic!("{value_str} unknown") //SPValue::UNKNOWN
                 }
             }
 
@@ -195,7 +195,7 @@ impl SPValue {
                         let now = SystemTime::now();
                         return match now.checked_sub(dur) {
                             Some(st) => SPValue::Time(st),
-                            None => SPValue::UNKNOWN,
+                            None => panic!("{value_str} unknown") //SPValue::UNKNOWN,
                         };
                     }
                 }
@@ -221,11 +221,11 @@ impl SPValue {
                     // let len = items.len();
                     SPValue::Array(SPValueType::UNKNOWN, items)
                 } else {
-                    SPValue::UNKNOWN
+                    panic!("{value_str} unknown") //SPValue::UNKNOWN
                 }
             }
 
-            _ => SPValue::UNKNOWN,
+            _ => panic!("Prefix is something else...") //SPValue::UNKNOWN,
         }
     }
 

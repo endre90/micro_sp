@@ -28,7 +28,7 @@ impl SPAssignment {
         match self.val.clone() {
             SPValue::Bool(b) => format!("bool:{}", b),
             SPValue::Int64(i) => format!("int:{}", i),
-            SPValue::Float64(f) => format!("float:{}", f),
+            SPValue::Float64(f) => format!("float:{}", f.into_inner()),
             SPValue::String(s) => format!("string:{}", s),
             SPValue::Time(x) => format!("time:{:?}", x.elapsed().unwrap_or_default()),
             SPValue::Array(_, arr) => {
