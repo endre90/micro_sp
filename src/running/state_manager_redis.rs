@@ -9,7 +9,7 @@ pub enum StateManagement {
     GetState(oneshot::Sender<State>),
     Get((String, oneshot::Sender<SPValue>)),
     SetPartialState(State),
-    Set((String, SPValue)),
+    Set((String, SPAssignment)),
     // Update
 }
 
@@ -91,7 +91,7 @@ pub async fn redis_state_manager(
     // First populate the redis DB with the state.
     for (var, assignment) in state.state.clone() {
         if let Err(e) = con
-            .hset::<_, _, _, ()>("my_state", &var, assignment.val.to_string())
+            .hset::<_, _, _, ()>("my_state", &var, assignment.val_to_string())
             .await
         {
             eprintln!("Failed to hset boolean {}: {:?}", var, e);
@@ -166,7 +166,7 @@ pub async fn redis_state_manager(
             StateManagement::SetPartialState(partial_state) => {
                 for (var, assignment) in partial_state.state {
                     if let Err(e) = con
-                        .hset::<_, _, _, ()>("my_state", &var, assignment.val.to_string())
+                        .hset::<_, _, _, ()>("my_state", &var, assignment.val_to_string())
                         .await
                     {
                         eprintln!("Failed to hset boolean {}: {:?}", var, e);
@@ -175,14 +175,14 @@ pub async fn redis_state_manager(
                 }
             }
 
-            StateManagement::Set((var, new_val)) => {
+            StateManagement::Set((var, assignment)) => {
                 if let Err(e) = con
-                    .hset::<_, _, _, ()>("my_state", &var, new_val.to_string())
+                    .hset::<_, _, _, ()>("my_state", &var, assignment.val_to_string())
                     .await
                 {
                     eprintln!("Failed to hset boolean {}: {:?}", var, e);
                 }
-                state = state.update(&var, new_val)
+                state = state.update(&var, assignment.val)
             }
         }
     }
