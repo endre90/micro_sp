@@ -122,7 +122,7 @@ pub async fn redis_state_manager(
                 match con.hgetall::<_, HashMap<String, String>>("my_state").await {
                     Ok(map) => {
                         let old_state = state.clone();
-                        println!("{:?}", old_state);
+                        println!("OLD: {:#?}", old_state);
                         let new_state = State {
                             state: map
                                 .iter()
@@ -137,7 +137,7 @@ pub async fn redis_state_manager(
                                 })
                                 .collect(),
                         };
-                        println!("{:?}", new_state);
+                        println!("NEW: {:#?}", new_state);
                         let _ = response_sender.send(new_state);
                     }
                     Err(e) => {
