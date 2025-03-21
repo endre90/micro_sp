@@ -161,14 +161,14 @@ impl SPValue {
             "bool" => match value_str {
                 "true" => SPValue::Bool(true),
                 "false" => SPValue::Bool(false),
-                _ => panic!("{value_str} unknown") //SPValue::UNKNOWN,
+                _ => SPValue::UNKNOWN,
             },
 
             "int" => {
                 if let Ok(i) = value_str.parse::<i64>() {
                     SPValue::Int64(i)
                 } else {
-                    panic!("{value_str} unknown") //SPValue::UNKNOWN
+                    SPValue::UNKNOWN
                 }
             }
 
@@ -176,7 +176,7 @@ impl SPValue {
                 if let Ok(f) = value_str.parse::<f64>() {
                     SPValue::Float64(OrderedFloat(f))
                 } else {
-                    panic!("{value_str} unknown") //SPValue::UNKNOWN
+                    SPValue::UNKNOWN
                 }
             }
 
@@ -195,7 +195,7 @@ impl SPValue {
                         let now = SystemTime::now();
                         return match now.checked_sub(dur) {
                             Some(st) => SPValue::Time(st),
-                            None => panic!("{value_str} unknown") //SPValue::UNKNOWN,
+                            None => SPValue::UNKNOWN,
                         };
                     }
                 }
@@ -221,11 +221,11 @@ impl SPValue {
                     // let len = items.len();
                     SPValue::Array(SPValueType::UNKNOWN, items)
                 } else {
-                    panic!("{value_str} unknown") //SPValue::UNKNOWN
+                    SPValue::UNKNOWN
                 }
             }
 
-            _ => panic!("Prefix is something else...") //SPValue::UNKNOWN,
+            _ => SPValue::UNKNOWN,
         }
     }
 

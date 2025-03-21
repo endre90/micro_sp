@@ -39,15 +39,16 @@ impl SPAssignment {
                     .join(", ");
                 format!("array:[{}]", items_str)
             },
-            SPValue::UNKNOWN => match self.var.value_type {
-                SPValueType::Bool => "bool:UNKNOWN".to_string(),
-                SPValueType::Float64 => "float:UNKNOWN".to_string(),
-                SPValueType::Int64 => "int:UNKNOWN".to_string(),
-                SPValueType::String => "string:UNKNOWN".to_string(),
-                SPValueType::Time => "time:UNKNOWN".to_string(),
-                SPValueType::Array => "array:UNKNOWN".to_string(),
-                SPValueType::UNKNOWN => "UNKNOWN:UNKNOWN".to_string(),
-            }
+            SPValue::UNKNOWN => "UNKNOWN".to_string()
+            // SPValue::UNKNOWN => match self.var.value_type {
+            //     SPValueType::Bool => "bool:UNKNOWN".to_string(),
+            //     SPValueType::Float64 => "float:UNKNOWN".to_string(),
+            //     SPValueType::Int64 => "int:UNKNOWN".to_string(),
+            //     SPValueType::String => "string:UNKNOWN".to_string(),
+            //     SPValueType::Time => "time:UNKNOWN".to_string(),
+            //     SPValueType::Array => "array:UNKNOWN".to_string(),
+            //     SPValueType::UNKNOWN => "UNKNOWN:UNKNOWN".to_string(),
+            // }
         }
     }
 
