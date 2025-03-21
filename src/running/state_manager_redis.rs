@@ -152,7 +152,7 @@ pub async fn redis_state_manager(
             }
 
             StateManagement::Get((var, response_sender)) => {
-                match con.hget::<_, _, Option<String>>(&var, &var).await {
+                match con.get::<_, Option<String>>(&var).await {
                     Ok(val) => {
                         match val {
                             Some(redis_value) => {
