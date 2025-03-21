@@ -13,7 +13,6 @@ pub enum StateManagement {
     // Update
 }
 
-
 // fn sp_value_to_redis_value(value: &SPValue) -> Value {
 //     match value {
 //         SPValue::Bool(val) => Value::Boolean(*val),
@@ -88,6 +87,17 @@ pub async fn redis_state_manager(
         .query_async(&mut con)
         .await
         .expect("Failed to set notify-keyspace-events for Redis.");
+
+    // First populate the redis DB with the state.
+    for (var, assignment) in state.state.clone() {
+        if let Err(e) = con
+            .hset::<_, _, _, ()>("my_state", &var, assignment.val.to_string())
+            .await
+        {
+            eprintln!("Failed to hset boolean {}: {:?}", var, e);
+        }
+    }
+
     // redis::cmd("CONFIG")
     //     .arg("SET")
     //     .arg("notify-keyspace-events")
@@ -155,17 +165,25 @@ pub async fn redis_state_manager(
 
             StateManagement::SetPartialState(partial_state) => {
                 for (var, assignment) in partial_state.state {
-                    if let Err(e) = con.hset::<_, _, _, ()>("my_state", &var, assignment.val.to_string()).await {
+                    if let Err(e) = con
+                        .hset::<_, _, _, ()>("my_state", &var, assignment.val.to_string())
+                        .await
+                    {
                         eprintln!("Failed to hset boolean {}: {:?}", var, e);
                     }
+                    state = state.update(&var, assignment.val)
                 }
             }
 
             StateManagement::Set((var, new_val)) => {
-                if let Err(e) = con.hset::<_, _, _, ()>("my_state", &var, new_val.to_string()).await {
+                if let Err(e) = con
+                    .hset::<_, _, _, ()>("my_state", &var, new_val.to_string())
+                    .await
+                {
                     eprintln!("Failed to hset boolean {}: {:?}", var, e);
                 }
-            },
+                state = state.update(&var, new_val)
+            }
         }
     }
 }
