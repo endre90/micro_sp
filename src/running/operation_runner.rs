@@ -6,11 +6,11 @@ use tokio::{
     time::{interval, Duration},
 };
 
-/// A runner is an algorithm which executes the plan P based on the model
+/// A planned operation runner is an algorithm which executes the plan P based on the model
 /// M, the current state of the system S, and a goal predicate G. While
 /// running, both the planning and running components of guards and actions
 /// of operation pre- and postconditions are evaluated and taken.
-pub async fn operation_runner(
+pub async fn planned_operation_runner(
     model: &Model,
     command_sender: mpsc::Sender<StateManagement>,
 ) -> Result<(), Box<dyn std::error::Error>> {

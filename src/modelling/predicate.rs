@@ -7,7 +7,7 @@ use std::fmt;
 /// A predicate is an equality logical formula that can evaluate to either true or false.
 /// An equality logic formula F is defined with the following grammar:
 ///     F : F ∧ F | F ∨ F | ¬F | atom
-///     atom : term == term | true | f alse
+///     atom : term == term | true | false
 ///     term : variable | value
 #[derive(Debug, PartialEq, Clone, Eq, Hash, Serialize, Deserialize)]
 pub enum Predicate {

@@ -26,7 +26,8 @@ pub use crate::running::auto_operation_runner::*;
 pub use crate::running::auto_transition_runner::*;
 pub use crate::running::operation_runner::*;
 pub use crate::running::planner_ticker::*;
-pub use crate::running::state_manager::*;
+// pub use crate::running::state_manager::*;
+pub use crate::running::state_manager_redis::*;
 pub use crate::running::utils::*;
 
 pub mod macros;

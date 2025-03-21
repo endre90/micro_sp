@@ -4,7 +4,8 @@ use tokio::{
     time::{interval, Duration},
 };
 
-/// Automatic operations should be taken as soon as their guard becomes true.
+/// Run operations automatically without a planner. 
+/// Taken as soon as the guard becomes true.
 pub async fn auto_operation_runner(
     name: &str,
     model: &Model,
@@ -17,7 +18,7 @@ pub async fn auto_operation_runner(
         command_sender.send(StateManagement::GetState(response_tx)).await?;
         let state = response_rx.await?;
 
-        for o in &model.auto_operations {
+        for o in &model.operations {
             if o.eval_running(&state) {
                 let new_state = o.start_running(&state);
                 log::info!(target: &&format!("{}_auto_runner", name), "Started auto operation: '{}'.", o.name);

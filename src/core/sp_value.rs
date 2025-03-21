@@ -1,7 +1,7 @@
 use ordered_float::OrderedFloat;
 use serde::{Deserialize, Serialize};
 use std::fmt;
-use std::time::SystemTime;
+use std::time::{Duration, SystemTime};
 
 /// Represents a variable value of a specific type.
 #[derive(Debug, PartialEq, Clone, Hash, Eq, PartialOrd, Ord, Serialize, Deserialize)]
@@ -119,24 +119,128 @@ impl SPValue {
         }
     }
 
-    /// Returns a `String` representation of the `SPValue`.
     pub fn to_string(&self) -> String {
         match self {
-            SPValue::Bool(x) => x.to_string(),
-            SPValue::Float64(x) => x.to_string(),
-            SPValue::Int64(x) => x.to_string(),
-            SPValue::String(x) => x.to_string(),
-            SPValue::Time(x) => format!("{:?}", x.elapsed().unwrap_or_default()),
-            SPValue::Array(_, arr) => format!(
-                "[{}]",
-                arr.iter()
-                    .map(|x| x.to_string())
-                    .collect::<Vec<String>>()
-                    .join(", ")
-            ),
+            SPValue::Bool(b) => format!("bool:{}", b),
+            SPValue::Int64(i) => format!("int:{}", i),
+            SPValue::Float64(f) => format!("float:{}", f),
+            SPValue::String(s) => format!("string:{}", s),
+            SPValue::Time(x) => format!("time:{:?}", x.elapsed().unwrap_or_default()),
+            SPValue::Array(_, arr) => {
+                let items_str = arr
+                    .iter()
+                    .map(|item| item.to_string())
+                    .collect::<Vec<_>>()
+                    .join(", ");
+                format!("array:[{}]", items_str)
+            },
             SPValue::UNKNOWN => "UNKNOWN".to_string(),
         }
     }
+
+    /// Attempt to parse a string of the form "<type>:<value>".
+    /// Examples:
+    /// - "bool:true"          -> SPValue::Bool(true)
+    /// - "int:42"             -> SPValue::Int64(42)
+    /// - "float:3.14"         -> SPValue::Float64(3.14)
+    /// - "string:Hello"       -> SPValue::String("Hello")
+    /// - "time:0.12345s"      -> SPValue::Time(SystemTime::now() - 0.12345s)
+    /// - "array:[bool:true, int:42]" -> SPValue::Array(2, [Bool(true), Int64(42)])
+    pub fn from_string(s: &str) -> SPValue {
+        // Split on the *first* colon. For example, "bool:true" -> ["bool", "true"]
+        let parts: Vec<&str> = s.splitn(2, ':').collect();
+        if parts.len() < 2 {
+            // No colon or invalid format, treat as unknown or raw string
+            return SPValue::String(s.to_owned());
+        }
+
+        let prefix = parts[0];
+        let value_str = parts[1];
+
+        match prefix {
+            "bool" => match value_str {
+                "true" => SPValue::Bool(true),
+                "false" => SPValue::Bool(false),
+                _ => SPValue::UNKNOWN,
+            },
+
+            "int" => {
+                if let Ok(i) = value_str.parse::<i64>() {
+                    SPValue::Int64(i)
+                } else {
+                    SPValue::UNKNOWN
+                }
+            }
+
+            "float" => {
+                if let Ok(f) = value_str.parse::<f64>() {
+                    SPValue::Float64(OrderedFloat(f))
+                } else {
+                    SPValue::UNKNOWN
+                }
+            }
+
+            "string" => SPValue::String(value_str.to_string()),
+
+            "time" => {
+                // The `to_string` used format!("{:?}", x.elapsed()), which might look like "123.456789s"
+                // We'll parse that as a float followed by 's'.
+                // For example "0.123456s". Then interpret as a Duration from now minus that time.
+                // This is naive and depends on your actual format. 
+                if let Some((secs_part, _)) = value_str.rsplit_once('s') {
+                    if let Ok(float_secs) = secs_part.trim().parse::<f64>() {
+                        // Convert float seconds to a Duration
+                        let dur = float_secs_to_duration(float_secs);
+                        // We'll do: now - dur. So it's "dur seconds ago".
+                        let now = SystemTime::now();
+                        return match now.checked_sub(dur) {
+                            Some(st) => SPValue::Time(st),
+                            None => SPValue::UNKNOWN,
+                        };
+                    }
+                }
+                // fallback if we can't parse
+                SPValue::UNKNOWN
+            }
+
+            "array" => {
+                let trimmed = value_str.trim();
+                if trimmed.starts_with('[') && trimmed.ends_with(']') {
+                    let inner = trimmed[1..trimmed.len() - 1].trim();
+                    if inner.is_empty() {
+                        return SPValue::Array(SPValueType::UNKNOWN, vec![]);
+                    }
+
+                    // Very naive approach: split by comma, parse each item
+                    let parts = inner.split(',').map(|x| x.trim());
+                    let mut items = Vec::new();
+                    for p in parts {
+                        let item_val = SPValue::from_string(p);
+                        items.push(item_val);
+                    }
+                    // let len = items.len();
+                    SPValue::Array(SPValueType::UNKNOWN, items)
+                } else {
+                    SPValue::UNKNOWN
+                }
+            }
+
+            _ => SPValue::UNKNOWN,
+        }
+    }
+
+}
+
+/// Helper to convert fractional seconds to a `Duration`.
+fn float_secs_to_duration(secs: f64) -> Duration {
+    if secs < 0.0 {
+        // If negative, clamp to zero or handle how you prefer
+        return Duration::from_secs(0);
+    }
+    let whole = secs.floor() as u64;
+    let nanos_f = (secs - secs.floor()) * 1e9;
+    let nanos = nanos_f.round() as u32;
+    Duration::new(whole, nanos)
 }
 
 /// This trait defines a set of conversions from some Rust primitive types and containers to `SPValue`.
@@ -356,28 +460,28 @@ mod tests {
     #[test]
     fn test_to_string_returns_correct_string_for_bool() {
         let bool_value = SPValue::Bool(true);
-        assert_eq!(bool_value.to_string(), "true".to_string());
+        assert_eq!(bool_value.to_string(), "bool:true".to_string());
 
         let bool_value = SPValue::Bool(false);
-        assert_eq!(bool_value.to_string(), "false".to_string());
+        assert_eq!(bool_value.to_string(), "bool:false".to_string());
     }
 
     #[test]
     fn test_to_string_returns_correct_string_for_float() {
         let float_value = SPValue::Float64(OrderedFloat(3.14));
-        assert_eq!(float_value.to_string(), "3.14".to_string());
+        assert_eq!(float_value.to_string(), "float:3.14".to_string());
     }
 
     #[test]
     fn test_to_string_returns_correct_string_for_int() {
         let int_value = SPValue::Int64(42);
-        assert_eq!(int_value.to_string(), "42".to_string());
+        assert_eq!(int_value.to_string(), "int:42".to_string());
     }
 
     #[test]
     fn test_to_string_returns_correct_string_for_string() {
         let string_value = SPValue::String("Hello, world!".to_string());
-        assert_eq!(string_value.to_string(), "Hello, world!".to_string());
+        assert_eq!(string_value.to_string(), "string:Hello, world!".to_string());
     }
 
     #[should_panic]
@@ -392,7 +496,7 @@ mod tests {
             SPValueType::Int64,
             vec![SPValue::Int64(1), SPValue::Int64(2), SPValue::Int64(3)],
         );
-        assert_eq!(array_value.to_string(), "[1, 2, 3]".to_string());
+        assert_eq!(array_value.to_string(), "array:[int:1, int:2, int:3]".to_string());
     }
 
     #[test]

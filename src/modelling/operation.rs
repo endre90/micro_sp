@@ -170,7 +170,7 @@ impl Operation {
     }
 
     /// Check the running timeout_transition guard.
-    pub fn can_be_timeouted(&self, state: &State) -> bool {
+    pub fn can_be_timedout(&self, state: &State) -> bool {
         if state.get_value(&self.name) == OperationState::Completed.to_spvalue() {
             for timeout_transition in &self.timeout_transitions {
                 if timeout_transition.clone().eval_running(&state) {
