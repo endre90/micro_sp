@@ -134,7 +134,6 @@ pub async fn redis_state_manager(
                     }
                 }
 
-                let old_state = state.clone();
                 let new_state = State {
                     state: map
                         .iter()
@@ -142,7 +141,7 @@ pub async fn redis_state_manager(
                             (
                                 key.clone(),
                                 SPAssignment::new(
-                                    old_state.get_assignment(key).var,
+                                    state.get_assignment(key).var,
                                     SPValue::from_string(val),
                                 ),
                             )
@@ -172,26 +171,28 @@ pub async fn redis_state_manager(
 
             StateManagement::SetPartialState(partial_state) => {
                 for (var, assignment) in partial_state.state {
+                    state = state.update(&var, assignment.val.clone());
                     if let Err(e) = con
                         .set::<_, String, String>(&var, assignment.val_to_string())
                         .await
                     {
-                        eprintln!("Failed to hset {}: {:?}", var, e);
+                        eprintln!("Failed to set {}: {:?}", var, e);
                         panic!("!")
                     }
-                    state = state.update(&var, assignment.val)
+                    
                 }
             }
 
             StateManagement::Set((var, assignment)) => {
+                state = state.update(&var, assignment.val.clone());
                 if let Err(e) = con
                     .set::<_, String, String>(&var, assignment.val_to_string())
                     .await
                 {
-                    eprintln!("Failed to hset {}: {:?}", var, e);
+                    eprintln!("Failed to set {}: {:?}", var, e);
                     panic!("!")
                 }
-                state = state.update(&var, assignment.val)
+                
             }
         }
     }
