@@ -119,31 +119,36 @@ pub async fn redis_state_manager(
     while let Some(command) = receiver.recv().await {
         match command {
             StateManagement::GetState(response_sender) => {
-                match con.hgetall::<_, HashMap<String, String>>("my_state").await {
-                    Ok(map) => {
-                        let old_state = state.clone();
-                        let new_state = State {
-                            state: map
-                                .iter()
-                                .map(|(key, val)| {
-                                    (
-                                        key.clone(),
-                                        SPAssignment::new(
-                                            old_state.get_assignment(key).var,
-                                            SPValue::from_string(val),
-                                        ),
-                                    )
-                                })
-                                .collect(),
-                        };
-                        let _ = response_sender.send(new_state);
-                    }
-                    Err(e) => {
-                        eprintln!("Failed to hgetall: {:?}", e);
-                        panic!("Var doesn't exist!")
-                        // let _ = response_sender.send(State::new());
+
+                let keys: Vec<String> = con.keys("*").await.expect("Failed to get all keys.");
+            
+                let values: Vec<Option<String>> = con.mget(&keys).await.expect("Failed to get values for all keys.");
+            
+                // 3) Zip the keys with the values to build a HashMap
+                let mut map: HashMap<String, String> = HashMap::new();
+                for (key, maybe_value) in keys.into_iter().zip(values.into_iter()) {
+                    // MGET returns None if a given key doesn’t exist anymore
+                    if let Some(value) = maybe_value {
+                        map.insert(key, value);
                     }
                 }
+
+                let old_state = state.clone();
+                let new_state = State {
+                    state: map
+                        .iter()
+                        .map(|(key, val)| {
+                            (
+                                key.clone(),
+                                SPAssignment::new(
+                                    old_state.get_assignment(key).var,
+                                    SPValue::from_string(val),
+                                ),
+                            )
+                        })
+                        .collect(),
+                };
+                let _ = response_sender.send(new_state);
             }
 
             StateManagement::Get((var, response_sender)) => {
