@@ -123,6 +123,7 @@ pub async fn redis_state_manager(
                 let keys: Vec<String> = con.keys("*").await.expect("Failed to get all keys.");
             
                 let values: Vec<Option<String>> = con.mget(&keys).await.expect("Failed to get values for all keys.");
+                println!("{:?}", values);
             
                 // 3) Zip the keys with the values to build a HashMap
                 let mut map: HashMap<String, String> = HashMap::new();
