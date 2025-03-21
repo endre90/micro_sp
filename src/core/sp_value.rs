@@ -147,7 +147,6 @@ impl SPValue {
     /// - "time:0.12345s"      -> SPValue::Time(SystemTime::now() - 0.12345s)
     /// - "array:[bool:true, int:42]" -> SPValue::Array(2, [Bool(true), Int64(42)])
     pub fn from_string(s: &str) -> SPValue {
-        println!("{}", s);
         // Split on the *first* colon. For example, "bool:true" -> ["bool", "true"]
         let parts: Vec<&str> = s.splitn(2, ':').collect();
         if parts.len() < 2 {
