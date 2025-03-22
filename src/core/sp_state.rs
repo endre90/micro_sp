@@ -111,7 +111,7 @@ impl State {
     pub fn get_or_default_bool(&self, target: &str, name: &str) -> bool {
         match self.get_value(name) {
             SPValue::Bool(value) => value,
-            SPValue::UNKNOWN => {
+            SPValue::Unknown(SPValueType::Bool) => {
                 log::debug!(target: target, "Value for boolean '{}' is UNKNOWN, resulting to FALSE.", name);
                 false
             }
@@ -125,7 +125,7 @@ impl State {
     pub fn get_bool(&self, target: &str, name: &str) -> Option<bool> {
         match self.get_value(name) {
             SPValue::Bool(value) => Some(value),
-            SPValue::UNKNOWN => {
+            SPValue::Unknown(SPValueType::Bool) => {
                 log::debug!(target: target, "Value for boolean '{}' is UNKNOWN, resulting to None.", name);
                 None
             }
@@ -139,7 +139,7 @@ impl State {
     pub fn get_or_default_i64(&self, target: &str, name: &str) -> i64 {
         match self.get_value(name) {
             SPValue::Int64(value) => value,
-            SPValue::UNKNOWN => {
+            SPValue::Unknown(SPValueType::Int64) => {
                 log::debug!(target: target, "Value for Int64 '{}' is UNKNOWN, resulting to 0.", name);
                 0
             }
@@ -153,7 +153,7 @@ impl State {
     pub fn get_or_default_f64(&self, target: &str, name: &str) -> f64 {
         match self.get_value(name) {
             SPValue::Float64(value) => value.into_inner(),
-            SPValue::UNKNOWN => {
+            SPValue::Unknown(SPValueType::Float64) => {
                 log::debug!(target: target, "Value for Float64 '{}' is UNKNOWN, resulting to 0.0.", name);
                 0.0
             }
@@ -167,7 +167,7 @@ impl State {
     pub fn get_or_default_string(&self, target: &str, name: &str) -> String {
         match self.get_value(name) {
             SPValue::String(value) => value,
-            SPValue::UNKNOWN => {
+            SPValue::Unknown(SPValueType::String) => {
                 log::debug!(target: target, "Value for String '{}' is UNKNOWN, resulting to ''.", name);
                 "UNKNOWN".to_string()
             }
@@ -187,7 +187,7 @@ impl State {
                     _ => "".to_string(),
                 })
                 .collect(),
-            SPValue::UNKNOWN => {
+            SPValue::Unknown(SPValueType::Array) => {
                 log::debug!(target: target, "Value for Array<String> '{}' is UNKNOWN, resulting to [].", name);
                 vec![]
             }

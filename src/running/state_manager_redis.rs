@@ -1,7 +1,8 @@
 use std::collections::HashMap;
 
 use crate::*;
-use redis::{AsyncCommands, Client};
+use ordered_float::OrderedFloat;
+use redis::{AsyncCommands, Client, Value};
 use tokio::sync::{mpsc, oneshot};
 
 /// Available commands that the async tasks can ask from the state manager.
@@ -9,31 +10,41 @@ pub enum StateManagement {
     GetState(oneshot::Sender<State>),
     Get((String, oneshot::Sender<SPValue>)),
     SetPartialState(State),
-    Set((String, SPAssignment)),
+    Set((String, SPValue)),
     // Update
 }
 
-// fn sp_value_to_redis_value(value: &SPValue) -> Value {
+// // Serialize to JSON (which embeds type info)
+// let serialized = serde_json::to_string(&value).unwrap();
+// println!("Serialized: {}", serialized);
+// // This might print: {"type":"Int64","value":42}
+
+// // Deserialize back to SPValue
+// let deserialized: SPValue = serde_json::from_str(&serialized).unwrap();
+// println!("Deserialized: {:?}", deserialized);
+
+// fn sp_value_to_serialied_string(value: &SPValue) -> String {
 //     match value {
-//         SPValue::Bool(val) => Value::Boolean(*val),
-//         SPValue::Float64(ord) => Value::Double(ord.clone().into()),
-//         SPValue::Int64(int) => Value::Int(*int),
-//         SPValue::String(str) => Value::SimpleString(str.clone()),
-//         SPValue::Array(_, spvalues) => Value::Array(
-//             spvalues
+//         SPValue::Bool(val) => serde_json::to_string(&val).unwrap(),
+//         SPValue::Float64(ord) => serde_json::to_string(&ord.into_inner()).unwrap(),
+//         SPValue::Int64(int) => serde_json::to_string(&int).unwrap(),
+//         SPValue::String(str) => serde_json::to_string(&str).unwrap(),
+//         SPValue::Array(_, spvalues) => serde_json::to_string(
+//             &spvalues
 //                 .iter()
-//                 .map(|x| sp_value_to_redis_value(x))
-//                 .collect(),
-//         ),
-//         SPValue::Time(_) => todo!(),
-//         SPValue::UNKNOWN => todo!(),
+//                 .map(|x| sp_value_to_serialied_string(x))
+//                 .collect::<Vec<String>>(),
+//         )
+//         .unwrap(),
+//         SPValue::Time(time) => serde_json::to_string(&time).unwrap(),
+//         // Could be that I would need specialized unknown for all the types because I want INT:UNKNOWN
+//         SPValue::Unknown(SPValueType::Array) => serde_json::to_string("UNKNOWN").unwrap(),
 //     }
-//     SPValue::to_string(&self, serializer)
 // }
 
 // fn redis_value_to_sp_value(value: &Value) -> SPValue {
 //     match value {
-//         Value::Nil => todo!(),
+//         Value::Nil => SPValue::UNKNOWN,
 //         Value::Int(int) => SPValue::Int64(*int),
 //         Value::BulkString(_) => todo!(),
 //         Value::Array(values) => SPValue::Array(
@@ -91,10 +102,10 @@ pub async fn redis_state_manager(
     // First populate the redis DB with the state.
     for (var, assignment) in state.state.clone() {
         if let Err(e) = con
-            .set::<_, String, String>(&var, assignment.val_to_string())
+            .set::<_, String, String>(&var, serde_json::to_string(&assignment.val).unwrap())
             .await
         {
-            eprintln!("Failed to hset boolean {}: {:?}", var, e);
+            eprintln!("Failed to set {}: {:?}", var, e);
         }
     }
 
@@ -119,36 +130,24 @@ pub async fn redis_state_manager(
     while let Some(command) = receiver.recv().await {
         match command {
             StateManagement::GetState(response_sender) => {
-
                 let keys: Vec<String> = con.keys("*").await.expect("Failed to get all keys.");
-            
-                let values: Vec<Option<String>> = con.mget(&keys).await.expect("Failed to get values for all keys.");
-                // println!("{:?}", values);
-            
-                // 3) Zip the keys with the values to build a HashMap
-                let mut map: HashMap<String, String> = HashMap::new();
+
+                let values: Vec<Option<String>> = con
+                    .mget(&keys)
+                    .await
+                    .expect("Failed to get values for all keys.");
+
+                let mut map: HashMap<String, SPAssignment> = HashMap::new();
                 for (key, maybe_value) in keys.into_iter().zip(values.into_iter()) {
-                    // MGET returns None if a given key doesn’t exist anymore
                     if let Some(value) = maybe_value {
-                        map.insert(key, value);
+                        let var = state.get_assignment(&key).var;
+                        let new_assignment =
+                            SPAssignment::new(var, serde_json::from_str(&value).unwrap());
+                        map.insert(key, new_assignment);
                     }
                 }
 
-                let new_state = State {
-                    state: map
-                        .iter()
-                        .map(|(key, val)| {
-                            (
-                                key.clone(),
-                                SPAssignment::new(
-                                    state.get_assignment(key).var,
-                                    SPValue::from_string(val),
-                                ),
-                            )
-                        })
-                        .collect(),
-                };
-                let _ = response_sender.send(new_state);
+                let _ = response_sender.send(State { state: map });
             }
 
             StateManagement::Get((var, response_sender)) => {
@@ -156,14 +155,14 @@ pub async fn redis_state_manager(
                     Ok(val) => {
                         match val {
                             Some(redis_value) => {
-                                let _ = response_sender.send(SPValue::from_string(&redis_value));
+                                let _ = response_sender.send(serde_json::from_str(&redis_value).unwrap());
                             }
                             None => panic!("Var doesn't exist!"),
                         }
                         panic!("Var doesn't exist!")
                     }
                     Err(e) => {
-                        eprintln!("Failed to hget {}: {:?}", var, e);
+                        eprintln!("Failed to get {}: {:?}", var, e);
                         panic!("Var doesn't exist!")
                     }
                 }
@@ -173,26 +172,27 @@ pub async fn redis_state_manager(
                 for (var, assignment) in partial_state.state {
                     state = state.update(&var, assignment.val.clone());
                     if let Err(e) = con
-                        .set::<_, String, String>(&var, assignment.val_to_string())
+                        .set::<_, String, Value>(
+                            &var,
+                            serde_json::to_string(&assignment.val).unwrap(),
+                        )
                         .await
                     {
                         eprintln!("Failed to set {}: {:?}", var, e);
                         panic!("!")
                     }
-                    
                 }
             }
 
-            StateManagement::Set((var, assignment)) => {
-                state = state.update(&var, assignment.val.clone());
+            StateManagement::Set((var, val)) => {
+                state = state.update(&var, val.clone());
                 if let Err(e) = con
-                    .set::<_, String, String>(&var, assignment.val_to_string())
+                    .set::<_, String, Value>(&var, serde_json::to_string(&val).unwrap())
                     .await
                 {
                     eprintln!("Failed to set {}: {:?}", var, e);
                     panic!("!")
                 }
-                
             }
         }
     }

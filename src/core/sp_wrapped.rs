@@ -75,7 +75,7 @@ impl fmt::Display for SPWrapped {
                 SPValue::String(s) => write!(fmtr, "{}", s),
                 SPValue::Time(t) => write!(fmtr, "{:?} s", t.elapsed().unwrap_or_default()),
                 SPValue::Array(_, a) => write!(fmtr, "{:?}", a),
-                SPValue::UNKNOWN => write!(fmtr, "UNKNOWN"),
+                SPValue::Unknown(_) => write!(fmtr, "UNKNOWN"),
             },
             SPWrapped::SPVariable(var) => write!(fmtr, "{}", var.name.to_owned()),
         }

@@ -5,6 +5,7 @@ use std::time::{Duration, SystemTime};
 
 /// Represents a variable value of a specific type.
 #[derive(Debug, PartialEq, Clone, Hash, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(tag = "type", content = "value")]
 pub enum SPValue {
     Bool(bool),
     Float64(OrderedFloat<f64>),
@@ -13,12 +14,12 @@ pub enum SPValue {
     Time(SystemTime),
     // Instant(Instant),
     Array(SPValueType, Vec<SPValue>),
-    UNKNOWN,
+    Unknown(SPValueType),
 }
 
 impl Default for SPValue {
     fn default() -> Self {
-        SPValue::UNKNOWN
+        SPValue::Unknown(SPValueType::UNKNOWN)
     }
 }
 
@@ -33,7 +34,7 @@ impl fmt::Display for SPValue {
             SPValue::String(s) => write!(fmtr, "{}", s),
             SPValue::Time(t) => write!(fmtr, "{:?}", t.elapsed().unwrap_or_default()),
             SPValue::Array(_, a) => write!(fmtr, "{:?}", a),
-            SPValue::UNKNOWN => write!(fmtr, "UNKNOWN"),
+            SPValue::Unknown(_) => write!(fmtr, "UNKNOWN"),
         }
     }
 }
@@ -94,7 +95,13 @@ impl SPValue {
             SPValue::String(_) => SPValueType::String == t,
             SPValue::Time(_) => SPValueType::Time == t,
             SPValue::Array(_, _) => SPValueType::Array == t,
-            SPValue::UNKNOWN => SPValueType::UNKNOWN == t,
+            SPValue::Unknown(SPValueType::Bool) => SPValueType::Bool == t,
+            SPValue::Unknown(SPValueType::Float64) => SPValueType::Float64 == t,
+            SPValue::Unknown(SPValueType::Int64) => SPValueType::Int64 == t,
+            SPValue::Unknown(SPValueType::String) => SPValueType::String == t,
+            SPValue::Unknown(SPValueType::Time) => SPValueType::Time == t,
+            SPValue::Unknown(SPValueType::Array) => SPValueType::Array == t,
+            SPValue::Unknown(SPValueType::UNKNOWN) => SPValueType::UNKNOWN == t,
         }
     }
 
@@ -107,7 +114,13 @@ impl SPValue {
             SPValue::String(_) => SPValueType::String,
             SPValue::Time(_) => SPValueType::Time,
             SPValue::Array(_, _) => SPValueType::Array,
-            SPValue::UNKNOWN => SPValueType::UNKNOWN,
+            SPValue::Unknown(SPValueType::Bool) => SPValueType::Bool,
+            SPValue::Unknown(SPValueType::Float64) => SPValueType::Float64,
+            SPValue::Unknown(SPValueType::Int64) => SPValueType::Int64,
+            SPValue::Unknown(SPValueType::String) => SPValueType::String,
+            SPValue::Unknown(SPValueType::Time) => SPValueType::Time,
+            SPValue::Unknown(SPValueType::Array) => SPValueType::Array,
+            SPValue::Unknown(SPValueType::UNKNOWN) => SPValueType::UNKNOWN,
         }
     }
 
@@ -119,115 +132,115 @@ impl SPValue {
         }
     }
 
-    pub fn to_string(&self) -> String {
-        match self {
-            SPValue::Bool(b) => format!("bool:{}", b),
-            SPValue::Int64(i) => format!("int:{}", i),
-            SPValue::Float64(f) => format!("float:{}", f.into_inner()),
-            SPValue::String(s) => format!("string:{}", s),
-            SPValue::Time(x) => format!("time:{:?}", x.elapsed().unwrap_or_default()),
-            SPValue::Array(_, arr) => {
-                let items_str = arr
-                    .iter()
-                    .map(|item| item.to_string())
-                    .collect::<Vec<_>>()
-                    .join(", ");
-                format!("array:[{}]", items_str)
-            },
-            SPValue::UNKNOWN => "UNKNOWN".to_string(),
-        }
-    }
+    // pub fn to_string(&self) -> String {
+    //     match self {
+    //         SPValue::Bool(b) => format!("bool:{}", b),
+    //         SPValue::Int64(i) => format!("int:{}", i),
+    //         SPValue::Float64(f) => format!("float:{}", f.into_inner()),
+    //         SPValue::String(s) => format!("string:{}", s),
+    //         SPValue::Time(x) => format!("time:{:?}", x.elapsed().unwrap_or_default()),
+    //         SPValue::Array(_, arr) => {
+    //             let items_str = arr
+    //                 .iter()
+    //                 .map(|item| item.to_string())
+    //                 .collect::<Vec<_>>()
+    //                 .join(", ");
+    //             format!("array:[{}]", items_str)
+    //         },
+    //         SPValue::UNKNOWN => "UNKNOWN".to_string(),
+    //     }
+    // }
 
-    /// Attempt to parse a string of the form "<type>:<value>".
-    /// Examples:
-    /// - "bool:true"          -> SPValue::Bool(true)
-    /// - "int:42"             -> SPValue::Int64(42)
-    /// - "float:3.14"         -> SPValue::Float64(3.14)
-    /// - "string:Hello"       -> SPValue::String("Hello")
-    /// - "time:0.12345s"      -> SPValue::Time(SystemTime::now() - 0.12345s)
-    /// - "array:[bool:true, int:42]" -> SPValue::Array(2, [Bool(true), Int64(42)])
-    pub fn from_string(s: &str) -> SPValue {
-        // Split on the *first* colon. For example, "bool:true" -> ["bool", "true"]
-        let parts: Vec<&str> = s.splitn(2, ':').collect();
-        if parts.len() < 2 {
-            // No colon or invalid format, treat as unknown or raw string
-            return SPValue::String(s.to_owned());
-        }
+    // /// Attempt to parse a string of the form "<type>:<value>".
+    // /// Examples:
+    // /// - "bool:true"          -> SPValue::Bool(true)
+    // /// - "int:42"             -> SPValue::Int64(42)
+    // /// - "float:3.14"         -> SPValue::Float64(3.14)
+    // /// - "string:Hello"       -> SPValue::String("Hello")
+    // /// - "time:0.12345s"      -> SPValue::Time(SystemTime::now() - 0.12345s)
+    // /// - "array:[bool:true, int:42]" -> SPValue::Array(2, [Bool(true), Int64(42)])
+    // pub fn from_string(s: &str) -> SPValue {
+    //     // Split on the *first* colon. For example, "bool:true" -> ["bool", "true"]
+    //     let parts: Vec<&str> = s.splitn(2, ':').collect();
+    //     if parts.len() < 2 {
+    //         // No colon or invalid format, treat as unknown or raw string
+    //         return SPValue::String(s.to_owned());
+    //     }
 
-        let prefix = parts[0];
-        let value_str = parts[1];
+    //     let prefix = parts[0];
+    //     let value_str = parts[1];
 
-        match prefix {
-            "bool" => match value_str {
-                "true" => SPValue::Bool(true),
-                "false" => SPValue::Bool(false),
-                _ => SPValue::UNKNOWN,
-            },
+    //     match prefix {
+    //         "bool" => match value_str {
+    //             "true" => SPValue::Bool(true),
+    //             "false" => SPValue::Bool(false),
+    //             _ => SPValue::UNKNOWN,
+    //         },
 
-            "int" => {
-                if let Ok(i) = value_str.parse::<i64>() {
-                    SPValue::Int64(i)
-                } else {
-                    SPValue::UNKNOWN
-                }
-            }
+    //         "int" => {
+    //             if let Ok(i) = value_str.parse::<i64>() {
+    //                 SPValue::Int64(i)
+    //             } else {
+    //                 SPValue::UNKNOWN
+    //             }
+    //         }
 
-            "float" => {
-                if let Ok(f) = value_str.parse::<f64>() {
-                    SPValue::Float64(OrderedFloat(f))
-                } else {
-                    SPValue::UNKNOWN
-                }
-            }
+    //         "float" => {
+    //             if let Ok(f) = value_str.parse::<f64>() {
+    //                 SPValue::Float64(OrderedFloat(f))
+    //             } else {
+    //                 SPValue::UNKNOWN
+    //             }
+    //         }
 
-            "string" => SPValue::String(value_str.to_string()),
+    //         "string" => SPValue::String(value_str.to_string()),
 
-            "time" => {
-                // The `to_string` used format!("{:?}", x.elapsed()), which might look like "123.456789s"
-                // We'll parse that as a float followed by 's'.
-                // For example "0.123456s". Then interpret as a Duration from now minus that time.
-                // This is naive and depends on your actual format. 
-                if let Some((secs_part, _)) = value_str.rsplit_once('s') {
-                    if let Ok(float_secs) = secs_part.trim().parse::<f64>() {
-                        // Convert float seconds to a Duration
-                        let dur = float_secs_to_duration(float_secs);
-                        // We'll do: now - dur. So it's "dur seconds ago".
-                        let now = SystemTime::now();
-                        return match now.checked_sub(dur) {
-                            Some(st) => SPValue::Time(st),
-                            None => SPValue::UNKNOWN,
-                        };
-                    }
-                }
-                // fallback if we can't parse
-                SPValue::UNKNOWN
-            }
+    //         "time" => {
+    //             // The `to_string` used format!("{:?}", x.elapsed()), which might look like "123.456789s"
+    //             // We'll parse that as a float followed by 's'.
+    //             // For example "0.123456s". Then interpret as a Duration from now minus that time.
+    //             // This is naive and depends on your actual format. 
+    //             if let Some((secs_part, _)) = value_str.rsplit_once('s') {
+    //                 if let Ok(float_secs) = secs_part.trim().parse::<f64>() {
+    //                     // Convert float seconds to a Duration
+    //                     let dur = float_secs_to_duration(float_secs);
+    //                     // We'll do: now - dur. So it's "dur seconds ago".
+    //                     let now = SystemTime::now();
+    //                     return match now.checked_sub(dur) {
+    //                         Some(st) => SPValue::Time(st),
+    //                         None => SPValue::UNKNOWN,
+    //                     };
+    //                 }
+    //             }
+    //             // fallback if we can't parse
+    //             SPValue::UNKNOWN
+    //         }
 
-            "array" => {
-                let trimmed = value_str.trim();
-                if trimmed.starts_with('[') && trimmed.ends_with(']') {
-                    let inner = trimmed[1..trimmed.len() - 1].trim();
-                    if inner.is_empty() {
-                        return SPValue::Array(SPValueType::UNKNOWN, vec![]);
-                    }
+    //         "array" => {
+    //             let trimmed = value_str.trim();
+    //             if trimmed.starts_with('[') && trimmed.ends_with(']') {
+    //                 let inner = trimmed[1..trimmed.len() - 1].trim();
+    //                 if inner.is_empty() {
+    //                     return SPValue::Array(SPValueType::UNKNOWN, vec![]);
+    //                 }
 
-                    // Very naive approach: split by comma, parse each item
-                    let parts = inner.split(',').map(|x| x.trim());
-                    let mut items = Vec::new();
-                    for p in parts {
-                        let item_val = SPValue::from_string(p);
-                        items.push(item_val);
-                    }
-                    // let len = items.len();
-                    SPValue::Array(SPValueType::UNKNOWN, items)
-                } else {
-                    SPValue::UNKNOWN
-                }
-            }
+    //                 // Very naive approach: split by comma, parse each item
+    //                 let parts = inner.split(',').map(|x| x.trim());
+    //                 let mut items = Vec::new();
+    //                 for p in parts {
+    //                     let item_val = SPValue::from_string(p);
+    //                     items.push(item_val);
+    //                 }
+    //                 // let len = items.len();
+    //                 SPValue::Array(SPValueType::UNKNOWN, items)
+    //             } else {
+    //                 SPValue::UNKNOWN
+    //             }
+    //         }
 
-            _ => SPValue::UNKNOWN,
-        }
-    }
+    //         _ => SPValue::UNKNOWN,
+    //     }
+    // }
 
 }
 
@@ -258,7 +271,7 @@ impl ToSPValue for Option<bool> {
     fn to_spvalue(&self) -> SPValue {
         match self {
             Some(value) => SPValue::Bool(*value),
-            None => SPValue::UNKNOWN,
+            None => SPValue::Unknown(SPValueType::Bool),
         }
     }
 }
@@ -278,7 +291,7 @@ impl ToSPValue for f64 {
 impl ToSPValue for String {
     fn to_spvalue(&self) -> SPValue {
         if self == "Unknown" || self == "unknown" || self == "UNKNOWN" {
-            SPValue::UNKNOWN
+            SPValue::Unknown(SPValueType::String)
         } else {
             SPValue::String(self.clone())
         }
@@ -377,7 +390,7 @@ mod tests {
 
     #[test]
     fn test_is_type_unknown() {
-        let val = SPValue::UNKNOWN;
+        let val = SPValue::Unknown(SPValueType::UNKNOWN);
         assert!(val.is_type(SPValueType::UNKNOWN));
         assert!(!val.is_type(SPValueType::Int64));
     }
@@ -423,7 +436,7 @@ mod tests {
 
     #[test]
     fn test_has_type_unknown() {
-        let value = SPValue::UNKNOWN;
+        let value = SPValue::Unknown(SPValueType::UNKNOWN);
         assert_eq!(value.has_type(), SPValueType::UNKNOWN);
     }
 
@@ -453,8 +466,11 @@ mod tests {
         let time_value = SPValue::Time(SystemTime::UNIX_EPOCH);
         assert_eq!(time_value.is_array(), false);
 
-        let unknown_value = SPValue::UNKNOWN;
+        let unknown_value = SPValue::Unknown(SPValueType::UNKNOWN);
         assert_eq!(unknown_value.is_array(), false);
+
+        let unknown_value = SPValue::Unknown(SPValueType::Array);
+        assert_eq!(unknown_value.is_array(), true);
     }
 
     #[test]
@@ -501,7 +517,7 @@ mod tests {
 
     #[test]
     fn test_to_string_returns_correct_string_for_unknown() {
-        let unknown_value = SPValue::UNKNOWN;
+        let unknown_value = SPValue::Unknown(SPValueType::Array);
         assert_eq!(unknown_value.to_string(), "UNKNOWN".to_string());
     }
 
@@ -584,7 +600,7 @@ mod tests {
 
     #[test]
     fn test_display_unknown() {
-        let value = SPValue::UNKNOWN;
+        let value = SPValue::Unknown(SPValueType::Array);
         assert_eq!(format!("{}", value), "UNKNOWN");
     }
 
