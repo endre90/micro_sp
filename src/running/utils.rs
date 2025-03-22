@@ -26,7 +26,7 @@ pub fn generate_runner_state_variables(name: &str) -> State {
 
     state = state.add(assign!(runner_state, SPValue::Unknown(SPValueType::String)));
     // state = state.add(assign!(runner_ref_counter, 1.to_spvalue()));
-    state = state.add(assign!(goal, SPValue::Unknown(SPValueType::Array)));
+    state = state.add(assign!(goal, SPValue::Unknown(SPValueType::String)));
     state = state.add(assign!(goal_exists, SPValue::Unknown(SPValueType::Bool)));
     state = state.add(assign!(plan, SPValue::Unknown(SPValueType::Array)));
     state = state.add(assign!(plan_exists, SPValue::Unknown(SPValueType::Bool)));
