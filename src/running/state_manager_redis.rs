@@ -170,7 +170,7 @@ pub async fn redis_state_manager(
 
             StateManagement::SetPartialState(partial_state) => {
                 for (var, assignment) in partial_state.state {
-                    state = state.update(&var, assignment.val.clone());
+                    // state = state.update(&var, assignment.val.clone());
                     if let Err(e) = con
                         .set::<_, String, Value>(
                             &var,
@@ -185,7 +185,7 @@ pub async fn redis_state_manager(
             }
 
             StateManagement::Set((var, val)) => {
-                state = state.update(&var, val.clone());
+                // state = state.update(&var, val.clone());
                 if let Err(e) = con
                     .set::<_, String, Value>(&var, serde_json::to_string(&val).unwrap())
                     .await

@@ -12,13 +12,13 @@ peg::parser!(pub grammar pred_parser() for str {
 
     pub rule value(state: &State) -> SPWrapped
         = _ var:variable(&state) _ { SPWrapped::SPVariable(var) }
-        / _ "UNKNOWN" _ { SPWrapped::SPValue(SPValue::Unknown(SPValueType::Array)) }
-        / _ "UNKNOWN" _ { SPWrapped::SPValue(SPValue::Unknown(SPValueType::Bool)) }
-        / _ "UNKNOWN" _ { SPWrapped::SPValue(SPValue::Unknown(SPValueType::Float64)) }
-        / _ "UNKNOWN" _ { SPWrapped::SPValue(SPValue::Unknown(SPValueType::Int64)) }
-        / _ "UNKNOWN" _ { SPWrapped::SPValue(SPValue::Unknown(SPValueType::Time)) }
-        / _ "UNKNOWN" _ { SPWrapped::SPValue(SPValue::Unknown(SPValueType::String)) }
-        / _ "UNKNOWN" _ { SPWrapped::SPValue(SPValue::Unknown(SPValueType::UNKNOWN)) }
+        / _ "UNKNOWN_array" _ { SPWrapped::SPValue(SPValue::Unknown(SPValueType::Array)) }
+        / _ "UNKNOWN_bool" _ { SPWrapped::SPValue(SPValue::Unknown(SPValueType::Bool)) }
+        / _ "UNKNOWN_float" _ { SPWrapped::SPValue(SPValue::Unknown(SPValueType::Float64)) }
+        / _ "UNKNOWN_int" _ { SPWrapped::SPValue(SPValue::Unknown(SPValueType::Int64)) }
+        / _ "UNKNOWN_time" _ { SPWrapped::SPValue(SPValue::Unknown(SPValueType::Time)) }
+        / _ "UNKNOWN_string" _ { SPWrapped::SPValue(SPValue::Unknown(SPValueType::String)) }
+        / _ "UNKNOWN_unknown" _ { SPWrapped::SPValue(SPValue::Unknown(SPValueType::UNKNOWN)) }
         / _ "true" _ { SPWrapped::SPValue(true.to_spvalue()) }
         / _ "TRUE" _ { SPWrapped::SPValue(true.to_spvalue()) }
         / _ "false" _ { SPWrapped::SPValue(false.to_spvalue()) }
