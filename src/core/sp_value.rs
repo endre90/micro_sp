@@ -1,5 +1,5 @@
 use ordered_float::OrderedFloat;
-use serde::{Deserialize, Serialize, Serializer, Deserializer};
+use serde::{Deserialize, Serialize};
 use std::fmt;
 use std::time::SystemTime;
 

@@ -42,11 +42,13 @@ pub async fn redis_state_manager(mut receiver: mpsc::Receiver<StateManagement>, 
 
                 let mut map: HashMap<String, SPAssignment> = HashMap::new();
                 for (key, maybe_value) in keys.into_iter().zip(values.into_iter()) {
-                    if let Some(value) = maybe_value {
-                        let var = state.get_assignment(&key).var;
-                        let new_assignment =
-                            SPAssignment::new(var, serde_json::from_str(&value).unwrap());
-                        map.insert(key, new_assignment);
+                    if state.contains(&key) { // Only get state that is locally tracked
+                        if let Some(value) = maybe_value {
+                            let var = state.get_assignment(&key).var;
+                            let new_assignment =
+                                SPAssignment::new(var, serde_json::from_str(&value).unwrap());
+                            map.insert(key, new_assignment);
+                        }
                     }
                 }
 
