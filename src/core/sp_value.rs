@@ -26,7 +26,7 @@ impl Serialize for SPValue {
 
         match self {
             SPValue::Unknown(value_type) => {
-                let mut state = serializer.serialize_struct("SPValue", 2)?;
+                let mut state = serializer.serialize_struct("SPValue", 7)?;
                 state.serialize_field("type", &value_type)?;
                 state.serialize_field("value", "Unknown")?;
                 state.end()
