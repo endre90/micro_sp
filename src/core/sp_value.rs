@@ -3,19 +3,19 @@ use serde::{Deserialize, Serialize, Serializer, Deserializer};
 use std::fmt;
 use std::time::SystemTime;
 
-// /// Represents a variable value of a specific type.
-// #[derive(Debug, PartialEq, Clone, Hash, Eq, PartialOrd, Ord)]
-// // #[serde(tag = "type", content = "value")]
-// pub enum SPValue {
-//     Bool(bool),
-//     Float64(OrderedFloat<f64>),
-//     Int64(i64),
-//     String(String),
-//     Time(SystemTime),
-//     // Instant(Instant),
-//     Array(SPValueType, Vec<SPValue>),
-//     Unknown(SPValueType),
-// }
+/// Represents a variable value of a specific type.
+#[derive(Debug, PartialEq, Clone, Hash, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(tag = "type", content = "value")]
+pub enum SPValue {
+    Bool(bool),
+    Float64(OrderedFloat<f64>),
+    Int64(i64),
+    String(String),
+    Time(SystemTime),
+    // Instant(Instant),
+    Array(SPValueType, Vec<SPValue>),
+    Unknown(SPValueType),
+}
 
 // impl Serialize for SPValue {
 //     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
@@ -89,80 +89,80 @@ use std::time::SystemTime;
 //     }
 // }
 
-#[derive(Debug, PartialEq, Clone, Hash, Eq, PartialOrd, Ord, Deserialize)]
-#[serde(tag = "type", content = "value")]
-pub enum SPValue {
-    Bool(bool),
-    Float64(OrderedFloat<f64>),
-    Int64(i64),
-    String(String),
-    Time(SystemTime),
-    Array(SPValueType, Vec<SPValue>),
-    #[serde(deserialize_with = "deserialize_unknown")]
-    Unknown(SPValueType),
-}
+// #[derive(Debug, PartialEq, Clone, Hash, Eq, PartialOrd, Ord, Deserialize)]
+// #[serde(tag = "type", content = "value")]
+// pub enum SPValue {
+//     Bool(BoolOrUnknown),
+//     Float64(OrderedFloat<f64>),
+//     Int64(i64),
+//     String(String),
+//     Time(SystemTime),
+//     Array(SPValueType, Vec<SPValue>),
+//     // #[serde(deserialize_with = "deserialize_unknown")]
+//     Unknown(SPValueType),
+// }
 
-impl Serialize for SPValue {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        use serde::ser::SerializeStruct;
+// impl Serialize for SPValue {
+//     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+//     where
+//         S: Serializer,
+//     {
+//         use serde::ser::SerializeStruct;
 
-        match self {
-            SPValue::Unknown(value_type) => {
-                // Special handling for Unknown variant
-                let mut s = serializer.serialize_struct("SPValue", 2)?;
-                s.serialize_field("type", value_type)?;
-                s.serialize_field("value", "Unknown")?;
-                s.end()
-            }
-            _ => {
-                // Default handling for other variants
-                #[derive(Serialize)]
-                #[serde(tag = "type", content = "value")]
-                enum SPValueHelper<'a> {
-                    Bool(bool),
-                    Float64(&'a OrderedFloat<f64>),
-                    Int64(i64),
-                    String(&'a String),
-                    Time(&'a SystemTime),
-                    Array(&'a SPValueType, &'a Vec<SPValue>),
-                }
+//         match self {
+//             SPValue::Unknown(value_type) => {
+//                 // Special handling for Unknown variant
+//                 let mut s = serializer.serialize_struct("SPValue", 7)?;
+//                 s.serialize_field("type", value_type)?;
+//                 s.serialize_field("value", "Unknown")?;
+//                 s.end()
+//             }
+//             _ => {
+//                 // Default handling for other variants
+//                 #[derive(Serialize)]
+//                 #[serde(tag = "type", content = "value")]
+//                 enum SPValueHelper<'a> {
+//                     Bool(bool),
+//                     Float64(&'a OrderedFloat<f64>),
+//                     Int64(i64),
+//                     String(&'a String),
+//                     Time(&'a SystemTime),
+//                     Array(&'a SPValueType, &'a Vec<SPValue>),
+//                 }
 
-                let helper = match self {
-                    SPValue::Bool(b) => SPValueHelper::Bool(*b),
-                    SPValue::Float64(f) => SPValueHelper::Float64(f),
-                    SPValue::Int64(i) => SPValueHelper::Int64(*i),
-                    SPValue::String(s) => SPValueHelper::String(s),
-                    SPValue::Time(t) => SPValueHelper::Time(t),
-                    SPValue::Array(ty, vec) => SPValueHelper::Array(ty, vec),
-                    SPValue::Unknown(_) => unreachable!(), // Handled above
-                };
+//                 let helper = match self {
+//                     SPValue::Bool(b) => SPValueHelper::Bool(*b),
+//                     SPValue::Float64(f) => SPValueHelper::Float64(f),
+//                     SPValue::Int64(i) => SPValueHelper::Int64(*i),
+//                     SPValue::String(s) => SPValueHelper::String(s),
+//                     SPValue::Time(t) => SPValueHelper::Time(t),
+//                     SPValue::Array(ty, vec) => SPValueHelper::Array(ty, vec),
+//                     SPValue::Unknown(_) => unreachable!(), // Handled above
+//                 };
 
-                helper.serialize(serializer)
-            }
-        }
-    }
-}
+//                 helper.serialize(serializer)
+//             }
+//         }
+//     }
+// }
 
-fn deserialize_unknown<'de, D>(deserializer: D) -> Result<SPValueType, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    #[derive(Deserialize)]
-    struct UnknownFormat {
-        #[serde(rename = "type")]
-        value_type: SPValueType,
-        value: String,
-    }
+// fn deserialize_unknown<'de, D>(deserializer: D) -> Result<SPValueType, D::Error>
+// where
+//     D: Deserializer<'de>,
+// {
+//     #[derive(Deserialize)]
+//     struct UnknownFormat {
+//         #[serde(rename = "type")]
+//         value_type: SPValueType,
+//         value: String,
+//     }
 
-    let uf = UnknownFormat::deserialize(deserializer)?;
-    if uf.value != "Unknown" {
-        return Err(serde::de::Error::custom("Expected value to be 'Unknown'"));
-    }
-    Ok(uf.value_type)
-}
+//     let uf = UnknownFormat::deserialize(deserializer)?;
+//     if uf.value != "Unknown" {
+//         return Err(serde::de::Error::custom("Expected value to be 'Unknown'"));
+//     }
+//     Ok(uf.value_type)
+// }
 
 /// Displaying the value of an SPValue instance in a user-friendly way.
 impl fmt::Display for SPValue {
@@ -191,6 +191,12 @@ pub enum SPValueType {
     Array,
     UNKNOWN,
 }
+
+// #[derive(Debug, PartialEq, Clone, Hash, Eq, PartialOrd, Ord, Deserialize)]
+// pub enum BoolOrUnknown {
+//     Bool,
+//     Unknown
+// }
 
 impl Default for SPValueType {
     fn default() -> Self {
