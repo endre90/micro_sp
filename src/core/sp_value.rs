@@ -1,9 +1,94 @@
 use ordered_float::OrderedFloat;
-use serde::{Deserialize, Serialize, Serializer};
+use serde::{Deserialize, Serialize, Serializer, Deserializer};
 use std::fmt;
 use std::time::SystemTime;
 
-/// Represents a variable value of a specific type.
+// /// Represents a variable value of a specific type.
+// #[derive(Debug, PartialEq, Clone, Hash, Eq, PartialOrd, Ord)]
+// // #[serde(tag = "type", content = "value")]
+// pub enum SPValue {
+//     Bool(bool),
+//     Float64(OrderedFloat<f64>),
+//     Int64(i64),
+//     String(String),
+//     Time(SystemTime),
+//     // Instant(Instant),
+//     Array(SPValueType, Vec<SPValue>),
+//     Unknown(SPValueType),
+// }
+
+// impl Serialize for SPValue {
+//     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+//     where
+//         S: Serializer,
+//     {
+//         use serde::ser::SerializeStruct;
+
+//         match self {
+//             SPValue::Unknown(value_type) => {
+//                 let mut state = serializer.serialize_struct("SPValue", 7)?;
+//                 state.serialize_field("type", &value_type)?;
+//                 state.serialize_field("value", "Unknown")?;
+//                 state.end()
+//             }
+//             _ => {
+//                 let value = format!("{:?}", self);
+//                 serializer.serialize_str(&value)
+//             }
+//         }
+//     }
+// }
+
+// impl<'de> Deserialize<'de> for SPValue {
+//     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+//     where
+//         D: Deserializer<'de>,
+//     {
+//         struct SPValueVisitor;
+
+//         impl<'de> Visitor<'de> for SPValueVisitor {
+//             type Value = SPValue;
+
+//             fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+//                 formatter.write_str("a struct representing SPValue")
+//             }
+
+//             fn visit_map<A>(self, mut map: A) -> Result<SPValue, A::Error>
+//             where
+//                 A: MapAccess<'de>,
+//             {
+//                 let mut value_type = None;
+//                 let mut value = None;
+
+//                 while let Some(key) = map.next_key::<String>()? {
+//                     match key.as_str() {
+//                         "type" => {
+//                             value_type = Some(map.next_value()?);
+//                         }
+//                         "value" => {
+//                             value = Some(map.next_value()?);
+//                         }
+//                         _ => {}
+//                     }
+//                 }
+
+//                 match (value_type, value) {
+//                     (Some(t), Some(v)) if v == "Unknown" => Ok(SPValue::Unknown(t)),
+//                     _ => Err(de::Error::custom("Invalid SPValue format")),
+//                 }
+//             }
+//         }
+
+//         deserializer.deserialize_map(SPValueVisitor)
+//     }
+// }
+
+// impl Default for SPValue {
+//     fn default() -> Self {
+//         SPValue::Unknown(SPValueType::UNKNOWN)
+//     }
+// }
+
 #[derive(Debug, PartialEq, Clone, Hash, Eq, PartialOrd, Ord, Deserialize)]
 #[serde(tag = "type", content = "value")]
 pub enum SPValue {
@@ -12,8 +97,8 @@ pub enum SPValue {
     Int64(i64),
     String(String),
     Time(SystemTime),
-    // Instant(Instant),
     Array(SPValueType, Vec<SPValue>),
+    #[serde(deserialize_with = "deserialize_unknown")]
     Unknown(SPValueType),
 }
 
@@ -26,23 +111,57 @@ impl Serialize for SPValue {
 
         match self {
             SPValue::Unknown(value_type) => {
-                let mut state = serializer.serialize_struct("SPValue", 7)?;
-                state.serialize_field("type", &value_type)?;
-                state.serialize_field("value", "Unknown")?;
-                state.end()
+                // Special handling for Unknown variant
+                let mut s = serializer.serialize_struct("SPValue", 2)?;
+                s.serialize_field("type", value_type)?;
+                s.serialize_field("value", "Unknown")?;
+                s.end()
             }
             _ => {
-                let value = format!("{:?}", self); // Convert to a serializable form
-                serializer.serialize_str(&value)
+                // Default handling for other variants
+                #[derive(Serialize)]
+                #[serde(tag = "type", content = "value")]
+                enum SPValueHelper<'a> {
+                    Bool(bool),
+                    Float64(&'a OrderedFloat<f64>),
+                    Int64(i64),
+                    String(&'a String),
+                    Time(&'a SystemTime),
+                    Array(&'a SPValueType, &'a Vec<SPValue>),
+                }
+
+                let helper = match self {
+                    SPValue::Bool(b) => SPValueHelper::Bool(*b),
+                    SPValue::Float64(f) => SPValueHelper::Float64(f),
+                    SPValue::Int64(i) => SPValueHelper::Int64(*i),
+                    SPValue::String(s) => SPValueHelper::String(s),
+                    SPValue::Time(t) => SPValueHelper::Time(t),
+                    SPValue::Array(ty, vec) => SPValueHelper::Array(ty, vec),
+                    SPValue::Unknown(_) => unreachable!(), // Handled above
+                };
+
+                helper.serialize(serializer)
             }
         }
     }
 }
 
-impl Default for SPValue {
-    fn default() -> Self {
-        SPValue::Unknown(SPValueType::UNKNOWN)
+fn deserialize_unknown<'de, D>(deserializer: D) -> Result<SPValueType, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    #[derive(Deserialize)]
+    struct UnknownFormat {
+        #[serde(rename = "type")]
+        value_type: SPValueType,
+        value: String,
     }
+
+    let uf = UnknownFormat::deserialize(deserializer)?;
+    if uf.value != "Unknown" {
+        return Err(serde::de::Error::custom("Expected value to be 'Unknown'"));
+    }
+    Ok(uf.value_type)
 }
 
 /// Displaying the value of an SPValue instance in a user-friendly way.
@@ -150,28 +269,29 @@ impl SPValue {
     pub fn is_array(&self) -> bool {
         match self {
             SPValue::Array(_, _) => true,
+            SPValue::Unknown(SPValueType::Array) => true,
             _ => false,
         }
     }
 
-    // pub fn to_string(&self) -> String {
-    //     match self {
-    //         SPValue::Bool(b) => format!("bool:{}", b),
-    //         SPValue::Int64(i) => format!("int:{}", i),
-    //         SPValue::Float64(f) => format!("float:{}", f.into_inner()),
-    //         SPValue::String(s) => format!("string:{}", s),
-    //         SPValue::Time(x) => format!("time:{:?}", x.elapsed().unwrap_or_default()),
-    //         SPValue::Array(_, arr) => {
-    //             let items_str = arr
-    //                 .iter()
-    //                 .map(|item| item.to_string())
-    //                 .collect::<Vec<_>>()
-    //                 .join(", ");
-    //             format!("array:[{}]", items_str)
-    //         },
-    //         SPValue::UNKNOWN => "UNKNOWN".to_string(),
-    //     }
-    // }
+    pub fn to_string(&self) -> String {
+        match self {
+            SPValue::Bool(b) => format!("{}", b),
+            SPValue::Int64(i) => format!("{}", i),
+            SPValue::Float64(f) => format!("{}", f.into_inner()),
+            SPValue::String(s) => format!("{}", s),
+            SPValue::Time(x) => format!("{:?}", x.elapsed().unwrap_or_default()),
+            SPValue::Array(_, arr) => {
+                let items_str = arr
+                    .iter()
+                    .map(|item| item.to_string())
+                    .collect::<Vec<_>>()
+                    .join(", ");
+                format!("[{}]", items_str)
+            },
+            SPValue::Unknown(_) => "UNKNOWN".to_string(),
+        }
+    }
 
     // /// Attempt to parse a string of the form "<type>:<value>".
     // /// Examples:
@@ -497,28 +617,28 @@ mod tests {
     #[test]
     fn test_to_string_returns_correct_string_for_bool() {
         let bool_value = SPValue::Bool(true);
-        assert_eq!(bool_value.to_string(), "bool:true".to_string());
+        assert_eq!(bool_value.to_string(), "true".to_string());
 
         let bool_value = SPValue::Bool(false);
-        assert_eq!(bool_value.to_string(), "bool:false".to_string());
+        assert_eq!(bool_value.to_string(), "false".to_string());
     }
 
     #[test]
     fn test_to_string_returns_correct_string_for_float() {
         let float_value = SPValue::Float64(OrderedFloat(3.14));
-        assert_eq!(float_value.to_string(), "float:3.14".to_string());
+        assert_eq!(float_value.to_string(), "3.14".to_string());
     }
 
     #[test]
     fn test_to_string_returns_correct_string_for_int() {
         let int_value = SPValue::Int64(42);
-        assert_eq!(int_value.to_string(), "int:42".to_string());
+        assert_eq!(int_value.to_string(), "42".to_string());
     }
 
     #[test]
     fn test_to_string_returns_correct_string_for_string() {
         let string_value = SPValue::String("Hello, world!".to_string());
-        assert_eq!(string_value.to_string(), "string:Hello, world!".to_string());
+        assert_eq!(string_value.to_string(), "Hello, world!".to_string());
     }
 
     #[should_panic]
@@ -535,7 +655,7 @@ mod tests {
         );
         assert_eq!(
             array_value.to_string(),
-            "array:[int:1, int:2, int:3]".to_string()
+            "[1, 2, 3]".to_string()
         );
     }
 

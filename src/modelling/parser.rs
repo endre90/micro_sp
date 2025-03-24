@@ -19,6 +19,7 @@ peg::parser!(pub grammar pred_parser() for str {
         / _ "UNKNOWN_time" _ { SPWrapped::SPValue(SPValue::Unknown(SPValueType::Time)) }
         / _ "UNKNOWN_string" _ { SPWrapped::SPValue(SPValue::Unknown(SPValueType::String)) }
         / _ "UNKNOWN_unknown" _ { SPWrapped::SPValue(SPValue::Unknown(SPValueType::UNKNOWN)) }
+        / _ "UNKNOWN" _ { SPWrapped::SPValue(SPValue::Unknown(SPValueType::UNKNOWN)) }
         / _ "true" _ { SPWrapped::SPValue(true.to_spvalue()) }
         / _ "TRUE" _ { SPWrapped::SPValue(true.to_spvalue()) }
         / _ "false" _ { SPWrapped::SPValue(false.to_spvalue()) }
@@ -149,7 +150,7 @@ mod tests {
             Ok(SPWrapped::SPValue(false.to_spvalue()))
         );
         assert_eq!(
-            pred_parser::value("UNKNOWN", &s),
+            pred_parser::value("UNKNOWN_array", &s),
             Ok(SPWrapped::SPValue(SPValue::Unknown(SPValueType::Array)))
         );
     }
