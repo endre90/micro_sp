@@ -1,10 +1,10 @@
 use ordered_float::OrderedFloat;
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize, Serializer};
 use std::fmt;
 use std::time::{Duration, SystemTime};
 
 /// Represents a variable value of a specific type.
-#[derive(Debug, PartialEq, Clone, Hash, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Clone, Hash, Eq, PartialOrd, Ord, Deserialize)]
 #[serde(tag = "type", content = "value")]
 pub enum SPValue {
     Bool(bool),
@@ -15,6 +15,25 @@ pub enum SPValue {
     // Instant(Instant),
     Array(SPValueType, Vec<SPValue>),
     Unknown(SPValueType),
+}
+
+impl Serialize for SPValue {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        use serde::ser::SerializeStruct;
+
+        match self {
+            SPValue::Unknown(value_type) => {
+                let mut state = serializer.serialize_struct("SPValue", 2)?;
+                state.serialize_field("type", &value_type)?;
+                state.serialize_field("value", "Unknown")?;
+                state.end()
+            }
+            _ => self.serialize(serializer),
+        }
+    }
 }
 
 impl Default for SPValue {
@@ -199,7 +218,7 @@ impl SPValue {
     //             // The `to_string` used format!("{:?}", x.elapsed()), which might look like "123.456789s"
     //             // We'll parse that as a float followed by 's'.
     //             // For example "0.123456s". Then interpret as a Duration from now minus that time.
-    //             // This is naive and depends on your actual format. 
+    //             // This is naive and depends on your actual format.
     //             if let Some((secs_part, _)) = value_str.rsplit_once('s') {
     //                 if let Ok(float_secs) = secs_part.trim().parse::<f64>() {
     //                     // Convert float seconds to a Duration
@@ -241,20 +260,19 @@ impl SPValue {
     //         _ => SPValue::UNKNOWN,
     //     }
     // }
-
 }
 
 /// Helper to convert fractional seconds to a `Duration`.
-fn float_secs_to_duration(secs: f64) -> Duration {
-    if secs < 0.0 {
-        // If negative, clamp to zero or handle how you prefer
-        return Duration::from_secs(0);
-    }
-    let whole = secs.floor() as u64;
-    let nanos_f = (secs - secs.floor()) * 1e9;
-    let nanos = nanos_f.round() as u32;
-    Duration::new(whole, nanos)
-}
+// fn float_secs_to_duration(secs: f64) -> Duration {
+//     if secs < 0.0 {
+//         // If negative, clamp to zero or handle how you prefer
+//         return Duration::from_secs(0);
+//     }
+//     let whole = secs.floor() as u64;
+//     let nanos_f = (secs - secs.floor()) * 1e9;
+//     let nanos = nanos_f.round() as u32;
+//     Duration::new(whole, nanos)
+// }
 
 /// This trait defines a set of conversions from some Rust primitive types and containers to `SPValue`.
 pub trait ToSPValue {
@@ -512,7 +530,10 @@ mod tests {
             SPValueType::Int64,
             vec![SPValue::Int64(1), SPValue::Int64(2), SPValue::Int64(3)],
         );
-        assert_eq!(array_value.to_string(), "array:[int:1, int:2, int:3]".to_string());
+        assert_eq!(
+            array_value.to_string(),
+            "array:[int:1, int:2, int:3]".to_string()
+        );
     }
 
     #[test]
