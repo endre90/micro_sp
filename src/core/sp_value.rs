@@ -1,7 +1,7 @@
 use ordered_float::OrderedFloat;
 use serde::{Deserialize, Serialize, Serializer};
 use std::fmt;
-use std::time::{Duration, SystemTime};
+use std::time::SystemTime;
 
 /// Represents a variable value of a specific type.
 #[derive(Debug, PartialEq, Clone, Hash, Eq, PartialOrd, Ord, Deserialize)]
@@ -31,7 +31,10 @@ impl Serialize for SPValue {
                 state.serialize_field("value", "Unknown")?;
                 state.end()
             }
-            _ => self.serialize(serializer),
+            _ => {
+                let value = format!("{:?}", self); // Convert to a serializable form
+                serializer.serialize_str(&value)
+            }
         }
     }
 }
