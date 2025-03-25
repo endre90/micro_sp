@@ -4,7 +4,7 @@ macro_rules! v {
         SPVariable::new(
             $a.clone(),
             SPValueType::String,
-            vec![],
+            // vec![],
         )
     };
 }
@@ -15,7 +15,7 @@ macro_rules! bv {
         SPVariable::new(
             $a.clone(),
             SPValueType::Bool,
-            vec![true.to_spvalue(), false.to_spvalue()],
+            // vec![true.to_spvalue(), false.to_spvalue()],
         )
     };
 }
@@ -26,7 +26,7 @@ macro_rules! iv {
         SPVariable::new(
             $a.clone(),
             SPValueType::Int64,
-            vec![],
+            // vec![],
             // $b.iter().map(|x| x.clone().to_spvalue()).collect(),
         )
     };
@@ -38,7 +38,7 @@ macro_rules! fv {
         SPVariable::new(
             $a.clone(),
             SPValueType::Float64,
-            vec![]
+            // vec![]
         )
     };
 }
@@ -49,7 +49,7 @@ macro_rules! av {
         SPVariable::new(
             $a.clone(),
             SPValueType::Array,
-            vec![],
+            // vec![],
         )
     };
 }

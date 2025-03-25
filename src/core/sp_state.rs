@@ -108,91 +108,101 @@ impl State {
         }
     }
 
-    pub fn get_or_default_bool(&self, target: &str, name: &str) -> bool {
+    pub fn get_bool_or_unknown(&self, target: &str, name: &str) -> BoolOrUnknown {
         match self.get_value(name) {
-            SPValue::Bool(value) => value,
-            SPValue::Unknown(SPValueType::Bool) => {
-                log::debug!(target: target, "Value for boolean '{}' is UNKNOWN, resulting to FALSE.", name);
+            SPValue::Bool(b) => b,
+            _ => {
+                log::error!(target: target, "Couldn't get boolean '{}' from the state, resulting to UNKNOWN.", name);
+                BoolOrUnknown::UNKNOWN
+            }
+        }
+    }
+
+    pub fn get_bool_or_default_to_false(&self, target: &str, name: &str) -> bool {
+        match self.get_bool_or_unknown(target, name) {
+            BoolOrUnknown::Bool(b) => b,
+            _ => {
+                log::warn!(target: target, "The value of bool '{}' is UNKNWON, resulting to default: FALSE.", name);
                 false
             }
+        }
+    }
+
+    pub fn get_int_or_unknown(&self, target: &str, name: &str) -> IntOrUnknown {
+        match self.get_value(name) {
+            SPValue::Int64(i) => i,
             _ => {
-                log::error!(target: target, "Couldn't get boolean '{}' from the state, resulting to FALSE.", name);
-                false
+                log::error!(target: target, "Couldn't get int '{}' from the state, resulting to UNKNOWN.", name);
+                IntOrUnknown::UNKNOWN
             }
         }
     }
 
-    pub fn get_bool(&self, target: &str, name: &str) -> Option<bool> {
-        match self.get_value(name) {
-            SPValue::Bool(value) => Some(value),
-            SPValue::Unknown(SPValueType::Bool) => {
-                log::debug!(target: target, "Value for boolean '{}' is UNKNOWN, resulting to None.", name);
-                None
-            }
+    pub fn get_int_or_default_to_zero(&self, target: &str, name: &str) -> i64 {
+        match self.get_int_or_unknown(target, name) {
+            IntOrUnknown::Int64(i) => i,
             _ => {
-                log::error!(target: target, "Couldn't get boolean '{}' from the state, resulting to None.", name);
-                None
-            }
-        }
-    }
-
-    pub fn get_or_default_i64(&self, target: &str, name: &str) -> i64 {
-        match self.get_value(name) {
-            SPValue::Int64(value) => value,
-            SPValue::Unknown(SPValueType::Int64) => {
-                log::debug!(target: target, "Value for Int64 '{}' is UNKNOWN, resulting to 0.", name);
-                0
-            }
-            _ => {
-                log::error!(target: target, "Couldn't get Int64 '{}' from the state, resulting to 0.", name);
+                log::warn!(target: target, "The value of int '{}' is UNKNWON, resulting to default: 0.", name);
                 0
             }
         }
     }
 
-    pub fn get_or_default_f64(&self, target: &str, name: &str) -> f64 {
+    pub fn get_float_or_unknown(&self, target: &str, name: &str) -> FloatOrUnknown {
         match self.get_value(name) {
-            SPValue::Float64(value) => value.into_inner(),
-            SPValue::Unknown(SPValueType::Float64) => {
-                log::debug!(target: target, "Value for Float64 '{}' is UNKNOWN, resulting to 0.0.", name);
-                0.0
-            }
+            SPValue::Float64(f) => f,
             _ => {
-                log::error!(target: target, "Couldn't get Float64 '{}' from the state, resulting to 0.0.", name);
+                log::error!(target: target, "Couldn't get float '{}' from the state, resulting to UNKNOWN.", name);
+                FloatOrUnknown::UNKNOWN
+            }
+        }
+    }
+
+    pub fn get_float_or_default_to_zero(&self, target: &str, name: &str) -> f64 {
+        match self.get_float_or_unknown(target, name) {
+            FloatOrUnknown::Float64(f) => f.into_inner(),
+            _ => {
+                log::warn!(target: target, "The value of float '{}' is UNKNWON, resulting to default: 0.0.", name);
                 0.0
             }
         }
     }
 
-    pub fn get_or_default_string(&self, target: &str, name: &str) -> String {
+    pub fn get_string_or_unknown(&self, target: &str, name: &str) -> StringOrUnknown {
         match self.get_value(name) {
-            SPValue::String(value) => value,
-            SPValue::Unknown(SPValueType::String) => {
-                log::debug!(target: target, "Value for String '{}' is UNKNOWN, resulting to ''.", name);
-                "UNKNOWN".to_string()
-            }
+            SPValue::String(s) => s,
             _ => {
-                log::error!(target: target, "Couldn't get String '{}' from the state, resulting to ''.", name);
-                "UNKNOWN".to_string()
+                log::error!(target: target, "Couldn't get string '{}' from the state, resulting to UNKNOWN.", name);
+                StringOrUnknown::UNKNOWN
             }
         }
     }
 
-    pub fn get_or_default_array_of_strings(&self, target: &str, name: &str) -> Vec<String> {
-        match self.get_value(name) {
-            SPValue::Array(_, arr) => arr
-                .iter()
-                .map(|x| match x {
-                    SPValue::String(value) => value.clone(),
-                    _ => "".to_string(),
-                })
-                .collect(),
-            SPValue::Unknown(SPValueType::Array) => {
-                log::debug!(target: target, "Value for Array<String> '{}' is UNKNOWN, resulting to [].", name);
-                vec![]
-            }
+    pub fn get_string_or_default_to_unknown(&self, target: &str, name: &str) -> String {
+        match self.get_string_or_unknown(target, name) {
+            StringOrUnknown::String(s) => s,
             _ => {
-                log::error!(target: target, "Couldn't get Array<String> '{}' from the state, resulting to [].", name);
+                log::warn!(target: target, "The value of string '{}' is UNKNWON, resulting to default: UNKNOWN.", name);
+                SPValue::String(StringOrUnknown::UNKNOWN).to_string()
+            }
+        }
+    }
+
+    pub fn get_array_or_unknown(&self, target: &str, name: &str) -> ArrayOrUnknown {
+        match self.get_value(name) {
+            SPValue::Array(a) => a,
+            _ => {
+                log::error!(target: target, "Couldn't get array '{}' from the state, resulting to UNKNOWN.", name);
+                ArrayOrUnknown::UNKNOWN
+            }
+        }
+    }
+
+    pub fn get_array_or_default_to_empty(&self, target: &str, name: &str) -> Vec<SPValue> {
+        match self.get_array_or_unknown(target, name) {
+            ArrayOrUnknown::Array(a) => a,
+            _ => {
+                log::warn!(target: target, "The value of array '{}' is UNKNWON, resulting to default: vec!().", name);
                 vec![]
             }
         }
@@ -267,10 +277,12 @@ impl State {
     pub fn extract_goal(&self, name: &str) -> Predicate {
         match self.state.get(&format!("{}_goal", name)) {
             Some(g_spvalue) => match &g_spvalue.val {
-                SPValue::String(g_value) => match pred_parser::pred(&g_value, &self) {
-                    Ok(goal_predicate) => goal_predicate,
-                    Err(_) => Predicate::TRUE,
-                },
+                SPValue::String(StringOrUnknown::String(g_value)) => {
+                    match pred_parser::pred(&g_value, &self) {
+                        Ok(goal_predicate) => goal_predicate,
+                        Err(_) => Predicate::TRUE,
+                    }
+                }
                 _ => Predicate::TRUE,
             },
             None => Predicate::TRUE,
@@ -287,16 +299,19 @@ impl fmt::Display for State {
                 .state
                 .iter()
                 .map(|(k, v)| match &v.val {
-                    SPValue::Array(_, some_array) => {
-                        let mut sub_children: Vec<String> = vec![format!("    {}:", k)];
-                        sub_children.extend(
-                            some_array
-                                .iter()
-                                .map(|value| format!("        {}", value))
-                                .collect::<Vec<String>>(),
-                        );
-                        format!("{}", sub_children.join("\n"))
-                    }
+                    SPValue::Array(arr) => match arr {
+                        ArrayOrUnknown::UNKNOWN => format!("    {}: {}", k, v.val),
+                        ArrayOrUnknown::Array(some_array) => {
+                            let mut sub_children: Vec<String> = vec![format!("    {}:", k)];
+                            sub_children.extend(
+                                some_array
+                                    .iter()
+                                    .map(|value| format!("        {}", value))
+                                    .collect::<Vec<String>>(),
+                            );
+                            format!("{}", sub_children.join("\n"))
+                        }
+                    },
                     _ => format!("    {}: {}", k, v.val),
                 })
                 .collect();

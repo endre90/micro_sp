@@ -26,42 +26,51 @@ pub async fn planner_ticker(
 
     loop {
         let (response_tx, response_rx) = oneshot::channel();
-        command_sender.send(StateManagement::GetState(response_tx)).await?;
+        command_sender
+            .send(StateManagement::GetState(response_tx))
+            .await?;
         let state = response_rx.await?;
 
-        let mut replan_trigger = state.get_or_default_bool(
+        let mut replan_trigger = state.get_bool_or_default_to_false(
             &format!("{}_planner_ticker", name),
             &format!("{}_replan_trigger", name),
         );
-        let mut replanned = state.get_or_default_bool(
+        let mut replanned = state.get_bool_or_default_to_false(
             &format!("{}_planner_ticker", name),
             &format!("{}_replanned", name),
         );
-        let mut plan_counter = state.get_or_default_i64(
+        let mut plan_counter = state.get_int_or_default_to_zero(
             &format!("{}_planner_ticker", name),
             &format!("{}_plan_counter", name),
         );
-        let mut replan_counter = state.get_or_default_i64(
+        let mut replan_counter = state.get_int_or_default_to_zero(
             &format!("{}_planner_ticker", name),
             &format!("{}_replan_counter", name),
         );
-        let mut replan_counter_total = state.get_or_default_i64(
+        let mut replan_counter_total = state.get_int_or_default_to_zero(
             &format!("{}_planner_ticker", name),
             &format!("{}_replan_counter_total", name),
         );
-        let mut plan_state = state.get_or_default_string(
+        let mut plan_state = state.get_string_or_default_to_unknown(
             &format!("{}_planner_ticker", name),
             &format!("{}_plan_state", name),
         );
-        let mut plan_current_step = state.get_or_default_i64(
+        let mut plan_current_step = state.get_int_or_default_to_zero(
             &format!("{}_planner_ticker", name),
             &format!("{}_plan_current_step", name),
         );
-        let mut plan = state.get_or_default_array_of_strings(
+        let plan_of_sp_values = state.get_array_or_default_to_empty(
             &format!("{}_planner_ticker", name),
             &format!("{}_plan", name),
         );
-        let mut planner_information = state.get_or_default_string(
+
+        let mut plan: Vec<String> = plan_of_sp_values
+            .iter()
+            .filter(|val| val.is_string())
+            .map(|y| y.to_string())
+            .collect();
+
+        let mut planner_information = state.get_string_or_default_to_unknown(
             &format!("{}_planner_ticker", name),
             &format!("{}_planner_information", name),
         );
@@ -79,7 +88,7 @@ pub async fn planner_ticker(
 
         if plan_old != plan {
             log::info!(
-                target: &format!("{}_planner_ticker", name), 
+                target: &format!("{}_planner_ticker", name),
                 "Got a plan:\n{}",
                 plan.iter()
                     .enumerate()

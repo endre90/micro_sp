@@ -29,22 +29,30 @@ pub async fn planned_operation_runner(
 
     loop {
         let (response_tx, response_rx) = oneshot::channel();
-        command_sender.send(StateManagement::GetState(response_tx)).await?;
+        command_sender
+            .send(StateManagement::GetState(response_tx))
+            .await?;
         let state = response_rx.await?;
         let mut new_state = state.clone();
 
-        let mut plan_state = state.get_or_default_string(
+        let mut plan_state = state.get_string_or_default_to_unknown(
             &format!("{}_operation_runner", name),
             &format!("{}_plan_state", name),
         );
-        let mut plan_current_step = state.get_or_default_i64(
+        let mut plan_current_step = state.get_int_or_default_to_zero(
             &format!("{}_operation_runner", name),
             &format!("{}_plan_current_step", name),
         );
-        let plan = state.get_or_default_array_of_strings(
+        let plan_of_sp_values = state.get_array_or_default_to_empty(
             &format!("{}_operation_runner", name),
             &format!("{}_plan", name),
         );
+
+        let plan: Vec<String> = plan_of_sp_values
+            .iter()
+            .filter(|val| val.is_string())
+            .map(|y| y.to_string())
+            .collect();
 
         // Log only when something changes and not every tick
         if plan_state_old != plan_state {
@@ -66,17 +74,17 @@ pub async fn planned_operation_runner(
                         .unwrap()
                         .to_owned();
 
-                    let operation_state = state.get_or_default_string(
+                    let operation_state = state.get_string_or_default_to_unknown(
                         &format!("{}_operation_runner", name),
                         &format!("{}", operation.name),
                     );
 
-                    let mut operation_information = state.get_or_default_string(
+                    let mut operation_information = state.get_string_or_default_to_unknown(
                         &format!("{}_operation_runner", name),
                         &format!("{}_information", operation.name),
                     );
 
-                    let mut operation_retry_counter = state.get_or_default_i64(
+                    let mut operation_retry_counter = state.get_int_or_default_to_zero(
                         &format!("{}_operation_runner", name),
                         &format!("{}_retry_counter", operation.name),
                     );

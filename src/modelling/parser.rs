@@ -12,14 +12,12 @@ peg::parser!(pub grammar pred_parser() for str {
 
     pub rule value(state: &State) -> SPWrapped
         = _ var:variable(&state) _ { SPWrapped::SPVariable(var) }
-        / _ "UNKNOWN_array" _ { SPWrapped::SPValue(SPValue::Unknown(SPValueType::Array)) }
-        / _ "UNKNOWN_bool" _ { SPWrapped::SPValue(SPValue::Unknown(SPValueType::Bool)) }
-        / _ "UNKNOWN_float" _ { SPWrapped::SPValue(SPValue::Unknown(SPValueType::Float64)) }
-        / _ "UNKNOWN_int" _ { SPWrapped::SPValue(SPValue::Unknown(SPValueType::Int64)) }
-        / _ "UNKNOWN_time" _ { SPWrapped::SPValue(SPValue::Unknown(SPValueType::Time)) }
-        / _ "UNKNOWN_string" _ { SPWrapped::SPValue(SPValue::Unknown(SPValueType::String)) }
-        / _ "UNKNOWN_unknown" _ { SPWrapped::SPValue(SPValue::Unknown(SPValueType::UNKNOWN)) }
-        / _ "UNKNOWN" _ { SPWrapped::SPValue(SPValue::Unknown(SPValueType::UNKNOWN)) }
+        / _ "UNKNOWN_bool" _ { SPWrapped::SPValue(SPValue::Bool(BoolOrUnknown::UNKNOWN)) }
+        / _ "UNKNOWN_int" _ { SPWrapped::SPValue(SPValue::Int64(IntOrUnknown::UNKNOWN)) }
+        / _ "UNKNOWN_float" _ { SPWrapped::SPValue(SPValue::Float64(FloatOrUnknown::UNKNOWN)) }
+        / _ "UNKNOWN_time" _ { SPWrapped::SPValue(SPValue::Time(TimeOrUnknown::UNKNOWN)) }
+        / _ "UNKNOWN_string" _ { SPWrapped::SPValue(SPValue::String(StringOrUnknown::UNKNOWN)) }
+        / _ "UNKNOWN_array" _ { SPWrapped::SPValue(SPValue::Array(ArrayOrUnknown::UNKNOWN)) }
         / _ "true" _ { SPWrapped::SPValue(true.to_spvalue()) }
         / _ "TRUE" _ { SPWrapped::SPValue(true.to_spvalue()) }
         / _ "false" _ { SPWrapped::SPValue(false.to_spvalue()) }
@@ -36,11 +34,11 @@ peg::parser!(pub grammar pred_parser() for str {
             let i: i64 = n.parse().unwrap();
             SPWrapped::SPValue(i.to_spvalue())
         }
-        // this is not tested, probably doesn't work
+        // this is not tested
         / _ var:variable(&state) "+" _ n:$(['0'..='9']+) {
             let i: i64 = n.parse().unwrap();
             let new_val = match state.get_value(&var.name) {
-                SPValue::Int64(val) => (val + i).to_spvalue(),
+                SPValue::Int64(IntOrUnknown::Int64(val)) => (val + i).to_spvalue(),
                 _ => panic!("Can't increment non-integer variable")
             };
             SPWrapped::SPValue(new_val)
@@ -150,8 +148,28 @@ mod tests {
             Ok(SPWrapped::SPValue(false.to_spvalue()))
         );
         assert_eq!(
+            pred_parser::value("UNKNOWN_bool", &s),
+            Ok(SPWrapped::SPValue(SPValue::Bool(BoolOrUnknown::UNKNOWN)))
+        );
+        assert_eq!(
+            pred_parser::value("UNKNOWN_int", &s),
+            Ok(SPWrapped::SPValue(SPValue::Int64(IntOrUnknown::UNKNOWN)))
+        );
+        assert_eq!(
+            pred_parser::value("UNKNOWN_float", &s),
+            Ok(SPWrapped::SPValue(SPValue::Float64(FloatOrUnknown::UNKNOWN)))
+        );
+        assert_eq!(
+            pred_parser::value("UNKNOWN_string", &s),
+            Ok(SPWrapped::SPValue(SPValue::String(StringOrUnknown::UNKNOWN)))
+        );
+        assert_eq!(
+            pred_parser::value("UNKNOWN_time", &s),
+            Ok(SPWrapped::SPValue(SPValue::Time(TimeOrUnknown::UNKNOWN)))
+        );
+        assert_eq!(
             pred_parser::value("UNKNOWN_array", &s),
-            Ok(SPWrapped::SPValue(SPValue::Unknown(SPValueType::Array)))
+            Ok(SPWrapped::SPValue(SPValue::Array(ArrayOrUnknown::UNKNOWN)))
         );
     }
 
@@ -269,12 +287,12 @@ mod tests {
                 var: SPVariable {
                     name: "weight".to_string(),
                     value_type: SPValueType::Float64,
-                    domain: [].to_vec()
+                    // domain: [].to_vec()
                 },
                 var_or_val: SPVariable {
                     name: "weight_2".to_string(),
                     value_type: SPValueType::Float64,
-                    domain: vec!()
+                    // domain: vec!()
                 }
                 .wrap()
             })
