@@ -66,10 +66,10 @@ pub async fn redis_state_manager(mut receiver: mpsc::Receiver<StateManagement>, 
     }
 
     let mut old_state = state.clone();
+    let mut error_tracker = 0;
+    let mut error_value = 0;
+    let mut error = "".to_string();
     while let Some(command) = receiver.recv().await {
-        let mut error_tracker = 0;
-        let mut error_value = 0;
-        let mut error = "".to_string();
         match command {
             StateManagement::GetState(response_sender) => {
                 match con.keys::<&str, Vec<String>>("*").await {
