@@ -68,18 +68,18 @@ pub async fn redis_state_manager(mut receiver: mpsc::Receiver<StateManagement>, 
 
     tokio::time::sleep(std::time::Duration::from_millis(500)).await;
 
-    // Let the other tasks know that the state manager is online
-    if let Err(e) = con
-        .set::<_, String, String>(
-            "state_manager_online",
-            serde_json::to_string(&SPValue::Bool(BoolOrUnknown::Bool(true))).unwrap(),
-        )
-        .await
-    {
-        log::error!(target: &&format!("redis_state_manager"), "Failed to set value of state_manager_online with error {}.", e)
-    }
+    // // Let the other tasks know that the state manager is online
+    // if let Err(e) = con
+    //     .set::<_, String, String>(
+    //         "state_manager_online",
+    //         serde_json::to_string(&SPValue::Bool(BoolOrUnknown::Bool(true))).unwrap(),
+    //     )
+    //     .await
+    // {
+    //     log::error!(target: &&format!("redis_state_manager"), "Failed to set value of state_manager_online with error {}.", e)
+    // }
 
-    log::warn!(target: &&format!("redis_state_manager"), "State manager online.");
+    log::warn!(target: &&format!("redis_state_manager"), "Online.");
 
     let mut old_state = state.clone();
     let mut error_tracker = 0;

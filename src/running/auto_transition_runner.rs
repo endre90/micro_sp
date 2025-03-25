@@ -1,4 +1,4 @@
-use crate::{running::planner_ticker, *};
+use crate::*;
 use tokio::{
     sync::{mpsc, oneshot},
     time::{interval, Duration},
@@ -13,37 +13,37 @@ pub async fn auto_transition_runner(
     let mut interval = interval(Duration::from_millis(100));
     let model = model.clone();
 
-    'initialize: loop {
-        let (response_tx, response_rx) = oneshot::channel();
-        command_sender
-            .send(StateManagement::Get((
-                "state_manager_online".to_string(),
-                response_tx,
-            )))
-            .await?;
-        let state_manager_online = response_rx.await?;
-        let (response_tx, response_rx) = oneshot::channel();
-        command_sender
-            .send(StateManagement::Get((
-                format!("{}_planner_ticker_online", name),
-                response_tx,
-            )))
-            .await?;
-        let planner_ticker = response_rx.await?;
-        match (state_manager_online, planner_ticker) {
-            (SPValue::Bool(BoolOrUnknown::Bool(true)), SPValue::Bool(BoolOrUnknown::Bool(true))) => break 'initialize,
-            _ => {},
-        }
-        interval.tick().await;
-    }
+    // 'initialize: loop {
+    //     let (response_tx, response_rx) = oneshot::channel();
+    //     command_sender
+    //         .send(StateManagement::Get((
+    //             "state_manager_online".to_string(),
+    //             response_tx,
+    //         )))
+    //         .await?;
+    //     let state_manager_online = response_rx.await?;
+    //     let (response_tx, response_rx) = oneshot::channel();
+    //     command_sender
+    //         .send(StateManagement::Get((
+    //             format!("{}_planner_ticker_online", name),
+    //             response_tx,
+    //         )))
+    //         .await?;
+    //     let planner_ticker = response_rx.await?;
+    //     match (state_manager_online, planner_ticker) {
+    //         (SPValue::Bool(BoolOrUnknown::Bool(true)), SPValue::Bool(BoolOrUnknown::Bool(true))) => break 'initialize,
+    //         _ => {},
+    //     }
+    //     interval.tick().await;
+    // }
 
-    log::info!(target: &&format!("{}_auto_runner", name), "Online.");
-    command_sender
-        .send(StateManagement::Set((
-            format!("{}_auto_runner_online", name),
-            SPValue::Bool(BoolOrUnknown::Bool(true)),
-        )))
-        .await?;
+    // log::info!(target: &&format!("{}_auto_runner", name), "Online.");
+    // command_sender
+    //     .send(StateManagement::Set((
+    //         format!("{}_auto_runner_online", name),
+    //         SPValue::Bool(BoolOrUnknown::Bool(true)),
+    //     )))
+    //     .await?;
 
     log::info!(target: &&format!("{}_auto_runner", name), "Online.");
 

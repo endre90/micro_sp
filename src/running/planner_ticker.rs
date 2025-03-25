@@ -24,29 +24,29 @@ pub async fn planner_ticker(
     let mut planner_information_old = "".to_string();
     let mut plan_old: Vec<String> = vec![];
 
-    'initialize: loop {
-        let (response_tx, response_rx) = oneshot::channel();
-        command_sender
-            .send(StateManagement::Get((
-                "state_manager_online".to_string(),
-                response_tx,
-            )))
-            .await?;
-        let state_manager_online = response_rx.await?;
-        match state_manager_online {
-            SPValue::Bool(BoolOrUnknown::Bool(true)) => break 'initialize,
-            _ => {}
-        }
-        interval.tick().await;
-    }
+    // 'initialize: loop {
+    //     let (response_tx, response_rx) = oneshot::channel();
+    //     command_sender
+    //         .send(StateManagement::Get((
+    //             "state_manager_online".to_string(),
+    //             response_tx,
+    //         )))
+    //         .await?;
+    //     let state_manager_online = response_rx.await?;
+    //     match state_manager_online {
+    //         SPValue::Bool(BoolOrUnknown::Bool(true)) => break 'initialize,
+    //         _ => {}
+    //     }
+    //     interval.tick().await;
+    // }
 
     log::info!(target: &&format!("{}_planner_ticker", name), "Online.");
-    command_sender
-        .send(StateManagement::Set((
-            format!("{}_planner_ticker_online", name),
-            SPValue::Bool(BoolOrUnknown::Bool(true)),
-        )))
-        .await?;
+    // command_sender
+    //     .send(StateManagement::Set((
+    //         format!("{}_planner_ticker_online", name),
+    //         SPValue::Bool(BoolOrUnknown::Bool(true)),
+    //     )))
+    //     .await?;
 
     loop {
         let (response_tx, response_rx) = oneshot::channel();
