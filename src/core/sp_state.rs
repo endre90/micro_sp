@@ -122,7 +122,7 @@ impl State {
         match self.get_bool_or_unknown(target, name) {
             BoolOrUnknown::Bool(b) => b,
             _ => {
-                log::warn!(target: target, "The value of bool '{}' is UNKNWON, resulting to default: FALSE.", name);
+                // log::warn!(target: target, "The value of bool '{}' is UNKNOWN, resulting to default: FALSE.", name);
                 false
             }
         }
@@ -142,7 +142,7 @@ impl State {
         match self.get_int_or_unknown(target, name) {
             IntOrUnknown::Int64(i) => i,
             _ => {
-                log::warn!(target: target, "The value of int '{}' is UNKNWON, resulting to default: 0.", name);
+                // log::warn!(target: target, "The value of int '{}' is UNKNOWN, resulting to default: 0.", name);
                 0
             }
         }
@@ -162,7 +162,7 @@ impl State {
         match self.get_float_or_unknown(target, name) {
             FloatOrUnknown::Float64(f) => f.into_inner(),
             _ => {
-                log::warn!(target: target, "The value of float '{}' is UNKNWON, resulting to default: 0.0.", name);
+                // log::warn!(target: target, "The value of float '{}' is UNKNOWN, resulting to default: 0.0.", name);
                 0.0
             }
         }
@@ -182,7 +182,7 @@ impl State {
         match self.get_string_or_unknown(target, name) {
             StringOrUnknown::String(s) => s,
             _ => {
-                log::warn!(target: target, "The value of string '{}' is UNKNWON, resulting to default: UNKNOWN.", name);
+                // log::warn!(target: target, "The value of string '{}' is UNKNOWN, resulting to default: UNKNOWN.", name);
                 SPValue::String(StringOrUnknown::UNKNOWN).to_string()
             }
         }
@@ -202,7 +202,7 @@ impl State {
         match self.get_array_or_unknown(target, name) {
             ArrayOrUnknown::Array(a) => a,
             _ => {
-                log::warn!(target: target, "The value of array '{}' is UNKNWON, resulting to default: vec!().", name);
+                // log::warn!(target: target, "The value of array '{}' is UNKNOWN, resulting to default: vec!().", name);
                 vec![]
             }
         }
