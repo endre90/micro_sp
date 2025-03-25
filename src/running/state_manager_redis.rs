@@ -66,6 +66,8 @@ pub async fn redis_state_manager(mut receiver: mpsc::Receiver<StateManagement>, 
         }
     }
 
+    tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+
     // Let the other tasks know that the state manager is online
     if let Err(e) = con
         .set::<_, String, String>(
