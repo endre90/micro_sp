@@ -94,21 +94,22 @@ pub async fn redis_state_manager(mut receiver: mpsc::Receiver<StateManagement>, 
                             }
                             // we want to keep updating a copy of a state so that we can maintain it if
                             // the connection to Redis gets disrupted
-                            let new_state = State { state: map };
-                            old_state = new_state;
-                            let _ = response_sender.send(old_state.clone());
+                            // let new_state = State { state: map };
+                            // old_state = new_state;
+                            // let _ = response_sender.send(old_state.clone());
+                            let _ = response_sender.send(State { state: map });
                         }
                         Err(e) => {
                             error_tracker = 1;
                             error = e.to_string();
-                            let _ = response_sender.send(old_state.clone());
+                            // let _ = response_sender.send(old_state.clone());
                         }
                     },
 
                     Err(e) => {
                         error_tracker = 2;
                         error = e.to_string();
-                        let _ = response_sender.send(old_state.clone());
+                        // let _ = response_sender.send(old_state.clone());
                     }
                 }
             }
@@ -124,13 +125,13 @@ pub async fn redis_state_manager(mut receiver: mpsc::Receiver<StateManagement>, 
                         }
                         None => {
                             error_tracker = 3;
-                            let _ = response_sender.send(old_state.get_value(&var));
+                            // let _ = response_sender.send(old_state.get_value(&var));
                         }
                     },
                     Err(e) => {
                         error_tracker = 4;
                         error = format!("Failed to get variable {} with error: {}.", var, e);
-                        let _ = response_sender.send(old_state.get_value(&var));
+                        // let _ = response_sender.send(old_state.get_value(&var));
                     }
                 }
             }
