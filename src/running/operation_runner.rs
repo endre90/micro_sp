@@ -34,8 +34,9 @@ pub async fn planned_operation_runner(
         let state_manager_online = response_rx.await?;
         match state_manager_online {
             SPValue::Bool(BoolOrUnknown::Bool(true)) => break 'initialize,
-            _ => continue 'initialize,
+            _ => {},
         }
+        interval.tick().await;
     }
 
     loop {

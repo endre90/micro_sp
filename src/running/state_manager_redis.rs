@@ -77,6 +77,8 @@ pub async fn redis_state_manager(mut receiver: mpsc::Receiver<StateManagement>, 
         log::error!(target: &&format!("redis_state_manager"), "Failed to set value of state_manager_online with error {}.", e)
     }
 
+    log::warn!(target: &&format!("redis_state_manager"), "State manager online.");
+
     let mut old_state = state.clone();
     let mut error_tracker = 0;
     let mut error_value = 0;
