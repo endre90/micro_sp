@@ -35,12 +35,18 @@ pub async fn planner_ticker(
         let state_manager_online = response_rx.await?;
         match state_manager_online {
             SPValue::Bool(BoolOrUnknown::Bool(true)) => break 'initialize,
-            _ => {},
+            _ => {}
         }
         interval.tick().await;
     }
 
     log::info!(target: &&format!("{}_planner_ticker", name), "Online.");
+    command_sender
+        .send(StateManagement::Set((
+            format!("{}_planner_ticker_online", name),
+            SPValue::Bool(BoolOrUnknown::Bool(true)),
+        )))
+        .await?;
 
     loop {
         let (response_tx, response_rx) = oneshot::channel();
