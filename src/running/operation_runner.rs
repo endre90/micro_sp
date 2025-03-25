@@ -39,6 +39,8 @@ pub async fn planned_operation_runner(
         interval.tick().await;
     }
 
+    log::info!(target: &&format!("{}_operation_runner", name), "Online.");
+
     loop {
         let (response_tx, response_rx) = oneshot::channel();
         command_sender

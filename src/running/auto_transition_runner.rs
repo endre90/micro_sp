@@ -29,6 +29,8 @@ pub async fn auto_transition_runner(
         interval.tick().await;
     }
 
+    log::info!(target: &&format!("{}_auto_runner", name), "Online.");
+
     loop {
         let (response_tx, response_rx) = oneshot::channel();
         command_sender.send(StateManagement::GetState(response_tx)).await?;

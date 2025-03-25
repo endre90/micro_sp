@@ -40,6 +40,8 @@ pub async fn planner_ticker(
         interval.tick().await;
     }
 
+    log::info!(target: &&format!("{}_planner_ticker", name), "Online.");
+
     loop {
         let (response_tx, response_rx) = oneshot::channel();
         command_sender
