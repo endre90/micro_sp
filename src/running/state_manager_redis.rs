@@ -66,53 +66,42 @@ pub async fn redis_state_manager(mut receiver: mpsc::Receiver<StateManagement>, 
     }
 
     let mut old_state = state.clone();
-    let mut error_tracker = 0;
-    let mut error_value = 0;
-    let mut error = "".to_string();
     while let Some(command) = receiver.recv().await {
         match command {
-            StateManagement::GetState(response_sender) => {
-                match con.keys::<&str, Vec<String>>("*").await {
-                    Ok(keys) => match con
-                        .mget::<&Vec<std::string::String>, Vec<Option<String>>>(&keys)
+            StateManagement::GetState(response_sender) => match con
+                .keys::<&str, Vec<String>>("*")
+                .await
+            {
+                Ok(keys) => {
+                    let values: Vec<Option<String>> = con
+                        .mget(&keys)
                         .await
-                    {
-                        Ok(values) => {
-                            let mut map: HashMap<String, SPAssignment> = HashMap::new();
-                            for (key, maybe_value) in keys.into_iter().zip(values.into_iter()) {
-                                if state.contains(&key) {
-                                    // Only get state that is locally tracked
-                                    if let Some(value) = maybe_value {
-                                        let var = state.get_assignment(&key).var;
-                                        let new_assignment = SPAssignment::new(
-                                            var,
-                                            serde_json::from_str(&value).unwrap(),
-                                        );
-                                        map.insert(key, new_assignment);
-                                    }
-                                }
-                            }
-                            // we want to keep updating a copy of a state so that we can maintain it if
-                            // the connection to Redis gets disrupted
-                            // let new_state = State { state: map };
-                            // old_state = new_state;
-                            // let _ = response_sender.send(old_state.clone());
-                            let _ = response_sender.send(State { state: map });
-                        }
-                        Err(e) => {
-                            error_tracker = 1;
-                            error = e.to_string();
-                            // let _ = response_sender.send(old_state.clone());
-                        }
-                    },
+                        .expect("Failed to get values for all keys.");
 
-                    Err(e) => {
-                        error_tracker = 2;
-                        error = e.to_string();
-                        // let _ = response_sender.send(old_state.clone());
+                    let mut map: HashMap<String, SPAssignment> = HashMap::new();
+                    for (key, maybe_value) in keys.into_iter().zip(values.into_iter()) {
+                        if state.contains(&key) {
+                            // Only get state that is locally tracked
+                            if let Some(value) = maybe_value {
+                                let var = state.get_assignment(&key).var;
+                                let new_assignment =
+                                    SPAssignment::new(var, serde_json::from_str(&value).unwrap());
+                                map.insert(key, new_assignment);
+                            }
+                        }
                     }
+
+                    // we want to keep updating a copy of a state so that we can maintain it if
+                    // the connection to Redis gets disrupted
+                    let new_state = State { state: map };
+                    old_state = new_state;
+                    let _ = response_sender.send(old_state.clone());
                 }
-            }
+                Err(e) => {
+                    log::error!(target: &&format!("redis_state_manager"), "Failed to get keys with: '{e}'.");
+                    let _ = response_sender.send(old_state.clone());
+                }
+            },
 
             StateManagement::Get((var, response_sender)) => {
                 match con.get::<_, Option<String>>(&var).await {
@@ -124,14 +113,13 @@ pub async fn redis_state_manager(mut receiver: mpsc::Receiver<StateManagement>, 
                                 response_sender.send(serde_json::from_str(&redis_value).unwrap());
                         }
                         None => {
-                            error_tracker = 3;
-                            // let _ = response_sender.send(old_state.get_value(&var));
+                            log::error!(target: &&format!("redis_state_manager"), "Variable doesn't exist in Redis.");
+                            let _ = response_sender.send(old_state.get_value(&var));
                         }
                     },
                     Err(e) => {
-                        error_tracker = 4;
-                        error = format!("Failed to get variable {} with error: {}.", var, e);
-                        // let _ = response_sender.send(old_state.get_value(&var));
+                        log::error!(target: &&format!("redis_state_manager"), "Failed to get variable {} with error: {}.", var, e);
+                        let _ = response_sender.send(old_state.get_value(&var));
                     }
                 }
             }
@@ -146,8 +134,7 @@ pub async fn redis_state_manager(mut receiver: mpsc::Receiver<StateManagement>, 
                         )
                         .await
                     {
-                        error_tracker = 5;
-                        error = format!("Failed to set variable {} with error: {}.", var, e);
+                        log::error!(target: &&format!("redis_state_manager"), "Failed to set variable {} with error: {}.", var, e);
                     }
                 }
             }
@@ -157,29 +144,128 @@ pub async fn redis_state_manager(mut receiver: mpsc::Receiver<StateManagement>, 
                     .set::<_, String, Value>(&var, serde_json::to_string(&val).unwrap())
                     .await
                 {
-                    error_tracker = 6;
-                    error = format!("Failed to set variable {} with error: {}.", var, e);
+                    log::error!(target: &&format!("redis_state_manager"), "Failed to set variable {} with error: {}.", var, e);
                 }
-            }
-        }
-
-        if error_value != error_tracker {
-            error_value = error_tracker;
-            match error_value {
-                1 => {
-                    log::error!(target: &&format!("redis_state_manager"), "Failed to get keys with error: {}'.", error)
-                }
-                2 => {
-                    log::error!(target: &&format!("redis_state_manager"), "Failed to get keys with error: {}'.", error)
-                }
-                3 => {
-                    log::error!(target: &&format!("redis_state_manager"), "Variable doesn't exist in Redis.")
-                }
-                4 => log::error!(target: &&format!("redis_state_manager"), "{}", error),
-                5 => log::error!(target: &&format!("redis_state_manager"), "{}", error),
-                6 => log::error!(target: &&format!("redis_state_manager"), "{}", error),
-                _ => unreachable!(),
             }
         }
     }
 }
+
+//     let mut old_state = state.clone();
+//     let mut error_tracker = 0;
+//     let mut error_value = 0;
+//     let mut error = "".to_string();
+//     while let Some(command) = receiver.recv().await {
+//         match command {
+//             StateManagement::GetState(response_sender) => {
+//                 match con.keys::<&str, Vec<String>>("*").await {
+//                     Ok(keys) => match con
+//                         .mget::<&Vec<std::string::String>, Vec<Option<String>>>(&keys)
+//                         .await
+//                     {
+//                         Ok(values) => {
+//                             let mut map: HashMap<String, SPAssignment> = HashMap::new();
+//                             for (key, maybe_value) in keys.into_iter().zip(values.into_iter()) {
+//                                 if state.contains(&key) {
+//                                     // Only get state that is locally tracked
+//                                     if let Some(value) = maybe_value {
+//                                         let var = state.get_assignment(&key).var;
+//                                         let new_assignment = SPAssignment::new(
+//                                             var,
+//                                             serde_json::from_str(&value).unwrap(),
+//                                         );
+//                                         map.insert(key, new_assignment);
+//                                     }
+//                                 }
+//                             }
+//                             // we want to keep updating a copy of a state so that we can maintain it if
+//                             // the connection to Redis gets disrupted
+//                             // let new_state = State { state: map };
+//                             // old_state = new_state;
+//                             // let _ = response_sender.send(old_state.clone());
+//                             let _ = response_sender.send(State { state: map });
+//                         }
+//                         Err(e) => {
+//                             error_tracker = 1;
+//                             error = e.to_string();
+//                             // let _ = response_sender.send(old_state.clone());
+//                         }
+//                     },
+
+//                     Err(e) => {
+//                         error_tracker = 2;
+//                         error = e.to_string();
+//                         // let _ = response_sender.send(old_state.clone());
+//                     }
+//                 }
+//             }
+
+//             StateManagement::Get((var, response_sender)) => {
+//                 match con.get::<_, Option<String>>(&var).await {
+//                     Ok(val) => match val {
+//                         Some(redis_value) => {
+//                             old_state =
+//                                 old_state.update(&var, serde_json::from_str(&redis_value).unwrap());
+//                             let _ =
+//                                 response_sender.send(serde_json::from_str(&redis_value).unwrap());
+//                         }
+//                         None => {
+//                             error_tracker = 3;
+//                             // let _ = response_sender.send(old_state.get_value(&var));
+//                         }
+//                     },
+//                     Err(e) => {
+//                         error_tracker = 4;
+//                         error = format!("Failed to get variable {} with error: {}.", var, e);
+//                         // let _ = response_sender.send(old_state.get_value(&var));
+//                     }
+//                 }
+//             }
+
+//             StateManagement::SetPartialState(partial_state) => {
+//                 for (var, assignment) in partial_state.state {
+//                     // state = state.update(&var, assignment.val.clone());
+//                     if let Err(e) = con
+//                         .set::<_, String, Value>(
+//                             &var,
+//                             serde_json::to_string(&assignment.val).unwrap(),
+//                         )
+//                         .await
+//                     {
+//                         error_tracker = 5;
+//                         error = format!("Failed to set variable {} with error: {}.", var, e);
+//                     }
+//                 }
+//             }
+
+//             StateManagement::Set((var, val)) => {
+//                 if let Err(e) = con
+//                     .set::<_, String, Value>(&var, serde_json::to_string(&val).unwrap())
+//                     .await
+//                 {
+//                     error_tracker = 6;
+//                     error = format!("Failed to set variable {} with error: {}.", var, e);
+//                 }
+//             }
+//         }
+
+//         if error_value != error_tracker {
+//             error_value = error_tracker;
+//             match error_value {
+//                 1 => {
+//                     log::error!(target: &&format!("redis_state_manager"), "Failed to get keys with error: {}'.", error)
+//                 }
+//                 2 => {
+//                     log::error!(target: &&format!("redis_state_manager"), "Failed to get keys with error: {}'.", error)
+//                 }
+//                 3 => {
+//                     log::error!(target: &&format!("redis_state_manager"), "Variable doesn't exist in Redis.")
+//                 }
+//                 4 => log::error!(target: &&format!("redis_state_manager"), "{}", error),
+//                 5 => log::error!(target: &&format!("redis_state_manager"), "{}", error),
+//                 6 => log::error!(target: &&format!("redis_state_manager"), "{}", error),
+//                 _ => unreachable!(),
+//             }
+//         }
+//     }
+// }
