@@ -14,20 +14,46 @@ pub enum StateManagement {
 }
 
 pub async fn redis_state_manager(mut receiver: mpsc::Receiver<StateManagement>, state: State) {
-    let mut interval = interval(Duration::from_millis(100));
-    let mut con = 'connect: loop {
-        match Client::open("redis://127.0.0.1/") {
-            Ok(redis_client) => match redis_client.get_multiplexed_async_connection().await {
-                Ok(redis_connection) => break 'connect redis_connection,
+    let mut con = {
+        let mut interval = interval(Duration::from_millis(100));
+        let mut error_tracker;
+        let mut error_value = 0;
+        let mut error: String;
+        'connect: loop {
+            match Client::open("redis://127.0.0.1/") {
+                Ok(redis_client) => match redis_client.get_multiplexed_async_connection().await {
+                    Ok(redis_connection) => {
+                        log::info!(target: &&format!("redis_state_manager"), "Redis connection established. ");
+                        break 'connect redis_connection;
+                    }
+                    Err(e) => {
+                        error_tracker = 2;
+                        error = e.to_string();
+                    }
+                },
                 Err(e) => {
-                    log::error!(target: &&format!("redis_state_manager"), "Cannot connect to Redis with error: {}.", e)
+                    error_tracker = 3;
+                    error = e.to_string();
                 }
-            },
-            Err(e) => {
-                log::error!(target: &&format!("redis_state_manager"), "Cannot connect to Redis with error: {}.", e)
             }
+            if error_value != error_tracker {
+                error_value = error_tracker;
+                match error_value {
+                    0 => {
+                        log::warn!(target: &&format!("redis_state_manager"), "Waiting for a Redis connection.")
+                    }
+                    2 => {
+                        log::error!(target: &&format!("redis_state_manager"), "Cannot connect to Redis with error: {}.", error)
+                    }
+                    3 => {
+                        log::error!(target: &&format!("redis_state_manager"), "Cannot connect to Redis with error: {}.", error)
+                    }
+                    _ => unreachable!(),
+                }
+            }
+
+            interval.tick().await;
         }
-        interval.tick().await;
     };
 
     for (var, assignment) in state.state.clone() {
@@ -41,6 +67,9 @@ pub async fn redis_state_manager(mut receiver: mpsc::Receiver<StateManagement>, 
 
     let mut old_state = state.clone();
     while let Some(command) = receiver.recv().await {
+        // let mut error_tracker: i32;
+        // let mut error_value = 0;
+        // let mut error: String;
         match command {
             StateManagement::GetState(response_sender) => match con
                 .keys::<&str, Vec<String>>("*")
