@@ -41,6 +41,16 @@ pub fn generate_runner_state_variables(name: &str) -> State {
     state = state.add(assign!(replan_fail_counter, SPValue::Int64(IntOrUnknown::UNKNOWN)));
     state = state.add(assign!(replan_trigger, SPValue::Bool(BoolOrUnknown::UNKNOWN)));
 
+    // Define variables to keep track of the processes
+    let state_manager_online = bv!(&&format!("state_manager_online"));
+    let auto_transition_runner_online = bv!(&&format!("auto_transition_runner_online"));
+    let operation_planner_online = bv!(&&format!("operation_planner_online"));
+    let operation_runner_online = bv!(&&format!("operation_runner_online"));
+    state = state.add(assign!(state_manager_online, SPValue::Bool(BoolOrUnknown::UNKNOWN)));
+    state = state.add(assign!(auto_transition_runner_online, SPValue::Bool(BoolOrUnknown::UNKNOWN)));
+    state = state.add(assign!(operation_planner_online, SPValue::Bool(BoolOrUnknown::UNKNOWN)));
+    state = state.add(assign!(operation_runner_online, SPValue::Bool(BoolOrUnknown::UNKNOWN)));
+
     state
 }
 

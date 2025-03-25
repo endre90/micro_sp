@@ -23,9 +23,20 @@ pub async fn planned_operation_runner(
     let mut operation_state_old = "".to_string();
     let mut operation_information_old = "".to_string();
 
-    // // Initialized values that we can overwrite
-    // let mut operation_state = "".to_string();
-    // let mut operation_information = "".to_string();
+    'initialize: loop {
+        let (response_tx, response_rx) = oneshot::channel();
+        command_sender
+            .send(StateManagement::Get((
+                "state_manager_online".to_string(),
+                response_tx,
+            )))
+            .await?;
+        let state_manager_online = response_rx.await?;
+        match state_manager_online {
+            SPValue::Bool(BoolOrUnknown::Bool(true)) => break 'initialize,
+            _ => continue 'initialize,
+        }
+    }
 
     loop {
         let (response_tx, response_rx) = oneshot::channel();

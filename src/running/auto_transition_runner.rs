@@ -12,6 +12,22 @@ pub async fn auto_transition_runner(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let mut interval = interval(Duration::from_millis(100));
     let model = model.clone();
+
+    'initialize: loop {
+        let (response_tx, response_rx) = oneshot::channel();
+        command_sender
+            .send(StateManagement::Get((
+                "state_manager_online".to_string(),
+                response_tx,
+            )))
+            .await?;
+        let state_manager_online = response_rx.await?;
+        match state_manager_online {
+            SPValue::Bool(BoolOrUnknown::Bool(true)) => break 'initialize,
+            _ => continue 'initialize,
+        }
+    }
+
     loop {
         let (response_tx, response_rx) = oneshot::channel();
         command_sender.send(StateManagement::GetState(response_tx)).await?;
