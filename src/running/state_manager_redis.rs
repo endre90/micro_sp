@@ -99,29 +99,16 @@ pub async fn redis_state_manager(mut receiver: mpsc::Receiver<StateManagement>, 
                             let _ = response_sender.send(old_state.clone());
                         }
                         Err(e) => {
-                            error_tracker = 2;
+                            error_tracker = 1;
                             error = e.to_string();
                             let _ = response_sender.send(old_state.clone());
                         }
                     },
 
                     Err(e) => {
-                        error_tracker = 3;
+                        error_tracker = 2;
                         error = e.to_string();
                         let _ = response_sender.send(old_state.clone());
-                    }
-                }
-
-                if error_value != error_tracker {
-                    error_value = error_tracker;
-                    match error_value {
-                        2 => {
-                            log::error!(target: &&format!("redis_state_manager"), "Failed to get keys with error: {}'.", error);
-                        }
-                        3 => {
-                            log::error!(target: &&format!("redis_state_manager"), "Failed to get keys with error: {}'.", error);
-                        }
-                        _ => unreachable!(),
                     }
                 }
             }
@@ -136,12 +123,13 @@ pub async fn redis_state_manager(mut receiver: mpsc::Receiver<StateManagement>, 
                                 response_sender.send(serde_json::from_str(&redis_value).unwrap());
                         }
                         None => {
-                            log::error!(target: &&format!("redis_state_manager"), "Variable doesn't exist in Redis.");
+                            error_tracker = 3;
                             let _ = response_sender.send(old_state.get_value(&var));
                         }
                     },
                     Err(e) => {
-                        log::error!(target: &&format!("redis_state_manager"), "Failed to get variable {} with error: {}.", var, e);
+                        error_tracker = 4;
+                        error = format!("Failed to get variable {} with error: {}.", var, e);
                         let _ = response_sender.send(old_state.get_value(&var));
                     }
                 }
@@ -157,7 +145,8 @@ pub async fn redis_state_manager(mut receiver: mpsc::Receiver<StateManagement>, 
                         )
                         .await
                     {
-                        log::error!(target: &&format!("redis_state_manager"), "Failed to set variable {} with error: {}.", var, e);
+                        error_tracker = 5;
+                        error = format!("Failed to set variable {} with error: {}.", var, e);
                     }
                 }
             }
@@ -167,8 +156,28 @@ pub async fn redis_state_manager(mut receiver: mpsc::Receiver<StateManagement>, 
                     .set::<_, String, Value>(&var, serde_json::to_string(&val).unwrap())
                     .await
                 {
-                    log::error!(target: &&format!("redis_state_manager"), "Failed to set variable {} with error: {}.", var, e);
+                    error_tracker = 6;
+                    error = format!("Failed to set variable {} with error: {}.", var, e);
                 }
+            }
+        }
+
+        if error_value != error_tracker {
+            error_value = error_tracker;
+            match error_value {
+                1 => {
+                    log::error!(target: &&format!("redis_state_manager"), "Failed to get keys with error: {}'.", error)
+                }
+                2 => {
+                    log::error!(target: &&format!("redis_state_manager"), "Failed to get keys with error: {}'.", error)
+                }
+                3 => {
+                    log::error!(target: &&format!("redis_state_manager"), "Variable doesn't exist in Redis.")
+                }
+                4 => log::error!(target: &&format!("redis_state_manager"), "{}", error),
+                5 => log::error!(target: &&format!("redis_state_manager"), "{}", error),
+                6 => log::error!(target: &&format!("redis_state_manager"), "{}", error),
+                _ => unreachable!(),
             }
         }
     }
