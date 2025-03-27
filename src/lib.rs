@@ -30,6 +30,9 @@ pub use crate::running::planner_ticker::*;
 pub use crate::running::state_manager_redis::*;
 pub use crate::running::utils::*;
 
+pub mod utils;
+pub use crate::utils::logger::*;
+
 pub mod macros;
 #[allow(unused_imports)]
 pub use crate::macros::action::*;
