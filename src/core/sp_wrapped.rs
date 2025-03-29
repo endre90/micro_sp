@@ -107,6 +107,17 @@ impl fmt::Display for SPWrapped {
                     }
                     ArrayOrUnknown::UNKNOWN => write!(fmtr, "UNKNOWN"),
                 },
+                SPValue::Map(m) => match m {
+                    MapOrUnknown::Map(m_val) => {
+                        let items_str = m_val
+                            .iter()
+                            .map(|(k, v)| format!("({}, {})", k.is_string(), v.is_string()))
+                            .collect::<Vec<_>>()
+                            .join(", ");
+                        write!(fmtr, "[{}]", items_str)
+                    }
+                    MapOrUnknown::UNKNOWN => write!(fmtr, "UNKNOWN"),
+                },
             },
             SPWrapped::SPVariable(var) => write!(fmtr, "{}", var.name.to_owned()),
         }

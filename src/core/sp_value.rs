@@ -13,6 +13,7 @@ pub enum SPValue {
     Time(TimeOrUnknown),
     // Instant and Duration maybe instead of time...
     Array(ArrayOrUnknown),
+    Map(MapOrUnknown), // The map is ordered
 }
 
 #[derive(Debug, PartialEq, Clone, Hash, Eq, PartialOrd, Ord, Serialize, Deserialize)]
@@ -48,6 +49,12 @@ pub enum TimeOrUnknown {
 #[derive(Debug, PartialEq, Clone, Hash, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum ArrayOrUnknown {
     Array(Vec<SPValue>),
+    UNKNOWN,
+}
+
+#[derive(Debug, PartialEq, Clone, Hash, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+pub enum MapOrUnknown {
+    Map(Vec<(SPValue, SPValue)>),
     UNKNOWN,
 }
 
@@ -91,6 +98,17 @@ impl fmt::Display for SPValue {
                 }
                 ArrayOrUnknown::UNKNOWN => write!(fmtr, "UNKNOWN"),
             },
+            SPValue::Map(m) => match m {
+                MapOrUnknown::Map(m_val) => {
+                    let items_str = m_val
+                        .iter()
+                        .map(|(k, v)| format!("({}, {})", k.is_string(), v.is_string()))
+                        .collect::<Vec<_>>()
+                        .join(", ");
+                    write!(fmtr, "[{}]", items_str)
+                }
+                MapOrUnknown::UNKNOWN => write!(fmtr, "UNKNOWN"),
+            },
         }
     }
 }
@@ -104,6 +122,7 @@ pub enum SPValueType {
     String,
     Time,
     Array,
+    Map,
 }
 
 impl SPValueType {
@@ -115,6 +134,7 @@ impl SPValueType {
             "string" => SPValueType::String,
             "time" => SPValueType::Time,
             "array" => SPValueType::Array,
+            "map" => SPValueType::Map,
             _ => panic!("Unsupported SPValueType!"),
         }
     }
@@ -129,6 +149,7 @@ impl fmt::Display for SPValueType {
             SPValueType::String => write!(fmtr, "string"),
             SPValueType::Time => write!(fmtr, "time"),
             SPValueType::Array => write!(fmtr, "array"),
+            SPValueType::Map => write!(fmtr, "map"),
         }
     }
 }
@@ -143,6 +164,7 @@ impl SPValue {
             SPValue::String(_) => SPValueType::String == t,
             SPValue::Time(_) => SPValueType::Time == t,
             SPValue::Array(_) => SPValueType::Array == t,
+            SPValue::Map(_) => SPValueType::Map == t,
         }
     }
 
@@ -155,6 +177,7 @@ impl SPValue {
             SPValue::String(_) => SPValueType::String,
             SPValue::Time(_) => SPValueType::Time,
             SPValue::Array(_) => SPValueType::Array,
+            SPValue::Map(_) => SPValueType::Map,
         }
     }
 
@@ -206,6 +229,17 @@ impl SPValue {
                     format!("[{}]", items_str)
                 }
                 ArrayOrUnknown::UNKNOWN => "UNKNOWN".to_string(),
+            },
+            SPValue::Map(m) => match m {
+                MapOrUnknown::Map(m_val) => {
+                    let items_str = m_val
+                        .iter()
+                        .map(|(k, v)| format!("({}, {})", k.is_string(), v.is_string()))
+                        .collect::<Vec<_>>()
+                        .join(", ");
+                    format!("[{}]", items_str)
+                }
+                MapOrUnknown::UNKNOWN => "UNKNOWN".to_string(),
             },
         }
     }
