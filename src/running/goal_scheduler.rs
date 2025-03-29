@@ -10,7 +10,7 @@ use tokio::{
 // and puts in the queue of goals to be executed. It also clears the variable so that
 // new goals can arrive.
 pub async fn goal_scheduler(
-    name: &str,
+    name: &str, // micro_sp instance name
     command_sender: mpsc::Sender<StateManagement>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let mut interval = interval(Duration::from_millis(3000));
@@ -40,7 +40,7 @@ pub async fn goal_scheduler(
                     let goal_priority = GoalPriority::from_str(&priority.to_string());
                     log::info!(target: &&format!("{}_goal_scheduler", name), 
                         "New goal with id '{}' arrived: '{}'.", goal_id, goal.to_string());
-                    let _ = add_goal_to_state(&goal_id, &goal, &goal_priority, &command_sender); // Need also goal from state to remove stuff
+                    let _ = add_goal_to_state(&name, &goal_id, &goal, &goal_priority, &command_sender); // Need also goal from state to remove stuff
                     (goal.clone(), goal_priority.to_int())
                 })
                 .collect::<Vec<(SPValue, i64)>>(),
@@ -106,27 +106,28 @@ pub async fn goal_scheduler(
 }
 
 async fn add_goal_to_state(
-    id: &str,
+    name: &str, // micro_sp instance name
+    id: &str, // goal_id
     predicate: &SPValue,
     priority: &GoalPriority,
     command_sender: &mpsc::Sender<StateManagement>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let mut goal_state = State::new();
 
-    let goal_id: SPVariable = v!(&&format!("goal_{}_id", id)); // An id to track the goal
-    let goal_predicate = v!(&&format!("goal_{}_predicate", id)); // The actual goal
-    let goal_priority = v!(&&format!("goal_{}_priority", id)); // High(1), Normal(2), or Low(3)
-    let goal_time_arrived = tv!(&&format!("goal_{}_time_arrived", id)); // When did the goal arrive
-    let goal_time_started = tv!(&&format!("goal_{}_time_started", id)); // Start of the execution time of he goal
-    let goal_time_concluded = tv!(&&format!("goal_{}_time_concluded", id)); // When was the goal concluded
-    let goal_conclusion = v!(&&format!("goal_{}_conclusion", id)); // Completed, Failed, Aborted, Timedout
-    let goal_nr_of_replans = iv!(&&format!("goal_{}_nr_of_replans", id));
-    let goal_nr_of_failures = iv!(&&format!("goal_{}_nr_of_failures", id));
-    let goal_nr_of_timeouts = iv!(&&format!("goal_{}_nr_of_timeouts", id));
-    let goal_planned_paths = mv!(&&format!("goal_{}_planned_paths", id)); // A map of (planned_path(Array), planning_duration(Time))
-    let goal_log = mv!(&&format!("goal_{}_log", id)); // A map of (goal_id(String), goal_log(Array(GoalLog)))
-    let goal_execution_path = av!((&&format!("goal_{}_execution_path", id))); // Which operations and autos did we take to reach the goal
-    let goal_duration = iv!((&&format!("goal_{}_duration", id))); // how many milliseconds did the goal take to conclude
+    let goal_id: SPVariable = v!(&&format!("{}_goal_{}_id", name, id)); // An id to track the goal
+    let goal_predicate = v!(&&format!("{}_goal_{}_predicate", name, id)); // The actual goal
+    let goal_priority = v!(&&format!("{}_goal_{}_priority", name, id)); // High(1), Normal(2), or Low(3)
+    let goal_time_arrived = tv!(&&format!("{}_goal_{}_time_arrived", name, id)); // When did the goal arrive
+    let goal_time_started = tv!(&&format!("{}_goal_{}_time_started", name, id)); // Start of the execution time of he goal
+    let goal_time_concluded = tv!(&&format!("{}_goal_{}_time_concluded", name, id)); // When was the goal concluded
+    let goal_conclusion = v!(&&format!("{}_goal_{}_conclusion", name, id)); // Completed, Failed, Aborted, Timedout
+    let goal_nr_of_replans = iv!(&&format!("{}_goal_{}_nr_of_replans", name, id));
+    let goal_nr_of_failures = iv!(&&format!("{}_goal_{}_nr_of_failures", name, id));
+    let goal_nr_of_timeouts = iv!(&&format!("{}_goal_{}_nr_of_timeouts", name, id));
+    let goal_planned_paths = mv!(&&format!("{}_goal_{}_planned_paths", name, id)); // A map of (planned_path(Array), planning_duration(Time))
+    let goal_log = mv!(&&format!("{}_goal_{}_log", name, id)); // A map of (goal_id(String), goal_log(Array(GoalLog)))
+    let goal_execution_path = av!((&&format!("{}_goal_{}_execution_path", name, id))); // Which operations and autos did we take to reach the goal
+    let goal_duration = iv!((&&format!("{}_goal_{}_duration", name, id))); // how many milliseconds did the goal take to conclude
 
     goal_state = goal_state.add(assign!(goal_id, SPValue::String(StringOrUnknown::UNKNOWN)));
     goal_state = goal_state.add(assign!(goal_predicate, predicate.to_owned()));

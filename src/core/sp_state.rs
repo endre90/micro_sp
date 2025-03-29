@@ -209,6 +209,26 @@ impl State {
         }
     }
 
+    pub fn get_map_or_unknown(&self, target: &str, name: &str) -> MapOrUnknown {
+        match self.get_value(name) {
+            SPValue::Map(m) => m,
+            _ => {
+                log::error!(target: target, "Couldn't get map '{}' from the state, resulting to UNKNOWN.", name);
+                MapOrUnknown::UNKNOWN
+            }
+        }
+    }
+
+    pub fn get_map_or_default_to_empty(&self, target: &str, name: &str) -> Vec<(SPValue, SPValue)> {
+        match self.get_map_or_unknown(target, name) {
+            MapOrUnknown::Map(m) => m,
+            _ => {
+                // log::warn!(target: target, "The value of array '{}' is UNKNOWN, resulting to default: vec!().", name);
+                vec![]
+            }
+        }
+    }
+
     /// Get the assignment of a variable in the state,
     /// or panic if the variable is not found.
     pub fn get_assignment(&self, name: &str) -> SPAssignment {

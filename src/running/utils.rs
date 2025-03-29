@@ -7,8 +7,9 @@ pub fn generate_runner_state_variables(name: &str) -> State {
 
     // Define variables
     let runner_state = v!(&&format!("{}_runner_state", name)); // does nothing for now
-    let current_goal = v!(&&format!("{}_current_goal", name)); // goal as a string predicate
-    let goal_exists = bv!(&&format!("{}_goal_exists", name)); // does nothing for now
+    let current_goal_predicate = v!(&&format!("{}_current_goal_predicate", name)); // goal as a string predicate
+    let current_goal_id = v!(&&format!("{}_current_goal_id", name)); // goal as a string predicate
+    let current_goal_state = v!(&&format!("{}_current_goal_state", name)); // goal as a string predicate
     let plan = av!(&&format!("{}_plan", name)); // plan as array of string
     let plan_counter = iv!(&&format!("{}_plan_counter", name)); // How many times has a plan been found
     let plan_exists = bv!(&&format!("{}_plan_exists", name)); // does nothing for now
@@ -28,8 +29,9 @@ pub fn generate_runner_state_variables(name: &str) -> State {
 
     // Initialize values
     state = state.add(assign!(runner_state, SPValue::String(StringOrUnknown::UNKNOWN)));
-    state = state.add(assign!(current_goal, SPValue::String(StringOrUnknown::UNKNOWN)));
-    state = state.add(assign!(goal_exists, SPValue::Bool(BoolOrUnknown::UNKNOWN)));
+    state = state.add(assign!(current_goal_predicate, SPValue::String(StringOrUnknown::UNKNOWN)));
+    state = state.add(assign!(current_goal_id, SPValue::String(StringOrUnknown::UNKNOWN)));
+    state = state.add(assign!(current_goal_state, SPValue::String(StringOrUnknown::UNKNOWN)));
     state = state.add(assign!(plan, SPValue::Array(ArrayOrUnknown::UNKNOWN)));
     state = state.add(assign!(plan_exists, SPValue::Bool(BoolOrUnknown::UNKNOWN)));
     state = state.add(assign!(plan_name, SPValue::String(StringOrUnknown::UNKNOWN)));
