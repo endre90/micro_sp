@@ -7,7 +7,7 @@ pub fn generate_runner_state_variables(name: &str) -> State {
 
     // Define variables
     let runner_state = v!(&&format!("{}_runner_state", name)); // does nothing for now
-    let goal = v!(&&format!("{}_goal", name)); // goal as a string predicate
+    let current_goal = v!(&&format!("{}_current_goal", name)); // goal as a string predicate
     let goal_exists = bv!(&&format!("{}_goal_exists", name)); // does nothing for now
     let plan = av!(&&format!("{}_plan", name)); // plan as array of string
     let plan_counter = iv!(&&format!("{}_plan_counter", name)); // How many times has a plan been found
@@ -22,10 +22,13 @@ pub fn generate_runner_state_variables(name: &str) -> State {
     let replan_counter = iv!(&&format!("{}_replan_counter", name)); // How many times has the planner tried to replan for the same problem
     let replan_fail_counter = iv!(&&format!("{}_replan_fail_counter", name)); // How many times has the planner failed in
     let replan_trigger = bv!(&&format!("{}_replan_trigger", name)); // boolean for tracking the planner triggering
+    let incoming_goals = mv!(&&format!("{}_incoming_goals", name));
+    let scheduled_goals = mv!(&&format!("{}_scheduled_goals", name));
+    
 
     // Initialize values
     state = state.add(assign!(runner_state, SPValue::String(StringOrUnknown::UNKNOWN)));
-    state = state.add(assign!(goal, SPValue::String(StringOrUnknown::UNKNOWN)));
+    state = state.add(assign!(current_goal, SPValue::String(StringOrUnknown::UNKNOWN)));
     state = state.add(assign!(goal_exists, SPValue::Bool(BoolOrUnknown::UNKNOWN)));
     state = state.add(assign!(plan, SPValue::Array(ArrayOrUnknown::UNKNOWN)));
     state = state.add(assign!(plan_exists, SPValue::Bool(BoolOrUnknown::UNKNOWN)));
@@ -40,6 +43,8 @@ pub fn generate_runner_state_variables(name: &str) -> State {
     state = state.add(assign!(plan_counter, SPValue::Int64(IntOrUnknown::UNKNOWN)));
     state = state.add(assign!(replan_fail_counter, SPValue::Int64(IntOrUnknown::UNKNOWN)));
     state = state.add(assign!(replan_trigger, SPValue::Bool(BoolOrUnknown::UNKNOWN)));
+    state = state.add(assign!(incoming_goals, SPValue::Map(MapOrUnknown::UNKNOWN)));
+    state = state.add(assign!(scheduled_goals, SPValue::Map(MapOrUnknown::UNKNOWN)));
 
     // Define variables to keep track of the processes
     let state_manager_online = bv!(&&format!("state_manager_online"));

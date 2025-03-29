@@ -134,13 +134,15 @@ impl fmt::Display for GoalPriority {
     }
 }
 
-pub struct ErrorRecord {
+#[derive(Debug, PartialEq, Clone, Hash, Eq, Serialize, Deserialize)]
+pub struct GoalLog {
     pub time: SystemTime,
     pub state: State,
     pub operation: Operation,
     pub operation_state: OperationState,
 }
 
+#[derive(Debug, PartialEq, Clone, Hash, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct Goal {
     pub name: String,
     pub goal_string: String,

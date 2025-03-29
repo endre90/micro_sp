@@ -53,3 +53,25 @@ macro_rules! av {
         )
     };
 }
+
+#[macro_export]
+macro_rules! tv {
+    ($a:expr) => {
+        SPVariable::new(
+            $a.clone(),
+            SPValueType::Time,
+            // vec![],
+        )
+    };
+}
+
+#[macro_export]
+macro_rules! mv {
+    ($a:expr) => {
+        SPVariable::new(
+            $a.clone(),
+            SPValueType::Map,
+            // vec![],
+        )
+    };
+}

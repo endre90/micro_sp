@@ -87,10 +87,11 @@ impl State {
     /// Add an SPAssignment to the State, returning a new State.
     pub fn add(&self, assignment: SPAssignment) -> State {
         match self.state.clone().get(&assignment.var.name) {
-            Some(_) => panic!(
-                "Variable {} already in state!",
-                assignment.var.name.to_string()
-            ),
+            Some(_) => {
+                log::error!(target: &&format!("sp_state"), 
+                    "Variable {} already in state! Skipped add.", assignment.var.name.to_string());
+                self.clone()
+            }
             None => {
                 let mut state = self.state.clone();
                 state.insert(assignment.var.name.to_string(), assignment.clone());
