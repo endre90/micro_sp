@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::env;
 
 use crate::*;
 use redis::{AsyncCommands, Client, Value};
@@ -20,8 +21,12 @@ pub async fn redis_state_manager(mut receiver: mpsc::Receiver<StateManagement>, 
         let mut error_tracker;
         let mut error_value = 0;
         let mut error: String;
+         // Read hostname and port from environment variables
+        let redis_host = env::var("REDIS_HOST").unwrap_or_else(|_| "redis".to_string()); // Default to 'redis'
+        let redis_port = env::var("REDIS_PORT").unwrap_or_else(|_| "6379".to_string());
+        let redis_addr = format!("redis://{}:{}", redis_host, redis_port);
         'connect: loop {
-            match Client::open("redis://127.0.0.1/") {
+            match Client::open(redis_addr.clone()) {
                 Ok(redis_client) => match redis_client.get_multiplexed_async_connection().await {
                     Ok(redis_connection) => {
                         log::info!(target: &&format!("redis_state_manager"), "Redis connection established. ");
