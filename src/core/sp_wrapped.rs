@@ -118,6 +118,47 @@ impl fmt::Display for SPWrapped {
                     }
                     MapOrUnknown::UNKNOWN => write!(fmtr, "UNKNOWN"),
                 },
+                SPValue::Transform(t) => match t {
+                    TransformOrUnknown::Transform(ts_val) => {
+                        let trans = &ts_val.transform.translation;
+                        let trans_str =
+                            format!("({:.3}, {:.3}, {:.3})", trans.x.0, trans.y.0, trans.z.0);
+
+                        let rot = &ts_val.transform.rotation;
+                        let rot_str = format!(
+                            "({:.3}, {:.3}, {:.3}, {:.3})",
+                            rot.x.0, rot.y.0, rot.z.0, rot.w.0
+                        );
+
+                        let time_str =
+                            format!("{:?}", ts_val.time_stamp.elapsed().unwrap_or_default());
+
+                        let meta_str = match &ts_val.metadata {
+                            MapOrUnknown::Map(map_val) => {
+                                let items = map_val
+                                    .iter()
+                                    .map(|(k, v)| format!("{}: {}", k, v))
+                                    .collect::<Vec<_>>()
+                                    .join(", ");
+                                format!("{{{}}}", items)
+                            }
+                            MapOrUnknown::UNKNOWN => "UNKNOWN".to_string(),
+                        };
+
+                        write!(
+                            fmtr,
+                            "TF(active={}, time={}, parent={}, child={}, translation:{}, rotation:{}, meta={})",
+                            ts_val.active,
+                            time_str,
+                            ts_val.parent_frame_id,
+                            ts_val.child_frame_id,
+                            trans_str,
+                            rot_str,
+                            meta_str
+                        )
+                    }
+                    TransformOrUnknown::UNKNOWN => write!(fmtr, "UNKNOWN"),
+                },
             },
             SPWrapped::SPVariable(var) => write!(fmtr, "{}", var.name.to_owned()),
         }

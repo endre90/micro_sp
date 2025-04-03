@@ -1,3 +1,4 @@
+// use nalgebra::{Isometry3, Quaternion, UnitQuaternion, Vector3};
 use ordered_float::OrderedFloat;
 use serde::{Deserialize, Serialize};
 use std::{fmt, time::SystemTime};
@@ -11,9 +12,9 @@ pub enum SPValue {
     Int64(IntOrUnknown),
     String(StringOrUnknown),
     Time(TimeOrUnknown),
-    // Instant and Duration maybe instead of time...
     Array(ArrayOrUnknown),
     Map(MapOrUnknown), // The map is ordered
+    Transform(TransformOrUnknown),
 }
 
 #[derive(Debug, PartialEq, Clone, Hash, Eq, PartialOrd, Ord, Serialize, Deserialize)]
@@ -56,6 +57,43 @@ pub enum ArrayOrUnknown {
 pub enum MapOrUnknown {
     Map(Vec<(SPValue, SPValue)>),
     UNKNOWN,
+}
+
+#[derive(Debug, PartialEq, Clone, Hash, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+pub enum TransformOrUnknown {
+    Transform(SPTransformStamped),
+    UNKNOWN,
+}
+
+#[derive(Debug, PartialEq, Clone, Hash, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+pub struct SPTransform {
+    pub translation: SPTranslation,
+    pub rotation: SPRotation,
+}
+
+#[derive(Debug, PartialEq, Clone, Hash, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+pub struct SPTranslation {
+    pub x: OrderedFloat<f64>,
+    pub y: OrderedFloat<f64>,
+    pub z: OrderedFloat<f64>,
+}
+
+#[derive(Debug, PartialEq, Clone, Hash, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+pub struct SPRotation {
+    pub x: OrderedFloat<f64>,
+    pub y: OrderedFloat<f64>,
+    pub z: OrderedFloat<f64>,
+    pub w: OrderedFloat<f64>,
+}
+
+#[derive(Debug, PartialEq, Clone, Hash, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+pub struct SPTransformStamped {
+    pub active: bool,
+    pub time_stamp: SystemTime,
+    pub parent_frame_id: String,
+    pub child_frame_id: String,
+    pub transform: SPTransform,
+    pub metadata: MapOrUnknown,
 }
 
 /// Displaying the value of an SPValue instance in a user-friendly way.
@@ -109,6 +147,46 @@ impl fmt::Display for SPValue {
                 }
                 MapOrUnknown::UNKNOWN => write!(fmtr, "UNKNOWN"),
             },
+            SPValue::Transform(t) => match t {
+                TransformOrUnknown::Transform(ts_val) => {
+                    let trans = &ts_val.transform.translation;
+                    let trans_str =
+                        format!("({:.3}, {:.3}, {:.3})", trans.x.0, trans.y.0, trans.z.0);
+
+                    let rot = &ts_val.transform.rotation;
+                    let rot_str = format!(
+                        "({:.3}, {:.3}, {:.3}, {:.3})",
+                        rot.x.0, rot.y.0, rot.z.0, rot.w.0
+                    );
+
+                    let time_str = format!("{:?}", ts_val.time_stamp.elapsed().unwrap_or_default());
+
+                    let meta_str = match &ts_val.metadata {
+                        MapOrUnknown::Map(map_val) => {
+                            let items = map_val
+                                .iter()
+                                .map(|(k, v)| format!("{}: {}", k, v))
+                                .collect::<Vec<_>>()
+                                .join(", ");
+                            format!("{{{}}}", items)
+                        }
+                        MapOrUnknown::UNKNOWN => "UNKNOWN".to_string(),
+                    };
+
+                    write!(
+                        fmtr,
+                        "TF(active={}, time={}, parent={}, child={}, translation:{}, rotation:{}, meta={})",
+                        ts_val.active,
+                        time_str,
+                        ts_val.parent_frame_id,
+                        ts_val.child_frame_id,
+                        trans_str,
+                        rot_str,
+                        meta_str
+                    )
+                }
+                TransformOrUnknown::UNKNOWN => write!(fmtr, "UNKNOWN"),
+            },
         }
     }
 }
@@ -123,6 +201,7 @@ pub enum SPValueType {
     Time,
     Array,
     Map,
+    Transform,
 }
 
 impl SPValueType {
@@ -135,6 +214,7 @@ impl SPValueType {
             "time" => SPValueType::Time,
             "array" => SPValueType::Array,
             "map" => SPValueType::Map,
+            "transform" => SPValueType::Transform,
             _ => panic!("Unsupported SPValueType!"),
         }
     }
@@ -150,6 +230,7 @@ impl fmt::Display for SPValueType {
             SPValueType::Time => write!(fmtr, "time"),
             SPValueType::Array => write!(fmtr, "array"),
             SPValueType::Map => write!(fmtr, "map"),
+            SPValueType::Transform => write!(fmtr, "transform"),
         }
     }
 }
@@ -165,6 +246,7 @@ impl SPValue {
             SPValue::Time(_) => SPValueType::Time == t,
             SPValue::Array(_) => SPValueType::Array == t,
             SPValue::Map(_) => SPValueType::Map == t,
+            SPValue::Transform(_) => SPValueType::Transform == t,
         }
     }
 
@@ -178,6 +260,7 @@ impl SPValue {
             SPValue::Time(_) => SPValueType::Time,
             SPValue::Array(_) => SPValueType::Array,
             SPValue::Map(_) => SPValueType::Map,
+            SPValue::Transform(_) => SPValueType::Transform,
         }
     }
 
@@ -193,6 +276,14 @@ impl SPValue {
     pub fn is_string(&self) -> bool {
         match self {
             SPValue::String(_) => true,
+            _ => false,
+        }
+    }
+
+    /// Checks whether the value is of the transform type.
+    pub fn is_transform(&self) -> bool {
+        match self {
+            SPValue::Transform(_) => true,
             _ => false,
         }
     }
@@ -240,6 +331,45 @@ impl SPValue {
                     format!("[{}]", items_str)
                 }
                 MapOrUnknown::UNKNOWN => "UNKNOWN".to_string(),
+            },
+            SPValue::Transform(t) => match t {
+                TransformOrUnknown::Transform(ts_val) => {
+                    let trans = &ts_val.transform.translation;
+                    let trans_str =
+                        format!("({:.3}, {:.3}, {:.3})", trans.x.0, trans.y.0, trans.z.0);
+
+                    let rot = &ts_val.transform.rotation;
+                    let rot_str = format!(
+                        "({:.3}, {:.3}, {:.3}, {:.3})",
+                        rot.x.0, rot.y.0, rot.z.0, rot.w.0
+                    );
+
+                    let time_str = format!("{:?}", ts_val.time_stamp.elapsed().unwrap_or_default());
+
+                    let meta_str = match &ts_val.metadata {
+                        MapOrUnknown::Map(map_val) => {
+                            let items = map_val
+                                .iter()
+                                .map(|(k, v)| format!("{}: {}", k, v))
+                                .collect::<Vec<_>>()
+                                .join(", ");
+                            format!("{{{}}}", items)
+                        }
+                        MapOrUnknown::UNKNOWN => "UNKNOWN".to_string(),
+                    };
+
+                    format!(
+                        "TF(active={}, time={}, parent={}, child={}, translation:{}, rotation:{}, meta={})",
+                        ts_val.active,
+                        time_str,
+                        ts_val.parent_frame_id,
+                        ts_val.child_frame_id,
+                        trans_str,
+                        rot_str,
+                        meta_str
+                    )
+                }
+                TransformOrUnknown::UNKNOWN => "UNKNOWN".to_string(),
             },
         }
     }

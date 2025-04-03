@@ -14,6 +14,10 @@ pub enum StateManagement {
     Set((String, SPValue)),
 }
 
+
+
+// MArtin: If you have more than one command for redis to do, use a pipeline to group commands together
+
 // put this in another process that we can trigger from outside to reconnect if dsconnected
 pub async fn redis_state_manager(mut receiver: mpsc::Receiver<StateManagement>, state: State) {
     let mut con = {
@@ -70,17 +74,6 @@ pub async fn redis_state_manager(mut receiver: mpsc::Receiver<StateManagement>, 
             log::error!(target: &&format!("redis_state_manager"), "Failed to set initial value of {} with error {}.", var, e)
         }
     }
-
-    // // Let the other tasks know that the state manager is online
-    // if let Err(e) = con
-    //     .set::<_, String, String>(
-    //         "state_manager_online",
-    //         serde_json::to_string(&SPValue::Bool(BoolOrUnknown::Bool(true))).unwrap(),
-    //     )
-    //     .await
-    // {
-    //     log::error!(target: &&format!("redis_state_manager"), "Failed to set value of state_manager_online with error {}.", e)
-    // }
 
     log::info!(target: &&format!("redis_state_manager"), "Online.");
 
