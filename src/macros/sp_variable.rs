@@ -75,3 +75,14 @@ macro_rules! mv {
         )
     };
 }
+
+#[macro_export]
+macro_rules! tfv {
+    ($a:expr) => {
+        SPVariable::new(
+            $a.clone(),
+            SPValueType::Transform,
+            // vec![],
+        )
+    };
+}
