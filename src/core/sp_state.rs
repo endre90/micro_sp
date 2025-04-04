@@ -296,7 +296,7 @@ impl State {
 
     /// Extract the goal predicate from the String value.
     pub fn extract_goal(&self, name: &str) -> Predicate {
-        match self.state.get(&format!("{}_current_goal", name)) {
+        match self.state.get(&format!("{}_current_goal_predicate", name)) {
             Some(g_spvalue) => match &g_spvalue.val {
                 SPValue::String(StringOrUnknown::String(g_value)) => {
                     match pred_parser::pred(&g_value, &self) {
