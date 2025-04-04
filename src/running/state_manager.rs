@@ -114,7 +114,7 @@ pub async fn redis_state_manager(mut receiver: mpsc::Receiver<StateManagement>, 
                         Ok(values) => {
                             let mut map: HashMap<String, SPAssignment> = HashMap::new();
                             for (key, maybe_value) in keys.into_iter().zip(values.into_iter()) {
-                                // if state.contains(&key) {
+                                if state.contains(&key) {
                                 // Only get state that is locally tracked
                                 if let Some(value) = maybe_value {
                                     let var = state.get_assignment(&key).var;
@@ -124,7 +124,7 @@ pub async fn redis_state_manager(mut receiver: mpsc::Receiver<StateManagement>, 
                                     );
                                     map.insert(key, new_assignment);
                                 }
-                                // }
+                                }
                             }
                             // we want to keep updating a copy of a state so that we can maintain it if
                             // the connection to Redis gets disrupted
