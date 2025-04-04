@@ -12,9 +12,31 @@ pub enum StateManagement {
     Get((String, oneshot::Sender<SPValue>)),
     SetPartialState(State),
     Set((String, SPValue)),
+    GetAllTransforms(oneshot::Sender<State>),
 }
 
+// /// Available commands that the async tasks can ask from the transform manager.
+// pub enum TransformManagement {
+//     GetAll(oneshot::Sender<State>),
+//     Get((String, oneshot::Sender<SPValue>)),
+//     Lookup((String, String, oneshot::Sender<SPValue>)),
+//     Add((String, SPValue)),
+//     Move((String, SPValue)),
+//     SetPartialState(State),
+//     Set((String, SPValue))
+// }
 
+// /// Represents the type of update to perform on a transform.
+// #[derive(Clone, Debug)]
+// enum UpdateType {
+//     Add,
+//     Move,
+//     Remove,
+//     Rename,
+//     Reparent,
+//     Clone,
+//     DeleteAll,
+// }
 
 // MArtin: If you have more than one command for redis to do, use a pipeline to group commands together
 
@@ -25,7 +47,7 @@ pub async fn redis_state_manager(mut receiver: mpsc::Receiver<StateManagement>, 
         let mut error_tracker;
         let mut error_value = 0;
         let mut error: String;
-         // Read hostname and port from environment variables
+        // Read hostname and port from environment variables
         let redis_host = env::var("REDIS_HOST").unwrap_or_else(|_| "redis".to_string()); // Default to 'redis'
         let redis_port = env::var("REDIS_PORT").unwrap_or_else(|_| "6379".to_string());
         let redis_addr = format!("redis://{}:{}", redis_host, redis_port);
@@ -92,17 +114,17 @@ pub async fn redis_state_manager(mut receiver: mpsc::Receiver<StateManagement>, 
                         Ok(values) => {
                             let mut map: HashMap<String, SPAssignment> = HashMap::new();
                             for (key, maybe_value) in keys.into_iter().zip(values.into_iter()) {
-                                if state.contains(&key) {
-                                    // Only get state that is locally tracked
-                                    if let Some(value) = maybe_value {
-                                        let var = state.get_assignment(&key).var;
-                                        let new_assignment = SPAssignment::new(
-                                            var,
-                                            serde_json::from_str(&value).unwrap(),
-                                        );
-                                        map.insert(key, new_assignment);
-                                    }
+                                // if state.contains(&key) {
+                                // Only get state that is locally tracked
+                                if let Some(value) = maybe_value {
+                                    let var = state.get_assignment(&key).var;
+                                    let new_assignment = SPAssignment::new(
+                                        var,
+                                        serde_json::from_str(&value).unwrap(),
+                                    );
+                                    map.insert(key, new_assignment);
                                 }
+                                // }
                             }
                             // we want to keep updating a copy of a state so that we can maintain it if
                             // the connection to Redis gets disrupted
@@ -143,6 +165,46 @@ pub async fn redis_state_manager(mut receiver: mpsc::Receiver<StateManagement>, 
                         error_tracker = 4;
                         error = format!("Failed to get variable {} with error: {}.", var, e);
                         let _ = response_sender.send(old_state.get_value(&var));
+                    }
+                }
+            }
+
+            StateManagement::GetAllTransforms(response_sender) => {
+                match con.keys::<&str, Vec<String>>("transform_*").await {
+                    Ok(keys) => match con
+                        .mget::<&Vec<std::string::String>, Vec<Option<String>>>(&keys)
+                        .await
+                    {
+                        Ok(values) => {
+                            let mut map: HashMap<String, SPAssignment> = HashMap::new();
+                            for (key, maybe_value) in keys.into_iter().zip(values.into_iter()) {
+                                if let Some(value) = maybe_value {
+                                    let var = state.get_assignment(&key).var;
+                                    let new_assignment = SPAssignment::new(
+                                        var,
+                                        serde_json::from_str(&value).unwrap(),
+                                    );
+                                    map.insert(key, new_assignment);
+                                }
+                            }
+
+                            let _ = response_sender.send(State { state: map });
+                        }
+                        Err(e) => {
+                            error_tracker = 1;
+                            error = e.to_string();
+                            let _ = response_sender.send(State {
+                                state: HashMap::new(),
+                            });
+                        }
+                    },
+
+                    Err(e) => {
+                        error_tracker = 2;
+                        error = e.to_string();
+                        let _ = response_sender.send(State {
+                            state: HashMap::new(),
+                        });
                     }
                 }
             }
@@ -195,25 +257,27 @@ pub async fn redis_state_manager(mut receiver: mpsc::Receiver<StateManagement>, 
     }
 }
 
-
-/// Instead of sharing the state with Arc<Mutex<State>>, use a buffer of state read/write requests.
-pub async fn state_manager_no_redis(mut receiver: mpsc::Receiver<StateManagement>, mut state: State) {
-    while let Some(command) = receiver.recv().await {
-        match command {
-            StateManagement::GetState(response_sender) => {
-                let _ = response_sender.send(state.clone());
-            }
-            StateManagement::Get((var, response_sender)) => {
-                let _ = response_sender.send(state.get_value(&var));
-            }
-            StateManagement::SetPartialState(partial_state) => {
-                for (var, assignment) in partial_state.state {
-                    state = state.update(&var, assignment.val)
-                }
-            }
-            StateManagement::Set((var, new_val)) => {
-                state = state.update(&var, new_val);
-            }
-        }
-    }
-}
+// /// Instead of sharing the state with Arc<Mutex<State>>, use a buffer of state read/write requests.
+// pub async fn state_manager_no_redis(
+//     mut receiver: mpsc::Receiver<StateManagement>,
+//     mut state: State,
+// ) {
+//     while let Some(command) = receiver.recv().await {
+//         match command {
+//             StateManagement::GetState(response_sender) => {
+//                 let _ = response_sender.send(state.clone());
+//             }
+//             StateManagement::Get((var, response_sender)) => {
+//                 let _ = response_sender.send(state.get_value(&var));
+//             }
+//             StateManagement::SetPartialState(partial_state) => {
+//                 for (var, assignment) in partial_state.state {
+//                     state = state.update(&var, assignment.val)
+//                 }
+//             }
+//             StateManagement::Set((var, new_val)) => {
+//                 state = state.update(&var, new_val);
+//             }
+//         }
+//     }
+// }
