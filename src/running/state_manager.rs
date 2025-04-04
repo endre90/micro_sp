@@ -13,6 +13,8 @@ pub enum StateManagement {
     SetPartialState(State),
     Set((String, SPValue)),
     GetAllTransforms(oneshot::Sender<State>),
+    // GetTransform((String, oneshot::Sender<SPValue>)),
+    InsertTransform((String, SPTransformStamped)),
 }
 
 // /// Available commands that the async tasks can ask from the transform manager.
@@ -117,7 +119,7 @@ pub async fn redis_state_manager(mut receiver: mpsc::Receiver<StateManagement>, 
                         Ok(values) => {
                             let mut map: HashMap<String, SPAssignment> = HashMap::new();
                             for (key, maybe_value) in keys.into_iter().zip(values.into_iter()) {
-                                if state.contains(&key) {
+                                // if state.contains(&key) { // test without this BUT MIGHT NEED IT!
                                 // Only get state that is locally tracked
                                 if let Some(value) = maybe_value {
                                     let var = state.get_assignment(&key).var;
@@ -127,7 +129,7 @@ pub async fn redis_state_manager(mut receiver: mpsc::Receiver<StateManagement>, 
                                     );
                                     map.insert(key, new_assignment);
                                 }
-                                }
+                                // }
                             }
                             // we want to keep updating a copy of a state so that we can maintain it if
                             // the connection to Redis gets disrupted
@@ -161,6 +163,7 @@ pub async fn redis_state_manager(mut receiver: mpsc::Receiver<StateManagement>, 
                         }
                         None => {
                             error_tracker = 3;
+                            error = format!("Failed to get variable {}.", var);
                             let _ = response_sender.send(old_state.get_value(&var));
                         }
                     },
@@ -235,6 +238,52 @@ pub async fn redis_state_manager(mut receiver: mpsc::Receiver<StateManagement>, 
                 {
                     error_tracker = 6;
                     error = format!("Failed to set variable {} with error: {}.", var, e);
+                }
+            }
+
+            StateManagement::InsertTransform((name, transform)) => {
+                match con.keys::<&str, Vec<String>>("transform_*").await {
+                    Ok(keys) => match con
+                        .mget::<&Vec<std::string::String>, Vec<Option<String>>>(&keys)
+                        .await
+                    {
+                        Ok(values) => {
+                            let mut buffer: HashMap<String, SPTransformStamped> = HashMap::new();
+                            for (key, maybe_value) in keys.into_iter().zip(values.into_iter()) {
+                                if let Some(value) = maybe_value {
+                                    buffer.insert(key, serde_json::from_str(&value).unwrap());
+                                }
+                            }
+
+                            if name != transform.child_frame_id {
+                                log::info!("Transform name '{name}' in buffer doesn't match the child_frame_id {}, 
+                                        they should be the same. Not added.", transform.child_frame_id);
+                            } else if let Some(_) = buffer.get(&name) {
+                                log::info!("Transform '{}' already exists, not added.", name);
+                            } else {
+                                let transform = transform.clone();
+                                if check_would_produce_cycle(&transform, &buffer) {
+                                    log::info!(
+                                        "Transform '{}' would produce cycle, not added.",
+                                        name
+                                    );
+                                } else {
+                                    buffer.insert(name.to_string(), transform);
+                                    log::info!("Inserted transform '{name}'.");
+                                }
+                            }
+
+                            // let _ = response_sender.send(State { state: map });
+                        }
+                        Err(e) => {
+                            error_tracker = 1;
+                            error = e.to_string();
+                        }
+                    },
+                    Err(e) => {
+                        error_tracker = 2;
+                        error = e.to_string();
+                    } //
                 }
             }
         }
