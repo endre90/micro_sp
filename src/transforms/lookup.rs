@@ -59,9 +59,10 @@ pub fn lookup_transform_with_root(
     parent_frame_id: &str,
     child_frame_id: &str,
     root_frame_id: &str,
-    buffer: &Arc<Mutex<HashMap<String, SPTransformStamped>>>,
+    buffer: &HashMap<String, SPTransformStamped>,
 ) -> Option<SPTransformStamped> {
-    let buffer_local = buffer.lock().unwrap().clone();
+    // let buffer_local = buffer.lock().unwrap().clone();
+    let buffer_local = buffer.clone();
     let mut chain = vec![];
     if !is_cyclic_all(&buffer_local) {
         match parent_to_root(parent_frame_id, root_frame_id, &buffer_local) {

@@ -34,6 +34,7 @@ pub use crate::running::utils::*;
 pub mod transforms;
 pub use crate::transforms::cycles::*;
 pub use crate::transforms::lookup::*;
+pub use crate::transforms::treeviz::*;
 
 pub mod utils;
 pub use crate::utils::logger::*;

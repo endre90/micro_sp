@@ -13,8 +13,8 @@ pub enum StateManagement {
     SetPartialState(State),
     Set((String, SPValue)),
     GetAllTransforms(oneshot::Sender<State>),
-    // GetTransform((String, oneshot::Sender<SPValue>)),
     InsertTransform((String, SPTransformStamped)),
+    LookupTransform((String, String, oneshot::Sender<SPTransformStamped>))
 }
 
 // /// Available commands that the async tasks can ask from the transform manager.
@@ -272,20 +272,72 @@ pub async fn redis_state_manager(mut receiver: mpsc::Receiver<StateManagement>, 
                                     log::info!("Inserted transform '{name}'.");
                                 }
                             }
-
-                            // let _ = response_sender.send(State { state: map });
                         }
                         Err(e) => {
-                            error_tracker = 1;
+                            error_tracker = 7;
                             error = e.to_string();
                         }
                     },
                     Err(e) => {
-                        error_tracker = 2;
+                        error_tracker = 8;
                         error = e.to_string();
                     } //
                 }
             }
+
+            StateManagement::LookupTransform((parent_frame_id, child_frame_id, response_sender)) => {
+                match con.keys::<&str, Vec<String>>("transform_*").await {
+                    Ok(keys) => match con
+                        .mget::<&Vec<std::string::String>, Vec<Option<String>>>(&keys)
+                        .await
+                    {
+                        Ok(values) => {
+                            let mut buffer: HashMap<String, SPTransformStamped> = HashMap::new();
+                            for (key, maybe_value) in keys.into_iter().zip(values.into_iter()) {
+                                if let Some(value) = maybe_value {
+                                    buffer.insert(key, serde_json::from_str(&value).unwrap());
+                                }
+                            }
+
+                            match get_tree_root(&buffer) {
+                                Some(root) => {
+                                    match lookup_transform_with_root(&parent_frame_id, &child_frame_id, &root, &buffer) {
+                                        Some(transform) => {
+                                            let _ = response_sender.send(transform);
+                                        },
+                                        None => {
+                                            error_tracker = 9;
+                                            error = "couln't lookup transform".to_string()
+                                        }
+                                    }
+                                },
+                                None => {
+                                     match lookup_transform_with_root(&parent_frame_id, &child_frame_id, "world", &buffer) {
+                                        Some(transform) => {
+                                            let _ = response_sender.send(transform);
+                                        },
+                                        None => {
+                                            error_tracker = 10;
+                                            error = "couln't lookup transform".to_string()
+                                        }
+                                     }
+                                }
+                            }
+
+
+                        }
+                        Err(e) => {
+                            error_tracker = 11;
+                            error = e.to_string();
+                        }
+                    },
+                    Err(e) => {
+                        error_tracker = 12;
+                        error = e.to_string();
+                    } //
+                }
+            }
+
         }
 
         if error_value != error_tracker {
