@@ -1,10 +1,7 @@
 use serde_json::Value;
 use std::{
-    collections::HashMap,
-    fs::{self, File},
-    io::BufReader,
+    collections::HashMap, fs::{self, File}, io::BufReader, time::SystemTime
 };
-use tokio::time::Instant;
 
 use crate::*;
 use std::error::Error;
@@ -63,7 +60,7 @@ pub fn list_frames_in_dir(path: &str) -> Result<Vec<String>, Box<dyn std::error:
     Ok(scenario)
 }
 
-pub fn load_new_scenario(scenario: &Vec<String>) -> HashMap<String, TransformStamped> {
+pub fn load_new_scenario(scenario: &Vec<String>) -> HashMap<String, SPTransformStamped> {
     let mut transforms_stamped = HashMap::new();
 
     for path in scenario {
@@ -108,13 +105,13 @@ pub fn load_new_scenario(scenario: &Vec<String>) -> HashMap<String, TransformSta
         if enable_transform {
             transforms_stamped.insert(
                 child_frame_id.clone(),
-                TransformStamped {
+                SPTransformStamped {
                     active,
-                    time_stamp: Instant::now(),
+                    time_stamp: SystemTime::now(),
                     child_frame_id,
                     parent_frame_id,
-                    transform: json_transform_to_isometry(transform),
-                    metadata,
+                    transform,
+                    metadata: MapOrUnknown::UNKNOWN//serde_json::from_value(metadata).unwrap()
                 },
             );
         }
@@ -173,7 +170,7 @@ fn extract_string_field(json: &Value, field: &str) -> Option<String> {
     }
 }
 
-fn extract_transform(json: &Value) -> Option<JsonTransform> {
+fn extract_transform(json: &Value) -> Option<SPTransform> {
     match json.get("transform") {
         Some(value) => match serde_json::from_value(value.clone()) {
             Ok(transform) => Some(transform),
@@ -213,7 +210,7 @@ fn test_load_and_deserialize_from_file() {
 
     let manifest_dir = std::env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR is not set");
 
-    let path = format!("{}/examples/data", manifest_dir);
+    let path = format!("{}/src/transforms/examples/data", manifest_dir);
     println!("{}", path);
     let frames = list_frames_in_dir(&path);
 

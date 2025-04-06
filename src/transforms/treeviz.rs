@@ -1,33 +1,32 @@
 use std::collections::HashMap;
 use crate::*;
 
-// use termtree::Tree;
+use termtree::Tree;
 
-// pub fn build_tree_recursive(
-//     node_id: &str,
-//     transforms: &HashMap<String, TransformStamped>,
-//     parent_map: &HashMap<String, Vec<String>>,
-//     current_depth: u64,
-// ) -> Tree<String> {
-//     if current_depth > MAX_RECURSION_DEPTH {
-//         eprintln!("Maximum recursion depth reached for node ID {}", node_id);
-//         return Tree::new(format!("{} (depth limit reached)", node_id));
-//     }
+pub fn build_tree_recursive(
+    node_id: &str,
+    transforms: &HashMap<String, SPTransformStamped>,
+    parent_map: &HashMap<String, Vec<String>>,
+    current_depth: u64,
+) -> Tree<String> {
+    if current_depth > MAX_RECURSION_DEPTH {
+        eprintln!("Maximum recursion depth reached for node ID {}", node_id);
+        return Tree::new(format!("{} (depth limit reached)", node_id));
+    }
 
-//     let mut tree = Tree::new(node_id.to_string());
+    let mut tree = Tree::new(node_id.to_string());
 
-//     if let Some(mut children) = parent_map.get(node_id).cloned() {
-//         children.sort_unstable();
-//         for child_id in children {
-//             let child_tree =
-//                 build_tree_recursive(&child_id, transforms, parent_map, current_depth + 1);
-//             tree.push(child_tree);
-//         }
-//     }
+    if let Some(mut children) = parent_map.get(node_id).cloned() {
+        children.sort_unstable();
+        for child_id in children {
+            let child_tree =
+                build_tree_recursive(&child_id, transforms, parent_map, current_depth + 1);
+            tree.push(child_tree);
+        }
+    }
 
-//     tree
-// }
-
+    tree
+}
 
 pub fn get_tree_root(buffer: &HashMap<String, SPTransformStamped>) -> Option<String> {
     if let Some(start_frame) = buffer.keys().next() {
@@ -42,38 +41,36 @@ pub fn get_tree_root(buffer: &HashMap<String, SPTransformStamped>) -> Option<Str
     None
 }
 
-// pub async fn vizualize_tree(
-//     buffer: &SpaceTreeServer,
+// pub async fn update_tree_visualization(
+//     buffer: &HashMap<String, SPTransformStamped>,
 //     refresh_rate: u64,
 // ) -> Result<(), Box<dyn std::error::Error>> {
 //     loop {
-//         let _ = visualize_tree_once(buffer);
+//         let tree_data = update_tree_visualization_once(buffer);
+
 //         tokio::time::sleep(Duration::from_millis(refresh_rate)).await;
 //     }
 // }
 
-// pub fn visualize_tree_once(
-//     buffer: &SpaceTreeServer,
-// ) -> Result<(), Box<dyn std::error::Error>> {
-//     let buffer_local = buffer.local_buffer.lock().unwrap().clone();
+pub fn update_tree_visualization_once(
+    buffer: &HashMap<String, SPTransformStamped>,
+) -> String {
+    let mut parent_map: HashMap<String, Vec<String>> = HashMap::new();
+    for transform in buffer.values() {
+        parent_map
+            .entry(transform.parent_frame_id.clone())
+            .or_default()
+            .push(transform.child_frame_id.clone());
+    }
 
-//     let mut parent_map: HashMap<String, Vec<String>> = HashMap::new();
-//     for transform in buffer_local.values() {
-//         parent_map
-//             .entry(transform.parent_frame_id.clone())
-//             .or_default()
-//             .push(transform.child_frame_id.clone());
-//     }
-
-//     match get_tree_root(&buffer_local) {
-//         Some(root) => println!(
-//             "{}",
-//             build_tree_recursive(&root, &buffer_local, &parent_map, 0)
-//         ),
-//         None => println!("No tree root."),
-//     }
-//     Ok(())
-// }
+    match get_tree_root(&buffer) {
+        Some(root) => format!(
+            "{}",
+            build_tree_recursive(&root, &buffer, &parent_map, 0)
+        ),
+        None => format!("No tree root."),
+    }
+}
 
 // #[cfg(test)]
 // mod tests {
@@ -91,10 +88,10 @@ pub fn get_tree_root(buffer: &HashMap<String, SPTransformStamped>) -> Option<Str
 
 //     #[test]
 //     fn test_build_tree_recursive() {
-//         let mut transforms: HashMap<String, TransformStamped> = HashMap::new();
+//         let mut transforms: HashMap<String, SPTransformStamped> = HashMap::new();
 //         transforms.insert(
 //             "child1".to_string(),
-//             TransformStamped {
+//             SPTransformStamped {
 //                 active: true,
 //                 time_stamp: Instant::now(),
 //                 parent_frame_id: "root".to_string(),
@@ -105,7 +102,7 @@ pub fn get_tree_root(buffer: &HashMap<String, SPTransformStamped>) -> Option<Str
 //         );
 //         transforms.insert(
 //             "child2".to_string(),
-//             TransformStamped {
+//             SPTransformStamped {
 //                 active: true,
 //                 time_stamp: Instant::now(),
 //                 parent_frame_id: "child1".to_string(),
@@ -116,7 +113,7 @@ pub fn get_tree_root(buffer: &HashMap<String, SPTransformStamped>) -> Option<Str
 //         );
 //         transforms.insert(
 //             "child3".to_string(),
-//             TransformStamped {
+//             SPTransformStamped {
 //                 active: true,
 //                 time_stamp: Instant::now(),
 //                 parent_frame_id: "child1".to_string(),
@@ -127,7 +124,7 @@ pub fn get_tree_root(buffer: &HashMap<String, SPTransformStamped>) -> Option<Str
 //         );
 //         transforms.insert(
 //             "child5".to_string(),
-//             TransformStamped {
+//             SPTransformStamped {
 //                 active: true,
 //                 time_stamp: Instant::now(),
 //                 parent_frame_id: "child3".to_string(),
@@ -139,7 +136,7 @@ pub fn get_tree_root(buffer: &HashMap<String, SPTransformStamped>) -> Option<Str
 
 //         transforms.insert(
 //             "child4".to_string(),
-//             TransformStamped {
+//             SPTransformStamped {
 //                 active: true,
 //                 time_stamp: Instant::now(),
 //                 parent_frame_id: "root".to_string(),
@@ -165,7 +162,7 @@ pub fn get_tree_root(buffer: &HashMap<String, SPTransformStamped>) -> Option<Str
 
 //     #[test]
 //     fn test_tree_maximum_recursion_depth() {
-//         let mut transforms: HashMap<String, TransformStamped> = HashMap::new();
+//         let mut transforms: HashMap<String, SPTransformStamped> = HashMap::new();
 //         let max_depth = MAX_RECURSION_DEPTH + 1; // We exceed MAX_DEPTH to trigger the limit
 //         let parent_id_base = "node";
 
@@ -180,7 +177,7 @@ pub fn get_tree_root(buffer: &HashMap<String, SPTransformStamped>) -> Option<Str
 
 //             transforms.insert(
 //                 child_id.clone(),
-//                 TransformStamped {
+//                 SPTransformStamped {
 //                     active: true,
 //                     time_stamp: Instant::now(),
 //                     parent_frame_id: parent_id,

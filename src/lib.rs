@@ -1,5 +1,6 @@
 pub static MAX_ALLOWED_OPERATION_DURATION: f64 = 3600.0; // seconds
 pub static MAX_REPLAN_RETRIES: i64 = 3;
+pub static MAX_RECURSION_DEPTH: u64 = 1000;
 
 pub mod core;
 pub use crate::core::sp_assignment::*;
@@ -35,6 +36,7 @@ pub mod transforms;
 pub use crate::transforms::cycles::*;
 pub use crate::transforms::lookup::*;
 pub use crate::transforms::treeviz::*;
+pub use crate::transforms::loading::*;
 
 pub mod utils;
 pub use crate::utils::logger::*;
