@@ -5,7 +5,6 @@ use nalgebra::{Isometry3, Quaternion, UnitQuaternion, Vector3};
 use ordered_float::OrderedFloat;
 // use serde_sp_transform::Value;
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
 use std::time::SystemTime;
 
 // use tokio::time::Instant;
@@ -138,7 +137,13 @@ pub fn root_to_child(
     let mut stack = vec![];
     get_frame_children(root_frame_id, buffer)
         .iter()
-        .for_each(|(k, v)| stack.push((k.to_string(), vec![k.to_string()], vec![v.transform.clone()])));
+        .for_each(|(k, v)| {
+            stack.push((
+                k.to_string(),
+                vec![k.to_string()],
+                vec![v.transform.clone()],
+            ))
+        });
 
     let res = loop {
         if length >= MAX_TRANSFORM_CHAIN {
@@ -192,536 +197,524 @@ pub fn get_frame_children(
         .collect()
 }
 
-// #[cfg(test)]
-// mod tests {
+#[cfg(test)]
+mod tests {
 
-//     use nalgebra::{Isometry3, Quaternion, Translation, UnitQuaternion, Vector3};
-//     use serde_sp_transform::Value;
-//     use std::collections::HashMap;
-//     use std::sync::{Arc, Mutex};
-//     use tokio::time::Instant;
-//     use utils::lookup::{
-//         get_frame_children, lookup_transform_with_root, parent_to_root, root_to_child,
-//     };
+    use nalgebra::{Isometry3, Quaternion, Translation, UnitQuaternion, Vector3};
+    // use serde_sp_transform::Value;
+    use std::collections::HashMap;
+    use std::time::SystemTime;
 
-//     use crate::*;
+    use crate::*;
 
-//     #[test]
-//     fn test_simple_direct_child() {
-//         let mut buffer = HashMap::new();
-//         buffer.insert(
-//             "child".to_string(),
-//             create_transform("root", "child", Isometry3::translation(1.0, 0.0, 0.0)),
-//         );
+    #[test]
+    fn test_simple_direct_child() {
+        let mut buffer = HashMap::new();
+        buffer.insert(
+            "child".to_string(),
+            create_transform("root", "child", Isometry3::translation(1.0, 0.0, 0.0)),
+        );
 
-//         let result = root_to_child("child", "root", &buffer);
+        let result = root_to_child("child", "root", &buffer);
 
-//         assert!(result.is_some());
-//         let transform = result.unwrap();
-//         let expected_transform = Isometry3::translation(1.0, 0.0, 0.0);
-//         assert_eq!(transform.translation, expected_transform.translation);
-//     }
+        assert!(result.is_some());
+        let transform = result.unwrap();
+        let expected_transform = Isometry3::translation(1.0, 0.0, 0.0);
+        assert_eq!(transform.translation, expected_transform.translation);
+    }
 
-//     // Test 2: Intermediate Frames
-//     #[test]
-//     fn test_intermediate_frames() {
-//         let mut buffer = HashMap::new();
-//         buffer.insert(
-//             "intermediate".to_string(),
-//             create_transform(
-//                 "root",
-//                 "intermediate",
-//                 Isometry3::translation(1.0, 1.0, 0.0),
-//             ),
-//         );
-//         buffer.insert(
-//             "child".to_string(),
-//             create_transform(
-//                 "intermediate",
-//                 "child",
-//                 Isometry3::translation(1.0, 0.0, 1.0),
-//             ),
-//         );
+    // Test 2: Intermediate Frames
+    #[test]
+    fn test_intermediate_frames() {
+        let mut buffer = HashMap::new();
+        buffer.insert(
+            "intermediate".to_string(),
+            create_transform(
+                "root",
+                "intermediate",
+                Isometry3::translation(1.0, 1.0, 0.0),
+            ),
+        );
+        buffer.insert(
+            "child".to_string(),
+            create_transform(
+                "intermediate",
+                "child",
+                Isometry3::translation(1.0, 0.0, 1.0),
+            ),
+        );
 
-//         let result = root_to_child("child", "root", &buffer);
+        let result = root_to_child("child", "root", &buffer);
 
-//         assert!(result.is_some());
-//         let transform = result.unwrap();
-//         let expected_transform = Isometry3::translation(2.0, 1.0, 1.0);
-//         assert_eq!(transform.translation, expected_transform.translation);
-//     }
+        assert!(result.is_some());
+        let transform = result.unwrap();
+        let expected_transform = Isometry3::translation(2.0, 1.0, 1.0);
+        assert_eq!(transform.translation, expected_transform.translation);
+    }
 
-//     // Test 3: Complex Chain with Multiple Branches
-//     #[test]
-//     fn test_complex_chain_with_multiple_branches() {
-//         let mut buffer = HashMap::new();
-//         buffer.insert(
-//             "intermediate1".to_string(),
-//             create_transform(
-//                 "root",
-//                 "intermediate1",
-//                 Isometry3::translation(1.0, 0.0, 0.0),
-//             ),
-//         );
-//         buffer.insert(
-//             "intermediate2".to_string(),
-//             create_transform(
-//                 "intermediate1",
-//                 "intermediate2",
-//                 Isometry3::translation(0.0, 1.0, 0.0),
-//             ),
-//         );
-//         buffer.insert(
-//             "branch".to_string(),
-//             create_transform(
-//                 "intermediate1",
-//                 "branch",
-//                 Isometry3::translation(0.0, 0.0, 1.0),
-//             ),
-//         );
-//         buffer.insert(
-//             "child".to_string(),
-//             create_transform(
-//                 "intermediate2",
-//                 "child",
-//                 Isometry3::translation(1.0, 1.0, 1.0),
-//             ),
-//         );
+    // Test 3: Complex Chain with Multiple Branches
+    #[test]
+    fn test_complex_chain_with_multiple_branches() {
+        let mut buffer = HashMap::new();
+        buffer.insert(
+            "intermediate1".to_string(),
+            create_transform(
+                "root",
+                "intermediate1",
+                Isometry3::translation(1.0, 0.0, 0.0),
+            ),
+        );
+        buffer.insert(
+            "intermediate2".to_string(),
+            create_transform(
+                "intermediate1",
+                "intermediate2",
+                Isometry3::translation(0.0, 1.0, 0.0),
+            ),
+        );
+        buffer.insert(
+            "branch".to_string(),
+            create_transform(
+                "intermediate1",
+                "branch",
+                Isometry3::translation(0.0, 0.0, 1.0),
+            ),
+        );
+        buffer.insert(
+            "child".to_string(),
+            create_transform(
+                "intermediate2",
+                "child",
+                Isometry3::translation(1.0, 1.0, 1.0),
+            ),
+        );
 
-//         let result = root_to_child("child", "root", &buffer);
+        let result = root_to_child("child", "root", &buffer);
 
-//         assert!(result.is_some());
-//         let transform = result.unwrap();
-//         let expected_transform = Isometry3::translation(2.0, 2.0, 1.0);
-//         assert_eq!(transform.translation, expected_transform.translation);
-//     }
+        assert!(result.is_some());
+        let transform = result.unwrap();
+        let expected_transform = Isometry3::translation(2.0, 2.0, 1.0);
+        assert_eq!(transform.translation, expected_transform.translation);
+    }
 
-//     #[test]
-//     fn test_simple_direct_parent() {
-//         let mut buffer = HashMap::new();
-//         buffer.insert(
-//             "child".to_string(),
-//             create_transform("root", "child", Isometry3::translation(1.0, 0.0, 0.0)),
-//         );
+    #[test]
+    fn test_simple_direct_parent() {
+        let mut buffer = HashMap::new();
+        buffer.insert(
+            "child".to_string(),
+            create_transform("root", "child", Isometry3::translation(1.0, 0.0, 0.0)),
+        );
 
-//         let result = parent_to_root("child", "root", &buffer);
+        let result = parent_to_root("child", "root", &buffer);
 
-//         assert!(result.is_some());
-//         let transform = result.unwrap();
-//         let expected_transform = Isometry3::translation(-1.0, 0.0, 0.0); // Inverse of the translation
-//         assert_eq!(transform.translation, expected_transform.translation);
-//     }
+        assert!(result.is_some());
+        let transform = result.unwrap();
+        let expected_transform = Isometry3::translation(-1.0, 0.0, 0.0); // Inverse of the translation
+        assert_eq!(transform.translation, expected_transform.translation);
+    }
 
-//     // Test 2: Intermediate Frames
-//     #[test]
-//     fn test_intermediate_frames_2() {
-//         let mut buffer = HashMap::new();
-//         buffer.insert(
-//             "intermediate".to_string(),
-//             create_transform(
-//                 "root",
-//                 "intermediate",
-//                 Isometry3::translation(1.0, 1.0, 0.0),
-//             ),
-//         );
-//         buffer.insert(
-//             "child".to_string(),
-//             create_transform(
-//                 "intermediate",
-//                 "child",
-//                 Isometry3::translation(1.0, 0.0, 1.0),
-//             ),
-//         );
+    // Test 2: Intermediate Frames
+    #[test]
+    fn test_intermediate_frames_2() {
+        let mut buffer = HashMap::new();
+        buffer.insert(
+            "intermediate".to_string(),
+            create_transform(
+                "root",
+                "intermediate",
+                Isometry3::translation(1.0, 1.0, 0.0),
+            ),
+        );
+        buffer.insert(
+            "child".to_string(),
+            create_transform(
+                "intermediate",
+                "child",
+                Isometry3::translation(1.0, 0.0, 1.0),
+            ),
+        );
 
-//         let result = parent_to_root("child", "root", &buffer);
+        let result = parent_to_root("child", "root", &buffer);
 
-//         assert!(result.is_some());
-//         let transform = result.unwrap();
-//         let expected_transform = Isometry3::translation(-2.0, -1.0, -1.0); // Inverse of the combined translation
-//         assert_eq!(transform.translation, expected_transform.translation);
-//     }
+        assert!(result.is_some());
+        let transform = result.unwrap();
+        let expected_transform = Isometry3::translation(-2.0, -1.0, -1.0); // Inverse of the combined translation
+        assert_eq!(transform.translation, expected_transform.translation);
+    }
 
-//     // Test 3: Complex Chain with Multiple Branches
-//     #[test]
-//     fn test_complex_chain_with_multiple_branches_2() {
-//         let mut buffer = HashMap::new();
-//         buffer.insert(
-//             "intermediate1".to_string(),
-//             create_transform(
-//                 "root",
-//                 "intermediate1",
-//                 Isometry3::translation(1.0, 0.0, 0.0),
-//             ),
-//         );
-//         buffer.insert(
-//             "intermediate2".to_string(),
-//             create_transform(
-//                 "intermediate1",
-//                 "intermediate2",
-//                 Isometry3::translation(0.0, 1.0, 0.0),
-//             ),
-//         );
-//         buffer.insert(
-//             "branch".to_string(),
-//             create_transform(
-//                 "intermediate1",
-//                 "branch",
-//                 Isometry3::translation(0.0, 0.0, 1.0),
-//             ),
-//         );
-//         buffer.insert(
-//             "child".to_string(),
-//             create_transform(
-//                 "intermediate2",
-//                 "child",
-//                 Isometry3::translation(1.0, 1.0, 1.0),
-//             ),
-//         );
+    // Test 3: Complex Chain with Multiple Branches
+    #[test]
+    fn test_complex_chain_with_multiple_branches_2() {
+        let mut buffer = HashMap::new();
+        buffer.insert(
+            "intermediate1".to_string(),
+            create_transform(
+                "root",
+                "intermediate1",
+                Isometry3::translation(1.0, 0.0, 0.0),
+            ),
+        );
+        buffer.insert(
+            "intermediate2".to_string(),
+            create_transform(
+                "intermediate1",
+                "intermediate2",
+                Isometry3::translation(0.0, 1.0, 0.0),
+            ),
+        );
+        buffer.insert(
+            "branch".to_string(),
+            create_transform(
+                "intermediate1",
+                "branch",
+                Isometry3::translation(0.0, 0.0, 1.0),
+            ),
+        );
+        buffer.insert(
+            "child".to_string(),
+            create_transform(
+                "intermediate2",
+                "child",
+                Isometry3::translation(1.0, 1.0, 1.0),
+            ),
+        );
 
-//         let result = parent_to_root("child", "root", &buffer);
+        let result = parent_to_root("child", "root", &buffer);
 
-//         assert!(result.is_some());
-//         let transform = result.unwrap();
-//         let expected_transform = Isometry3::translation(-2.0, -2.0, -1.0); // Inverse of the chosen path
-//         assert_eq!(transform.translation, expected_transform.translation);
-//     }
+        assert!(result.is_some());
+        let transform = result.unwrap();
+        let expected_transform = Isometry3::translation(-2.0, -2.0, -1.0); // Inverse of the chosen path
+        assert_eq!(transform.translation, expected_transform.translation);
+    }
 
-//     #[test]
-//     fn test_complex_transform_chain() {
-//         let mut buffer = HashMap::new();
-//         buffer.insert(
-//             "frame1".to_string(),
-//             create_transform("root", "frame1", Isometry3::translation(1.0, 2.0, 0.0)),
-//         );
-//         buffer.insert(
-//             "frame2".to_string(),
-//             create_transform("frame1", "frame2", Isometry3::translation(0.0, 3.0, 1.0)),
-//         );
-//         buffer.insert(
-//             "frame3".to_string(),
-//             create_transform("frame2", "frame3", Isometry3::translation(2.0, 0.0, -1.0)),
-//         );
+    #[test]
+    fn test_complex_transform_chain() {
+        let mut buffer = HashMap::new();
+        buffer.insert(
+            "frame1".to_string(),
+            create_transform("root", "frame1", Isometry3::translation(1.0, 2.0, 0.0)),
+        );
+        buffer.insert(
+            "frame2".to_string(),
+            create_transform("frame1", "frame2", Isometry3::translation(0.0, 3.0, 1.0)),
+        );
+        buffer.insert(
+            "frame3".to_string(),
+            create_transform("frame2", "frame3", Isometry3::translation(2.0, 0.0, -1.0)),
+        );
 
-//         let buffer = Arc::new(Mutex::new(buffer));
+        let result = lookup_transform_with_root("frame1", "frame3", "root", &buffer);
 
-//         let result = lookup_transform_with_root("frame1", "frame3", "root", &buffer);
+        assert!(result.is_some());
+        let transform = result.unwrap();
+        assert_eq!(transform.parent_frame_id, "frame1");
+        assert_eq!(transform.child_frame_id, "frame3");
 
-//         assert!(result.is_some());
-//         let transform = result.unwrap();
-//         assert_eq!(transform.parent_frame_id, "frame1");
-//         assert_eq!(transform.child_frame_id, "frame3");
+        // The expected transform is the result of the chain: T1 -> T2 -> T3
+        let expected_transform = isometry_to_sp_transform(Isometry3::translation(2.0, 3.0, 0.0));
+        assert_eq!(
+            transform.transform.translation,
+            expected_transform.translation
+        );
+    }
 
-//         // The expected transform is the result of the chain: T1 -> T2 -> T3
-//         let expected_transform = Isometry3::translation(2.0, 3.0, 0.0);
-//         assert_eq!(
-//             transform.transform.translation,
-//             expected_transform.translation
-//         );
-//     }
+    // Test 5: Multiple Intermediate Frames
+    #[test]
+    fn test_multiple_intermediate_frames() {
+        let mut buffer = HashMap::new();
+        buffer.insert(
+            "frameA".to_string(),
+            create_transform("root", "frameA", Isometry3::translation(1.0, 1.0, 1.0)),
+        );
+        buffer.insert(
+            "frameB".to_string(),
+            create_transform("frameA", "frameB", Isometry3::translation(1.0, 0.0, 0.0)),
+        );
+        buffer.insert(
+            "frameC".to_string(),
+            create_transform("frameB", "frameC", Isometry3::translation(0.0, 2.0, 0.0)),
+        );
+        buffer.insert(
+            "frameD".to_string(),
+            create_transform("frameC", "frameD", Isometry3::translation(0.0, 0.0, 3.0)),
+        );
 
-//     // Test 5: Multiple Intermediate Frames
-//     #[test]
-//     fn test_multiple_intermediate_frames() {
-//         let mut buffer = HashMap::new();
-//         buffer.insert(
-//             "frameA".to_string(),
-//             create_transform("root", "frameA", Isometry3::translation(1.0, 1.0, 1.0)),
-//         );
-//         buffer.insert(
-//             "frameB".to_string(),
-//             create_transform("frameA", "frameB", Isometry3::translation(1.0, 0.0, 0.0)),
-//         );
-//         buffer.insert(
-//             "frameC".to_string(),
-//             create_transform("frameB", "frameC", Isometry3::translation(0.0, 2.0, 0.0)),
-//         );
-//         buffer.insert(
-//             "frameD".to_string(),
-//             create_transform("frameC", "frameD", Isometry3::translation(0.0, 0.0, 3.0)),
-//         );
+        let result = lookup_transform_with_root("root", "frameD", "root", &buffer);
 
-//         let buffer = Arc::new(Mutex::new(buffer));
+        assert!(result.is_some());
+        let transform = result.unwrap();
+        assert_eq!(transform.parent_frame_id, "root");
+        assert_eq!(transform.child_frame_id, "frameD");
 
-//         let result = lookup_transform_with_root("root", "frameD", "root", &buffer);
+        // The expected transform is the result of the chain: T1 -> T2 -> T3 -> T4
+        let expected_transform = isometry_to_sp_transform(Isometry3::translation(2.0, 3.0, 4.0));
+        assert_eq!(
+            transform.transform.translation,
+            expected_transform.translation
+        );
+    }
 
-//         assert!(result.is_some());
-//         let transform = result.unwrap();
-//         assert_eq!(transform.parent_frame_id, "root");
-//         assert_eq!(transform.child_frame_id, "frameD");
+    // Test 6: Mixed Transformations with Rotations
+    #[test]
+    fn test_mixed_transformations_with_rotations() {
+        let mut buffer = HashMap::new();
+        buffer.insert(
+            "frame1".to_string(),
+            create_transform("root", "frame1", Isometry3::translation(0.0, 0.0, 1.0)),
+        );
 
-//         // The expected transform is the result of the chain: T1 -> T2 -> T3 -> T4
-//         let expected_transform = Isometry3::translation(2.0, 3.0, 4.0);
-//         assert_eq!(
-//             transform.transform.translation,
-//             expected_transform.translation
-//         );
-//     }
+        let rot = Isometry3::rotation(Vector3::new(0.5, 0.0, 0.0));
+        let rot2 = Isometry3::rotation(Vector3::new(0.5, 0.5, 0.0));
 
-//     // Test 6: Mixed Transformations with Rotations
-//     #[test]
-//     fn test_mixed_transformations_with_rotations() {
-//         let mut buffer = HashMap::new();
-//         buffer.insert(
-//             "frame1".to_string(),
-//             create_transform("root", "frame1", Isometry3::translation(0.0, 0.0, 1.0)),
-//         );
+        buffer.insert(
+            "frame2".to_string(),
+            create_transform("frame1", "frame2", rot), // Assume rotation around X-axis
+        );
+        buffer.insert(
+            "frame3".to_string(),
+            create_transform("frame2", "frame3", Isometry3::translation(1.0, 0.0, 0.0)),
+        );
+        buffer.insert(
+            "frame4".to_string(),
+            create_transform("frame3", "frame4", rot2),
+        );
 
-//         let rot = Isometry3::rotation(Vector3::new(0.5, 0.0, 0.0));
-//         let rot2 = Isometry3::rotation(Vector3::new(0.5, 0.5, 0.0));
+        let result = lookup_transform_with_root("frame1", "frame4", "root", &buffer);
 
-//         buffer.insert(
-//             "frame2".to_string(),
-//             create_transform("frame1", "frame2", rot), // Assume rotation around X-axis
-//         );
-//         buffer.insert(
-//             "frame3".to_string(),
-//             create_transform("frame2", "frame3", Isometry3::translation(1.0, 0.0, 0.0)),
-//         );
-//         buffer.insert(
-//             "frame4".to_string(),
-//             create_transform("frame3", "frame4", rot2),
-//         );
+        assert!(result.is_some());
+        let transform = result.unwrap();
+        assert_eq!(transform.parent_frame_id, "frame1");
+        assert_eq!(transform.child_frame_id, "frame4");
 
-//         let buffer = Arc::new(Mutex::new(buffer));
+        // The expected transform combines translation and rotation
+        let expected_translation = isometry_to_sp_transform(Isometry3::translation(1.0, 0.0, 0.0));
+        assert_eq!(transform.transform.translation, expected_translation.translation);
+        println!("{:?}", transform.transform.rotation);
+    }
 
-//         let result = lookup_transform_with_root("frame1", "frame4", "root", &buffer);
+    #[test]
+    fn test_parent_to_root() {
+        let test_buffer = HashMap::from([
+            (
+                "finger".to_string(),
+                SPTransformStamped {
+                    active: true,
+                    time_stamp: SystemTime::now(),
+                    child_frame_id: "finger".to_string(),
+                    parent_frame_id: "hand".to_string(),
+                    transform: isometry_to_sp_transform(Isometry3 {
+                        translation: Translation {
+                            vector: Vector3::new(0.0, 0.0, 0.0),
+                        },
+                        rotation: UnitQuaternion::from_quaternion(Quaternion::new(
+                            1.0, 0.0, 0.0, 0.0,
+                        )),
+                    }),
+                    metadata: MapOrUnknown::UNKNOWN,
+                },
+            ),
+            (
+                "hand".to_string(),
+                SPTransformStamped {
+                    active: true,
+                    time_stamp: SystemTime::now(),
+                    child_frame_id: "hand".to_string(),
+                    parent_frame_id: "elbow".to_string(),
+                    transform: isometry_to_sp_transform(Isometry3 {
+                        translation: Translation {
+                            vector: Vector3::new(1.0, 0.0, 0.0),
+                        },
+                        rotation: UnitQuaternion::from_quaternion(Quaternion::new(
+                            0.7071, 0.7071, 0.0, 0.0,
+                        )),
+                    }),
+                    metadata: MapOrUnknown::UNKNOWN
+                },
+            ),
+            (
+                "elbow".to_string(),
+                SPTransformStamped {
+                    active: true,
+                    time_stamp: SystemTime::now(),
+                    child_frame_id: "elbow".to_string(),
+                    parent_frame_id: "shoulder".to_string(),
+                    transform: isometry_to_sp_transform(Isometry3 {
+                        translation: Translation {
+                            vector: Vector3::new(0.0, 1.0, 0.0),
+                        },
+                        rotation: UnitQuaternion::from_quaternion(Quaternion::new(
+                            0.7071, 0.0, 0.7071, 0.0,
+                        )),
+                    }),
+                    metadata: MapOrUnknown::UNKNOWN
+                },
+            ),
+            (
+                "shoulder".to_string(),
+                SPTransformStamped {
+                    active: false,
+                    time_stamp: SystemTime::now(),
+                    child_frame_id: "shoulder".to_string(),
+                    parent_frame_id: "world".to_string(),
+                    transform: isometry_to_sp_transform(Isometry3 {
+                        translation: Translation {
+                            vector: Vector3::new(0.0, 0.0, 1.0),
+                        },
+                        rotation: UnitQuaternion::from_quaternion(Quaternion::new(
+                            0.7071, 0.0, 0.0, 0.7071,
+                        )),
+                    }),
+                    metadata: MapOrUnknown::UNKNOWN
+                },
+            ),
+        ]);
 
-//         assert!(result.is_some());
-//         let transform = result.unwrap();
-//         assert_eq!(transform.parent_frame_id, "frame1");
-//         assert_eq!(transform.child_frame_id, "frame4");
+        let res = parent_to_root("hand", "world", &test_buffer);
+        assert!(!res.is_none());
+        println!("{}", res.unwrap());
+        // TODO: verify if this is correct and test
+    }
 
-//         // The expected transform combines translation and rotation
-//         let expected_translation = Isometry3::translation(1.0, 0.0, 0.0).translation;
-//         assert_eq!(transform.transform.translation, expected_translation);
-//         println!("{}", transform.transform.rotation);
-//     }
+    fn dummy_1_frame() -> SPTransformStamped {
+        SPTransformStamped {
+            active: false,
+            time_stamp: SystemTime::now(),
+            parent_frame_id: "world".to_string(),
+            child_frame_id: "dummy_1".to_string(),
+            transform: isometry_to_sp_transform(Isometry3::default()),
+            metadata: MapOrUnknown::UNKNOWN
+        }
+    }
 
-//     #[test]
-//     fn test_parent_to_root() {
-//         let test_buffer = HashMap::from([
-//             (
-//                 "finger".to_string(),
-//                 SPTransformStamped {
-//                     active: true,
-//                     time_stamp: Instant::now(),
-//                     child_frame_id: "finger".to_string(),
-//                     parent_frame_id: "hand".to_string(),
-//                     transform: Isometry3 {
-//                         translation: Translation {
-//                             vector: Vector3::new(0.0, 0.0, 0.0),
-//                         },
-//                         rotation: UnitQuaternion::from_quaternion(Quaternion::new(
-//                             1.0, 0.0, 0.0, 0.0,
-//                         )),
-//                     },
-//                     metadata: Value::default(),
-//                 },
-//             ),
-//             (
-//                 "hand".to_string(),
-//                 SPTransformStamped {
-//                     active: true,
-//                     time_stamp: Instant::now(),
-//                     child_frame_id: "hand".to_string(),
-//                     parent_frame_id: "elbow".to_string(),
-//                     transform: Isometry3 {
-//                         translation: Translation {
-//                             vector: Vector3::new(1.0, 0.0, 0.0),
-//                         },
-//                         rotation: UnitQuaternion::from_quaternion(Quaternion::new(
-//                             0.7071, 0.7071, 0.0, 0.0,
-//                         )),
-//                     },
-//                     metadata: Value::default(),
-//                 },
-//             ),
-//             (
-//                 "elbow".to_string(),
-//                 SPTransformStamped {
-//                     active: true,
-//                     time_stamp: Instant::now(),
-//                     child_frame_id: "elbow".to_string(),
-//                     parent_frame_id: "shoulder".to_string(),
-//                     transform: Isometry3 {
-//                         translation: Translation {
-//                             vector: Vector3::new(0.0, 1.0, 0.0),
-//                         },
-//                         rotation: UnitQuaternion::from_quaternion(Quaternion::new(
-//                             0.7071, 0.0, 0.7071, 0.0,
-//                         )),
-//                     },
-//                     metadata: Value::default(),
-//                 },
-//             ),
-//             (
-//                 "shoulder".to_string(),
-//                 SPTransformStamped {
-//                     active: false,
-//                     time_stamp: Instant::now(),
-//                     child_frame_id: "shoulder".to_string(),
-//                     parent_frame_id: "world".to_string(),
-//                     transform: Isometry3 {
-//                         translation: Translation {
-//                             vector: Vector3::new(0.0, 0.0, 1.0),
-//                         },
-//                         rotation: UnitQuaternion::from_quaternion(Quaternion::new(
-//                             0.7071, 0.0, 0.0, 0.7071,
-//                         )),
-//                     },
-//                     metadata: Value::default(),
-//                 },
-//             ),
-//         ]);
+    fn dummy_2_frame() -> SPTransformStamped {
+        SPTransformStamped {
+            active: true,
+            time_stamp: SystemTime::now(),
+            parent_frame_id: "dummy_1".to_string(),
+            child_frame_id: "dummy_2".to_string(),
+            transform: isometry_to_sp_transform(Isometry3::default()),
+            metadata: MapOrUnknown::UNKNOWN
+        }
+    }
 
-//         let res = parent_to_root("hand", "world", &test_buffer);
-//         assert!(!res.is_none());
-//         println!("{}", res.unwrap());
-//         // TODO: verify if this is correct and test
-//     }
+    fn dummy_3_frame() -> SPTransformStamped {
+        SPTransformStamped {
+            active: true,
+            time_stamp: SystemTime::now(),
+            parent_frame_id: "dummy_1".to_string(),
+            child_frame_id: "dummy_3".to_string(),
+            transform: isometry_to_sp_transform(Isometry3::default()),
+            metadata: MapOrUnknown::UNKNOWN
+        }
+    }
 
-//     fn dummy_1_frame() -> SPTransformStamped {
-//         SPTransformStamped {
-//             active: false,
-//             time_stamp: Instant::now(),
-//             parent_frame_id: "world".to_string(),
-//             child_frame_id: "dummy_1".to_string(),
-//             transform: Isometry3::default(),
-//             metadata: Value::default(),
-//         }
-//     }
+    #[test]
+    fn test_get_frame_children() {
+        let mut buffer = HashMap::<String, SPTransformStamped>::new();
+        buffer.insert("dummy_1".to_string(), dummy_1_frame());
 
-//     fn dummy_2_frame() -> SPTransformStamped {
-//         SPTransformStamped {
-//             active: true,
-//             time_stamp: Instant::now(),
-//             parent_frame_id: "dummy_1".to_string(),
-//             child_frame_id: "dummy_2".to_string(),
-//             transform: Isometry3::default(),
-//             metadata: Value::default(),
-//         }
-//     }
+        //          w
+        //          |
+        //          d1
 
-//     fn dummy_3_frame() -> SPTransformStamped {
-//         SPTransformStamped {
-//             active: true,
-//             time_stamp: Instant::now(),
-//             parent_frame_id: "dummy_1".to_string(),
-//             child_frame_id: "dummy_3".to_string(),
-//             transform: Isometry3::default(),
-//             metadata: Value::default(),
-//         }
-//     }
+        assert_eq!(
+            get_frame_children("world", &buffer)
+                .iter()
+                .map(|x| x.0.clone())
+                .collect::<Vec<String>>(),
+            vec!("dummy_1")
+        );
 
-//     #[test]
-//     fn test_get_frame_children() {
-//         let mut buffer = HashMap::<String, SPTransformStamped>::new();
-//         buffer.insert("dummy_1".to_string(), dummy_1_frame());
+        buffer.insert("dummy_2".to_string(), dummy_2_frame());
 
-//         //          w
-//         //          |
-//         //          d1
+        //          w
+        //          |
+        //          d1
+        //          |
+        //          d2
 
-//         assert_eq!(
-//             get_frame_children("world", &buffer)
-//                 .iter()
-//                 .map(|x| x.0.clone())
-//                 .collect::<Vec<String>>(),
-//             vec!("dummy_1")
-//         );
+        assert_eq!(
+            get_frame_children("dummy_1", &buffer)
+                .iter()
+                .map(|x| x.0.clone())
+                .collect::<Vec<String>>(),
+            vec!("dummy_2")
+        );
 
-//         buffer.insert("dummy_2".to_string(), dummy_2_frame());
+        assert_eq!(
+            get_frame_children("world", &buffer)
+                .iter()
+                .map(|x| x.0.clone())
+                .collect::<Vec<String>>(),
+            vec!("dummy_1")
+        );
 
-//         //          w
-//         //          |
-//         //          d1
-//         //          |
-//         //          d2
+        assert_eq!(
+            get_frame_children("dummy_2", &buffer)
+                .iter()
+                .map(|x| x.0.clone())
+                .collect::<Vec<String>>(),
+            Vec::<String>::new()
+        );
 
-//         assert_eq!(
-//             get_frame_children("dummy_1", &buffer)
-//                 .iter()
-//                 .map(|x| x.0.clone())
-//                 .collect::<Vec<String>>(),
-//             vec!("dummy_2")
-//         );
+        buffer.insert("dummy_3".to_string(), dummy_3_frame());
 
-//         assert_eq!(
-//             get_frame_children("world", &buffer)
-//                 .iter()
-//                 .map(|x| x.0.clone())
-//                 .collect::<Vec<String>>(),
-//             vec!("dummy_1")
-//         );
+        //          w
+        //          |
+        //          d1
+        //         /  \
+        //       d2    d3
 
-//         assert_eq!(
-//             get_frame_children("dummy_2", &buffer)
-//                 .iter()
-//                 .map(|x| x.0.clone())
-//                 .collect::<Vec<String>>(),
-//             Vec::<String>::new()
-//         );
+        assert_eq!(
+            get_frame_children("world", &buffer)
+                .iter()
+                .map(|x| x.0.clone())
+                .collect::<Vec<String>>()
+                .sort(),
+            vec!("dummy_2", "dummy_3").sort()
+        );
+    }
 
-//         buffer.insert("dummy_3".to_string(), dummy_3_frame());
+    fn create_transform(
+        parent_frame_id: &str,
+        child_frame_id: &str,
+        transform: Isometry3<f64>,
+    ) -> SPTransformStamped {
+        SPTransformStamped {
+            active: true,
+            time_stamp: SystemTime::now(),
+            parent_frame_id: parent_frame_id.to_string(),
+            child_frame_id: child_frame_id.to_string(),
+            transform: isometry_to_sp_transform(transform),
+            metadata: MapOrUnknown::UNKNOWN
+        }
+    }
 
-//         //          w
-//         //          |
-//         //          d1
-//         //         /  \
-//         //       d2    d3
+    // Successful Transform Lookup
+    #[test]
+    fn test_successful_transform_lookup() {
+        let mut buffer = HashMap::new();
+        buffer.insert(
+            "parent".to_string(),
+            create_transform("root", "parent", Isometry3::translation(1.0, 0.0, 0.0)),
+        );
+        buffer.insert(
+            "child".to_string(),
+            create_transform("parent", "child", Isometry3::translation(0.0, 1.0, 0.0)),
+        );
 
-//         assert_eq!(
-//             get_frame_children("world", &buffer)
-//                 .iter()
-//                 .map(|x| x.0.clone())
-//                 .collect::<Vec<String>>()
-//                 .sort(),
-//             vec!("dummy_2", "dummy_3").sort()
-//         );
-//     }
+        let result = lookup_transform_with_root("parent", "child", "root", &buffer);
 
-//     fn create_transform(
-//         parent_frame_id: &str,
-//         child_frame_id: &str,
-//         transform: Isometry3<f64>,
-//     ) -> SPTransformStamped {
-//         SPTransformStamped {
-//             active: true,
-//             time_stamp: Instant::now(),
-//             parent_frame_id: parent_frame_id.to_string(),
-//             child_frame_id: child_frame_id.to_string(),
-//             transform,
-//             metadata: Value::default(),
-//         }
-//     }
+        assert!(result.is_some());
+        let transform = result.unwrap();
+        assert_eq!(transform.parent_frame_id, "parent");
+        assert_eq!(transform.child_frame_id, "child");
 
-//     // Successful Transform Lookup
-//     #[test]
-//     fn test_successful_transform_lookup() {
-//         let mut buffer = HashMap::new();
-//         buffer.insert(
-//             "parent".to_string(),
-//             create_transform("root", "parent", Isometry3::translation(1.0, 0.0, 0.0)),
-//         );
-//         buffer.insert(
-//             "child".to_string(),
-//             create_transform("parent", "child", Isometry3::translation(0.0, 1.0, 0.0)),
-//         );
-
-//         let buffer = Arc::new(Mutex::new(buffer));
-
-//         let result = lookup_transform_with_root("parent", "child", "root", &buffer);
-
-//         assert!(result.is_some());
-//         let transform = result.unwrap();
-//         assert_eq!(transform.parent_frame_id, "parent");
-//         assert_eq!(transform.child_frame_id, "child");
-
-//         // We expect the result to be a combined transform of (1, 1, 0)
-//         let expected_transform = Isometry3::translation(0.0, 1.0, 0.0);
-//         assert_eq!(
-//             transform.transform.translation,
-//             expected_transform.translation
-//         );
-//     }
-// }
+        // We expect the result to be a combined transform of (1, 1, 0)
+        let expected_transform = Isometry3::translation(0.0, 1.0, 0.0);
+        assert_eq!(
+            transform.transform.translation,
+            isometry_to_sp_transform(expected_transform).translation
+        );
+    }
+}
