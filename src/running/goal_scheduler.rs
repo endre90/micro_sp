@@ -33,17 +33,29 @@ pub async fn goal_scheduler(
             .await?;
         let incoming_goals = response_rx.await?;
         let incoming_goals_and_prios = match incoming_goals {
-            SPValue::Map(MapOrUnknown::Map(map)) => map
-                .iter()
-                .map(|(goal, priority)| {
-                    let goal_id = nanoid::nanoid!();
-                    let goal_priority = GoalPriority::from_str(&priority.to_string());
-                    log::info!(target: &&format!("{}_goal_scheduler", name), 
-                        "New goal with id '{}' arrived: '{}'.", goal_id, goal.to_string());
-                    let _ = add_goal_to_state(&name, &goal_id, &goal, &goal_priority, &command_sender); // Need also goal from state to remove stuff
-                    (goal.clone(), goal_priority.to_int())
-                })
-                .collect::<Vec<(SPValue, i64)>>(),
+            SPValue::Map(map_or_unknown) => {
+                match map_or_unknown {
+                    MapOrUnknown::Map(map) => {
+                        map.iter()
+                            .map(|(goal, priority)| {
+                                let goal_id = nanoid::nanoid!();
+                                let goal_priority = GoalPriority::from_str(&priority.to_string());
+                                log::info!(target: &&format!("{}_goal_scheduler", name), 
+                                "New goal with id '{}' arrived: '{}'.", goal_id, goal.to_string());
+                                let _ = add_goal_to_state(
+                                    &name,
+                                    &goal_id,
+                                    &goal,
+                                    &goal_priority,
+                                    &command_sender,
+                                ); // Need also goal from state to remove stuff
+                                (goal.clone(), goal_priority.to_int())
+                            })
+                            .collect::<Vec<(SPValue, i64)>>()
+                    }
+                    MapOrUnknown::UNKNOWN => vec![],
+                }
+            }
             _ => {
                 log::error!(target: &&format!("{}_goal_scheduler", name), "Type of incoming_goals has to be a Map.");
                 vec![]
@@ -107,7 +119,7 @@ pub async fn goal_scheduler(
 
 async fn add_goal_to_state(
     name: &str, // micro_sp instance name
-    id: &str, // goal_id
+    id: &str,   // goal_id
     predicate: &SPValue,
     priority: &GoalPriority,
     command_sender: &mpsc::Sender<StateManagement>,
@@ -180,7 +192,6 @@ async fn add_goal_to_state(
 
     Ok(())
 }
-
 
 // #[cfg(test)]
 // mod tests {
@@ -364,7 +375,6 @@ async fn add_goal_to_state(
 //         }
 //         assert!(found_goal_1, "Could not find detailed state for goal_pred_1");
 
-
 //         // --- Cleanup ---
 //         // Stop the scheduler by dropping the sender (causes sends to fail)
 //         drop(command_sender);
@@ -441,7 +451,6 @@ async fn add_goal_to_state(
 
 //         // We expect details only for the 2 *new* goals processed in this run
 //         assert_eq!(goal_detail_keys.len(), 2, "Expected detail state for 2 new goals");
-
 
 //         drop(command_sender);
 //         let _ = scheduler_handle.await;
