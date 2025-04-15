@@ -1,3 +1,5 @@
+use std::time::SystemTime;
+
 use crate::*;
 use tokio::{
     sync::{mpsc, oneshot},
@@ -9,7 +11,7 @@ pub async fn goal_runner(
     model: &Model,
     command_sender: mpsc::Sender<StateManagement>,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let mut interval = interval(Duration::from_millis(3000));
+    let mut interval = interval(Duration::from_millis(100));
 
     log::info!(target: &&format!("{}_goal_runner", name), "Online.");
 
@@ -18,7 +20,7 @@ pub async fn goal_runner(
     let mut planner_information_old = "".to_string();
     let mut operation_state_old = "".to_string();
     let mut operation_information_old = "".to_string();
-    let mut plan_state_old = "".to_string();
+    let mut current_goal_state_old = "".to_string();
     let mut plan_old: Vec<String> = vec![];
 
     loop {
@@ -28,7 +30,7 @@ pub async fn goal_runner(
             .await?;
         let state = response_rx.await?;
 
-        let current_goal_state = state.get_string_or_default_to_unknown(
+        let mut current_goal_state = state.get_string_or_default_to_unknown(
             &format!("{}_goal_runner", name),
             &format!("{}_current_goal_state", name),
         );
@@ -52,7 +54,7 @@ pub async fn goal_runner(
                     let current_goal_id = first_goal_id.to_string();
                     let current_goal_predicate = state.get_string_or_default_to_unknown(
                         &format!("{}_goal_runner", name),
-                        &format!("{}_goal_{}_predicate", name, current_goal_id),
+                        &format!("{}_current_goal_predicate", name),
                     );
                     let current_goal_state = CurrentGoalState::Initial;
 
@@ -101,31 +103,31 @@ pub async fn goal_runner(
             }
             CurrentGoalState::Planning => {
                 let mut replan_trigger = state.get_bool_or_default_to_false(
-                    &format!("{}_planner_ticker", name),
+                    &format!("{}_goal_runner", name),
                     &format!("{}_replan_trigger", name),
                 );
                 let mut replanned = state.get_bool_or_default_to_false(
-                    &format!("{}_planner_ticker", name),
+                    &format!("{}_goal_runner", name),
                     &format!("{}_replanned", name),
                 );
                 let mut plan_counter = state.get_int_or_default_to_zero(
-                    &format!("{}_planner_ticker", name),
+                    &format!("{}_goal_runner", name),
                     &format!("{}_plan_counter", name),
                 );
                 let mut replan_counter = state.get_int_or_default_to_zero(
-                    &format!("{}_planner_ticker", name),
+                    &format!("{}_goal_runner", name),
                     &format!("{}_replan_counter", name),
                 );
                 let mut replan_counter_total = state.get_int_or_default_to_zero(
-                    &format!("{}_planner_ticker", name),
+                    &format!("{}_goal_runner", name),
                     &format!("{}_replan_counter_total", name),
                 );
                 let mut plan_current_step = state.get_int_or_default_to_zero(
-                    &format!("{}_planner_ticker", name),
+                    &format!("{}_goal_runner", name),
                     &format!("{}_plan_current_step", name),
                 );
                 let plan_of_sp_values = state.get_array_or_default_to_empty(
-                    &format!("{}_planner_ticker", name),
+                    &format!("{}_goal_runner", name),
                     &format!("{}_plan", name),
                 );
 
@@ -136,24 +138,24 @@ pub async fn goal_runner(
                     .collect();
 
                 let mut planner_information = state.get_string_or_default_to_unknown(
-                    &format!("{}_planner_ticker", name),
+                    &format!("{}_goal_runner", name),
                     &format!("{}_planner_information", name),
                 );
 
                 // Log only when something changes and not every tick
                 if plan_current_step_old != plan_current_step {
-                    log::info!(target: &format!("{}_planner_ticker", name), "Plan current step: {plan_current_step}.");
+                    log::info!(target: &format!("{}_goal_runner", name), "Plan current step: {plan_current_step}.");
                     plan_current_step_old = plan_current_step
                 }
 
                 if planner_information_old != planner_information {
-                    log::info!(target: &format!("{}_planner_ticker", name), "Planner info: {planner_information}");
+                    log::info!(target: &format!("{}_goal_runner", name), "Planner info: {planner_information}");
                     planner_information_old = planner_information.clone()
                 }
 
                 if plan_old != plan {
                     log::info!(
-                        target: &format!("{}_planner_ticker", name),
+                        target: &format!("{}_goal_runner", name),
                         "Got a plan:\n{}",
                         plan.iter()
                             .enumerate()
@@ -261,16 +263,12 @@ pub async fn goal_runner(
             }
             CurrentGoalState::Executing => {
                 let mut new_state = state.clone();
-                let mut plan_state = state.get_string_or_default_to_unknown(
-                    &format!("{}_operation_runner", name),
-                    &format!("{}_plan_state", name),
-                );
                 let mut plan_current_step = state.get_int_or_default_to_zero(
-                    &format!("{}_operation_runner", name),
+                    &format!("{}_goal_runner", name),
                     &format!("{}_plan_current_step", name),
                 );
                 let plan_of_sp_values = state.get_array_or_default_to_empty(
-                    &format!("{}_operation_runner", name),
+                    &format!("{}_goal_runner", name),
                     &format!("{}_plan", name),
                 );
 
@@ -281,132 +279,150 @@ pub async fn goal_runner(
                     .collect();
 
                 // Log only when something changes and not every tick
-                if plan_state_old != plan_state {
-                    log::info!(target: &format!("{}_operation_runner", name), "Plan current state: {plan_state}.");
-                    plan_state_old = plan_state.clone()
+                if current_goal_state_old != current_goal_state {
+                    log::info!(target: &format!("{}_goal_runner", name), "Goal in current state: {current_goal_state}.");
+                    current_goal_state_old = current_goal_state.clone()
                 }
 
-                match PlanState::from_str(&plan_state) {
-                    PlanState::Initial => {
-                        plan_state = PlanState::Executing.to_string();
-                        plan_current_step = 0;
+                if plan.len() > plan_current_step as usize {
+                    let operation = model
+                        .operations
+                        .iter()
+                        .find(|op| op.name == plan[plan_current_step as usize].to_string())
+                        .unwrap()
+                        .to_owned();
+
+                    let operation_state = state.get_string_or_default_to_unknown(
+                        &format!("{}_goal_runner", name),
+                        &format!("operation_{}", operation.name),
+                    );
+
+                    let mut operation_information = state.get_string_or_default_to_unknown(
+                        &format!("{}_goal_runner", name),
+                        &format!("operation_{}_information", operation.name),
+                    );
+
+                    let mut operation_retry_counter = state.get_int_or_default_to_zero(
+                        &format!("{}_goal_runner", name),
+                        &format!("operation_{}_retry_counter", operation.name),
+                    );
+
+                    let mut operation_start_time = state.get_time_or_unknown(
+                        &format!("{}_goal_runner", name),
+                        &format!("operation_{}_start_time", operation.name),
+                    );
+
+                    // Log only when something changes and not every tick
+                    if operation_state_old != operation_state {
+                        log::info!(target: &format!("{}_goal_runner", name), "Current state of operation {}: {}.", operation.name, operation_state);
+                        operation_state_old = operation_state.clone()
                     }
-                    PlanState::Executing => {
-                        if plan.len() > plan_current_step as usize {
-                            let operation = model
-                                .operations
-                                .iter()
-                                .find(|op| op.name == plan[plan_current_step as usize].to_string())
-                                .unwrap()
-                                .to_owned();
 
-                            let operation_state = state.get_string_or_default_to_unknown(
-                                &format!("{}_operation_runner", name),
-                                &format!("{}", operation.name),
-                            );
+                    if operation_information_old != operation_information {
+                        log::info!(target: &format!("{}_goal_runner", name), "Current operation '{}' info: {}.", operation.name, operation_information);
+                        operation_information_old = operation_information.clone()
+                    }
 
-                            let mut operation_information = state.get_string_or_default_to_unknown(
-                                &format!("{}_operation_runner", name),
-                                &format!("{}_information", operation.name),
-                            );
-
-                            let mut operation_retry_counter = state.get_int_or_default_to_zero(
-                                &format!("{}_operation_runner", name),
-                                &format!("{}_retry_counter", operation.name),
-                            );
-
-                            // let mut _operation_start_time = state.get_or_default_f64(
-                            //     &format!("{}_operation_runner", name),
-                            //     &format!("{}_start_time", operation.name),
-                            // );
-
-                            // Log only when something changes and not every tick
-                            if operation_state_old != operation_state {
-                                log::info!(target: &format!("{}_operation_runner", name), "Current state of operation {}: {}.", operation.name, operation_state);
-                                operation_state_old = operation_state.clone()
+                    match OperationState::from_str(&operation_state) {
+                        OperationState::Initial => {
+                            let now = SystemTime::now();
+                            if operation.eval_running(&state) {
+                                new_state = operation.start_running(&new_state);
+                                operation_start_time = TimeOrUnknown::Time(now);
                             }
-
-                            if operation_information_old != operation_information {
-                                log::info!(target: &format!("{}_operation_runner", name), "Current operation '{}' info: {}.", operation.name, operation_information);
-                                operation_information_old = operation_information.clone()
-                            }
-
-                            match OperationState::from_str(&operation_state) {
-                                OperationState::Initial => {
-                                    // let now = Instant::now();
-                                    if operation.eval_running(&state) {
-                                        new_state = operation.start_running(&new_state);
-                                        // _operation_start_time = Instant::now().duration_since(now).as_micros() as f64;
-                                    }
-                                }
-                                OperationState::Disabled => todo!(),
-                                OperationState::Executing => {
-                                    if operation.can_be_completed(&state) {
-                                        new_state = operation.clone().complete_running(&new_state);
-                                        operation_information = "Completing operation.".to_string();
-                                    } else if operation.can_be_failed(&state) {
-                                        new_state = operation.clone().fail_running(&new_state);
-                                        operation_information = "Failing operation.".to_string();
-                                    } else {
-                                        operation_information =
-                                            "Waiting to be completed.".to_string();
-                                    }
-                                }
-                                OperationState::Completed => {
-                                    operation_retry_counter = 0;
-                                    new_state = new_state.update(
-                                        &format!("{}_retry_counter", operation.name),
-                                        operation_retry_counter.to_spvalue(),
-                                    );
-                                    plan_current_step = plan_current_step + 1;
-                                }
-                                OperationState::Timedout => todo!(),
-                                OperationState::Failed => {
-                                    if operation_retry_counter < operation.retries {
-                                        operation_retry_counter = operation_retry_counter + 1;
-                                        operation_information = format!(
-                                            "Retrying. Retry nr. {} out of {}.",
-                                            operation_retry_counter, operation.retries
-                                        );
-                                        new_state = operation.clone().retry_running(&new_state);
-                                        new_state = new_state.update(
-                                            &format!("{}_retry_counter", operation.name),
-                                            operation_retry_counter.to_spvalue(),
-                                        );
-                                    } else {
-                                        operation_retry_counter = 0;
-                                        new_state = new_state.update(
-                                            &format!("{}_retry_counter", operation.name),
-                                            operation_retry_counter.to_spvalue(),
-                                        );
-                                        operation_information = format!(
-                                            "No more retries left. Failing the plan: {:?}",
-                                            plan
-                                        );
-                                        plan_state = PlanState::Failed.to_string();
-                                    }
-                                }
-                                OperationState::UNKNOWN => (),
-                            }
-
-                            new_state = new_state.update(
-                                &format!("{}_information", operation.name),
-                                operation_information.to_spvalue(),
-                            );
-                        } else {
-                            plan_state = PlanState::Completed.to_string();
                         }
+                        OperationState::Disabled => {
+                            operation_information = "Operation is disabled, waiting.".to_string();
+                            if operation.eval_running(&state) {
+                                new_state = operation.start_running(&new_state);
+                            }
+                        }
+                        OperationState::Executing => {
+                            if operation.can_be_completed(&state) {
+                                new_state = operation.clone().complete_running(&new_state);
+                                operation_information = "Completing operation.".to_string();
+                            } else if operation.can_be_failed(&state) {
+                                new_state = operation.clone().fail_running(&new_state);
+                                operation_information = "Failing operation.".to_string();
+                            } else {
+                                operation_information = "Waiting to be completed.".to_string();
+                                match operation_start_time {
+                                    TimeOrUnknown::Time(start_time_result) => {
+                                        match start_time_result.elapsed() {
+                                            Ok(start_time) => match operation.timeout_ms {
+                                                Some(timeout) => {
+                                                    if start_time.as_millis() > timeout {
+                                                        new_state =
+                                                            operation.timeout_running(&new_state);
+                                                    }
+                                                }
+                                                None => (),
+                                            },
+                                            Err(_) => {}
+                                        }
+                                    }
+                                    _ => {}
+                                }
+                            }
+                        }
+                        OperationState::Completed => {
+                            operation_retry_counter = 0;
+                            new_state = new_state.update(
+                                &format!("operation_{}_retry_counter", operation.name),
+                                operation_retry_counter.to_spvalue(),
+                            );
+                            plan_current_step = plan_current_step + 1;
+                        }
+                        OperationState::Timedout => {
+                            operation_information =
+                                format!("Operation '{}' timedout.", operation.name);
+                        }
+                        OperationState::Failed => {
+                            if operation_retry_counter < operation.retries {
+                                operation_retry_counter = operation_retry_counter + 1;
+                                operation_information = format!(
+                                    "Retrying. Retry nr. {} out of {}.",
+                                    operation_retry_counter, operation.retries
+                                );
+                                new_state = operation.clone().retry_running(&new_state);
+                                new_state = new_state.update(
+                                    &format!("operation_{}_retry_counter", operation.name),
+                                    operation_retry_counter.to_spvalue(),
+                                );
+                            } else {
+                                operation_retry_counter = 0;
+                                new_state = new_state.update(
+                                    &format!("operation_{}_retry_counter", operation.name),
+                                    operation_retry_counter.to_spvalue(),
+                                );
+                                operation_information = format!(
+                                    "No more operation retries left. Failing the plan: {:?}",
+                                    plan
+                                );
+                                current_goal_state = CurrentGoalState::Failed.to_string();
+                            }
+                        }
+                        OperationState::UNKNOWN => (),
                     }
-                    PlanState::Paused => {}
-                    PlanState::Failed => {}
-                    PlanState::NotFound => {}
-                    PlanState::Completed => {}
-                    PlanState::Cancelled => {}
-                    PlanState::UNKNOWN => {}
+
+                    new_state = new_state
+                        .update(
+                            &format!("operation_{}_information", operation.name),
+                            operation_information.to_spvalue(),
+                        )
+                        .update(
+                            &format!("operation_{}_start_time", name),
+                            operation_start_time.to_spvalue(),
+                        );
+                } else {
+                    current_goal_state = CurrentGoalState::Completed.to_string();
                 }
 
                 new_state = new_state
-                    .update(&format!("{}_plan_state", name), plan_state.to_spvalue())
+                    .update(
+                        &format!("{}_current_goal_state", name),
+                        current_goal_state.to_spvalue(),
+                    )
                     .update(
                         &format!("{}_plan_current_step", name),
                         plan_current_step.to_spvalue(),
@@ -418,7 +434,10 @@ pub async fn goal_runner(
                     .send(StateManagement::SetPartialState(modified_state))
                     .await?;
             }
-            CurrentGoalState::Paused => todo!(),
+            CurrentGoalState::Paused => {
+                log::warn!(target: &&format!("{}_goal_runner", name), 
+                    "The goal runner is paused.");
+            }
             CurrentGoalState::Failed => todo!(),
             CurrentGoalState::Aborted => todo!(),
             CurrentGoalState::Completed => todo!(),

@@ -434,6 +434,12 @@ impl ToSPValue for std::time::SystemTime {
     }
 }
 
+impl ToSPValue for TimeOrUnknown {
+    fn to_spvalue(&self) -> SPValue {
+        SPValue::Time(self.clone())
+    }
+}
+
 impl<T> ToSPValue for Vec<T>
 where
     T: ToSPValue,

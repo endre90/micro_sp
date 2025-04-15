@@ -196,3 +196,6 @@ pub async fn planned_operation_runner(
         interval.tick().await;
     }
 }
+
+// No planner, just runner. In this case the model has to be different
+// pub fn simple_operation_runner() {}

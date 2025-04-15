@@ -229,6 +229,16 @@ impl State {
         }
     }
 
+    pub fn get_time_or_unknown(&self, target: &str, name: &str) -> TimeOrUnknown {
+        match self.get_value(name) {
+            SPValue::Time(t) => t,
+            _ => {
+                log::error!(target: target, "Couldn't get time '{}' from the state, resulting to UNKNOWN.", name);
+                TimeOrUnknown::UNKNOWN
+            }
+        }
+    }
+
     /// Get the assignment of a variable in the state,
     /// or panic if the variable is not found.
     pub fn get_assignment(&self, name: &str) -> SPAssignment {

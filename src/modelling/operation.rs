@@ -1,4 +1,3 @@
-use ordered_float::OrderedFloat;
 use serde::{Deserialize, Serialize};
 use std::fmt;
 
@@ -63,7 +62,7 @@ impl fmt::Display for OperationState {
 pub struct Operation {
     pub name: String,
     pub state: OperationState,
-    pub timeout: Option<OrderedFloat<f64>>,
+    pub timeout_ms: Option<u128>,
     pub retries: i64,
     pub preconditions: Vec<Transition>,
     pub postconditions: Vec<Transition>,
@@ -75,7 +74,7 @@ pub struct Operation {
 impl Operation {
     pub fn new(
         name: &str,
-        timeout: Option<f64>,
+        timeout_ms: Option<u128>,
         retries: Option<i64>,
         preconditions: Vec<Transition>,
         postconditions: Vec<Transition>,
@@ -86,9 +85,9 @@ impl Operation {
         Operation {
             name: name.to_string(),
             state: OperationState::UNKNOWN,
-            timeout: match timeout {
-                None => Some(OrderedFloat::from(MAX_ALLOWED_OPERATION_DURATION)),
-                Some(x) => Some(OrderedFloat::from(x)),
+            timeout_ms: match timeout_ms {
+                None => Some(MAX_ALLOWED_OPERATION_DURATION_MS),
+                Some(x) => Some(x),
             },
             timeout_transitions,
             retries: match retries {
@@ -117,7 +116,8 @@ impl Operation {
     /// Execute the planing actions of both the pre and post conditions.
     /// Inex 0 taken as to indicate that the firstly defined transition should be taken when planning.
     pub fn take_planning(&self, state: &State) -> State {
-        self.postconditions[0].clone()
+        self.postconditions[0]
+            .clone()
             .take_planning(&self.preconditions[0].clone().take_planning(state))
     }
 
@@ -169,18 +169,6 @@ impl Operation {
         false
     }
 
-    /// Check the running timeout_transition guard.
-    pub fn can_be_timedout(&self, state: &State) -> bool {
-        if state.get_value(&self.name) == OperationState::Completed.to_spvalue() {
-            for timeout_transition in &self.timeout_transitions {
-                if timeout_transition.clone().eval_running(&state) {
-                    return true;
-                }
-            }
-        }
-        false
-    }
-
     /// Start executing the operation. Check for eval_running() first.
     pub fn start_running(&self, state: &State) -> State {
         let assignment = state.get_assignment(&self.name);
@@ -224,6 +212,23 @@ impl Operation {
                     let action =
                         Action::new(assignment.var, OperationState::Failed.to_spvalue().wrap());
                     return fail_transition.clone().take_running(&action.assign(&state));
+                }
+            }
+        }
+        state.clone()
+    }
+
+    /// Timeout an executing the operation.
+    pub fn timeout_running(&self, state: &State) -> State {
+        let assignment = state.get_assignment(&self.name);
+        if assignment.val == OperationState::Executing.to_spvalue() {
+            for timeout_transition in &self.timeout_transitions {
+                if timeout_transition.clone().eval_running(&state) {
+                    let action = Action::new(
+                        assignment.var,
+                        OperationState::Timedout.to_spvalue().wrap(),
+                    );
+                    return timeout_transition.clone().take_running(&action.assign(&state));
                 }
             }
         }
