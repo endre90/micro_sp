@@ -46,12 +46,12 @@ pub async fn goal_runner(
                         "Current goal state is Empty.");
                 // Load the first goal from the schedule to be executed
                 // remove it from the schedule and move up the goals
-                let scheduled_goals = state.get_array_or_default_to_empty(
+                let scheduled_goals = state.get_map_or_default_to_empty(
                     &format!("{}_goal_runner", name),
                     &format!("{}_scheduled_goals", name),
                 );
                 if let Some((first_goal_id, rest_of_the_goals)) = scheduled_goals.split_first() {
-                    let current_goal_id = first_goal_id.to_string();
+                    let current_goal_id = first_goal_id.0.to_string();
                     let current_goal_predicate = state.get_string_or_default_to_unknown(
                         &format!("{}_goal_runner", name),
                         &format!("{}_current_goal_predicate", name),
@@ -73,7 +73,7 @@ pub async fn goal_runner(
                         )
                         .update(
                             &format!("{}_scheduled_goals", name),
-                            SPValue::Array(ArrayOrUnknown::Array(rest_of_the_goals.to_vec())),
+                            SPValue::Map(MapOrUnknown::Map(rest_of_the_goals.to_vec())),
                         );
 
                     let modified_state = state.get_diff_partial_state(&new_state);
