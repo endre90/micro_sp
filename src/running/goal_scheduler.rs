@@ -71,32 +71,25 @@ pub async fn goal_scheduler(
                 .await?;
             let scheduled_goals = response_rx.await?;
 
-
-
-
             let mut scheduled_goals_and_prios = match scheduled_goals {
-                SPValue::Map(map_or_unknown) => {
-                    match map_or_unknown {
-                        MapOrUnknown::Map(map) => {
-                            map
-                            .iter()
-                            .map(|(goal_id, priority)| {
-                                (
-                                    goal_id.clone(),
-                                    GoalPriority::from_str(&priority.to_string()).to_int(),
-                                )
-                            })
-                            .collect::<Vec<(SPValue, i64)>>()
-                        },
-                        MapOrUnknown::UNKNOWN => vec![]
-                    }
-                }
+                SPValue::Map(map_or_unknown) => match map_or_unknown {
+                    MapOrUnknown::Map(map) => map
+                        .iter()
+                        .map(|(goal_id, priority)| {
+                            (
+                                goal_id.clone(),
+                                GoalPriority::from_str(&priority.to_string()).to_int(),
+                            )
+                        })
+                        .collect::<Vec<(SPValue, i64)>>(),
+                    MapOrUnknown::UNKNOWN => vec![],
+                },
                 _ => {
                     log::error!(target: &&format!("{}_goal_scheduler", name), "Type of scheduled_goals has to be a Map.");
                     vec![]
                 }
             };
-              
+
             scheduled_goals_and_prios.extend(incoming_goals_and_prios);
             scheduled_goals_and_prios.sort_by_key(|(_, v)| *v); // Keeps the order of equal elements
             let new_goal_schedule = SPValue::Map(MapOrUnknown::Map(

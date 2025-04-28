@@ -1,4 +1,7 @@
+// use r2r_transform::*;
+use redis::aio::MultiplexedConnection;
 use std::collections::HashMap;
+
 use std::env;
 
 use crate::*;
@@ -12,9 +15,11 @@ pub enum StateManagement {
     Get((String, oneshot::Sender<SPValue>)),
     SetPartialState(State),
     Set((String, SPValue)),
+    LoadTransformScenario(String), //((String, bool)), // path, overlay
     GetAllTransforms(oneshot::Sender<State>),
-    InsertTransform((String, SPTransformStamped)),
-    LookupTransform((String, String, oneshot::Sender<SPTransformStamped>))
+    LookupTransform((String, String, oneshot::Sender<SPTransformStamped>)),
+    InsertTransform((String, SPTransformStamped)), // Use r2r_transforms why not!
+                                                   // MoveTransform((String, SPTransform)), // move to a new position specified by SPTransform
 }
 
 // /// Available commands that the async tasks can ask from the transform manager.
@@ -104,6 +109,8 @@ pub async fn redis_state_manager(mut receiver: mpsc::Receiver<StateManagement>, 
 
     log::info!(target: &&format!("redis_state_manager"), "Online.");
 
+    // let space_tree_server = SpaceTreeServer::new("space_tree_server");
+
     let mut old_state = state.clone();
     let mut error_tracker = 0;
     let mut error_value = 0;
@@ -152,6 +159,38 @@ pub async fn redis_state_manager(mut receiver: mpsc::Receiver<StateManagement>, 
                 }
             }
 
+            StateManagement::LoadTransformScenario(path) => {
+                //, overlay)) => {
+                match list_frames_in_dir(&path) {
+                    Ok(list) => {
+                        let frames = load_new_scenario(&list);
+                        // if overlay {
+                        for frame in frames.values() {
+                            insert_transform(
+                                frame.child_frame_id.clone(),
+                                frame.clone(),
+                                con.clone(),
+                            )
+                            .await;
+                        }
+                        // } else {
+                        //     let buffer = self.local_buffer.lock().unwrap();
+                        //     frames
+                        //         .values()
+                        //         .filter(|frame| buffer.get(&frame.child_frame_id) == None)
+                        //         .for_each(|frame| {
+                        //             Self::insert_transform(
+                        //                 &self,
+                        //                 &frame.child_frame_id,
+                        //                 frame.clone(),
+                        //             )
+                        //         });
+                        // }
+                    }
+                    Err(e) => (),
+                }
+            }
+
             StateManagement::Get((var, response_sender)) => {
                 match con.get::<_, Option<String>>(&var).await {
                     Ok(val) => match val {
@@ -176,6 +215,9 @@ pub async fn redis_state_manager(mut receiver: mpsc::Receiver<StateManagement>, 
             }
 
             StateManagement::GetAllTransforms(response_sender) => {
+                // OR:
+                // space_tree_server.get_all()
+
                 match con.keys::<&str, Vec<String>>("transform_*").await {
                     Ok(keys) => match con
                         .mget::<&Vec<std::string::String>, Vec<Option<String>>>(&keys)
@@ -242,50 +284,55 @@ pub async fn redis_state_manager(mut receiver: mpsc::Receiver<StateManagement>, 
             }
 
             StateManagement::InsertTransform((name, transform)) => {
-                match con.keys::<&str, Vec<String>>("transform_*").await {
-                    Ok(keys) => match con
-                        .mget::<&Vec<std::string::String>, Vec<Option<String>>>(&keys)
-                        .await
-                    {
-                        Ok(values) => {
-                            let mut buffer: HashMap<String, SPTransformStamped> = HashMap::new();
-                            for (key, maybe_value) in keys.into_iter().zip(values.into_iter()) {
-                                if let Some(value) = maybe_value {
-                                    buffer.insert(key, serde_json::from_str(&value).unwrap());
-                                }
-                            }
+                (error_tracker, error) = insert_transform(name, transform, con.clone()).await;
+                // match con.keys::<&str, Vec<String>>("transform_*").await {
+                //     Ok(keys) => match con
+                //         .mget::<&Vec<std::string::String>, Vec<Option<String>>>(&keys)
+                //         .await
+                //     {
+                //         Ok(values) => {
+                //             let mut buffer: HashMap<String, SPTransformStamped> = HashMap::new();
+                //             for (key, maybe_value) in keys.into_iter().zip(values.into_iter()) {
+                //                 if let Some(value) = maybe_value {
+                //                     buffer.insert(key, serde_json::from_str(&value).unwrap());
+                //                 }
+                //             }
 
-                            if name != transform.child_frame_id {
-                                log::info!("Transform name '{name}' in buffer doesn't match the child_frame_id {}, 
-                                        they should be the same. Not added.", transform.child_frame_id);
-                            } else if let Some(_) = buffer.get(&name) {
-                                log::info!("Transform '{}' already exists, not added.", name);
-                            } else {
-                                let transform = transform.clone();
-                                if check_would_produce_cycle(&transform, &buffer) {
-                                    log::info!(
-                                        "Transform '{}' would produce cycle, not added.",
-                                        name
-                                    );
-                                } else {
-                                    buffer.insert(name.to_string(), transform);
-                                    log::info!("Inserted transform '{name}'.");
-                                }
-                            }
-                        }
-                        Err(e) => {
-                            error_tracker = 7;
-                            error = e.to_string();
-                        }
-                    },
-                    Err(e) => {
-                        error_tracker = 8;
-                        error = e.to_string();
-                    } //
-                }
+                //             if name != transform.child_frame_id {
+                //                 log::info!("Transform name '{name}' in buffer doesn't match the child_frame_id {},
+                //                         they should be the same. Not added.", transform.child_frame_id);
+                //             } else if let Some(_) = buffer.get(&name) {
+                //                 log::info!("Transform '{}' already exists, not added.", name);
+                //             } else {
+                //                 let transform = transform.clone();
+                //                 if check_would_produce_cycle(&transform, &buffer) {
+                //                     log::info!(
+                //                         "Transform '{}' would produce cycle, not added.",
+                //                         name
+                //                     );
+                //                 } else {
+                //                     buffer.insert(name.to_string(), transform);
+                //                     log::info!("Inserted transform '{name}'.");
+                //                 }
+                //             }
+                //         }
+                //         Err(e) => {
+                //             error_tracker = 7;
+                //             error = e.to_string();
+                //         }
+                //     },
+                //     Err(e) => {
+                //         error_tracker = 8;
+                //         error = e.to_string();
+                //     } //
+                // }
             }
 
-            StateManagement::LookupTransform((parent_frame_id, child_frame_id, response_sender)) => {
+            StateManagement::LookupTransform((
+                parent_frame_id,
+                child_frame_id,
+                response_sender,
+            )) => {
                 match con.keys::<&str, Vec<String>>("transform_*").await {
                     Ok(keys) => match con
                         .mget::<&Vec<std::string::String>, Vec<Option<String>>>(&keys)
@@ -301,30 +348,38 @@ pub async fn redis_state_manager(mut receiver: mpsc::Receiver<StateManagement>, 
 
                             match get_tree_root(&buffer) {
                                 Some(root) => {
-                                    match lookup_transform_with_root(&parent_frame_id, &child_frame_id, &root, &buffer) {
+                                    match lookup_transform_with_root(
+                                        &parent_frame_id,
+                                        &child_frame_id,
+                                        &root,
+                                        &buffer,
+                                    ) {
                                         Some(transform) => {
                                             let _ = response_sender.send(transform);
-                                        },
+                                        }
                                         None => {
                                             error_tracker = 9;
-                                            error = "couln't lookup transform".to_string()
+                                            error = "couldn't lookup transform".to_string()
                                         }
                                     }
-                                },
+                                }
                                 None => {
-                                     match lookup_transform_with_root(&parent_frame_id, &child_frame_id, "world", &buffer) {
+                                    match lookup_transform_with_root(
+                                        &parent_frame_id,
+                                        &child_frame_id,
+                                        "world",
+                                        &buffer,
+                                    ) {
                                         Some(transform) => {
                                             let _ = response_sender.send(transform);
-                                        },
+                                        }
                                         None => {
                                             error_tracker = 10;
-                                            error = "couln't lookup transform".to_string()
+                                            error = "couldn't lookup transform".to_string()
                                         }
-                                     }
+                                    }
                                 }
                             }
-
-
                         }
                         Err(e) => {
                             error_tracker = 11;
@@ -337,7 +392,6 @@ pub async fn redis_state_manager(mut receiver: mpsc::Receiver<StateManagement>, 
                     } //
                 }
             }
-
         }
 
         if error_value != error_tracker {
@@ -358,6 +412,121 @@ pub async fn redis_state_manager(mut receiver: mpsc::Receiver<StateManagement>, 
                 _ => unreachable!(),
             }
         }
+    }
+}
+
+async fn insert_transform(
+    name: String,
+    transform: SPTransformStamped,
+    mut con: MultiplexedConnection,
+) -> (i32, String) {
+    let mut error_tracker = 0;
+    let mut error: String = "".to_string();
+    match con.keys::<&str, Vec<String>>("transform_*").await {
+        Ok(keys) => {
+            match con
+                .mget::<&Vec<std::string::String>, Vec<Option<String>>>(&keys)
+                .await
+            {
+                Ok(values) => {
+                    let mut buffer: HashMap<String, SPTransformStamped> = HashMap::new();
+                    for (key, maybe_value) in keys.into_iter().zip(values.into_iter()) {
+                        if let Some(value) = maybe_value {
+                            buffer.insert(key, serde_json::from_str(&value).unwrap());
+                        }
+                    }
+
+                    if name != transform.child_frame_id {
+                        log::info!("Transform name '{name}' in buffer doesn't match the child_frame_id {}, 
+                            they should be the same. Not added.", transform.child_frame_id);
+                    } else if let Some(_) = buffer.get(&name) {
+                        log::info!("Transform '{}' already exists, not added.", name);
+                    } else {
+                        let transform = transform.clone();
+                        if check_would_produce_cycle(&transform, &buffer) {
+                            log::info!("Transform '{}' would produce cycle, not added.", name);
+                        } else {
+                            buffer.insert(name.to_string(), transform);
+                            log::info!("Inserted transform '{name}'.");
+                        }
+                    }
+                }
+                Err(e) => {
+                    error_tracker = 7;
+                    error = e.to_string();
+                }
+            }
+        }
+        Err(e) => {
+            error_tracker = 8;
+            error = e.to_string();
+        } //
+    }
+    (error_tracker, error)
+}
+
+#[cfg(test)]
+mod tests {
+
+    use crate::*;
+    use tokio::sync::{mpsc, oneshot};
+
+    // use testcontainers::{
+    //     core::{IntoContainerPort, WaitFor},
+    //     runners::AsyncRunner,
+    //     GenericImage,
+    // };
+
+    use redis::Client;
+    use testcontainers::{
+        core::{ContainerPort, IntoContainerPort, WaitFor},
+        runners::AsyncRunner,
+        GenericImage, ImageExt,
+    };
+
+    use testcontainers_modules::redis::Redis;
+
+    fn dummy_state() -> State {
+        let state = State::new();
+        let x = iv!("x");
+        let y = iv!("y");
+        let z = iv!("z");
+        let state = state.add(assign!(x, 1.to_spvalue()));
+        let state = state.add(assign!(y, 2.to_spvalue()));
+        let state = state.add(assign!(z, 3.to_spvalue()));
+        state
+    }
+
+    #[tokio::test]
+    async fn test_get() {
+        let container = Redis::default().with_mapped_port(6379, ContainerPort::Tcp(6379))
+            .start().await.unwrap();
+
+        let state = dummy_state();
+        let (tx, rx) = mpsc::channel(32); // Experiment with buffer size
+
+        tokio::task::spawn(async move { redis_state_manager(rx, state).await });
+
+        let (response_tx, response_rx) = oneshot::channel();
+        tx.send(StateManagement::GetState(response_tx))
+            .await
+            .expect("failed"); // TODO: maybe we can just ask for values from the guard
+        let recv_state = response_rx.await.expect("failed");
+
+        let x = recv_state.get_int_or_default_to_zero(&format!("test_case"), &format!("x"));
+
+        assert_eq!(1, x);
+        // drop(tx);
+
+        // // --- Wait for the manager task to finish ---
+        // // This ensures the manager loop exits cleanly and catches any panics
+        // // that might occur during its shutdown or regular operation.
+        // // Use a timeout here as well for robustness.
+        // match tokio::time::timeout(std::time::Duration::from_secs(1), manager_handle).await {
+        //     Ok(Ok(_)) => println!("State manager task finished cleanly."),
+        //     Ok(Err(e)) => panic!("State manager task panicked: {:?}", e),
+        //     Err(_) => panic!("Timed out waiting for state manager task to finish after channel close."),
+        // }
     }
 }
 
