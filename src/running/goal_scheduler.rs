@@ -32,7 +32,7 @@ pub async fn goal_scheduler(
             )))
             .await?;
         let incoming_goals = response_rx.await?;
-        let incoming_goals_and_prios = match incoming_goals {
+        let incoming_goals_and_prios = match incoming_goals.unwrap() {
             SPValue::Map(map_or_unknown) => {
                 match map_or_unknown {
                     MapOrUnknown::Map(map) => {
@@ -71,7 +71,7 @@ pub async fn goal_scheduler(
                 .await?;
             let scheduled_goals = response_rx.await?;
 
-            let mut scheduled_goals_and_prios = match scheduled_goals {
+            let mut scheduled_goals_and_prios = match scheduled_goals.unwrap() {
                 SPValue::Map(map_or_unknown) => match map_or_unknown {
                     MapOrUnknown::Map(map) => map
                         .iter()

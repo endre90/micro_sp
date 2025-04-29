@@ -86,6 +86,24 @@ pub struct SPRotation {
     pub w: OrderedFloat<f64>,
 }
 
+impl Default for SPTransform {
+    fn default() -> Self {
+        SPTransform {
+            translation: SPTranslation {
+                x: ordered_float::OrderedFloat(0.0),
+                y: ordered_float::OrderedFloat(0.0),
+                z: ordered_float::OrderedFloat(0.0),
+            },
+            rotation: SPRotation {
+                x: ordered_float::OrderedFloat(0.0),
+                y: ordered_float::OrderedFloat(0.0),
+                z: ordered_float::OrderedFloat(0.0),
+                w: ordered_float::OrderedFloat(1.0),
+            },
+        }
+    }
+}
+
 #[derive(Debug, PartialEq, Clone, Hash, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct SPTransformStamped {
     pub active: bool,
@@ -459,6 +477,47 @@ impl ToSPValue for Vec<SPValue> {
             SPValue::Array(ArrayOrUnknown::Array(vec![]))
         } else {
             SPValue::Array(ArrayOrUnknown::Array(self.clone()))
+        }
+    }
+}
+
+impl ToSPValue for SPTransformStamped {
+    fn to_spvalue(&self) -> SPValue {
+        SPValue::Transform(TransformOrUnknown::Transform(self.clone()))
+    }
+}
+
+pub trait ToIntOrUnknown {
+    fn to_int_or_unknown(self) -> IntOrUnknown;
+}
+
+pub trait ToInt64 {
+    fn to_int_or_zero(self) -> i64;
+}
+
+impl ToIntOrUnknown for SPValue {
+    fn to_int_or_unknown(self) -> IntOrUnknown {
+        match self {
+            SPValue::Int64(int_or_unknown) => int_or_unknown,
+            _ => {
+                log::error!(target: &&format!("sp_values"), "SPValue is not of type Int64. Taken UNKNOWN.");
+                IntOrUnknown::UNKNOWN
+            }
+        }
+    }
+}
+
+impl ToInt64 for SPValue {
+    fn to_int_or_zero(self) -> i64 {
+        match self {
+            SPValue::Int64(int_or_unknown) => match int_or_unknown {
+                IntOrUnknown::Int64(val) => val,
+                IntOrUnknown::UNKNOWN => 0,
+            },
+            _ => {
+                log::error!(target: &&format!("sp_values"), "SPValue is not of type Int64. Taken 0.");
+                0
+            }
         }
     }
 }

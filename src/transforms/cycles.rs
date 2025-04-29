@@ -3,7 +3,7 @@ use transforms::lookup::get_frame_children;
 use crate::*;
 use std::collections::HashMap;
 
-pub static MAX_TRANSFORM_CHAIN: u64 = 1000;
+// pub static MAX_TRANSFORM_CHAIN: u64 = 1000;
 
 // Check for cycles in the tree segment starting from this frame
 pub fn is_cyclic(frame: &str, buffer: &HashMap<String, SPTransformStamped>) -> bool {

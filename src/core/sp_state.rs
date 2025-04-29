@@ -239,6 +239,16 @@ impl State {
         }
     }
 
+    pub fn get_transform_or_unknown(&self, target: &str, name: &str) -> TransformOrUnknown {
+        match self.get_value(name) {
+            SPValue::Transform(t) => t,
+            _ => {
+                log::error!(target: target, "Couldn't get transform '{}' from the state, resulting to UNKNOWN.", name);
+                TransformOrUnknown::UNKNOWN
+            }
+        }
+    }
+
     /// Get the assignment of a variable in the state,
     /// or panic if the variable is not found.
     pub fn get_assignment(&self, name: &str) -> SPAssignment {
