@@ -106,7 +106,7 @@ impl Default for SPTransform {
 
 #[derive(Debug, PartialEq, Clone, Hash, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct SPTransformStamped {
-    pub active: bool,
+    pub active_transform: bool,
     pub time_stamp: SystemTime,
     pub parent_frame_id: String,
     pub child_frame_id: String,
@@ -194,7 +194,7 @@ impl fmt::Display for SPValue {
                     write!(
                         fmtr,
                         "TF(active={}, time={}, parent={}, child={}, translation:{}, rotation:{}, meta={})",
-                        ts_val.active,
+                        ts_val.active_transform,
                         time_str,
                         ts_val.parent_frame_id,
                         ts_val.child_frame_id,
@@ -378,7 +378,7 @@ impl SPValue {
 
                     format!(
                         "TF(active={}, time={}, parent={}, child={}, translation:{}, rotation:{}, meta={})",
-                        ts_val.active,
+                        ts_val.active_transform,
                         time_str,
                         ts_val.parent_frame_id,
                         ts_val.child_frame_id,
@@ -484,6 +484,12 @@ impl ToSPValue for Vec<SPValue> {
 impl ToSPValue for SPTransformStamped {
     fn to_spvalue(&self) -> SPValue {
         SPValue::Transform(TransformOrUnknown::Transform(self.clone()))
+    }
+}
+
+impl ToSPValue for TransformOrUnknown {
+    fn to_spvalue(&self) -> SPValue {
+        SPValue::Transform(self.clone())
     }
 }
 

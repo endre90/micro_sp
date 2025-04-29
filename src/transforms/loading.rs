@@ -86,8 +86,8 @@ pub fn load_new_scenario(scenario: &Vec<String>) -> HashMap<String, SPTransformS
 
         let metadata = json["metadata"].clone();
 
-        let active = if let Some(Value::Bool(val)) = metadata.get("active_transform") {
-            // println!("active_transform: {}", val);
+        let active_transform = if let Some(Value::Bool(val)) = metadata.get("active_transform") {
+            // println!("active_transform_transform: {}", val);
             *val
         } else {
             println!("active_transform not found or not a bool. Defaulting to true.");
@@ -106,7 +106,7 @@ pub fn load_new_scenario(scenario: &Vec<String>) -> HashMap<String, SPTransformS
             transforms_stamped.insert(
                 child_frame_id.clone(),
                 SPTransformStamped {
-                    active,
+                    active_transform,
                     time_stamp: SystemTime::now(),
                     child_frame_id,
                     parent_frame_id,

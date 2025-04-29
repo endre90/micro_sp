@@ -15,9 +15,8 @@ pub enum StateManagement {
     Get((String, oneshot::Sender<Option<SPValue>>)),
     SetPartialState(State),
     Set((String, SPValue)),
-    // Insert, need this to add new variables on the fly, and also transforms
-    InsertTransform((String, SPTransformStamped)), // Use r2r_transforms why not!
-    LoadTransformScenario(String),                 //((String, bool)), // path, overlay
+    InsertTransform((String, SPTransformStamped)),
+    LoadTransformScenario(String),
     // GetAllTransforms(oneshot::Sender<State>),
     LookupTransform((String, String, oneshot::Sender<SPTransformStamped>)),
     // MoveTransform((String, SPTransform)), // move to a new position specified by SPTransform
@@ -71,27 +70,22 @@ pub async fn redis_state_manager(mut receiver: mpsc::Receiver<StateManagement>, 
                     }
                     Err(e) => {
                         error_tracker = 2;
-                        error = e.to_string();
+                        error = format!("Cannot connect to Redis with error: {e}.");
                     }
                 },
                 Err(e) => {
                     error_tracker = 3;
-                    error = e.to_string();
+                    error = format!("Cannot connect to Redis with error: {e}.");
                 }
             }
+
             if error_value != error_tracker {
                 error_value = error_tracker;
                 match error_value {
                     0 => {
                         log::warn!(target: &&format!("redis_state_manager"), "Waiting for a Redis connection.")
                     }
-                    2 => {
-                        log::error!(target: &&format!("redis_state_manager"), "Cannot connect to Redis with error: {}.", error)
-                    }
-                    3 => {
-                        log::error!(target: &&format!("redis_state_manager"), "Cannot connect to Redis with error: {}.", error)
-                    }
-                    _ => unreachable!(),
+                    _ => log::error!(target: &&format!("redis_state_manager"), "{}", error),
                 }
             }
 
@@ -104,13 +98,11 @@ pub async fn redis_state_manager(mut receiver: mpsc::Receiver<StateManagement>, 
             .set::<_, String, String>(&var, serde_json::to_string(&assignment.val).unwrap())
             .await
         {
-            log::error!(target: &&format!("redis_state_manager"), "Failed to set initial value of {} with error {}.", var, e)
+            log::error!(target: &&format!("redis_state_manager"), "Failed to set initial value of {var} with error {e}.")
         }
     }
 
     log::info!(target: &&format!("redis_state_manager"), "Online.");
-
-    // let space_tree_server = SpaceTreeServer::new("space_tree_server");
 
     let mut old_state = state.clone();
     let mut error_tracker = 0;
@@ -124,47 +116,46 @@ pub async fn redis_state_manager(mut receiver: mpsc::Receiver<StateManagement>, 
                         .mget::<&Vec<std::string::String>, Vec<Option<String>>>(&keys)
                         .await
                     {
-                        // Ok(values) => {
-                        //     let mut map: HashMap<String, SPAssignment> = HashMap::new();
-                        //     for (key, maybe_value) in keys.into_iter().zip(values.into_iter()) {
-                        //         if let Some(value) = maybe_value {
-                        //             match serde_json::from_str(&value) {
-                        //                 Ok(value_deser) => {
-
-                        //                 },
-                        //                 Err(_) => ()
-                        //             }
-                        //             let var: SPVariable = serde_json::from_str(&key).unwrap();
-                        //             let val: SPValue = serde_json::from_str(&value).unwrap();
-
-                        //             let new_assignment = SPAssignment::new(
-                        //                 var,
-                        //                 val
-                        //             );
-                        //             map.insert(key, new_assignment);
-                        //         }
-                        //         // }
-                        //     }
-                        //     // we want to keep updating a copy of a state so that we can maintain it if
-                        //     // the connection to Redis gets disrupted
-                        //     let new_state = State { state: map };
-                        //     old_state = new_state;
-                        //     let _ = response_sender.send(old_state.clone());
-                        // }
                         Ok(values) => {
                             let mut map: HashMap<String, SPAssignment> = HashMap::new();
                             for (key, maybe_value) in keys.into_iter().zip(values.into_iter()) {
-                                // if state.contains(&key) { // test without this BUT MIGHT NEED IT!
-                                // Only get state that is locally tracked
                                 if let Some(value) = maybe_value {
-                                    let var = state.get_assignment(&key).var; //cant' have this if I want to add new variables
-                                    let new_assignment = SPAssignment::new(
-                                        var,
-                                        serde_json::from_str(&value).unwrap(),
-                                    );
-                                    map.insert(key, new_assignment);
+                                    match serde_json::from_str::<SPValue>(&value) {
+                                        Ok(deser_value) => {
+                                            let new_assignment = match deser_value {
+                                                SPValue::Bool(_) => {
+                                                    SPAssignment::new(bv!(&&key), deser_value)
+                                                }
+                                                SPValue::Float64(_) => {
+                                                    SPAssignment::new(fv!(&&key), deser_value)
+                                                }
+                                                SPValue::Int64(_) => {
+                                                    SPAssignment::new(iv!(&&key), deser_value)
+                                                }
+                                                SPValue::String(_) => {
+                                                    SPAssignment::new(v!(&&key), deser_value)
+                                                }
+                                                SPValue::Time(_) => {
+                                                    SPAssignment::new(tv!(&&key), deser_value)
+                                                }
+                                                SPValue::Array(_) => {
+                                                    SPAssignment::new(av!(&&key), deser_value)
+                                                }
+                                                SPValue::Map(_) => {
+                                                    SPAssignment::new(mv!(&&key), deser_value)
+                                                }
+                                                SPValue::Transform(_) => {
+                                                    SPAssignment::new(tfv!(&&key), deser_value)
+                                                }
+                                            };
+                                            map.insert(key, new_assignment);
+                                        }
+                                        Err(e) => {
+                                            log::error!(target: &&format!("redis_state_manager"), 
+                                            "Failed to deserialize '{key}' with error '{e}'.")
+                                        }
+                                    }
                                 }
-                                // }
                             }
                             // we want to keep updating a copy of a state so that we can maintain it if
                             // the connection to Redis gets disrupted
@@ -172,6 +163,7 @@ pub async fn redis_state_manager(mut receiver: mpsc::Receiver<StateManagement>, 
                             old_state = new_state;
                             let _ = response_sender.send(old_state.clone());
                         }
+
                         Err(e) => {
                             error_tracker = 1;
                             error = e.to_string();
@@ -187,60 +179,6 @@ pub async fn redis_state_manager(mut receiver: mpsc::Receiver<StateManagement>, 
                 }
             }
 
-            StateManagement::LoadTransformScenario(path) => {
-                //, overlay)) => {
-                match list_frames_in_dir(&path) {
-                    Ok(list) => {
-                        let frames = load_new_scenario(&list);
-                        // if overlay {
-                        for frame in frames.values() {
-                            insert_transform(
-                                frame.child_frame_id.clone(),
-                                frame.clone(),
-                                con.clone(),
-                            )
-                            .await;
-                        }
-                        // } else {
-                        //     let buffer = self.local_buffer.lock().unwrap();
-                        //     frames
-                        //         .values()
-                        //         .filter(|frame| buffer.get(&frame.child_frame_id) == None)
-                        //         .for_each(|frame| {
-                        //             Self::insert_transform(
-                        //                 &self,
-                        //                 &frame.child_frame_id,
-                        //                 frame.clone(),
-                        //             )
-                        //         });
-                        // }
-                    }
-                    Err(_e) => (),
-                }
-            }
-
-            // StateManagement::Get((var, response_sender)) => {
-            //     match con.get::<_, Option<String>>(&var).await {
-            //         Ok(val) => match val {
-            //             Some(redis_value) => {
-            //                 old_state =
-            //                     old_state.update(&var, serde_json::from_str(&redis_value).unwrap());
-            //                 let _ =
-            //                     response_sender.send(serde_json::from_str(&redis_value).unwrap());
-            //             }
-            //             None => {
-            //                 error_tracker = 3;
-            //                 error = format!("Failed to get variable {}.", var);
-            //                 let _ = response_sender.send(old_state.get_value(&var));
-            //             }
-            //         },
-            //         Err(e) => {
-            //             error_tracker = 4;
-            //             error = format!("Failed to get variable {} with error: {}.", var, e);
-            //             let _ = response_sender.send(old_state.get_value(&var));
-            //         }
-            //     }
-            // }
             StateManagement::Get((var, response_sender)) => {
                 match con.get::<_, Option<String>>(&var).await {
                     Ok(val) => match val {
@@ -249,7 +187,7 @@ pub async fn redis_state_manager(mut receiver: mpsc::Receiver<StateManagement>, 
                                 .send(match serde_json::from_str(&redis_value) {
                                     Ok(deser_value) => Some(deser_value),
                                     Err(e) => {
-                                        log::error!(target: &&format!("redis_state_manager"), "Deserialize failure with: {}", e);
+                                        log::error!(target: &&format!("redis_state_manager"), "Deserializing '{var}' failed with: {e}.");
                                         None
                                     }
                                 }) {
@@ -261,7 +199,7 @@ pub async fn redis_state_manager(mut receiver: mpsc::Receiver<StateManagement>, 
                             }
                         },
                         Err(e) => {
-                            log::error!(target: &&format!("redis_state_manager"), "Failed to get with: {}", e);
+                            log::error!(target: &&format!("redis_state_manager"), "Failed to get value '{var}' with: {e}.");
                             let _ = response_sender.send(None);
                         }
                     }
@@ -337,47 +275,38 @@ pub async fn redis_state_manager(mut receiver: mpsc::Receiver<StateManagement>, 
 
             StateManagement::InsertTransform((name, transform)) => {
                 (error_tracker, error) = insert_transform(name, transform, con.clone()).await;
-                // match con.keys::<&str, Vec<String>>("transform_*").await {
-                //     Ok(keys) => match con
-                //         .mget::<&Vec<std::string::String>, Vec<Option<String>>>(&keys)
-                //         .await
-                //     {
-                //         Ok(values) => {
-                //             let mut buffer: HashMap<String, SPTransformStamped> = HashMap::new();
-                //             for (key, maybe_value) in keys.into_iter().zip(values.into_iter()) {
-                //                 if let Some(value) = maybe_value {
-                //                     buffer.insert(key, serde_json::from_str(&value).unwrap());
-                //                 }
-                //             }
+            }
 
-                //             if name != transform.child_frame_id {
-                //                 log::info!("Transform name '{name}' in buffer doesn't match the child_frame_id {},
-                //                         they should be the same. Not added.", transform.child_frame_id);
-                //             } else if let Some(_) = buffer.get(&name) {
-                //                 log::info!("Transform '{}' already exists, not added.", name);
-                //             } else {
-                //                 let transform = transform.clone();
-                //                 if check_would_produce_cycle(&transform, &buffer) {
-                //                     log::info!(
-                //                         "Transform '{}' would produce cycle, not added.",
-                //                         name
-                //                     );
-                //                 } else {
-                //                     buffer.insert(name.to_string(), transform);
-                //                     log::info!("Inserted transform '{name}'.");
-                //                 }
-                //             }
-                //         }
-                //         Err(e) => {
-                //             error_tracker = 7;
-                //             error = e.to_string();
-                //         }
-                //     },
-                //     Err(e) => {
-                //         error_tracker = 8;
-                //         error = e.to_string();
-                //     } //
-                // }
+            StateManagement::LoadTransformScenario(path) => {
+                //, overlay)) => {
+                match list_frames_in_dir(&path) {
+                    Ok(list) => {
+                        let frames = load_new_scenario(&list);
+                        // if overlay {
+                        for frame in frames.values() {
+                            insert_transform(
+                                frame.child_frame_id.clone(),
+                                frame.clone(),
+                                con.clone(),
+                            )
+                            .await;
+                        }
+                        // } else {
+                        //     let buffer = self.local_buffer.lock().unwrap();
+                        //     frames
+                        //         .values()
+                        //         .filter(|frame| buffer.get(&frame.child_frame_id) == None)
+                        //         .for_each(|frame| {
+                        //             Self::insert_transform(
+                        //                 &self,
+                        //                 &frame.child_frame_id,
+                        //                 frame.clone(),
+                        //             )
+                        //         });
+                        // }
+                    }
+                    Err(_e) => (),
+                }
             }
 
             StateManagement::LookupTransform((
@@ -453,13 +382,39 @@ pub async fn redis_state_manager(mut receiver: mpsc::Receiver<StateManagement>, 
     }
 }
 
+// fn main() {
+//     let value = r#"{"type":"Transform","value":{"Transform":{"active_transform":false,"time_stamp":{"secs_since_epoch":1745932853,"nanos_since_epoch":923299840},"parent_frame_id":"world","child_frame_id":"floor","transform":{"translation":{"x":0.0,"y":0.0,"z":0.0},"rotation":{"x":0.0,"y":0.0,"z":0.0,"w":1.0}},"metadata":"UNKNOWN"}}}"#;
+
+//     // Now this deserialization should work if the Rust structs match the JSON
+//     match serde_json::from_str::<SPValue>(&value) {
+//         Ok(sp_value) => {
+//             println!("Successfully deserialized: {:?}", sp_value);
+
+//             // Example of accessing nested data
+//             if let SPValue::Transform(transform_or_unknown) = sp_value {
+//                 if let TransformOrUnknown::Transform(transform_data) = transform_or_unknown {
+//                     println!("Active transform: {}", transform_data.active_transform);
+//                     println!("Parent frame: {}", transform_data.parent_frame_id);
+//                     println!("Timestamp secs: {}", transform_data.time_stamp.secs_since_epoch);
+//                     println!("Translation x: {}", transform_data.transform.translation.x);
+//                 } else {
+//                      println!("Transform value was Unknown or another variant.");
+//                 }
+//             }
+//         }
+//         Err(e) => {
+//             eprintln!("Deserialization failed: {}", e);
+//         }
+//     }
+// }
+
 async fn insert_transform(
     name: String,
     transform: SPTransformStamped,
     mut con: MultiplexedConnection,
 ) -> (i32, String) {
     let mut error_tracker = 0;
-    let mut error: String = "asdf".to_string();
+    let mut error: String = "".to_string();
     match con.keys::<&str, Vec<String>>("transform_*").await {
         Ok(keys) => {
             if !keys.is_empty() {
@@ -471,7 +426,24 @@ async fn insert_transform(
                         let mut buffer: HashMap<String, SPTransformStamped> = HashMap::new();
                         for (key, maybe_value) in keys.into_iter().zip(values.into_iter()) {
                             if let Some(value) = maybe_value {
-                                buffer.insert(key, serde_json::from_str(&value).unwrap());
+                                match serde_json::from_str::<SPValue>(&value) {
+                                    Ok(val) => match val {
+                                        SPValue::Transform(TransformOrUnknown::Transform(
+                                            transf,
+                                        )) => {
+                                            buffer.insert(key, transf);
+                                        }
+                                        SPValue::Transform(TransformOrUnknown::UNKNOWN) => {
+                                            log::error!("Transform '{key}' is UNKNOWN.")
+                                        }
+                                        _ => log::error!(
+                                            "Transform '{key}' has to be of type Transform."
+                                        ),
+                                    },
+                                    Err(e) => log::error!(
+                                        "Transform '{key}' failed deserialization with: {e}."
+                                    ),
+                                }
                             }
                         }
 
@@ -668,7 +640,7 @@ mod tests {
 
     #[tokio::test]
     #[serial]
-    async fn test_set() {
+    async fn test_set_get() {
         let _container = Redis::default()
             .with_mapped_port(6379, ContainerPort::Tcp(6379))
             .start()
@@ -728,55 +700,143 @@ mod tests {
         assert_eq!(9, j);
     }
 
-    // #[tokio::test]
-    // #[serial]
-    // async fn test_insert_transform() {
-    //     let _container = Redis::default()
-    //         .with_mapped_port(6379, ContainerPort::Tcp(6379))
-    //         .start()
-    //         .await
-    //         .unwrap();
+    #[tokio::test]
+    #[serial]
+    async fn test_set_get_state() {
+        let _container = Redis::default()
+            .with_mapped_port(6379, ContainerPort::Tcp(6379))
+            .start()
+            .await
+            .unwrap();
 
-    //     let state = dummy_state();
+        let state = dummy_state();
 
-    //     let transform = SPTransformStamped {
-    //         active: true,
-    //         time_stamp: SystemTime::now(),
-    //         parent_frame_id: "a".to_string(),
-    //         child_frame_id: "b".to_string(),
-    //         transform: SPTransform::default(),
-    //         metadata: MapOrUnknown::UNKNOWN,
-    //     };
+        let (tx, rx) = mpsc::channel(32);
 
-    //     let (tx, rx) = mpsc::channel(32);
+        tokio::task::spawn(async move { redis_state_manager(rx, state).await });
 
-    //     tokio::task::spawn(async move { redis_state_manager(rx, state).await });
+        tx.send(StateManagement::Set(("x".to_string(), 5.to_spvalue())))
+            .await
+            .expect("failed");
 
-    //     tx.send(StateManagement::InsertTransform((
-    //         transform.child_frame_id.clone(),
-    //         transform,
-    //     )))
-    //     .await
-    //     .expect("failed");
+        tx.send(StateManagement::Set(("y".to_string(), 6.to_spvalue())))
+            .await
+            .expect("failed");
 
-    //     let (response_tx, response_rx) = oneshot::channel();
-    //     tx.send(StateManagement::GetState(response_tx))
-    //         .await
-    //         .expect("failed");
-    //     let recv_state = response_rx.await.expect("failed");
+        tx.send(StateManagement::Set(("j".to_string(), 9.to_spvalue())))
+            .await
+            .expect("failed");
 
-    //     // let t = match recv_state.get_transform_or_unknown(&format!("test_case"), &format!("b")) {
-    //     //     TransformOrUnknown::Transform(t) => t,
-    //     //     TransformOrUnknown::UNKNOWN => {
-    //     //         panic!("failed")
-    //     //     }
-    //     // };
+        let (response_tx, response_rx) = oneshot::channel();
+        tx.send(StateManagement::GetState(response_tx))
+            .await
+            .expect("failed");
+        let recv_state = response_rx.await.expect("failed");
 
-    //     // assert_eq!(true, t.active);
-    //     // assert_eq!("b", t.child_frame_id);
-    //     // assert_eq!("a", t.parent_frame_id);
-    //     // assert_eq!(SPTransform::default(), t.transform);
-    // }
+        let x = recv_state.get_int_or_default_to_zero(&format!("test_case"), &format!("x"));
+        let y = recv_state.get_int_or_default_to_zero(&format!("test_case"), &format!("y"));
+        let z = recv_state.get_int_or_default_to_zero(&format!("test_case"), &format!("z"));
+        let j = recv_state.get_int_or_default_to_zero(&format!("test_case"), &format!("j"));
+
+        assert_eq!(5, x);
+        assert_eq!(6, y);
+        assert_eq!(3, z);
+        assert_eq!(9, j);
+    }
+
+    #[tokio::test]
+    #[serial]
+    async fn test_insert_transform() {
+        let _container = Redis::default()
+            .with_mapped_port(6379, ContainerPort::Tcp(6379))
+            .start()
+            .await
+            .unwrap();
+
+        let state = dummy_state();
+
+        let transform = SPTransformStamped {
+            active_transform: true,
+            time_stamp: SystemTime::now(),
+            parent_frame_id: "a".to_string(),
+            child_frame_id: "b".to_string(),
+            transform: SPTransform::default(),
+            metadata: MapOrUnknown::UNKNOWN,
+        };
+
+        let (tx, rx) = mpsc::channel(32);
+
+        tokio::task::spawn(async move { redis_state_manager(rx, state).await });
+
+        tx.send(StateManagement::InsertTransform((
+            transform.child_frame_id.clone(),
+            transform,
+        )))
+        .await
+        .expect("failed");
+
+        let (response_tx, response_rx) = oneshot::channel();
+        tx.send(StateManagement::GetState(response_tx))
+            .await
+            .expect("failed");
+        let recv_state = response_rx.await.expect("failed");
+
+        let t = match recv_state
+            .get_transform_or_unknown(&format!("test_case"), &format!("transform_b"))
+        {
+            TransformOrUnknown::Transform(t) => t,
+            TransformOrUnknown::UNKNOWN => {
+                panic!("failed")
+            }
+        };
+
+        assert_eq!(true, t.active_transform);
+        assert_eq!("b", t.child_frame_id);
+        assert_eq!("a", t.parent_frame_id);
+        assert_eq!(SPTransform::default(), t.transform);
+    }
+
+    #[tokio::test]
+    #[serial]
+    async fn test_load_transform_scenario() {
+        let _container = Redis::default()
+            .with_mapped_port(6379, ContainerPort::Tcp(6379))
+            .start()
+            .await
+            .unwrap();
+
+        let state = dummy_state();
+
+        let path = "/home/endre/rust_crates/micro_sp/src/transforms/examples/data/";
+
+        let (tx, rx) = mpsc::channel(32);
+
+        tokio::task::spawn(async move { redis_state_manager(rx, state).await });
+
+        tx.send(StateManagement::LoadTransformScenario(path.to_string()))
+            .await
+            .expect("failed");
+
+        let (response_tx, response_rx) = oneshot::channel();
+        tx.send(StateManagement::GetState(response_tx))
+            .await
+            .expect("failed");
+        let recv_state = response_rx.await.expect("failed");
+
+        let t1 = match recv_state
+            .get_transform_or_unknown(&format!("test_case"), &format!("transform_frame_1"))
+        {
+            TransformOrUnknown::Transform(t) => t,
+            TransformOrUnknown::UNKNOWN => {
+                panic!("failed")
+            }
+        };
+
+        // assert_eq!(false, t1.active_transform);
+        assert_eq!("frame_1", t1.child_frame_id);
+        assert_eq!("world", t1.parent_frame_id);
+        // assert_eq!(SPTransform::default(), t1.transform);
+    }
 }
 
 // /// Instead of sharing the state with Arc<Mutex<State>>, use a buffer of state read/write requests.

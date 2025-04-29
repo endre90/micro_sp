@@ -71,7 +71,7 @@ pub fn lookup_transform_with_root(
                     chain.push(down_chain);
                     let iso_3 = isometry_chain_product(chain);
                     Some(SPTransformStamped {
-                        active: buffer_local.get(child_frame_id).unwrap().active,
+                        active_transform: buffer_local.get(child_frame_id).unwrap().active_transform,
                         time_stamp: SystemTime::now(),
                         parent_frame_id: parent_frame_id.to_string(),
                         child_frame_id: child_frame_id.to_string(),
@@ -498,7 +498,7 @@ mod tests {
             (
                 "finger".to_string(),
                 SPTransformStamped {
-                    active: true,
+                    active_transform: true,
                     time_stamp: SystemTime::now(),
                     child_frame_id: "finger".to_string(),
                     parent_frame_id: "hand".to_string(),
@@ -516,7 +516,7 @@ mod tests {
             (
                 "hand".to_string(),
                 SPTransformStamped {
-                    active: true,
+                    active_transform: true,
                     time_stamp: SystemTime::now(),
                     child_frame_id: "hand".to_string(),
                     parent_frame_id: "elbow".to_string(),
@@ -534,7 +534,7 @@ mod tests {
             (
                 "elbow".to_string(),
                 SPTransformStamped {
-                    active: true,
+                    active_transform: true,
                     time_stamp: SystemTime::now(),
                     child_frame_id: "elbow".to_string(),
                     parent_frame_id: "shoulder".to_string(),
@@ -552,7 +552,7 @@ mod tests {
             (
                 "shoulder".to_string(),
                 SPTransformStamped {
-                    active: false,
+                    active_transform: false,
                     time_stamp: SystemTime::now(),
                     child_frame_id: "shoulder".to_string(),
                     parent_frame_id: "world".to_string(),
@@ -577,7 +577,7 @@ mod tests {
 
     fn dummy_1_frame() -> SPTransformStamped {
         SPTransformStamped {
-            active: false,
+            active_transform: false,
             time_stamp: SystemTime::now(),
             parent_frame_id: "world".to_string(),
             child_frame_id: "dummy_1".to_string(),
@@ -588,7 +588,7 @@ mod tests {
 
     fn dummy_2_frame() -> SPTransformStamped {
         SPTransformStamped {
-            active: true,
+            active_transform: true,
             time_stamp: SystemTime::now(),
             parent_frame_id: "dummy_1".to_string(),
             child_frame_id: "dummy_2".to_string(),
@@ -599,7 +599,7 @@ mod tests {
 
     fn dummy_3_frame() -> SPTransformStamped {
         SPTransformStamped {
-            active: true,
+            active_transform: true,
             time_stamp: SystemTime::now(),
             parent_frame_id: "dummy_1".to_string(),
             child_frame_id: "dummy_3".to_string(),
@@ -681,7 +681,7 @@ mod tests {
         transform: Isometry3<f64>,
     ) -> SPTransformStamped {
         SPTransformStamped {
-            active: true,
+            active_transform: true,
             time_stamp: SystemTime::now(),
             parent_frame_id: parent_frame_id.to_string(),
             child_frame_id: child_frame_id.to_string(),

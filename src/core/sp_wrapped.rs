@@ -148,7 +148,7 @@ impl fmt::Display for SPWrapped {
                         write!(
                             fmtr,
                             "TF(active={}, time={}, parent={}, child={}, translation:{}, rotation:{}, meta={})",
-                            ts_val.active,
+                            ts_val.active_transform,
                             time_str,
                             ts_val.parent_frame_id,
                             ts_val.child_frame_id,
