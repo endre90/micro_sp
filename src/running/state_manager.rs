@@ -18,7 +18,7 @@ pub enum StateManagement {
     InsertTransform((String, SPTransformStamped)),
     LoadTransformScenario(String), // overlay?
     GetAllTransforms(oneshot::Sender<HashMap<String, SPTransformStamped>>),
-    LookupTransform((String, String, oneshot::Sender<SPTransformStamped>)),
+    LookupTransform((String, String, oneshot::Sender<SPTransformStamped>)), // Try to remove the transform prefix
     // MoveTransform((String, SPTransform)), // move to a new position specified by SPTransform
 }
 
@@ -466,6 +466,7 @@ mod tests {
     use std::time::SystemTime;
 
     use crate::*;
+    use ordered_float::OrderedFloat;
     use serial_test::serial;
     use tokio::sync::{mpsc, oneshot};
 
@@ -865,7 +866,47 @@ mod tests {
 
         assert_eq!("transform_1", lookup.child_frame_id);
         assert_eq!("transform_world", lookup.parent_frame_id);
-        // assert_eq!(SPTransform::default(), lookup.transform);
+
+        let assert_t = SPTransform { 
+            translation: SPTranslation { 
+                x: OrderedFloat(1.0), 
+                y: OrderedFloat(0.0), 
+                z: OrderedFloat(0.0) 
+            }, 
+            rotation: SPRotation { 
+                x: OrderedFloat(0.0), 
+                y: OrderedFloat(0.0), 
+                z: OrderedFloat(0.0), 
+                w: OrderedFloat(1.0) 
+            }
+        };
+
+        assert_eq!(assert_t, lookup.transform);
+
+        let (response_tx, response_rx) = oneshot::channel();
+        tx.send(StateManagement::LookupTransform(("transform_1".to_string(), "transform_5".to_string(), response_tx)))
+            .await
+            .expect("failed");
+        let lookup = response_rx.await.expect("failed");
+
+        assert_eq!("transform_5", lookup.child_frame_id);
+        assert_eq!("transform_1", lookup.parent_frame_id);
+
+        let assert_t = SPTransform { 
+            translation: SPTranslation { 
+                x: OrderedFloat(1.0), 
+                y: OrderedFloat(5.0), 
+                z: OrderedFloat(1.0) 
+            }, 
+            rotation: SPRotation { 
+                x: OrderedFloat(0.0), 
+                y: OrderedFloat(0.0), 
+                z: OrderedFloat(0.0), 
+                w: OrderedFloat(1.0) 
+            }
+        };
+
+        assert_eq!(assert_t, lookup.transform);
     }
 }
 

@@ -15,6 +15,7 @@
         }
     },
     "metadata": {
-        "active_transform": false
+        "active_transform": false,
+        "enable_transform": true
     }
 }

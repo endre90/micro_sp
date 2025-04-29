@@ -4,7 +4,7 @@
     "transform": {
         "translation": {
             "x": 0.0,
-            "y": -1.0,
+            "y": 4.0,
             "z": 1.0
         },
         "rotation": {
@@ -16,6 +16,7 @@
     },
     "metadata": {
         "active_transform": false,
+        "enable_transform": true,
         "key": "value_23"
     }
 }
