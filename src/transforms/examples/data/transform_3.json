@@ -1,6 +1,6 @@
 {
-    "parent_frame_id": "frame_1",
-    "child_frame_id": "frame_3",
+    "parent_frame_id": "transform_1",
+    "child_frame_id": "transform_3",
     "transform": {
         "translation": {
             "x": 1.0,

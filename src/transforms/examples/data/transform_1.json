@@ -1,11 +1,11 @@
 {
-    "parent_frame_id": "frame_3",
-    "child_frame_id": "frame_5",
+    "parent_frame_id": "transform_world",
+    "child_frame_id": "transform_1",
     "transform": {
         "translation": {
-            "x": 0.0,
-            "y": -1.0,
-            "z": 1.0
+            "x": 1.0,
+            "y": 0.0,
+            "z": 0.0
         },
         "rotation": {
             "x": 0.0,
@@ -15,7 +15,6 @@
         }
     },
     "metadata": {
-        "active_transform": false,
-        "key": "value_23"
+        "active_transform": false
     }
 }

@@ -104,6 +104,7 @@ pub fn parent_to_root(
 
     let res = loop {
         if length >= MAX_TRANSFORM_CHAIN {
+            log::error!(target: "transform_lookup", "Max transform chain exceeded.");
             break None;
         } else {
             length = length + 1;
@@ -116,7 +117,10 @@ pub fn parent_to_root(
                         current_parent = parent.parent_frame_id.to_string();
                     }
                 }
-                None => break None,
+                None => {
+                    log::error!(target: "transform_lookup", "Failed to get current parent.");
+                    break None
+                },
             }
         }
     };
@@ -147,6 +151,7 @@ pub fn root_to_child(
 
     let res = loop {
         if length >= MAX_TRANSFORM_CHAIN {
+            log::error!(target: "transform_lookup", "Max transform chain exceeded.");
             break None;
         } else {
             length = length + 1;
@@ -169,7 +174,10 @@ pub fn root_to_child(
                             })
                     }
                 }
-                None => break None,
+                None => {
+                    log::error!(target: "transform_lookup", "No frames in the stack.");
+                    break None
+                }
             }
         }
     };

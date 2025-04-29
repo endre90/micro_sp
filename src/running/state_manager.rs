@@ -12,12 +12,12 @@ use tokio::time::{interval, Duration};
 /// Available commands that the async tasks can ask from the state manager.
 pub enum StateManagement {
     GetState(oneshot::Sender<State>),
-    Get((String, oneshot::Sender<Option<SPValue>>)),
+    Get((String, oneshot::Sender<Option<SPValue>>)), // maybe respond here with the old value instead of option
     SetPartialState(State),
     Set((String, SPValue)),
     InsertTransform((String, SPTransformStamped)),
-    LoadTransformScenario(String),
-    // GetAllTransforms(oneshot::Sender<State>),
+    LoadTransformScenario(String), // overlay?
+    GetAllTransforms(oneshot::Sender<HashMap<String, SPTransformStamped>>),
     LookupTransform((String, String, oneshot::Sender<SPTransformStamped>)),
     // MoveTransform((String, SPTransform)), // move to a new position specified by SPTransform
 }
@@ -205,48 +205,23 @@ pub async fn redis_state_manager(mut receiver: mpsc::Receiver<StateManagement>, 
                     }
             }
 
-            // StateManagement::GetAllTransforms(response_sender) => {
-            //     // OR:
-            //     // space_tree_server.get_all()
+            StateManagement::GetAllTransforms(response_sender) => {
+                let transforms = get_all_transforms(con.clone()).await;
+                // let map = transforms
+                //     .iter()
+                //     .map(|(key, val)| {
+                //         (
+                //             key.clone(),
+                //             assign!(
+                //                 tfv!(&key),
+                //                 SPValue::Transform(TransformOrUnknown::Transform(val.clone()))
+                //             ),
+                //         )
+                //     })
+                //     .collect();
+                let _ = response_sender.send(transforms);
+            }
 
-            //     match con.keys::<&str, Vec<String>>("transform_*").await {
-            //         Ok(keys) => match con
-            //             .mget::<&Vec<std::string::String>, Vec<Option<String>>>(&keys)
-            //             .await
-            //         {
-            //             Ok(values) => {
-            //                 let mut map: HashMap<String, SPAssignment> = HashMap::new();
-            //                 for (key, maybe_value) in keys.into_iter().zip(values.into_iter()) {
-            //                     if let Some(value) = maybe_value {
-            //                         let var = state.get_assignment(&key).var;
-            //                         let new_assignment = SPAssignment::new(
-            //                             var,
-            //                             serde_json::from_str(&value).unwrap(),
-            //                         );
-            //                         map.insert(key, new_assignment);
-            //                     }
-            //                 }
-
-            //                 let _ = response_sender.send(State { state: map });
-            //             }
-            //             Err(e) => {
-            //                 error_tracker = 1;
-            //                 error = e.to_string();
-            //                 let _ = response_sender.send(State {
-            //                     state: HashMap::new(),
-            //                 });
-            //             }
-            //         },
-
-            //         Err(e) => {
-            //             error_tracker = 2;
-            //             error = e.to_string();
-            //             let _ = response_sender.send(State {
-            //                 state: HashMap::new(),
-            //             });
-            //         }
-            //     }
-            // }
             StateManagement::SetPartialState(partial_state) => {
                 for (var, assignment) in partial_state.state {
                     // state = state.update(&var, assignment.val.clone());
@@ -278,7 +253,6 @@ pub async fn redis_state_manager(mut receiver: mpsc::Receiver<StateManagement>, 
             }
 
             StateManagement::LoadTransformScenario(path) => {
-                //, overlay)) => {
                 match list_frames_in_dir(&path) {
                     Ok(list) => {
                         let frames = load_new_scenario(&list);
@@ -291,19 +265,6 @@ pub async fn redis_state_manager(mut receiver: mpsc::Receiver<StateManagement>, 
                             )
                             .await;
                         }
-                        // } else {
-                        //     let buffer = self.local_buffer.lock().unwrap();
-                        //     frames
-                        //         .values()
-                        //         .filter(|frame| buffer.get(&frame.child_frame_id) == None)
-                        //         .for_each(|frame| {
-                        //             Self::insert_transform(
-                        //                 &self,
-                        //                 &frame.child_frame_id,
-                        //                 frame.clone(),
-                        //             )
-                        //         });
-                        // }
                     }
                     Err(_e) => (),
                 }
@@ -314,63 +275,41 @@ pub async fn redis_state_manager(mut receiver: mpsc::Receiver<StateManagement>, 
                 child_frame_id,
                 response_sender,
             )) => {
-                match con.keys::<&str, Vec<String>>("transform_*").await {
-                    Ok(keys) => match con
-                        .mget::<&Vec<std::string::String>, Vec<Option<String>>>(&keys)
-                        .await
-                    {
-                        Ok(values) => {
-                            let mut buffer: HashMap<String, SPTransformStamped> = HashMap::new();
-                            for (key, maybe_value) in keys.into_iter().zip(values.into_iter()) {
-                                if let Some(value) = maybe_value {
-                                    buffer.insert(key, serde_json::from_str(&value).unwrap());
-                                }
-                            }
+                let buffer = get_all_transforms(con.clone()).await;
 
-                            match get_tree_root(&buffer) {
-                                Some(root) => {
-                                    match lookup_transform_with_root(
-                                        &parent_frame_id,
-                                        &child_frame_id,
-                                        &root,
-                                        &buffer,
-                                    ) {
-                                        Some(transform) => {
-                                            let _ = response_sender.send(transform);
-                                        }
-                                        None => {
-                                            error_tracker = 9;
-                                            error = "couldn't lookup transform".to_string()
-                                        }
-                                    }
-                                }
-                                None => {
-                                    match lookup_transform_with_root(
-                                        &parent_frame_id,
-                                        &child_frame_id,
-                                        "world",
-                                        &buffer,
-                                    ) {
-                                        Some(transform) => {
-                                            let _ = response_sender.send(transform);
-                                        }
-                                        None => {
-                                            error_tracker = 10;
-                                            error = "couldn't lookup transform".to_string()
-                                        }
-                                    }
-                                }
+                match get_tree_root(&buffer) {
+                    Some(root) => {
+                        match lookup_transform_with_root(
+                            &parent_frame_id,
+                            &child_frame_id,
+                            &root,
+                            &buffer,
+                        ) {
+                            Some(transform) => {
+                                let _ = response_sender.send(transform);
+                            }
+                            None => {
+                                error_tracker = 9;
+                                error = "couldn't lookup transform".to_string()
                             }
                         }
-                        Err(e) => {
-                            error_tracker = 11;
-                            error = e.to_string();
+                    }
+                    None => {
+                        match lookup_transform_with_root(
+                            &parent_frame_id,
+                            &child_frame_id,
+                            "world",
+                            &buffer,
+                        ) {
+                            Some(transform) => {
+                                let _ = response_sender.send(transform);
+                            }
+                            None => {
+                                error_tracker = 10;
+                                error = "couldn't lookup transform".to_string()
+                            }
                         }
-                    },
-                    Err(e) => {
-                        error_tracker = 12;
-                        error = e.to_string();
-                    } //
+                    }
                 }
             }
         }
@@ -382,31 +321,49 @@ pub async fn redis_state_manager(mut receiver: mpsc::Receiver<StateManagement>, 
     }
 }
 
-// fn main() {
-//     let value = r#"{"type":"Transform","value":{"Transform":{"active_transform":false,"time_stamp":{"secs_since_epoch":1745932853,"nanos_since_epoch":923299840},"parent_frame_id":"world","child_frame_id":"floor","transform":{"translation":{"x":0.0,"y":0.0,"z":0.0},"rotation":{"x":0.0,"y":0.0,"z":0.0,"w":1.0}},"metadata":"UNKNOWN"}}}"#;
-
-//     // Now this deserialization should work if the Rust structs match the JSON
-//     match serde_json::from_str::<SPValue>(&value) {
-//         Ok(sp_value) => {
-//             println!("Successfully deserialized: {:?}", sp_value);
-
-//             // Example of accessing nested data
-//             if let SPValue::Transform(transform_or_unknown) = sp_value {
-//                 if let TransformOrUnknown::Transform(transform_data) = transform_or_unknown {
-//                     println!("Active transform: {}", transform_data.active_transform);
-//                     println!("Parent frame: {}", transform_data.parent_frame_id);
-//                     println!("Timestamp secs: {}", transform_data.time_stamp.secs_since_epoch);
-//                     println!("Translation x: {}", transform_data.transform.translation.x);
-//                 } else {
-//                      println!("Transform value was Unknown or another variant.");
-//                 }
-//             }
-//         }
-//         Err(e) => {
-//             eprintln!("Deserialization failed: {}", e);
-//         }
-//     }
-// }
+async fn get_all_transforms(mut con: MultiplexedConnection) -> HashMap<String, SPTransformStamped> {
+    match con.keys::<&str, Vec<String>>("transform_*").await {
+        Ok(keys) => {
+            match con
+                .mget::<&Vec<std::string::String>, Vec<Option<String>>>(&keys)
+                .await
+            {
+                Ok(values) => {
+                    let mut buffer: HashMap<String, SPTransformStamped> = HashMap::new();
+                    for (key, maybe_value) in keys.into_iter().zip(values.into_iter()) {
+                        if let Some(value) = maybe_value {
+                            match serde_json::from_str::<SPValue>(&value) {
+                                Ok(val) => match val {
+                                    SPValue::Transform(TransformOrUnknown::Transform(transf)) => {
+                                        buffer.insert(key, transf);
+                                    }
+                                    SPValue::Transform(TransformOrUnknown::UNKNOWN) => {
+                                        log::error!("Transform '{key}' is UNKNOWN.")
+                                    }
+                                    _ => log::error!(
+                                        "Transform '{key}' has to be of type Transform."
+                                    ),
+                                },
+                                Err(e) => log::error!(
+                                    "Transform '{key}' failed deserialization with: {e}."
+                                ),
+                            }
+                        }
+                    }
+                    buffer
+                }
+                Err(e) => {
+                    log::error!("Failed to get values with: {e}.");
+                    HashMap::new()
+                }
+            }
+        }
+        Err(e) => {
+            log::error!("Failed to get values with: {e}.");
+            HashMap::new()
+        }
+    }
+}
 
 async fn insert_transform(
     name: String,
@@ -459,7 +416,7 @@ async fn insert_transform(
                             } else {
                                 if let Err(e) = con
                                     .set::<_, String, Value>(
-                                        &format!("transform_{name}"),
+                                        &format!("{name}"),
                                         serde_json::to_string(&transform.to_spvalue()).unwrap(),
                                     )
                                     .await
@@ -483,7 +440,7 @@ async fn insert_transform(
             } else {
                 if let Err(e) = con
                     .set::<_, String, Value>(
-                        &format!("transform_{name}"),
+                        &format!("{name}"),
                         serde_json::to_string(&transform.to_spvalue()).unwrap(),
                     )
                     .await
@@ -498,7 +455,7 @@ async fn insert_transform(
         Err(e) => {
             error_tracker = 8;
             error = e.to_string();
-        } //
+        }
     }
     (error_tracker, error)
 }
@@ -758,8 +715,8 @@ mod tests {
         let transform = SPTransformStamped {
             active_transform: true,
             time_stamp: SystemTime::now(),
-            parent_frame_id: "a".to_string(),
-            child_frame_id: "b".to_string(),
+            parent_frame_id: "transform_a".to_string(),
+            child_frame_id: "transform_b".to_string(),
             transform: SPTransform::default(),
             metadata: MapOrUnknown::UNKNOWN,
         };
@@ -791,8 +748,8 @@ mod tests {
         };
 
         assert_eq!(true, t.active_transform);
-        assert_eq!("b", t.child_frame_id);
-        assert_eq!("a", t.parent_frame_id);
+        assert_eq!("transform_b", t.child_frame_id);
+        assert_eq!("transform_a", t.parent_frame_id);
         assert_eq!(SPTransform::default(), t.transform);
     }
 
@@ -824,7 +781,7 @@ mod tests {
         let recv_state = response_rx.await.expect("failed");
 
         let t1 = match recv_state
-            .get_transform_or_unknown(&format!("test_case"), &format!("transform_frame_1"))
+            .get_transform_or_unknown(&format!("test_case"), &format!("transform_1"))
         {
             TransformOrUnknown::Transform(t) => t,
             TransformOrUnknown::UNKNOWN => {
@@ -832,10 +789,83 @@ mod tests {
             }
         };
 
-        // assert_eq!(false, t1.active_transform);
-        assert_eq!("frame_1", t1.child_frame_id);
-        assert_eq!("world", t1.parent_frame_id);
-        // assert_eq!(SPTransform::default(), t1.transform);
+        let t2 = match recv_state
+            .get_transform_or_unknown(&format!("test_case"), &format!("transform_2"))
+        {
+            TransformOrUnknown::Transform(t) => t,
+            TransformOrUnknown::UNKNOWN => {
+                panic!("failed")
+            }
+        };
+
+        assert_eq!(false, t1.active_transform);
+        assert_eq!("transform_1", t1.child_frame_id);
+        assert_eq!("transform_world", t1.parent_frame_id);
+        assert_eq!("transform_2", t2.child_frame_id);
+        assert_eq!("transform_1", t2.parent_frame_id);
+        assert_ne!(SPTransform::default(), t1.transform);
+    }
+
+    #[tokio::test]
+    #[serial]
+    async fn test_get_all_transforms() {
+        let _container = Redis::default()
+            .with_mapped_port(6379, ContainerPort::Tcp(6379))
+            .start()
+            .await
+            .unwrap();
+
+        let state = dummy_state();
+
+        let path = "/home/endre/rust_crates/micro_sp/src/transforms/examples/data/";
+
+        let (tx, rx) = mpsc::channel(32);
+
+        tokio::task::spawn(async move { redis_state_manager(rx, state).await });
+
+        tx.send(StateManagement::LoadTransformScenario(path.to_string()))
+            .await
+            .expect("failed");
+
+        let (response_tx, response_rx) = oneshot::channel();
+        tx.send(StateManagement::GetAllTransforms(response_tx))
+            .await
+            .expect("failed");
+        let transforms = response_rx.await.expect("failed");
+
+        assert_eq!(6, transforms.len());
+    }
+
+    #[tokio::test]
+    #[serial]
+    async fn test_lookup_transforms() {
+        let _container = Redis::default()
+            .with_mapped_port(6379, ContainerPort::Tcp(6379))
+            .start()
+            .await
+            .unwrap();
+
+        let state = dummy_state();
+
+        let path = "/home/endre/rust_crates/micro_sp/src/transforms/examples/data/";
+
+        let (tx, rx) = mpsc::channel(32);
+
+        tokio::task::spawn(async move { redis_state_manager(rx, state).await });
+
+        tx.send(StateManagement::LoadTransformScenario(path.to_string()))
+            .await
+            .expect("failed");
+
+        let (response_tx, response_rx) = oneshot::channel();
+        tx.send(StateManagement::LookupTransform(("transform_world".to_string(), "transform_1".to_string(), response_tx)))
+            .await
+            .expect("failed");
+        let lookup = response_rx.await.expect("failed");
+
+        assert_eq!("transform_1", lookup.child_frame_id);
+        assert_eq!("transform_world", lookup.parent_frame_id);
+        // assert_eq!(SPTransform::default(), lookup.transform);
     }
 }
 
