@@ -38,7 +38,7 @@ pub enum StateManagement {
 // MArtin: If you have more than one command for redis to do, use a pipeline to group commands together
 
 // put this in another process that we can trigger from outside to reconnect if dsconnected
-pub async fn redis_state_manager(mut receiver: mpsc::Receiver<StateManagement>, state: State) {
+pub async fn redis_state_manager(mut receiver: mpsc::Receiver<StateManagement>, state: State) -> Result<(), Box<dyn std::error::Error>> {
     let mut con = {
         let mut interval = interval(Duration::from_millis(100));
         let mut error_tracker;
@@ -309,6 +309,9 @@ pub async fn redis_state_manager(mut receiver: mpsc::Receiver<StateManagement>, 
             log::error!(target: &&format!("redis_state_manager"), "{}", error)
         }
     }
+
+    Ok(())
+
 }
 
 async fn get_all_transforms(mut con: MultiplexedConnection) -> HashMap<String, SPTransformStamped> {
@@ -487,7 +490,14 @@ mod tests {
         let state = dummy_state();
         let (tx, rx) = mpsc::channel(32);
 
-        tokio::task::spawn(async move { redis_state_manager(rx, state).await });
+        tokio::task::spawn(async move {
+            match redis_state_manager(rx, state)
+            .await
+            {
+                Ok(()) => (),
+                Err(e) => log::error!(target: &&format!("redis_state_manager"), "{}", e),
+            };
+        });
 
         let (response_tx, response_rx) = oneshot::channel();
         tx.send(StateManagement::GetState(response_tx))
@@ -516,7 +526,14 @@ mod tests {
         let state = dummy_state();
         let (tx, rx) = mpsc::channel(32);
 
-        tokio::task::spawn(async move { redis_state_manager(rx, state).await });
+        tokio::task::spawn(async move {
+            match redis_state_manager(rx, state)
+            .await
+            {
+                Ok(()) => (),
+                Err(e) => log::error!(target: &&format!("redis_state_manager"), "{}", e),
+            };
+        });
 
         let (response_tx, response_rx) = oneshot::channel();
         tx.send(StateManagement::Get(("x".to_string(), response_tx)))
@@ -565,7 +582,14 @@ mod tests {
 
         let (tx, rx) = mpsc::channel(32);
 
-        tokio::task::spawn(async move { redis_state_manager(rx, state).await });
+        tokio::task::spawn(async move {
+            match redis_state_manager(rx, state)
+            .await
+            {
+                Ok(()) => (),
+                Err(e) => log::error!(target: &&format!("redis_state_manager"), "{}", e),
+            };
+        });
 
         tx.send(StateManagement::SetPartialState(modified_state))
             .await
@@ -599,7 +623,14 @@ mod tests {
 
         let (tx, rx) = mpsc::channel(32);
 
-        tokio::task::spawn(async move { redis_state_manager(rx, state).await });
+        tokio::task::spawn(async move {
+            match redis_state_manager(rx, state)
+            .await
+            {
+                Ok(()) => (),
+                Err(e) => log::error!(target: &&format!("redis_state_manager"), "{}", e),
+            };
+        });
 
         tx.send(StateManagement::Set(("x".to_string(), 5.to_spvalue())))
             .await
@@ -661,7 +692,14 @@ mod tests {
 
         let (tx, rx) = mpsc::channel(32);
 
-        tokio::task::spawn(async move { redis_state_manager(rx, state).await });
+        tokio::task::spawn(async move {
+            match redis_state_manager(rx, state)
+            .await
+            {
+                Ok(()) => (),
+                Err(e) => log::error!(target: &&format!("redis_state_manager"), "{}", e),
+            };
+        });
 
         tx.send(StateManagement::Set(("x".to_string(), 5.to_spvalue())))
             .await
@@ -715,7 +753,14 @@ mod tests {
 
         let (tx, rx) = mpsc::channel(32);
 
-        tokio::task::spawn(async move { redis_state_manager(rx, state).await });
+        tokio::task::spawn(async move {
+            match redis_state_manager(rx, state)
+            .await
+            {
+                Ok(()) => (),
+                Err(e) => log::error!(target: &&format!("redis_state_manager"), "{}", e),
+            };
+        });
 
         tx.send(StateManagement::InsertTransform((
             transform.child_frame_id.clone(),
@@ -760,7 +805,14 @@ mod tests {
 
         let (tx, rx) = mpsc::channel(32);
 
-        tokio::task::spawn(async move { redis_state_manager(rx, state).await });
+        tokio::task::spawn(async move {
+            match redis_state_manager(rx, state)
+            .await
+            {
+                Ok(()) => (),
+                Err(e) => log::error!(target: &&format!("redis_state_manager"), "{}", e),
+            };
+        });
 
         tx.send(StateManagement::LoadTransformScenario(path.to_string()))
             .await
@@ -813,7 +865,14 @@ mod tests {
 
         let (tx, rx) = mpsc::channel(32);
 
-        tokio::task::spawn(async move { redis_state_manager(rx, state).await });
+        tokio::task::spawn(async move {
+            match redis_state_manager(rx, state)
+            .await
+            {
+                Ok(()) => (),
+                Err(e) => log::error!(target: &&format!("redis_state_manager"), "{}", e),
+            };
+        });
 
         tx.send(StateManagement::LoadTransformScenario(path.to_string()))
             .await
@@ -843,7 +902,14 @@ mod tests {
 
         let (tx, rx) = mpsc::channel(32);
 
-        tokio::task::spawn(async move { redis_state_manager(rx, state).await });
+        tokio::task::spawn(async move {
+            match redis_state_manager(rx, state)
+            .await
+            {
+                Ok(()) => (),
+                Err(e) => log::error!(target: &&format!("redis_state_manager"), "{}", e),
+            };
+        });
 
         tx.send(StateManagement::LoadTransformScenario(path.to_string()))
             .await

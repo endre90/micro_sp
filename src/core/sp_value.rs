@@ -115,21 +115,6 @@ pub struct SPTransformStamped {
     pub metadata: MapOrUnknown,
 }
 
-#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
-pub struct PotentialTransformMetadata {
-    pub frame_threshold_zone: Option<f64>,    // when are you "at" the frame, threshold, in meters
-    pub next_frame: Option<HashSet<String>>,  // next frame, good for visualizing path plans
-    pub frame_type: Option<String>,           // can be used separate waypoint, tag, human, etc.
-    pub visualize_mesh: bool,
-    pub mesh_type: i32,                       // 1 - cube, 2 - sphere, 3 - cylinder or 10 - mesh (provide path)
-    pub mesh_path: Option<String>,
-    pub mesh_scale: f32,
-    pub mesh_r: f32,
-    pub mesh_g: f32,
-    pub mesh_b: f32,
-    pub mesh_a: f32,
-}
-
 /// Displaying the value of an SPValue instance in a user-friendly way.
 impl fmt::Display for SPValue {
     fn fmt(&self, fmtr: &mut fmt::Formatter<'_>) -> fmt::Result {
