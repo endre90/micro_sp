@@ -130,24 +130,6 @@ pub struct PotentialTransformMetadata {
     pub mesh_a: f32,
 }
 
-impl Default for PotentialTransformMetadata {
-    fn default() -> Self {
-        PotentialTransformMetadata { 
-            frame_threshold_zone: None, 
-            next_frame: None, 
-            frame_type: None, 
-            visualize_mesh: false, 
-            mesh_type: 10, 
-            mesh_path: None, 
-            mesh_scale: 0.001, 
-            mesh_r: 1.0, 
-            mesh_g: 1.0, 
-            mesh_b: 1.0, 
-            mesh_a: 1.0 
-        }
-    }
-}
-
 /// Displaying the value of an SPValue instance in a user-friendly way.
 impl fmt::Display for SPValue {
     fn fmt(&self, fmtr: &mut fmt::Formatter<'_>) -> fmt::Result {
