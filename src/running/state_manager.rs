@@ -22,16 +22,6 @@ pub enum StateManagement {
     // MoveTransform((String, SPTransform)), // move to a new position specified by SPTransform
 }
 
-// /// Available commands that the async tasks can ask from the transform manager.
-// pub enum TransformManagement {
-//     GetAll(oneshot::Sender<State>),
-//     Get((String, oneshot::Sender<SPValue>)),
-//     Lookup((String, String, oneshot::Sender<SPValue>)),
-//     Add((String, SPValue)),
-//     Move((String, SPValue)),
-//     SetPartialState(State),
-//     Set((String, SPValue))
-// }
 
 // /// Represents the type of update to perform on a transform.
 // #[derive(Clone, Debug)]
@@ -715,6 +705,7 @@ mod tests {
 
         let transform = SPTransformStamped {
             active_transform: true,
+            enable_transform: true,
             time_stamp: SystemTime::now(),
             parent_frame_id: "transform_a".to_string(),
             child_frame_id: "transform_b".to_string(),

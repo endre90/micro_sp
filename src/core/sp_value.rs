@@ -1,7 +1,7 @@
 // use nalgebra::{Isometry3, Quaternion, UnitQuaternion, Vector3};
 use ordered_float::OrderedFloat;
 use serde::{Deserialize, Serialize};
-use std::{fmt, time::SystemTime};
+use std::{collections::HashSet, fmt, time::SystemTime};
 
 /// Represents a variable value of a specific type.
 #[derive(Debug, PartialEq, Clone, Hash, Eq, PartialOrd, Ord, Serialize, Deserialize)]
@@ -107,11 +107,45 @@ impl Default for SPTransform {
 #[derive(Debug, PartialEq, Clone, Hash, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct SPTransformStamped {
     pub active_transform: bool,
+    pub enable_transform: bool,
     pub time_stamp: SystemTime,
     pub parent_frame_id: String,
     pub child_frame_id: String,
     pub transform: SPTransform,
     pub metadata: MapOrUnknown,
+}
+
+#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
+pub struct PotentialTransformMetadata {
+    pub frame_threshold_zone: Option<f64>,    // when are you "at" the frame, threshold, in meters
+    pub next_frame: Option<HashSet<String>>,  // next frame, good for visualizing path plans
+    pub frame_type: Option<String>,           // can be used separate waypoint, tag, human, etc.
+    pub visualize_mesh: bool,
+    pub mesh_type: i32,                       // 1 - cube, 2 - sphere, 3 - cylinder or 10 - mesh (provide path)
+    pub mesh_path: Option<String>,
+    pub mesh_scale: f32,
+    pub mesh_r: f32,
+    pub mesh_g: f32,
+    pub mesh_b: f32,
+    pub mesh_a: f32,
+}
+
+impl Default for PotentialTransformMetadata {
+    fn default() -> Self {
+        PotentialTransformMetadata { 
+            frame_threshold_zone: None, 
+            next_frame: None, 
+            frame_type: None, 
+            visualize_mesh: false, 
+            mesh_type: 10, 
+            mesh_path: None, 
+            mesh_scale: 0.001, 
+            mesh_r: 1.0, 
+            mesh_g: 1.0, 
+            mesh_b: 1.0, 
+            mesh_a: 1.0 
+        }
+    }
 }
 
 /// Displaying the value of an SPValue instance in a user-friendly way.

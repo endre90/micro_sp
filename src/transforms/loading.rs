@@ -1,6 +1,9 @@
 use serde_json::Value;
 use std::{
-    collections::HashMap, fs::{self, File}, io::BufReader, time::SystemTime
+    collections::HashMap,
+    fs::{self, File},
+    io::BufReader,
+    time::SystemTime,
 };
 
 use crate::*;
@@ -60,6 +63,62 @@ pub fn list_frames_in_dir(path: &str) -> Result<Vec<String>, Box<dyn std::error:
     Ok(scenario)
 }
 
+fn json_value_to_spvalue(val: &Value) -> Option<SPValue> {
+    match val {
+        Value::Bool(b) => Some(SPValue::Bool(BoolOrUnknown::Bool(*b))),
+        Value::Number(n) => {
+            if let Some(i) = n.as_i64() {
+                Some(SPValue::Int64(IntOrUnknown::Int64(i)))
+            } else if let Some(f) = n.as_f64() {
+                Some(SPValue::Float64(FloatOrUnknown::Float64(
+                    ordered_float::OrderedFloat(f),
+                )))
+            } else {
+                log::error!(target: &&format!("redis_state_manager"), "Cannot represent number as i64 or f64.");
+                None
+            }
+        }
+        Value::String(s) => Some(SPValue::String(StringOrUnknown::String(s.clone()))),
+        Value::Array(arr) => {
+            let items: Vec<SPValue> = arr.iter().filter_map(json_value_to_spvalue).collect();
+            Some(SPValue::Array(ArrayOrUnknown::Array(items)))
+        }
+        Value::Object(obj_map) => {
+            let mut entries = Vec::new();
+            for (k, v) in obj_map {
+                let key_sp = SPValue::String(StringOrUnknown::String(k.clone()));
+                if let Some(val_sp) = json_value_to_spvalue(v) {
+                    entries.push((key_sp, val_sp));
+                } else {
+                    log::error!(target: &&format!("redis_state_manager"), "Couldn't convert, skipping.");
+                }
+            }
+            entries.sort_by(|a, b| a.0.cmp(&b.0));
+            Some(SPValue::Map(MapOrUnknown::Map(entries)))
+        }
+        Value::Null => None,
+    }
+}
+
+fn convert_metadata_value(metadata_val: &Value) -> MapOrUnknown {
+    match metadata_val {
+        Value::Object(obj_map) => {
+            let mut entries = Vec::new();
+            for (key_str, value_json) in obj_map {
+                let key_sp = SPValue::String(StringOrUnknown::String(key_str.clone()));
+                if let Some(value_sp) = json_value_to_spvalue(value_json) {
+                    entries.push((key_sp, value_sp));
+                } else {
+                    log::error!(target: &&format!("redis_state_manager"), "Couldn't convert, skipping.");
+                }
+            }
+            entries.sort_by(|a,b| a.0.cmp(&b.0));
+            MapOrUnknown::Map(entries)
+        }
+        _ => MapOrUnknown::UNKNOWN,
+    }
+}
+
 pub fn load_new_scenario(scenario: &Vec<String>) -> HashMap<String, SPTransformStamped> {
     let mut transforms_stamped = HashMap::new();
 
@@ -107,11 +166,12 @@ pub fn load_new_scenario(scenario: &Vec<String>) -> HashMap<String, SPTransformS
                 child_frame_id.clone(),
                 SPTransformStamped {
                     active_transform,
+                    enable_transform,
                     time_stamp: SystemTime::now(),
                     child_frame_id,
                     parent_frame_id,
                     transform,
-                    metadata: MapOrUnknown::UNKNOWN//serde_json::from_value(metadata).unwrap()
+                    metadata: convert_metadata_value(&metadata),
                 },
             );
         }

@@ -62,6 +62,7 @@ mod tests {
     fn dummy_1_frame() -> SPTransformStamped {
         SPTransformStamped {
             active_transform: true,
+            enable_transform: true,
             time_stamp: SystemTime::now(),
             parent_frame_id: "world".to_string(),
             child_frame_id: "dummy_1".to_string(),
@@ -73,6 +74,7 @@ mod tests {
     fn dummy_2_frame() -> SPTransformStamped {
         SPTransformStamped {
             active_transform: true,
+            enable_transform: true,
             time_stamp: SystemTime::now(),
             parent_frame_id: "dummy_1".to_string(),
             child_frame_id: "dummy_2".to_string(),
@@ -84,6 +86,7 @@ mod tests {
     fn dummy_3_frame() -> SPTransformStamped {
         SPTransformStamped {
             active_transform: true,
+            enable_transform: true,
             time_stamp: SystemTime::now(),
             parent_frame_id: "dummy_2".to_string(),
             child_frame_id: "dummy_3".to_string(),
@@ -129,6 +132,7 @@ mod tests {
             "dummy_1".to_string(),
             SPTransformStamped {
                 active_transform: true,
+                enable_transform: true,
                 time_stamp: SystemTime::now(),
                 parent_frame_id: "dummy_2".to_string(),
                 child_frame_id: "dummy_1".to_string(),
@@ -177,6 +181,7 @@ mod tests {
             "dummy_1".to_string(),
             SPTransformStamped {
                 active_transform: true,
+                enable_transform: true,
                 time_stamp: SystemTime::now(),
                 parent_frame_id: "dummy_3".to_string(),
                 child_frame_id: "dummy_1".to_string(),
@@ -222,6 +227,7 @@ mod tests {
             "dummy_5".to_string(),
             SPTransformStamped {
                 active_transform: true,
+                enable_transform: true,
                 time_stamp: SystemTime::now(),
                 parent_frame_id: "dummy_4".to_string(),
                 child_frame_id: "dummy_5".to_string(),
@@ -234,6 +240,7 @@ mod tests {
             "dummy_6".to_string(),
             SPTransformStamped {
                 active_transform: true,
+                enable_transform: true,
                 time_stamp: SystemTime::now(),
                 parent_frame_id: "dummy_5".to_string(),
                 child_frame_id: "dummy_6".to_string(),
@@ -255,6 +262,7 @@ mod tests {
             "dummy_4".to_string(),
             SPTransformStamped {
                 active_transform: true,
+                enable_transform: true,
                 time_stamp: SystemTime::now(),
                 parent_frame_id: "dummy_6".to_string(),
                 child_frame_id: "dummy_4".to_string(),
@@ -276,6 +284,7 @@ mod tests {
             "dummy_4".to_string(),
             SPTransformStamped {
                 active_transform: true,
+                enable_transform: true,
                 time_stamp: SystemTime::now(),
                 parent_frame_id: "world".to_string(),
                 child_frame_id: "dummy_4".to_string(),
@@ -319,6 +328,7 @@ mod tests {
         assert_eq!(check_would_produce_cycle(
             &SPTransformStamped {
                 active_transform: true,
+                enable_transform: true,
                 time_stamp: SystemTime::now(),
                 parent_frame_id: "dummy_4".to_string(),
                 child_frame_id: "dummy_1".to_string(),
@@ -331,6 +341,7 @@ mod tests {
         assert_eq!(check_would_produce_cycle(
             &SPTransformStamped {
                 active_transform: true,
+                enable_transform: true,
                 time_stamp: SystemTime::now(),
                 parent_frame_id: "dummy_3".to_string(),
                 child_frame_id: "dummy_1".to_string(),
