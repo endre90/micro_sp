@@ -1,7 +1,7 @@
 // use nalgebra::{Isometry3, Quaternion, UnitQuaternion, Vector3};
 use ordered_float::OrderedFloat;
 use serde::{Deserialize, Serialize};
-use std::{collections::HashSet, fmt, time::SystemTime};
+use std::{fmt, time::SystemTime};
 
 /// Represents a variable value of a specific type.
 #[derive(Debug, PartialEq, Clone, Hash, Eq, PartialOrd, Ord, Serialize, Deserialize)]

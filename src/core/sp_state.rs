@@ -123,8 +123,16 @@ impl State {
         match self.get_bool_or_unknown(target, name) {
             BoolOrUnknown::Bool(b) => b,
             _ => {
-                // log::warn!(target: target, "The value of bool '{}' is UNKNOWN, resulting to default: FALSE.", name);
                 false
+            }
+        }
+    }
+
+    pub fn get_bool_or_value(&self, target: &str, name: &str, value: bool) -> bool {
+        match self.get_bool_or_unknown(target, name) {
+            BoolOrUnknown::Bool(b) => b,
+            _ => {
+                value
             }
         }
     }
@@ -143,8 +151,16 @@ impl State {
         match self.get_int_or_unknown(target, name) {
             IntOrUnknown::Int64(i) => i,
             _ => {
-                // log::warn!(target: target, "The value of int '{}' is UNKNOWN, resulting to default: 0.", name);
                 0
+            }
+        }
+    }
+
+    pub fn get_int_or_value(&self, target: &str, name: &str, value: i64) -> i64 {
+        match self.get_int_or_unknown(target, name) {
+            IntOrUnknown::Int64(i) => i,
+            _ => {
+                value
             }
         }
     }
@@ -163,11 +179,20 @@ impl State {
         match self.get_float_or_unknown(target, name) {
             FloatOrUnknown::Float64(f) => f.into_inner(),
             _ => {
-                // log::warn!(target: target, "The value of float '{}' is UNKNOWN, resulting to default: 0.0.", name);
                 0.0
             }
         }
     }
+
+    pub fn get_float_or_value(&self, target: &str, name: &str, value: f64) -> f64 {
+        match self.get_float_or_unknown(target, name) {
+            FloatOrUnknown::Float64(f) => f.into_inner(),
+            _ => {
+                value
+            }
+        }
+    }
+    
 
     pub fn get_string_or_unknown(&self, target: &str, name: &str) -> StringOrUnknown {
         match self.get_value(name) {
@@ -183,8 +208,16 @@ impl State {
         match self.get_string_or_unknown(target, name) {
             StringOrUnknown::String(s) => s,
             _ => {
-                // log::warn!(target: target, "The value of string '{}' is UNKNOWN, resulting to default: UNKNOWN.", name);
                 SPValue::String(StringOrUnknown::UNKNOWN).to_string()
+            }
+        }
+    }
+
+    pub fn get_string_or_value(&self, target: &str, name: &str, value: String) -> String {
+        match self.get_string_or_unknown(target, name) {
+            StringOrUnknown::String(s) => s,
+            _ => {
+                value
             }
         }
     }
@@ -203,8 +236,16 @@ impl State {
         match self.get_array_or_unknown(target, name) {
             ArrayOrUnknown::Array(a) => a,
             _ => {
-                // log::warn!(target: target, "The value of array '{}' is UNKNOWN, resulting to default: vec!().", name);
                 vec![]
+            }
+        }
+    }
+
+    pub fn get_array_or_value(&self, target: &str, name: &str, value: Vec<SPValue>) -> Vec<SPValue> {
+        match self.get_array_or_unknown(target, name) {
+            ArrayOrUnknown::Array(a) => a,
+            _ => {
+                value
             }
         }
     }
@@ -223,8 +264,16 @@ impl State {
         match self.get_map_or_unknown(target, name) {
             MapOrUnknown::Map(m) => m,
             _ => {
-                // log::warn!(target: target, "The value of array '{}' is UNKNOWN, resulting to default: vec!().", name);
                 vec![]
+            }
+        }
+    }
+
+    pub fn get_map_or_value(&self, target: &str, name: &str, value: Vec<(SPValue, SPValue)>) -> Vec<(SPValue, SPValue)> {
+        match self.get_map_or_unknown(target, name) {
+            MapOrUnknown::Map(m) => m,
+            _ => {
+                value
             }
         }
     }

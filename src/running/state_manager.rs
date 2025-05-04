@@ -780,6 +780,7 @@ mod tests {
     #[tokio::test]
     #[serial]
     async fn test_load_transform_scenario() {
+        // initialize_env_logger();
         let _container = Redis::default()
             .with_mapped_port(6379, ContainerPort::Tcp(6379))
             .start()
@@ -812,7 +813,7 @@ mod tests {
         let recv_state = response_rx.await.expect("failed");
 
         let t1 = match recv_state
-            .get_transform_or_unknown(&format!("test_case"), &format!("transform_1"))
+            .get_transform_or_unknown(&format!("test_case"), &format!("floor"))
         {
             TransformOrUnknown::Transform(t) => t,
             TransformOrUnknown::UNKNOWN => {
@@ -821,7 +822,7 @@ mod tests {
         };
 
         let t2 = match recv_state
-            .get_transform_or_unknown(&format!("test_case"), &format!("transform_2"))
+            .get_transform_or_unknown(&format!("test_case"), &format!("table"))
         {
             TransformOrUnknown::Transform(t) => t,
             TransformOrUnknown::UNKNOWN => {
@@ -830,10 +831,10 @@ mod tests {
         };
 
         assert_eq!(false, t1.active_transform);
-        assert_eq!("transform_1", t1.child_frame_id);
-        assert_eq!("transform_world", t1.parent_frame_id);
-        assert_eq!("transform_2", t2.child_frame_id);
-        assert_eq!("transform_1", t2.parent_frame_id);
+        assert_eq!("floor", t1.child_frame_id);
+        assert_eq!("world", t1.parent_frame_id);
+        assert_eq!("table", t2.child_frame_id);
+        assert_eq!("world", t2.parent_frame_id);
         assert_ne!(SPTransform::default(), t1.transform);
     }
 
@@ -877,6 +878,7 @@ mod tests {
     #[tokio::test]
     #[serial]
     async fn test_lookup_transforms() {
+        // initialize_env_logger();
         let _container = Redis::default()
             .with_mapped_port(6379, ContainerPort::Tcp(6379))
             .start()
@@ -903,19 +905,19 @@ mod tests {
             .expect("failed");
 
         let (response_tx, response_rx) = oneshot::channel();
-        tx.send(StateManagement::LookupTransform(("transform_world".to_string(), "transform_1".to_string(), response_tx)))
+        tx.send(StateManagement::LookupTransform(("world".to_string(), "floor".to_string(), response_tx)))
             .await
             .expect("failed");
         let lookup = response_rx.await.expect("failed");
 
-        assert_eq!("transform_1", lookup.child_frame_id);
-        assert_eq!("transform_world", lookup.parent_frame_id);
+        assert_eq!("floor", lookup.child_frame_id);
+        assert_eq!("world", lookup.parent_frame_id);
 
         let assert_t = SPTransform { 
             translation: SPTranslation { 
-                x: OrderedFloat(1.0), 
+                x: OrderedFloat(0.0), 
                 y: OrderedFloat(0.0), 
-                z: OrderedFloat(0.0) 
+                z: OrderedFloat(1.0) 
             }, 
             rotation: SPRotation { 
                 x: OrderedFloat(0.0), 
@@ -928,19 +930,19 @@ mod tests {
         assert_eq!(assert_t, lookup.transform);
 
         let (response_tx, response_rx) = oneshot::channel();
-        tx.send(StateManagement::LookupTransform(("transform_1".to_string(), "transform_5".to_string(), response_tx)))
+        tx.send(StateManagement::LookupTransform(("floor".to_string(), "food".to_string(), response_tx)))
             .await
             .expect("failed");
         let lookup = response_rx.await.expect("failed");
 
-        assert_eq!("transform_5", lookup.child_frame_id);
-        assert_eq!("transform_1", lookup.parent_frame_id);
+        assert_eq!("food", lookup.child_frame_id);
+        assert_eq!("floor", lookup.parent_frame_id);
 
         let assert_t = SPTransform { 
             translation: SPTranslation { 
                 x: OrderedFloat(1.0), 
                 y: OrderedFloat(5.0), 
-                z: OrderedFloat(1.0) 
+                z: OrderedFloat(0.0) 
             }, 
             rotation: SPRotation { 
                 x: OrderedFloat(0.0), 
