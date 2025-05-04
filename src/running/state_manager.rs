@@ -73,9 +73,13 @@ pub async fn redis_state_manager(mut receiver: mpsc::Receiver<StateManagement>, 
                 error_value = error_tracker;
                 match error_value {
                     0 => {
-                        log::warn!(target: &&format!("redis_state_manager"), "Waiting for a Redis connection.")
+                        log::warn!(target: &&format!("redis_state_manager"), "Waiting for a Redis connection.");
+                        log::warn!(target: &&format!("redis_state_manager"), "Have you started the redis container?")
                     }
-                    _ => log::error!(target: &&format!("redis_state_manager"), "{}", error),
+                    _ => {
+                        log::error!(target: &&format!("redis_state_manager"), "{}", error);
+                        log::warn!(target: &&format!("redis_state_manager"), "Have you started the redis container?")
+                    }
                 }
             }
 

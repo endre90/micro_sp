@@ -1,6 +1,6 @@
 {
     "child_frame_id": "transform_floor",   
-    "parent_frame_id": "transform_world",
+    "parent_frame_id": "world",
     "transform": {
         "translation": {
             "x": 0.0, 
