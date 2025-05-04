@@ -1,5 +1,5 @@
 {
-    "child_frame_id": "transform_floor",   
+    "child_frame_id": "floor",   
     "parent_frame_id": "world",
     "transform": {
         "translation": {

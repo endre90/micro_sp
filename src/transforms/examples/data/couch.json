@@ -1,11 +1,11 @@
 {
-    "parent_frame_id": "transform_1",
-    "child_frame_id": "transform_2",
+    "parent_frame_id": "world",
+    "child_frame_id": "couch",
     "transform": {
         "translation": {
-            "x": 0.0,
-            "y": 1.0,
-            "z": 0.0
+            "x": -1.0,
+            "y": 0.0,
+            "z": 1.0
         },
         "rotation": {
             "x": 0.0,
@@ -16,6 +16,7 @@
     },
     "metadata": {
         "active_transform": false,
-        "enable_transform": true
+        "enable_transform": true,
+        "key": "value_23"
     }
 }

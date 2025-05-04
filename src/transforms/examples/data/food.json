@@ -1,11 +1,11 @@
 {
-    "parent_frame_id": "world",
-    "child_frame_id": "transform_1",
+    "parent_frame_id": "plate",
+    "child_frame_id": "food",
     "transform": {
         "translation": {
-            "x": 1.0,
-            "y": 0.0,
-            "z": 0.0
+            "x": 0.0,
+            "y": 4.0,
+            "z": 1.0
         },
         "rotation": {
             "x": 0.0,
@@ -16,6 +16,7 @@
     },
     "metadata": {
         "active_transform": false,
-        "enable_transform": true
+        "enable_transform": true,
+        "key": "value_23"
     }
 }

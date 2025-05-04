@@ -35,7 +35,7 @@ pub enum StateManagement {
 //     DeleteAll,
 // }
 
-// MArtin: If you have more than one command for redis to do, use a pipeline to group commands together
+// Martin: If you have more than one command for redis to do, use a pipeline to group commands together
 
 // put this in another process that we can trigger from outside to reconnect if dsconnected
 pub async fn redis_state_manager(mut receiver: mpsc::Receiver<StateManagement>, state: State) -> Result<(), Box<dyn std::error::Error>> {
@@ -201,18 +201,6 @@ pub async fn redis_state_manager(mut receiver: mpsc::Receiver<StateManagement>, 
 
             StateManagement::GetAllTransforms(response_sender) => {
                 let transforms = get_all_transforms(con.clone()).await;
-                // let map = transforms
-                //     .iter()
-                //     .map(|(key, val)| {
-                //         (
-                //             key.clone(),
-                //             assign!(
-                //                 tfv!(&key),
-                //                 SPValue::Transform(TransformOrUnknown::Transform(val.clone()))
-                //             ),
-                //         )
-                //     })
-                //     .collect();
                 let _ = response_sender.send(transforms);
             }
 
@@ -284,7 +272,7 @@ pub async fn redis_state_manager(mut receiver: mpsc::Receiver<StateManagement>, 
                             }
                             None => {
                                 error_tracker = 9;
-                                error = "couldn't lookup transform".to_string()
+                                error = "Couldn't lookup transform".to_string()
                             }
                         }
                     }
@@ -300,7 +288,7 @@ pub async fn redis_state_manager(mut receiver: mpsc::Receiver<StateManagement>, 
                             }
                             None => {
                                 error_tracker = 10;
-                                error = "couldn't lookup transform".to_string()
+                                error = "Couldn't lookup transform".to_string()
                             }
                         }
                     }
@@ -319,7 +307,7 @@ pub async fn redis_state_manager(mut receiver: mpsc::Receiver<StateManagement>, 
 }
 
 async fn get_all_transforms(mut con: MultiplexedConnection) -> HashMap<String, SPTransformStamped> {
-    match con.keys::<&str, Vec<String>>("transform_*").await {
+    match con.keys::<&str, Vec<String>>("*").await {
         Ok(keys) => {
             match con
                 .mget::<&Vec<std::string::String>, Vec<Option<String>>>(&keys)
@@ -334,14 +322,9 @@ async fn get_all_transforms(mut con: MultiplexedConnection) -> HashMap<String, S
                                     SPValue::Transform(TransformOrUnknown::Transform(transf)) => {
                                         buffer.insert(key, transf);
                                     }
-                                    SPValue::Transform(TransformOrUnknown::UNKNOWN) => {
-                                        log::error!("Transform '{key}' is UNKNOWN.")
-                                    }
-                                    _ => log::error!(
-                                        "Transform '{key}' has to be of type Transform."
-                                    ),
+                                    _ => ()
                                 },
-                                Err(e) => log::error!(
+                                Err(e) => log::error!(target: &&format!("redis_state_manager"),
                                     "Transform '{key}' failed deserialization with: {e}."
                                 ),
                             }
@@ -350,13 +333,13 @@ async fn get_all_transforms(mut con: MultiplexedConnection) -> HashMap<String, S
                     buffer
                 }
                 Err(e) => {
-                    log::error!("Failed to get values with: {e}.");
+                    log::error!(target: &&format!("redis_state_manager"), "Failed to get values with: {e}.");
                     HashMap::new()
                 }
             }
         }
         Err(e) => {
-            log::error!("Failed to get values with: {e}.");
+            log::error!(target: &&format!("redis_state_manager"), "Failed to get values with: {e}.");
             HashMap::new()
         }
     }
@@ -369,7 +352,7 @@ async fn insert_transform(
 ) -> (i32, String) {
     let mut error_tracker = 0;
     let mut error: String = "".to_string();
-    match con.keys::<&str, Vec<String>>("transform_*").await {
+    match con.keys::<&str, Vec<String>>("*").await {
         Ok(keys) => {
             if !keys.is_empty() {
                 match con
@@ -387,14 +370,9 @@ async fn insert_transform(
                                         )) => {
                                             buffer.insert(key, transf);
                                         }
-                                        SPValue::Transform(TransformOrUnknown::UNKNOWN) => {
-                                            log::error!("Transform '{key}' is UNKNOWN.")
-                                        }
-                                        _ => log::error!(
-                                            "Transform '{key}' has to be of type Transform."
-                                        ),
+                                        _ => ()
                                     },
-                                    Err(e) => log::error!(
+                                    Err(e) => log::error!(target: &&format!("redis_state_manager"),
                                         "Transform '{key}' failed deserialization with: {e}."
                                     ),
                                 }
@@ -402,14 +380,17 @@ async fn insert_transform(
                         }
 
                         if name != transform.child_frame_id {
-                            log::info!("Transform name '{name}' in buffer doesn't match the child_frame_id {}, 
-                            they should be the same. Not added.", transform.child_frame_id);
+                            log::info!(target: &&format!("redis_state_manager"), 
+                                "Transform name '{name}' in buffer doesn't match the child_frame_id {}, 
+                                they should be the same. Not added.", transform.child_frame_id);
                         } else if let Some(_) = buffer.get(&name) {
-                            log::info!("Transform '{}' already exists, not added.", name);
+                            log::info!(target: &&format!("redis_state_manager"),
+                                "Transform '{}' already exists, not added.", name);
                         } else {
                             let transform = transform.clone();
                             if check_would_produce_cycle(&transform, &buffer) {
-                                log::error!("Transform '{}' would produce cycle, not added.", name);
+                                log::error!(target: &&format!("redis_state_manager"),
+                                    "Transform '{}' would produce cycle, not added.", name);
                             } else {
                                 if let Err(e) = con
                                     .set::<_, String, Value>(
@@ -424,7 +405,8 @@ async fn insert_transform(
                                         name, e
                                     );
                                 } else {
-                                    log::info!("Inserted transform '{name}'.");
+                                    log::info!(target: &&format!("redis_state_manager"),
+                                        "Inserted transform '{name}'.");
                                 }
                             }
                         }
@@ -445,7 +427,8 @@ async fn insert_transform(
                     error_tracker = 6;
                     error = format!("Failed to insert transform {} with error: {}.", name, e);
                 } else {
-                    log::info!("Inserted transform '{name}'.");
+                    log::info!(target: &&format!("redis_state_manager"),
+                        "Inserted transform '{name}'.");
                 }
             }
         }
