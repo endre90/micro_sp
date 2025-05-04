@@ -18,7 +18,8 @@ pub enum StateManagement {
     InsertTransform((String, SPTransformStamped)),
     LoadTransformScenario(String), // overlay?
     GetAllTransforms(oneshot::Sender<HashMap<String, SPTransformStamped>>),
-    LookupTransform((String, String, oneshot::Sender<SPTransformStamped>)), // Try to remove the transform prefix
+    /// Parent -> Child
+    LookupTransform((String, String, oneshot::Sender<Option<SPTransformStamped>>)), // Try to remove the transform prefix
     // MoveTransform((String, SPTransform)), // move to a new position specified by SPTransform
 }
 
@@ -268,11 +269,12 @@ pub async fn redis_state_manager(mut receiver: mpsc::Receiver<StateManagement>, 
                             &buffer,
                         ) {
                             Some(transform) => {
-                                let _ = response_sender.send(transform);
+                                let _ = response_sender.send(Some(transform));
                             }
                             None => {
                                 error_tracker = 9;
-                                error = "Couldn't lookup transform".to_string()
+                                error = "Couldn't lookup transform".to_string();
+                                let _ = response_sender.send(None);
                             }
                         }
                     }
@@ -284,11 +286,12 @@ pub async fn redis_state_manager(mut receiver: mpsc::Receiver<StateManagement>, 
                             &buffer,
                         ) {
                             Some(transform) => {
-                                let _ = response_sender.send(transform);
+                                let _ = response_sender.send(Some(transform));
                             }
                             None => {
                                 error_tracker = 10;
-                                error = "Couldn't lookup transform".to_string()
+                                error = "Couldn't lookup transform".to_string();
+                                let _ = response_sender.send(None);
                             }
                         }
                     }
@@ -910,8 +913,8 @@ mod tests {
             .expect("failed");
         let lookup = response_rx.await.expect("failed");
 
-        assert_eq!("floor", lookup.child_frame_id);
-        assert_eq!("world", lookup.parent_frame_id);
+        assert_eq!("floor", lookup.clone().unwrap().child_frame_id);
+        assert_eq!("world", lookup.clone().unwrap().parent_frame_id);
 
         let assert_t = SPTransform { 
             translation: SPTranslation { 
@@ -927,7 +930,7 @@ mod tests {
             }
         };
 
-        assert_eq!(assert_t, lookup.transform);
+        assert_eq!(assert_t, lookup.unwrap().transform);
 
         let (response_tx, response_rx) = oneshot::channel();
         tx.send(StateManagement::LookupTransform(("floor".to_string(), "food".to_string(), response_tx)))
@@ -935,8 +938,8 @@ mod tests {
             .expect("failed");
         let lookup = response_rx.await.expect("failed");
 
-        assert_eq!("food", lookup.child_frame_id);
-        assert_eq!("floor", lookup.parent_frame_id);
+        assert_eq!("food", lookup.clone().unwrap().child_frame_id);
+        assert_eq!("floor",lookup.clone().unwrap().parent_frame_id);
 
         let assert_t = SPTransform { 
             translation: SPTranslation { 
@@ -952,7 +955,7 @@ mod tests {
             }
         };
 
-        assert_eq!(assert_t, lookup.transform);
+        assert_eq!(assert_t, lookup.unwrap().transform);
     }
 }
 
