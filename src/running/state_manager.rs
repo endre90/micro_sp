@@ -16,13 +16,14 @@ pub enum StateManagement {
     SetPartialState(State),
     Set((String, SPValue)),
     InsertTransform((String, SPTransformStamped)),
+    MoveTransform(String, SPTransform),
     LoadTransformScenario(String), // overlay?
     GetAllTransforms(oneshot::Sender<HashMap<String, SPTransformStamped>>),
+
     /// Parent -> Child
     LookupTransform((String, String, oneshot::Sender<Option<SPTransformStamped>>)), // Try to remove the transform prefix
-    // MoveTransform((String, SPTransform)), // move to a new position specified by SPTransform
+                                                                                    // MoveTransform((String, SPTransform)), // move to a new position specified by SPTransform
 }
-
 
 // /// Represents the type of update to perform on a transform.
 // #[derive(Clone, Debug)]
@@ -39,7 +40,10 @@ pub enum StateManagement {
 // Martin: If you have more than one command for redis to do, use a pipeline to group commands together
 
 // put this in another process that we can trigger from outside to reconnect if dsconnected
-pub async fn redis_state_manager(mut receiver: mpsc::Receiver<StateManagement>, state: State) -> Result<(), Box<dyn std::error::Error>> {
+pub async fn redis_state_manager(
+    mut receiver: mpsc::Receiver<StateManagement>,
+    state: State,
+) -> Result<(), Box<dyn std::error::Error>> {
     let mut con = {
         let mut interval = interval(Duration::from_millis(100));
         let mut error_tracker;
@@ -235,6 +239,55 @@ pub async fn redis_state_manager(mut receiver: mpsc::Receiver<StateManagement>, 
                 (error_tracker, error) = insert_transform(name, transform, con.clone()).await;
             }
 
+            StateManagement::MoveTransform(name, new_transform) => {
+                match con.get::<_, Option<String>>(&name).await {
+                    Ok(val) => match val {
+                        Some(redis_value) => match serde_json::from_str::<SPValue>(&redis_value) {
+                            Ok(deser_value) => match deser_value {
+                                SPValue::Transform(tf_or_unknown) => match tf_or_unknown {
+                                    TransformOrUnknown::Transform(sp_tf_stamped) => {
+                                        let updated_sp_tf_stamped = SPTransformStamped {
+                                            active_transform: sp_tf_stamped.active_transform,
+                                            enable_transform: sp_tf_stamped.enable_transform,
+                                            time_stamp: sp_tf_stamped.time_stamp,
+                                            parent_frame_id: sp_tf_stamped.parent_frame_id,
+                                            child_frame_id: sp_tf_stamped.child_frame_id,
+                                            transform: new_transform,
+                                            metadata: sp_tf_stamped.metadata,
+                                        };
+                                        if let Err(e) = con
+                                            .set::<_, String, Value>(
+                                                &format!("{name}"),
+                                                serde_json::to_string(
+                                                    &updated_sp_tf_stamped.to_spvalue(),
+                                                )
+                                                .unwrap(),
+                                            )
+                                            .await
+                                        {
+                                            error_tracker = 16;
+                                            error = format!(
+                                                "Failed to move transform {} with error: {}.",
+                                                name, e
+                                            );
+                                        }
+                                    }
+                                    TransformOrUnknown::UNKNOWN => {}
+                                },
+                                _ => {}
+                            },
+                            Err(e) => {
+                                log::error!(target: &&format!("redis_state_manager"), "Deserializing '{name}' failed with: {e}.");
+                            }
+                        },
+                        None => {}
+                    },
+                    Err(e) => {
+                        log::error!(target: &&format!("redis_state_manager"), "Failed to get value '{name}' with: {e}.");
+                    }
+                }
+            }
+
             StateManagement::LoadTransformScenario(path) => {
                 match list_frames_in_dir(&path) {
                     Ok(list) => {
@@ -306,7 +359,6 @@ pub async fn redis_state_manager(mut receiver: mpsc::Receiver<StateManagement>, 
     }
 
     Ok(())
-
 }
 
 async fn get_all_transforms(mut con: MultiplexedConnection) -> HashMap<String, SPTransformStamped> {
@@ -325,7 +377,7 @@ async fn get_all_transforms(mut con: MultiplexedConnection) -> HashMap<String, S
                                     SPValue::Transform(TransformOrUnknown::Transform(transf)) => {
                                         buffer.insert(key, transf);
                                     }
-                                    _ => ()
+                                    _ => (),
                                 },
                                 Err(e) => log::error!(target: &&format!("redis_state_manager"),
                                     "Transform '{key}' failed deserialization with: {e}."
@@ -373,7 +425,7 @@ async fn insert_transform(
                                         )) => {
                                             buffer.insert(key, transf);
                                         }
-                                        _ => ()
+                                        _ => (),
                                     },
                                     Err(e) => log::error!(target: &&format!("redis_state_manager"),
                                         "Transform '{key}' failed deserialization with: {e}."
@@ -481,9 +533,7 @@ mod tests {
         let (tx, rx) = mpsc::channel(32);
 
         tokio::task::spawn(async move {
-            match redis_state_manager(rx, state)
-            .await
-            {
+            match redis_state_manager(rx, state).await {
                 Ok(()) => (),
                 Err(e) => log::error!(target: &&format!("redis_state_manager"), "{}", e),
             };
@@ -517,9 +567,7 @@ mod tests {
         let (tx, rx) = mpsc::channel(32);
 
         tokio::task::spawn(async move {
-            match redis_state_manager(rx, state)
-            .await
-            {
+            match redis_state_manager(rx, state).await {
                 Ok(()) => (),
                 Err(e) => log::error!(target: &&format!("redis_state_manager"), "{}", e),
             };
@@ -573,9 +621,7 @@ mod tests {
         let (tx, rx) = mpsc::channel(32);
 
         tokio::task::spawn(async move {
-            match redis_state_manager(rx, state)
-            .await
-            {
+            match redis_state_manager(rx, state).await {
                 Ok(()) => (),
                 Err(e) => log::error!(target: &&format!("redis_state_manager"), "{}", e),
             };
@@ -614,9 +660,7 @@ mod tests {
         let (tx, rx) = mpsc::channel(32);
 
         tokio::task::spawn(async move {
-            match redis_state_manager(rx, state)
-            .await
-            {
+            match redis_state_manager(rx, state).await {
                 Ok(()) => (),
                 Err(e) => log::error!(target: &&format!("redis_state_manager"), "{}", e),
             };
@@ -683,9 +727,7 @@ mod tests {
         let (tx, rx) = mpsc::channel(32);
 
         tokio::task::spawn(async move {
-            match redis_state_manager(rx, state)
-            .await
-            {
+            match redis_state_manager(rx, state).await {
                 Ok(()) => (),
                 Err(e) => log::error!(target: &&format!("redis_state_manager"), "{}", e),
             };
@@ -744,9 +786,7 @@ mod tests {
         let (tx, rx) = mpsc::channel(32);
 
         tokio::task::spawn(async move {
-            match redis_state_manager(rx, state)
-            .await
-            {
+            match redis_state_manager(rx, state).await {
                 Ok(()) => (),
                 Err(e) => log::error!(target: &&format!("redis_state_manager"), "{}", e),
             };
@@ -797,9 +837,7 @@ mod tests {
         let (tx, rx) = mpsc::channel(32);
 
         tokio::task::spawn(async move {
-            match redis_state_manager(rx, state)
-            .await
-            {
+            match redis_state_manager(rx, state).await {
                 Ok(()) => (),
                 Err(e) => log::error!(target: &&format!("redis_state_manager"), "{}", e),
             };
@@ -815,8 +853,7 @@ mod tests {
             .expect("failed");
         let recv_state = response_rx.await.expect("failed");
 
-        let t1 = match recv_state
-            .get_transform_or_unknown(&format!("test_case"), &format!("floor"))
+        let t1 = match recv_state.get_transform_or_unknown(&format!("test_case"), &format!("floor"))
         {
             TransformOrUnknown::Transform(t) => t,
             TransformOrUnknown::UNKNOWN => {
@@ -824,8 +861,7 @@ mod tests {
             }
         };
 
-        let t2 = match recv_state
-            .get_transform_or_unknown(&format!("test_case"), &format!("table"))
+        let t2 = match recv_state.get_transform_or_unknown(&format!("test_case"), &format!("table"))
         {
             TransformOrUnknown::Transform(t) => t,
             TransformOrUnknown::UNKNOWN => {
@@ -857,9 +893,7 @@ mod tests {
         let (tx, rx) = mpsc::channel(32);
 
         tokio::task::spawn(async move {
-            match redis_state_manager(rx, state)
-            .await
-            {
+            match redis_state_manager(rx, state).await {
                 Ok(()) => (),
                 Err(e) => log::error!(target: &&format!("redis_state_manager"), "{}", e),
             };
@@ -895,9 +929,7 @@ mod tests {
         let (tx, rx) = mpsc::channel(32);
 
         tokio::task::spawn(async move {
-            match redis_state_manager(rx, state)
-            .await
-            {
+            match redis_state_manager(rx, state).await {
                 Ok(()) => (),
                 Err(e) => log::error!(target: &&format!("redis_state_manager"), "{}", e),
             };
@@ -908,54 +940,141 @@ mod tests {
             .expect("failed");
 
         let (response_tx, response_rx) = oneshot::channel();
-        tx.send(StateManagement::LookupTransform(("world".to_string(), "floor".to_string(), response_tx)))
-            .await
-            .expect("failed");
+        tx.send(StateManagement::LookupTransform((
+            "world".to_string(),
+            "floor".to_string(),
+            response_tx,
+        )))
+        .await
+        .expect("failed");
         let lookup = response_rx.await.expect("failed");
 
         assert_eq!("floor", lookup.clone().unwrap().child_frame_id);
         assert_eq!("world", lookup.clone().unwrap().parent_frame_id);
 
-        let assert_t = SPTransform { 
-            translation: SPTranslation { 
-                x: OrderedFloat(0.0), 
-                y: OrderedFloat(0.0), 
-                z: OrderedFloat(1.0) 
-            }, 
-            rotation: SPRotation { 
-                x: OrderedFloat(0.0), 
-                y: OrderedFloat(0.0), 
-                z: OrderedFloat(0.0), 
-                w: OrderedFloat(1.0) 
-            }
+        let assert_t = SPTransform {
+            translation: SPTranslation {
+                x: OrderedFloat(0.0),
+                y: OrderedFloat(0.0),
+                z: OrderedFloat(1.0),
+            },
+            rotation: SPRotation {
+                x: OrderedFloat(0.0),
+                y: OrderedFloat(0.0),
+                z: OrderedFloat(0.0),
+                w: OrderedFloat(1.0),
+            },
         };
 
         assert_eq!(assert_t, lookup.unwrap().transform);
 
         let (response_tx, response_rx) = oneshot::channel();
-        tx.send(StateManagement::LookupTransform(("floor".to_string(), "food".to_string(), response_tx)))
-            .await
-            .expect("failed");
+        tx.send(StateManagement::LookupTransform((
+            "floor".to_string(),
+            "food".to_string(),
+            response_tx,
+        )))
+        .await
+        .expect("failed");
         let lookup = response_rx.await.expect("failed");
 
         assert_eq!("food", lookup.clone().unwrap().child_frame_id);
-        assert_eq!("floor",lookup.clone().unwrap().parent_frame_id);
+        assert_eq!("floor", lookup.clone().unwrap().parent_frame_id);
 
-        let assert_t = SPTransform { 
-            translation: SPTranslation { 
-                x: OrderedFloat(1.0), 
-                y: OrderedFloat(5.0), 
-                z: OrderedFloat(0.0) 
-            }, 
-            rotation: SPRotation { 
-                x: OrderedFloat(0.0), 
-                y: OrderedFloat(0.0), 
-                z: OrderedFloat(0.0), 
-                w: OrderedFloat(1.0) 
-            }
+        let assert_t = SPTransform {
+            translation: SPTranslation {
+                x: OrderedFloat(1.0),
+                y: OrderedFloat(5.0),
+                z: OrderedFloat(0.0),
+            },
+            rotation: SPRotation {
+                x: OrderedFloat(0.0),
+                y: OrderedFloat(0.0),
+                z: OrderedFloat(0.0),
+                w: OrderedFloat(1.0),
+            },
         };
 
         assert_eq!(assert_t, lookup.unwrap().transform);
+    }
+
+    #[tokio::test]
+    #[serial]
+    async fn test_move_transform() {
+        // initialize_env_logger();
+        let _container = Redis::default()
+            .with_mapped_port(6379, ContainerPort::Tcp(6379))
+            .start()
+            .await
+            .unwrap();
+
+        let state = dummy_state();
+
+        let path = "/home/endre/rust_crates/micro_sp/src/transforms/examples/data/";
+
+        let (tx, rx) = mpsc::channel(32);
+
+        tokio::task::spawn(async move {
+            match redis_state_manager(rx, state).await {
+                Ok(()) => (),
+                Err(e) => log::error!(target: &&format!("redis_state_manager"), "{}", e),
+            };
+        });
+
+        tx.send(StateManagement::LoadTransformScenario(path.to_string()))
+            .await
+            .expect("failed");
+
+        // let (response_tx, response_rx) = oneshot::channel();
+        tx.send(StateManagement::MoveTransform(
+            "floor".to_string(),
+            SPTransform {
+                translation: SPTranslation {
+                    x: OrderedFloat(1.0),
+                    y: OrderedFloat(2.0),
+                    z: OrderedFloat(3.0),
+                },
+                rotation: SPRotation {
+                    x: OrderedFloat(1.0),
+                    y: OrderedFloat(0.0),
+                    z: OrderedFloat(0.0),
+                    w: OrderedFloat(0.0),
+                },
+            },
+        ))
+        .await
+        .expect("failed");
+
+        let (response_tx, response_rx) = oneshot::channel();
+        tx.send(StateManagement::GetState(response_tx))
+            .await
+            .expect("failed");
+        let recv_state = response_rx.await.expect("failed");
+
+        let floor_moved = match recv_state.get_transform_or_unknown(&format!("test_case"), &format!("floor"))
+        {
+            TransformOrUnknown::Transform(t) => t,
+            TransformOrUnknown::UNKNOWN => {
+                panic!("failed")
+            }
+        };
+
+        let assert_t = SPTransform {
+            translation: SPTranslation {
+                x: OrderedFloat(1.0),
+                y: OrderedFloat(2.0),
+                z: OrderedFloat(3.0),
+            },
+            rotation: SPRotation {
+                x: OrderedFloat(1.0),
+                y: OrderedFloat(0.0),
+                z: OrderedFloat(0.0),
+                w: OrderedFloat(0.0),
+            },
+        };
+
+
+        assert_eq!(assert_t, floor_moved.transform);
     }
 }
 
