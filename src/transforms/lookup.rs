@@ -119,7 +119,7 @@ pub fn parent_to_root(
                     }
                 }
                 None => {
-                    log::error!(target: "transform_lookup", "Failed to get current parent.");
+                    log::error!(target: "transform_lookup", "Failed to get parent for: {current_parent}.");
                     break None
                 },
             }

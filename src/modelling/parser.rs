@@ -10,6 +10,15 @@ peg::parser!(pub grammar pred_parser() for str {
         state.get_assignment(n).var
     }
 
+    rule array_element(state: &State) -> SPValue =
+            v:value(state) {
+                match v {
+                    SPWrapped::SPValue(val) => val,
+                    SPWrapped::SPVariable(sp_var) => panic!()
+                    }
+                }
+
+
     pub rule value(state: &State) -> SPWrapped
         = _ var:variable(&state) _ { SPWrapped::SPVariable(var) }
         / _ "UNKNOWN_bool" _ { SPWrapped::SPValue(SPValue::Bool(BoolOrUnknown::UNKNOWN)) }
@@ -22,6 +31,11 @@ peg::parser!(pub grammar pred_parser() for str {
         / _ "TRUE" _ { SPWrapped::SPValue(true.to_spvalue()) }
         / _ "false" _ { SPWrapped::SPValue(false.to_spvalue()) }
         / _ "FALSE" _ { SPWrapped::SPValue(false.to_spvalue()) }
+        / _ "[" _ items:(array_element(state) ** (_ "," _))? _ "]" _ {
+            SPWrapped::SPValue(SPValue::Array(ArrayOrUnknown::Array(
+                items.unwrap_or_else(Vec::new) // Handles empty array `[]` (items would be None)
+            )))
+        }
         / _ n:$(['a'..='z' | 'A'..='Z' | '_']+) _ { SPWrapped::SPValue(n.to_spvalue()) }
         / _ "\"" n:$(!['"'] [_])* "\"" _ {
             SPWrapped::SPValue(n.into_iter().collect::<Vec<_>>().join("").to_spvalue())
@@ -131,6 +145,12 @@ mod tests {
             pred_parser::value("hej", &s),
             Ok(SPWrapped::SPValue("hej".to_spvalue()))
         );
+
+        assert_eq!(
+            pred_parser::value("[0.3, 0.7, 12.67]", &s),
+            Ok(SPWrapped::SPValue(vec![0.3, 0.7, 12.67].to_spvalue()))
+        );
+
         assert_eq!(
             pred_parser::value("true", &s),
             Ok(SPWrapped::SPValue(true.to_spvalue()))
@@ -157,11 +177,15 @@ mod tests {
         );
         assert_eq!(
             pred_parser::value("UNKNOWN_float", &s),
-            Ok(SPWrapped::SPValue(SPValue::Float64(FloatOrUnknown::UNKNOWN)))
+            Ok(SPWrapped::SPValue(SPValue::Float64(
+                FloatOrUnknown::UNKNOWN
+            )))
         );
         assert_eq!(
             pred_parser::value("UNKNOWN_string", &s),
-            Ok(SPWrapped::SPValue(SPValue::String(StringOrUnknown::UNKNOWN)))
+            Ok(SPWrapped::SPValue(SPValue::String(
+                StringOrUnknown::UNKNOWN
+            )))
         );
         assert_eq!(
             pred_parser::value("UNKNOWN_time", &s),
