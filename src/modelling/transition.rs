@@ -86,15 +86,51 @@ impl Transition {
     ) -> Transition {
         Transition::new(
             name,
-            pred_parser::pred(guard, state).unwrap(),
-            pred_parser::pred(runner_guard, state).unwrap(),
+            match pred_parser::pred(guard, state) {
+                Ok(guard_predicate) => guard_predicate,
+                Err(e) => {
+                    log::error!(target: &&format!("transition_parser"), 
+                        "Failed to parse guard {guard} with: {e}");
+                    log::error!(target: &&format!("transition_parser"), 
+                        "Guard set to FALSE, fix the model.");
+                    Predicate::FALSE
+                }
+            },
+            match pred_parser::pred(runner_guard, state) {
+                Ok(guard_predicate) => guard_predicate,
+                Err(e) => {
+                    log::error!(target: &&format!("transition_parser"), 
+                        "Failed to parse guard {runner_guard} with: {e}");
+                    log::error!(target: &&format!("transition_parser"), 
+                        "Runner guard set to FALSE, fix the model.");
+                    Predicate::FALSE
+                }
+            },
             actions
                 .iter()
-                .map(|action| pred_parser::action(action, state).unwrap())
+                .map(|action| match pred_parser::action(action, state){
+                    Ok(action_def) => action_def,
+                    Err(e) => {
+                        log::error!(target: &&format!("transition_parser"), 
+                            "Failed to parse action {action} with: {e}");
+                        log::error!(target: &&format!("transition_parser"), 
+                            "Action set to EMPTY, fix the model.");
+                        Action::empty()
+                    }
+                })
                 .collect::<Vec<Action>>(),
             runner_actions
                 .iter()
-                .map(|action| pred_parser::action(action, state).unwrap())
+                .map(|action| match pred_parser::action(action, state) {
+                    Ok(action_def) => action_def,
+                    Err(e) => {
+                        log::error!(target: &&format!("transition_parser"), 
+                            "Failed to parse runner_actions {action} with: {e}");
+                        log::error!(target: &&format!("transition_parser"), 
+                            "Runner action set to EMPTY, fix the model.");
+                        Action::empty()
+                    }
+                })
                 .collect::<Vec<Action>>(),
         )
     }

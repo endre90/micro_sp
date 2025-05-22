@@ -12,6 +12,13 @@ pub struct Action {
 }
 
 impl Action {
+    pub fn empty() -> Action {
+        Action {
+            var: SPVariable::new("dummy", SPValueType::Bool),
+            var_or_val: false.wrap(),
+        }
+    }
+
     pub fn new(var: SPVariable, var_or_val: SPWrapped) -> Action {
         Action { var, var_or_val }
     }

@@ -10,11 +10,11 @@ peg::parser!(pub grammar pred_parser() for str {
         state.get_assignment(n).var
     }
 
-    rule array_element(state: &State) -> SPValue =
+    pub rule array_element(state: &State) -> SPValue =
             v:value(state) {
                 match v {
                     SPWrapped::SPValue(val) => val,
-                    SPWrapped::SPVariable(sp_var) => panic!()
+                    SPWrapped::SPVariable(sp_var) => panic!("ASDFASDF")
                     }
                 }
 
@@ -33,7 +33,7 @@ peg::parser!(pub grammar pred_parser() for str {
         / _ "FALSE" _ { SPWrapped::SPValue(false.to_spvalue()) }
         / _ "[" _ items:(array_element(state) ** (_ "," _))? _ "]" _ {
             SPWrapped::SPValue(SPValue::Array(ArrayOrUnknown::Array(
-                items.unwrap_or_else(Vec::new) // Handles empty array `[]` (items would be None)
+                items.unwrap_or_else(Vec::new) 
             )))
         }
         / _ n:$(['a'..='z' | 'A'..='Z' | '_']+) _ { SPWrapped::SPValue(n.to_spvalue()) }

@@ -33,7 +33,19 @@ pub fn bfs_transition_planner(
                 }
             }
             _ => {
-                let (s, path) = stack.pop().unwrap();
+                let (s, path) = match stack.pop() {
+                    Some(popped) => popped,
+                    None => {
+                        log::error!(target: &&format!("transition_planner"), 
+                            "Failed to pop value from stack? This shouldn't happen.");
+                        log::error!(target: &&format!("transition_planner"), 
+                            "Breaking the search with empty planning result.");
+                        break PlanningResult {
+                            found: false,
+                            ..Default::default()
+                        };
+                    }
+                };
                 match goal.clone().eval(&s) {
                     true => {
                         break PlanningResult {
