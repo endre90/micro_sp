@@ -14,7 +14,7 @@ pub struct Action {
 impl Action {
     pub fn empty() -> Action {
         Action {
-            var: SPVariable::new("dummy", SPValueType::Bool),
+            var: SPVariable::new("empty", SPValueType::Bool),
             var_or_val: false.wrap(),
         }
     }
