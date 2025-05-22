@@ -132,14 +132,14 @@ mod tests {
     #[test]
     fn test_operation_planner() {
         let state = make_initial_state();
-        let op_move_to_b = v!("op_move_to_b");
-        let op_move_to_c = v!("op_move_to_c");
-        let op_move_to_d = v!("op_move_to_d");
+        let op_move_to_b = v!("operation_move_to_b");
+        let op_move_to_c = v!("operation_move_to_c");
+        let op_move_to_d = v!("operation_move_to_d");
         let state = state.add(assign!(op_move_to_b, "initial".to_spvalue()));
         let state = state.add(assign!(op_move_to_c, "initial".to_spvalue()));
         let state = state.add(assign!(op_move_to_d, "initial".to_spvalue()));
         let op_move_to_b = Operation::new(
-        "op_move_to_b",
+        "move_to_b",
         None,
         None,
         vec!(t!(
@@ -172,7 +172,7 @@ mod tests {
     );
 
         let op_move_to_c = Operation::new(
-        "op_move_to_c",
+        "move_to_c",
         None,
         None,
         vec!(t!(
@@ -205,7 +205,7 @@ mod tests {
     );
 
         let op_move_to_d = Operation::new(
-        "op_move_to_d",
+        "move_to_d",
         None,
         None,
         vec!(t!(
@@ -252,7 +252,7 @@ mod tests {
         let goal = pred_parser::pred("var:ur_current_pose == d", &state).unwrap();
         let result = bfs_operation_planner(state, goal, m.operations, 30);
         assert_eq!(
-            vec!("op_move_to_b", "op_move_to_c", "op_move_to_d"),
+            vec!("operation_move_to_b", "operation_move_to_c", "operation_move_to_d"),
             result.plan
         );
     }

@@ -67,10 +67,10 @@ pub fn generate_operation_state_variables(model: &Model, coverability_tracking: 
     let mut state = State::new();
     // operations should be put in the initial state once they are part of the plan
     for operation in &model.operations {
-        let operation_state = v!(&&format!("operation_{}", operation.name)); // Initial, Executing, Failed, Completed, Unknown
-        let operation_information = v!(&&format!("operation_{}_information", operation.name));
-        let operation_start_time = tv!(&&format!("operation_{}_start_time", operation.name)); // to timeout if it takes too long
-        let operation_retry_counter = iv!(&&format!("operation_{}_retry_counter", operation.name)); // without scrapping the current plan, how many times has an operation retried
+        let operation_state = v!(&&format!("{}", operation.name)); // Initial, Executing, Failed, Completed, Unknown
+        let operation_information = v!(&&format!("{}_information", operation.name));
+        let operation_start_time = tv!(&&format!("{}_start_time", operation.name)); // to timeout if it takes too long
+        let operation_retry_counter = iv!(&&format!("{}_retry_counter", operation.name)); // without scrapping the current plan, how many times has an operation retried
         state = state.add(assign!(operation_state, "initial".to_spvalue()));
         state = state.add(assign!(operation_information, SPValue::String(StringOrUnknown::UNKNOWN)));
         state = state.add(assign!(operation_start_time, SPValue::Time(TimeOrUnknown::UNKNOWN)));
@@ -78,12 +78,12 @@ pub fn generate_operation_state_variables(model: &Model, coverability_tracking: 
 
         if coverability_tracking {
             // coverability tracking does nothing for now
-            let initial = iv!(&&format!("operation_{}_visited_initial", operation.name));
-            let executing = iv!(&&format!("operation_{}_visited_executing", operation.name));
-            let timedout = iv!(&&format!("operation_{}_visited_timedout", operation.name)); // Operation should have optional deadline field
-            let disabled = iv!(&&format!("operation_{}_visited_disabled", operation.name));
-            let failed = iv!(&&format!("operation_{}_visited_failed", operation.name));
-            let completed = iv!(&&format!("operation_{}_visited_completed", operation.name));
+            let initial = iv!(&&format!("{}_visited_initial", operation.name));
+            let executing = iv!(&&format!("{}_visited_executing", operation.name));
+            let timedout = iv!(&&format!("{}_visited_timedout", operation.name)); // Operation should have optional deadline field
+            let disabled = iv!(&&format!("{}_visited_disabled", operation.name));
+            let failed = iv!(&&format!("{}_visited_failed", operation.name));
+            let completed = iv!(&&format!("{}_visited_completed", operation.name));
 
             for cov in vec![initial, executing, timedout, disabled, failed, completed] {
                 state = state.add(assign!(cov, 0.to_spvalue()));
@@ -99,10 +99,10 @@ pub fn generate_operation_state_variables(model: &Model, coverability_tracking: 
     }
 
     for operation in &model.auto_operations {
-        let operation_state = v!(&&format!("operation_{}", operation.name));
+        let operation_state = v!(&&format!("{}", operation.name));
         state = state.add(assign!(operation_state, "initial".to_spvalue()));
         if coverability_tracking {
-            let taken = iv!(&&format!("operation_{}_taken", operation.name));
+            let taken = iv!(&&format!("{}_taken", operation.name));
             state = state.add(assign!(taken, 0.to_spvalue()))
         }
     }
@@ -114,7 +114,7 @@ pub fn reset_all_operations(state: &State) -> State {
     let state = state.clone();
     let mut mut_state = state.clone();
     state.state.iter().for_each(|(k, _)| {
-        if k.starts_with("operation_") {
+        if k.starts_with("") {
             mut_state = mut_state.update(&k, "initial".to_spvalue());
         }
     });
