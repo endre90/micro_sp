@@ -37,8 +37,16 @@ impl Hash for State {
 impl State {
     /// Create and returns a new State instance.
     pub fn new() -> State {
+        let mut state = HashMap::new();
+        state.insert("empty".to_string(), SPAssignment::new(
+            SPVariable {
+                name: "empty".to_string(),
+                value_type: SPValueType::Bool,
+            },
+            false.to_spvalue(),
+        ));
         State {
-            state: HashMap::new(),
+            state
         }
     }
 
@@ -122,18 +130,14 @@ impl State {
     pub fn get_bool_or_default_to_false(&self, target: &str, name: &str) -> bool {
         match self.get_bool_or_unknown(target, name) {
             BoolOrUnknown::Bool(b) => b,
-            _ => {
-                false
-            }
+            _ => false,
         }
     }
 
     pub fn get_bool_or_value(&self, target: &str, name: &str, value: bool) -> bool {
         match self.get_bool_or_unknown(target, name) {
             BoolOrUnknown::Bool(b) => b,
-            _ => {
-                value
-            }
+            _ => value,
         }
     }
 
@@ -150,18 +154,14 @@ impl State {
     pub fn get_int_or_default_to_zero(&self, target: &str, name: &str) -> i64 {
         match self.get_int_or_unknown(target, name) {
             IntOrUnknown::Int64(i) => i,
-            _ => {
-                0
-            }
+            _ => 0,
         }
     }
 
     pub fn get_int_or_value(&self, target: &str, name: &str, value: i64) -> i64 {
         match self.get_int_or_unknown(target, name) {
             IntOrUnknown::Int64(i) => i,
-            _ => {
-                value
-            }
+            _ => value,
         }
     }
 
@@ -178,21 +178,16 @@ impl State {
     pub fn get_float_or_default_to_zero(&self, target: &str, name: &str) -> f64 {
         match self.get_float_or_unknown(target, name) {
             FloatOrUnknown::Float64(f) => f.into_inner(),
-            _ => {
-                0.0
-            }
+            _ => 0.0,
         }
     }
 
     pub fn get_float_or_value(&self, target: &str, name: &str, value: f64) -> f64 {
         match self.get_float_or_unknown(target, name) {
             FloatOrUnknown::Float64(f) => f.into_inner(),
-            _ => {
-                value
-            }
+            _ => value,
         }
     }
-    
 
     pub fn get_string_or_unknown(&self, target: &str, name: &str) -> StringOrUnknown {
         match self.get_value(name) {
@@ -207,18 +202,14 @@ impl State {
     pub fn get_string_or_default_to_unknown(&self, target: &str, name: &str) -> String {
         match self.get_string_or_unknown(target, name) {
             StringOrUnknown::String(s) => s,
-            _ => {
-                SPValue::String(StringOrUnknown::UNKNOWN).to_string()
-            }
+            _ => SPValue::String(StringOrUnknown::UNKNOWN).to_string(),
         }
     }
 
     pub fn get_string_or_value(&self, target: &str, name: &str, value: String) -> String {
         match self.get_string_or_unknown(target, name) {
             StringOrUnknown::String(s) => s,
-            _ => {
-                value
-            }
+            _ => value,
         }
     }
 
@@ -241,12 +232,15 @@ impl State {
         }
     }
 
-    pub fn get_array_or_value(&self, target: &str, name: &str, value: Vec<SPValue>) -> Vec<SPValue> {
+    pub fn get_array_or_value(
+        &self,
+        target: &str,
+        name: &str,
+        value: Vec<SPValue>,
+    ) -> Vec<SPValue> {
         match self.get_array_or_unknown(target, name) {
             ArrayOrUnknown::Array(a) => a,
-            _ => {
-                value
-            }
+            _ => value,
         }
     }
 
@@ -269,12 +263,15 @@ impl State {
         }
     }
 
-    pub fn get_map_or_value(&self, target: &str, name: &str, value: Vec<(SPValue, SPValue)>) -> Vec<(SPValue, SPValue)> {
+    pub fn get_map_or_value(
+        &self,
+        target: &str,
+        name: &str,
+        value: Vec<(SPValue, SPValue)>,
+    ) -> Vec<(SPValue, SPValue)> {
         match self.get_map_or_unknown(target, name) {
             MapOrUnknown::Map(m) => m,
-            _ => {
-                value
-            }
+            _ => value,
         }
     }
 
@@ -453,7 +450,7 @@ mod tests {
     #[test]
     fn test_state_new() {
         let new_state = State::new();
-        assert_eq!(new_state.state.len(), 0)
+        assert_eq!(new_state.state.len(), 1) // Has the empty var
     }
 
     #[test]
