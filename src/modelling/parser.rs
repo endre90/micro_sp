@@ -33,21 +33,42 @@ peg::parser!(pub grammar pred_parser() for str {
         / _ "FALSE" _ { SPWrapped::SPValue(false.to_spvalue()) }
         / _ "[" _ items:(array_element(state) ** (_ "," _))? _ "]" _ {
             SPWrapped::SPValue(SPValue::Array(ArrayOrUnknown::Array(
-                items.unwrap_or_else(Vec::new) 
+                items.unwrap_or_else(Vec::new)
             )))
         }
-        / _ n:$(['a'..='z' | 'A'..='Z' | '_']+) _ { SPWrapped::SPValue(n.to_spvalue()) }
-        / _ "\"" n:$(!['"'] [_])* "\"" _ {
+        / _ "\"" n:$(!['"'] [_])* "\"" _ { // Quoted string
             SPWrapped::SPValue(n.into_iter().collect::<Vec<_>>().join("").to_spvalue())
         }
-        / _ n:$(['0'..='9']+ "." ['0'..='9']+) _ {
-            let f: f64 = n.parse().unwrap();
+        / _ n:$(['0'..='9']+ "." ['0'..='9']+) !(['a'..='z' | 'A'..='Z' | '0'..='9' | '_']) _ { // Float
+            let f: f64 = n.parse().expect("Failed to parse float");
             SPWrapped::SPValue(f.to_spvalue())
         }
-        / _ n:$(['0'..='9']+) _ {
-            let i: i64 = n.parse().unwrap();
+        / _ n:$(['0'..='9']+) !(['a'..='z' | 'A'..='Z' | '0'..='9' | '_']) _ { // Integer
+            let i: i64 = n.parse().expect("Failed to parse integer");
             SPWrapped::SPValue(i.to_spvalue())
         }
+        / _ n:$(['a'..='z' | 'A'..='Z' | '0'..='9' | '_']+) _ {
+            SPWrapped::SPValue(n.to_spvalue())
+        }
+
+
+
+        // / _ n:$(['a'..='z' | 'A'..='Z' | '_']+) _ { SPWrapped::SPValue(n.to_spvalue()) }
+        // / _ "\"" n:$(!['"'] [_])* "\"" _ {
+        //     SPWrapped::SPValue(n.into_iter().collect::<Vec<_>>().join("").to_spvalue())
+        // }
+        // / _ n:$(['0'..='9']+ "." ['0'..='9']+) _ {
+        //     let f: f64 = n.parse().unwrap();
+        //     SPWrapped::SPValue(f.to_spvalue())
+        // }
+        // / _ n:$(['0'..='9']+) _ {
+        //     let i: i64 = n.parse().unwrap();
+        //     SPWrapped::SPValue(i.to_spvalue())
+        // }
+
+
+
+
         // this is not tested
         / _ var:variable(&state) "+" _ n:$(['0'..='9']+) {
             let i: i64 = n.parse().unwrap();
