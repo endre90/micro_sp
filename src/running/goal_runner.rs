@@ -91,6 +91,7 @@ pub async fn goal_runner(
                 let new_state = state
                     .update(&format!("{}_replan_trigger", name), true.to_spvalue())
                     .update(&format!("{}_replanned", name), false.to_spvalue())
+                    .update(&format!("{}_plan_current_step", name), 0.to_spvalue())
                     .update(
                         &format!("{}_current_goal_state", name),
                         current_goal_state.to_spvalue(),
@@ -448,7 +449,9 @@ pub async fn goal_runner(
             }
             CurrentGoalState::Failed => todo!(),
             CurrentGoalState::Aborted => todo!(),
-            CurrentGoalState::Completed => todo!(),
+            CurrentGoalState::Completed => {
+                log::info!(target: &&format!("{}_goal_runner", name), "Goal completed.");
+            },
         }
 
         interval.tick().await;
