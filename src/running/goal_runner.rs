@@ -415,7 +415,15 @@ pub async fn goal_runner(
                             operation_start_time.to_spvalue(),
                         );
                 } else {
-                    current_goal_state = CurrentGoalState::Completed.to_string();
+                    let replan_trigger = state.get_bool_or_default_to_false(
+                        &format!("{}_goal_runner", name),
+                        &format!("{}_replan_trigger", name),
+                    );
+                    if replan_trigger {
+                        current_goal_state = CurrentGoalState::Initial.to_string();
+                    } else {
+                        current_goal_state = CurrentGoalState::Completed.to_string();
+                    }                    
                 }
 
                 new_state = new_state
