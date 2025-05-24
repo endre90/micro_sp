@@ -307,10 +307,10 @@ pub async fn goal_runner(
                         &format!("{}_retry_counter", operation.name),
                     );
 
-                    let mut operation_start_time = state.get_time_or_unknown(
-                        &format!("{}_goal_runner", name),
-                        &format!("{}_start_time", operation.name),
-                    );
+                    // let mut operation_start_time = state.get_time_or_unknown(
+                    //     &format!("{}_goal_runner", name),
+                    //     &format!("{}_start_time", operation.name),
+                    // );
 
                     // Log only when something changes and not every tick
                     if operation_state_old != operation_state {
