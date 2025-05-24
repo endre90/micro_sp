@@ -25,6 +25,9 @@ pub fn generate_runner_state_variables(name: &str) -> State {
     let replan_trigger = bv!(&&format!("{}_replan_trigger", name)); // boolean for tracking the planner triggering
     let incoming_goals = mv!(&&format!("{}_incoming_goals", name));
     let scheduled_goals = mv!(&&format!("{}_scheduled_goals", name));
+    let sop_request_trigger = bv!(&&format!("{}_sop_request_trigger", name));
+    let sop_request_state = v!(&&format!("{}_sop_request_state", name));
+    let sop_id = v!(&&format!("{}_sop_id", name));
     
 
     // Initialize values
@@ -47,6 +50,9 @@ pub fn generate_runner_state_variables(name: &str) -> State {
     state = state.add(assign!(replan_trigger, SPValue::Bool(BoolOrUnknown::UNKNOWN)));
     state = state.add(assign!(incoming_goals, SPValue::Map(MapOrUnknown::UNKNOWN)));
     state = state.add(assign!(scheduled_goals, SPValue::Map(MapOrUnknown::UNKNOWN)));
+    state = state.add(assign!(sop_request_state, SPValue::String(StringOrUnknown::UNKNOWN)));
+    state = state.add(assign!(sop_id, SPValue::String(StringOrUnknown::UNKNOWN)));
+    state = state.add(assign!(sop_request_trigger, SPValue::Bool(BoolOrUnknown::UNKNOWN)));
 
     // Define variables to keep track of the processes
     let state_manager_online = bv!(&&format!("state_manager_online"));
@@ -98,14 +104,14 @@ pub fn generate_operation_state_variables(model: &Model, coverability_tracking: 
         }
     }
 
-    for operation in &model.auto_operations {
-        let operation_state = v!(&&format!("{}", operation.name));
-        state = state.add(assign!(operation_state, "initial".to_spvalue()));
-        if coverability_tracking {
-            let taken = iv!(&&format!("{}_taken", operation.name));
-            state = state.add(assign!(taken, 0.to_spvalue()))
-        }
-    }
+    // for operation in &model.auto_operations {
+    //     let operation_state = v!(&&format!("{}", operation.name));
+    //     state = state.add(assign!(operation_state, "initial".to_spvalue()));
+    //     if coverability_tracking {
+    //         let taken = iv!(&&format!("{}_taken", operation.name));
+    //         state = state.add(assign!(taken, 0.to_spvalue()))
+    //     }
+    // }
 
     state
 }

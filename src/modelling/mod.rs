@@ -1,5 +1,5 @@
 pub mod action;
-// pub mod operation_old;
+pub mod sops;
 pub mod operation;
 pub mod model;
 pub mod parser;

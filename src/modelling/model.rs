@@ -6,7 +6,7 @@ use crate::*;
 pub struct Model {
     pub name: String,
     pub auto_transitions: Vec<Transition>,
-    pub auto_operations: Vec<Operation>,
+    pub sops: Vec<SOPStruct>,
     pub operations: Vec<Operation>,
 }
 
@@ -14,13 +14,13 @@ impl Model {
     pub fn new(
         name: &str,
         auto_transitions: Vec<Transition>,
-        auto_operations: Vec<Operation>,
+        sops: Vec<SOPStruct>,
         operations: Vec<Operation>,
     ) -> Model {
         Model {
             name: name.to_string(),
             auto_transitions,
-            auto_operations,
+            sops,
             operations: operations.iter().map(|o| Operation { 
                 name: format!("operation_{}", o.name), 
                 timeout_ms: o.timeout_ms, 
