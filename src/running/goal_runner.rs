@@ -447,8 +447,12 @@ pub async fn goal_runner(
                 log::warn!(target: &&format!("{}_goal_runner", name), 
                     "The goal runner is paused.");
             }
-            CurrentGoalState::Failed => todo!(),
-            CurrentGoalState::Aborted => todo!(),
+            CurrentGoalState::Failed => {
+                log::info!(target: &&format!("{}_goal_runner", name), "Goal failed.");
+            },
+            CurrentGoalState::Aborted => {
+                log::info!(target: &&format!("{}_goal_runner", name), "Goal aborted.");
+            },
             CurrentGoalState::Completed => {
                 log::info!(target: &&format!("{}_goal_runner", name), "Goal completed.");
             },
