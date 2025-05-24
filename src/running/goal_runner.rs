@@ -294,22 +294,22 @@ pub async fn goal_runner(
 
                     let operation_state = state.get_string_or_default_to_unknown(
                         &format!("{}_goal_runner", name),
-                        &format!("operation_{}", operation.name),
+                        &format!("{}", operation.name),
                     );
 
                     let mut operation_information = state.get_string_or_default_to_unknown(
                         &format!("{}_goal_runner", name),
-                        &format!("operation_{}_information", operation.name),
+                        &format!("{}_information", operation.name),
                     );
 
                     let mut operation_retry_counter = state.get_int_or_default_to_zero(
                         &format!("{}_goal_runner", name),
-                        &format!("operation_{}_retry_counter", operation.name),
+                        &format!("{}_retry_counter", operation.name),
                     );
 
                     let mut operation_start_time = state.get_time_or_unknown(
                         &format!("{}_goal_runner", name),
-                        &format!("operation_{}_start_time", operation.name),
+                        &format!("{}_start_time", operation.name),
                     );
 
                     // Log only when something changes and not every tick
@@ -368,7 +368,7 @@ pub async fn goal_runner(
                         OperationState::Completed => {
                             operation_retry_counter = 0;
                             new_state = new_state.update(
-                                &format!("operation_{}_retry_counter", operation.name),
+                                &format!("{}_retry_counter", operation.name),
                                 operation_retry_counter.to_spvalue(),
                             );
                             plan_current_step = plan_current_step + 1;
@@ -386,13 +386,13 @@ pub async fn goal_runner(
                                 );
                                 new_state = operation.clone().retry_running(&new_state);
                                 new_state = new_state.update(
-                                    &format!("operation_{}_retry_counter", operation.name),
+                                    &format!("{}_retry_counter", operation.name),
                                     operation_retry_counter.to_spvalue(),
                                 );
                             } else {
                                 operation_retry_counter = 0;
                                 new_state = new_state.update(
-                                    &format!("operation_{}_retry_counter", operation.name),
+                                    &format!("{}_retry_counter", operation.name),
                                     operation_retry_counter.to_spvalue(),
                                 );
                                 operation_information = format!(
@@ -407,11 +407,11 @@ pub async fn goal_runner(
 
                     new_state = new_state
                         .update(
-                            &format!("operation_{}_information", operation.name),
+                            &format!("{}_information", operation.name),
                             operation_information.to_spvalue(),
                         )
                         .update(
-                            &format!("operation_{}_start_time", name),
+                            &format!("{}_start_time", name),
                             operation_start_time.to_spvalue(),
                         );
                 } else {
