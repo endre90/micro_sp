@@ -28,6 +28,7 @@ pub fn generate_runner_state_variables(name: &str) -> State {
     let sop_request_trigger = bv!(&&format!("{}_sop_request_trigger", name));
     let sop_request_state = v!(&&format!("{}_sop_request_state", name));
     let sop_id = v!(&&format!("{}_sop_id", name));
+    let sop_state = v!(&&format!("{}_sop_state", name));
     let start_time = tv!(&&format!("{}_start_time", name));
     
 
@@ -53,6 +54,7 @@ pub fn generate_runner_state_variables(name: &str) -> State {
     state = state.add(assign!(scheduled_goals, SPValue::Map(MapOrUnknown::UNKNOWN)));
     state = state.add(assign!(sop_request_state, SPValue::String(StringOrUnknown::UNKNOWN)));
     state = state.add(assign!(sop_id, SPValue::String(StringOrUnknown::UNKNOWN)));
+    state = state.add(assign!(sop_state, SPValue::String(StringOrUnknown::UNKNOWN)));
     state = state.add(assign!(sop_request_trigger, SPValue::Bool(BoolOrUnknown::UNKNOWN)));
     state = state.add(assign!(start_time, SPValue::Time(TimeOrUnknown::UNKNOWN)));
 
