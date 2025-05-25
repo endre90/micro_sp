@@ -351,6 +351,7 @@ pub async fn sop_runner(
                         );
                         match OperationState::from_str(&operation_state) {
                             OperationState::Completed => {
+                                log::info!(target: &format!("{}_sop_runner", sp_id), "completed ASDFASDF");
                                 sop_current_step = sop_current_step + 1;
                             }
                             // If retries have need exhausted, fail the sop
