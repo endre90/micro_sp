@@ -61,7 +61,7 @@ pub async fn cycle_operation(
                     operation_information.to_spvalue(),
                 );
 
-                new_state = state.get_diff_partial_state(&new_state);
+                // new_state = state.get_diff_partial_state(&new_state);
             }
         }
         OperationState::Disabled => todo!(),
@@ -94,7 +94,7 @@ pub async fn cycle_operation(
                 operation_information.to_spvalue(),
             );
 
-            new_state = state.get_diff_partial_state(&new_state);
+            // new_state = state.get_diff_partial_state(&new_state);
         }
         OperationState::Completed => {
             operation_retry_counter = 0;
@@ -108,7 +108,7 @@ pub async fn cycle_operation(
                 operation_information.to_spvalue(),
             );
 
-            new_state = state.get_diff_partial_state(&new_state);
+            // new_state = state.get_diff_partial_state(&new_state);
         }
         OperationState::Timedout => {
             operation_information = format!("Operation '{}' timedout.", operation.name);
@@ -134,7 +134,7 @@ pub async fn cycle_operation(
                     operation_information.to_spvalue(),
                 );
 
-                new_state = state.get_diff_partial_state(&new_state);
+                // new_state = state.get_diff_partial_state(&new_state);
             } else {
                 operation_retry_counter = 0;
                 new_state = new_state.update(
@@ -148,7 +148,7 @@ pub async fn cycle_operation(
                 );
 
                 new_state = operation.abandon_running(&new_state);
-                new_state = state.get_diff_partial_state(&new_state);
+                // new_state = state.get_diff_partial_state(&new_state);
             }
         }
         OperationState::Abandoned => {
