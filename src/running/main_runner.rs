@@ -53,8 +53,7 @@ impl fmt::Display for RunnerState {
 }
 
 // Run everything and provide a model
-pub async fn main_runner(model: Model, tx: mpsc::Sender<StateManagement>,) {
-    let sp_id = nanoid::nanoid!();
+pub async fn main_runner(sp_id: String, model: Model, tx: mpsc::Sender<StateManagement>,) {
     // Logs from extern crates to stdout
     initialize_env_logger();
 
