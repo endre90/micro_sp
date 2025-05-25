@@ -317,8 +317,8 @@ pub async fn sop_runner(
             sop_state_old = sop_state.clone()
         }
 
-        if sop_request_trigger && sop_state == ActionRequestState::Initial.to_string() {
-            sop_state = PlanState::Executing.to_string();
+        if sop_request_trigger {
+            sop_state = ActionRequestState::Executing.to_string();
             sop_current_step = 0;
             let sop = model
                 .sops
