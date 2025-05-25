@@ -252,10 +252,6 @@ pub async fn plan_runner(
             PlanState::UNKNOWN => {}
         }
 
-        for s in new_state.get_all_vars() {
-            println!("{}", s.name)
-        }
-
         new_state = new_state
             .update(&format!("{}_plan_state", sp_id), plan_state.to_spvalue())
             .update(
