@@ -269,6 +269,133 @@ pub async fn plan_runner(
     }
 }
 
+// Super simple for now only sequences, later extend with alternative, paralell, loops, etc.
+pub async fn sop_runner(
+    sp_id: &str,
+    model: &Model,
+    command_sender: mpsc::Sender<StateManagement>,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let mut interval = interval(Duration::from_millis(100));
+    let model = model.clone();
+
+    // For nicer logging
+    let mut sop_state_old = "".to_string();
+    // let mut operation_state_old = "".to_string();
+    // let mut operation_information_old = "".to_string();
+
+    log::info!(target: &&format!("{}_sop_runner", sp_id), "Online.");
+
+    loop {
+        let (response_tx, response_rx) = oneshot::channel();
+        command_sender
+            .send(StateManagement::GetState(response_tx))
+            .await?;
+        let state = response_rx.await?;
+        let mut new_state = state.clone();
+
+        let mut sop_state = state.get_string_or_default_to_unknown(
+            &format!("{}_sop_runner", sp_id),
+            &format!("{}_sop_state", sp_id),
+        );
+        let mut sop_current_step = state.get_int_or_default_to_zero(
+            &format!("{}_sop_runner", sp_id),
+            &format!("{}_sop_current_step", sp_id),
+        );
+        let sop_id = state.get_string_or_default_to_unknown(
+            &format!("{}_sop_runner", sp_id),
+            &format!("{}_sop_id", sp_id),
+        );
+
+        let mut sop_request_trigger = state.get_bool_or_default_to_false(
+            &format!("{}_sop_runner", sp_id),
+            &format!("{}_sop_request_trigger", sp_id),
+        );
+
+        // Log only when something changes and not every tick
+        if sop_state_old != sop_state {
+            log::info!(target: &format!("{}_sop_runner", sp_id), "SOP current state: {sop_state}.");
+            sop_state_old = sop_state.clone()
+        }
+
+        if sop_request_trigger && sop_state == ActionRequestState::Initial.to_string() {
+            sop_state = PlanState::Executing.to_string();
+            sop_current_step = 0;
+            let sop = model
+                .sops
+                .iter()
+                .find(|sop| sop.id == sop_id.to_string())
+                .unwrap()
+                .to_owned();
+            match ActionRequestState::from_str(&sop_state) {
+                ActionRequestState::Initial => {}
+                ActionRequestState::Executing => {
+                    if sop.sop.len() > sop_current_step as usize {
+                        let operation = model
+                            .operations
+                            .iter()
+                            .find(|op| op.name == sop.sop[sop_current_step as usize].to_string())
+                            .unwrap()
+                            .to_owned();
+
+
+                        // Might be a problem here if we are cycling the same operation from 2 different places
+                        new_state = cycle_operation(
+                            &format!("{sp_id}_sop"),
+                            operation.clone(),
+                            state.clone(),
+                        )
+                        .await;
+                        let operation_state = new_state.get_string_or_default_to_unknown(
+                            &format!("{}_plan_runner", sp_id),
+                            &format!("{}", operation.name),
+                        );
+                        match OperationState::from_str(&operation_state) {
+                            OperationState::Completed => {
+                                sop_current_step = sop_current_step + 1;
+                            }
+                            // If retries have need exhausted, fail the sop
+                            OperationState::Abandoned => {
+                                sop_state = ActionRequestState::Failed.to_string();
+                            }
+                            _ => (),
+                        }
+                    } else {
+                        sop_state = ActionRequestState::Succeeded.to_string();
+                        
+                    }
+                }
+                ActionRequestState::Succeeded => {
+                    sop_request_trigger = false;
+                    log::info!(target: &&format!("{}_sop_runner", sp_id), "SOP suceeded.");
+                }
+                ActionRequestState::Failed => {
+                    sop_request_trigger = false;
+                    log::info!(target: &&format!("{}_sop_runner", sp_id), "SOP failed.");
+                }
+                ActionRequestState::UNKNOWN => {}
+            }
+        }
+
+        new_state = new_state
+            .update(&format!("{}_sop_state", sp_id), sop_state.to_spvalue())
+            .update(
+                &format!("{}_sop_current_step", sp_id),
+                sop_current_step.to_spvalue(),
+            )
+            .update(
+                &format!("{}_sop_request_trigger", sp_id),
+                sop_request_trigger.to_spvalue(),
+            );
+
+        let modified_state = state.get_diff_partial_state(&new_state);
+        command_sender
+            .send(StateManagement::SetPartialState(modified_state))
+            .await?;
+
+        interval.tick().await;
+    }
+}
+
 // No planner, just runner. In this case the model has to be different
 // pub fn simple_single_operation_runner() {}
 
