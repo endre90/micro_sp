@@ -53,7 +53,7 @@ impl fmt::Display for RunnerState {
 }
 
 // Run everything and provide a model
-pub async fn main_runner(sp_id: String, model: Model, tx: mpsc::Sender<StateManagement>,) {
+pub async fn main_runner(sp_id: &String, model: Model, tx: mpsc::Sender<StateManagement>,) {
     // Logs from extern crates to stdout
     initialize_env_logger();
 
