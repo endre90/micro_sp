@@ -27,6 +27,7 @@ pub fn generate_runner_state_variables(name: &str) -> State {
     let scheduled_goals = mv!(&&format!("{}_scheduled_goals", name));
     let sop_request_trigger = bv!(&&format!("{}_sop_request_trigger", name));
     let sop_request_state = v!(&&format!("{}_sop_request_state", name));
+    let sop_current_step = iv!(&&format!("{}_sop_current_step", name));
     let sop_id = v!(&&format!("{}_sop_id", name));
     let sop_state = v!(&&format!("{}_sop_state", name));
     let start_time = tv!(&&format!("{}_start_time", name));
@@ -57,6 +58,7 @@ pub fn generate_runner_state_variables(name: &str) -> State {
     state = state.add(assign!(sop_state, SPValue::String(StringOrUnknown::UNKNOWN)));
     state = state.add(assign!(sop_request_trigger, SPValue::Bool(BoolOrUnknown::UNKNOWN)));
     state = state.add(assign!(start_time, SPValue::Time(TimeOrUnknown::UNKNOWN)));
+    state = state.add(assign!(sop_current_step, SPValue::Int64(IntOrUnknown::UNKNOWN)));
 
     // Define variables to keep track of the processes
     let state_manager_online = bv!(&&format!("state_manager_online"));
