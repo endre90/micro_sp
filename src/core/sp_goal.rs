@@ -14,12 +14,10 @@ pub enum GoalPriority {
 pub enum CurrentGoalState {
     Empty,
     Initial,
-    Planning,
-    PlanNotFound,
     Executing,
     Paused,
     Failed,
-    Aborted,
+    Cancelled,
     Completed
 }
 
@@ -74,12 +72,10 @@ impl CurrentGoalState {
         match x {
             "empty" => CurrentGoalState::Empty,
             "initial" => CurrentGoalState::Initial,
-            "planning" => CurrentGoalState::Planning,
-            "plan_not_found" => CurrentGoalState::PlanNotFound,
             "executing" => CurrentGoalState::Executing,
             "failed" => CurrentGoalState::Failed,
             "paused" => CurrentGoalState::Paused,
-            "aborted" => CurrentGoalState::Aborted,
+            "cancelled" => CurrentGoalState::Cancelled,
             "completed" => CurrentGoalState::Completed,
             _ => {
                 log::error!(target: &&format!("goal_priority"), 
@@ -98,10 +94,8 @@ impl fmt::Display for CurrentGoalState {
         match self {
             CurrentGoalState::Empty => write!(f, "empty"),
             CurrentGoalState::Initial => write!(f, "initial"),
-            CurrentGoalState::Planning => write!(f, "planning"),
-            CurrentGoalState::PlanNotFound => write!(f, "plan_not_found"),
             CurrentGoalState::Executing => write!(f, "executing"),
-            CurrentGoalState::Aborted => write!(f, "aborted"),
+            CurrentGoalState::Cancelled => write!(f, "cancelled"),
             CurrentGoalState::Paused => write!(f, "paused"),
             CurrentGoalState::Failed => write!(f, "failed"),
             CurrentGoalState::Completed => write!(f, "completed")

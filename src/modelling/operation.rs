@@ -18,6 +18,7 @@ pub enum OperationState {
     Completed,
     Timedout,
     Failed,
+    Abandoned,
     UNKNOWN,
 }
 
@@ -35,6 +36,7 @@ impl OperationState {
             "executing" => OperationState::Executing,
             "timedout" => OperationState::Timedout,
             "failed" => OperationState::Failed,
+            "abandoned" => OperationState::Abandoned,
             "completed" => OperationState::Completed,
             _ => OperationState::UNKNOWN,
         }
@@ -52,6 +54,7 @@ impl fmt::Display for OperationState {
             OperationState::Executing => write!(f, "executing"),
             OperationState::Timedout => write!(f, "timedout"),
             OperationState::Failed => write!(f, "failed"),
+            OperationState::Abandoned => write!(f, "abandoned"),
             OperationState::Completed => write!(f, "completed"),
             OperationState::UNKNOWN => write!(f, "UNKNOWN"),
         }
@@ -216,6 +219,18 @@ impl Operation {
             }
         }
         state.clone()
+    }
+
+    pub fn abandon_running(&self, state: &State) -> State {
+        let assignment = state.get_assignment(&self.name);
+        if assignment.val == OperationState::Failed.to_spvalue() {
+            let action =
+                Action::new(assignment.var, OperationState::Abandoned.to_spvalue().wrap());
+                action.assign(&state)
+        } else {
+            log::error!(target: &&format!("operations"), "Can't abandon an operation which hasn't failed.");
+            state.clone()
+        }
     }
 
     /// Timeout an executing the operation.

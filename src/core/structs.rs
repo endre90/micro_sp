@@ -20,7 +20,7 @@ pub enum PlanState {
     Failed,
     NotFound,
     Completed,
-    Cancelled,
+    // Cancelled,
     UNKNOWN,
 }
 
@@ -39,7 +39,7 @@ impl PlanState {
             "failed" => PlanState::Failed,
             "not_found" => PlanState::NotFound,
             "completed" => PlanState::Completed,
-            "cancelled" => PlanState::Cancelled,
+            // "cancelled" => PlanState::Cancelled,
             _ => PlanState::UNKNOWN,
         }
     }
@@ -51,7 +51,7 @@ impl PlanState {
             PlanState::Failed => "failed".to_spvalue(),
             PlanState::NotFound => "not_found".to_spvalue(),
             PlanState::Completed => "completed".to_spvalue(),
-            PlanState::Cancelled => "completed".to_spvalue(),
+            // PlanState::Cancelled => "cancelled".to_spvalue(),
             PlanState::UNKNOWN => "UNKNOWN".to_spvalue(),
         }
     }
@@ -67,60 +67,12 @@ impl fmt::Display for PlanState {
             PlanState::Failed => write!(f, "failed"),
             PlanState::NotFound => write!(f, "not_found"),
             PlanState::Completed => write!(f, "completed"),
-            PlanState::Cancelled => write!(f, "cancelled"),
+            // PlanState::Cancelled => write!(f, "cancelled"),
         }
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
-pub enum RunnerState {
-    Idle,
-    Running,
-    Paused,
-    Stopped,
-    UNKNOWN,
-}
 
-impl Default for RunnerState {
-    fn default() -> Self {
-        RunnerState::UNKNOWN
-    }
-}
-
-impl RunnerState {
-    pub fn from_str(x: &str) -> RunnerState {
-        match x {
-            "idle" => RunnerState::Idle,
-            "running" => RunnerState::Running,
-            "paused" => RunnerState::Paused,
-            "stopped" => RunnerState::Stopped,
-
-            _ => RunnerState::UNKNOWN,
-        }
-    }
-    pub fn to_spvalue(self) -> SPValue {
-        match self {
-            RunnerState::Running => "running".to_spvalue(),
-            RunnerState::Paused => "paused".to_spvalue(),
-            RunnerState::Stopped => "stopped".to_spvalue(),
-            RunnerState::Idle => "idle".to_spvalue(),
-            RunnerState::UNKNOWN => "UNKNOWN".to_spvalue(),
-        }
-    }
-}
-
-impl fmt::Display for RunnerState {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            RunnerState::UNKNOWN => write!(f, "UNKNOWN"),
-            RunnerState::Running => write!(f, "running"),
-            RunnerState::Paused => write!(f, "paused"),
-
-            RunnerState::Stopped => write!(f, "stopped"),
-            RunnerState::Idle => write!(f, "idle"),
-        }
-    }
-}
 
 pub enum ServiceRequestState {
     UNKNOWN,
