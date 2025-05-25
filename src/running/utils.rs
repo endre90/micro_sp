@@ -58,7 +58,7 @@ pub fn generate_runner_state_variables(name: &str) -> State {
     state = state.add(assign!(sop_state, SPValue::String(StringOrUnknown::UNKNOWN)));
     state = state.add(assign!(sop_request_trigger, SPValue::Bool(BoolOrUnknown::UNKNOWN)));
     state = state.add(assign!(start_time, SPValue::Time(TimeOrUnknown::UNKNOWN)));
-    state = state.add(assign!(sop_current_step, SPValue::Int64(IntOrUnknown::UNKNOWN)));
+    state = state.add(assign!(sop_current_step, SPValue::Int64(IntOrUnknown::Int64(0))));
 
     // Define variables to keep track of the processes
     let state_manager_online = bv!(&&format!("state_manager_online"));

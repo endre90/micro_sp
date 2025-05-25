@@ -319,7 +319,7 @@ pub async fn sop_runner(
 
         if sop_request_trigger {
             sop_state = ActionRequestState::Executing.to_string();
-            sop_current_step = 0;
+            // sop_current_step = 0;
             let sop = model
                 .sops
                 .iter()
@@ -346,7 +346,7 @@ pub async fn sop_runner(
                         )
                         .await;
                         let operation_state = new_state.get_string_or_default_to_unknown(
-                            &format!("{}_plan_runner", sp_id),
+                            &format!("{}_sop_runner", sp_id),
                             &format!("{}", operation.name),
                         );
                         match OperationState::from_str(&operation_state) {
