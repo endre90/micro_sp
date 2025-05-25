@@ -53,24 +53,20 @@ impl fmt::Display for RunnerState {
 }
 
 // Run everything and provide a model
-pub async fn micro_sp(state: State, model: Model) {
+pub async fn main_runner(model: Model, tx: mpsc::Sender<StateManagement>,) {
     let sp_id = nanoid::nanoid!();
     // Logs from extern crates to stdout
     initialize_env_logger();
 
-    // Enable coverability tracking:
-    let coverability_tracking = false;
+    // // Enable coverability tracking:
+    // let coverability_tracking = false;
 
-    // Add the variables that keep track of the runner state
-    let runner_vars = generate_runner_state_variables(&sp_id);
-    let state = state.extend(runner_vars, true);
+    // // Add the variables that keep track of the runner state
+    // let runner_vars = generate_runner_state_variables(&sp_id);
+    // let state = state.extend(runner_vars, true);
 
-    let op_vars = generate_operation_state_variables(&model, coverability_tracking);
-    let state = state.extend(op_vars, true);
-
-    let (tx, rx) = mpsc::channel(100); // Experiment with buffer size
-    log::info!(target: "micro_sp", "Spawning state manager.");
-    tokio::task::spawn(async move { redis_state_manager(rx, state).await.unwrap() });
+    // let op_vars = generate_operation_state_variables(&model, coverability_tracking);
+    // let state = state.extend(op_vars, true);
 
     log::info!(target: "micro_sp", "Spawning planner.");
     let model_clone = model.clone();
