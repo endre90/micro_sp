@@ -67,7 +67,7 @@ pub async fn main_runner(sp_id: &String, model: Model, tx: mpsc::Sender<StateMan
     // let op_vars = generate_operation_state_variables(&model, coverability_tracking);
     // let state = state.extend(op_vars, true);
 
-    log::info!(target: "micro_sp", "Spawning planner.");
+    log::info!(target: &format!("{sp_id}_micro_sp"), "Spawning planner.");
     let model_clone = model.clone();
     let tx_clone = tx.clone();
     let sp_id_clone = sp_id.clone();
@@ -77,13 +77,13 @@ pub async fn main_runner(sp_id: &String, model: Model, tx: mpsc::Sender<StateMan
             .unwrap()
     });
 
-    log::info!(target: "micro_sp", "Spawning plan runner.");
+    log::info!(target:  &format!("{sp_id}_micro_sp"), "Spawning plan runner.");
     let model_clone = model.clone();
     let tx_clone = tx.clone();
     let sp_id_clone = sp_id.clone();
     tokio::task::spawn(async move { plan_runner(&sp_id_clone, &model_clone, tx_clone).await.unwrap() });
 
-    log::info!(target: "micro_sp", "Spawning auto transition runner");
+    log::info!(target: &format!("{sp_id}_micro_sp"), "Spawning auto transition runner");
     let model_clone = model.clone();
     let tx_clone = tx.clone();
     tokio::task::spawn(async move {
@@ -92,13 +92,13 @@ pub async fn main_runner(sp_id: &String, model: Model, tx: mpsc::Sender<StateMan
             .unwrap()
     });
 
-    log::info!(target: "micro_sp", "Spawning goal runner.");
+    log::info!(target: &format!("{sp_id}_micro_sp"), "Spawning goal runner.");
     let model_clone = model.clone();
     let tx_clone = tx.clone();
     let sp_id_clone = sp_id.clone();
     tokio::task::spawn(async move { goal_runner(&sp_id_clone, &model_clone, tx_clone).await.unwrap() });
 
-    log::info!(target: "micro_sp", "Spawning goal scheduler.");
+    log::info!(target: &format!("{sp_id}_micro_sp"), "Spawning goal scheduler.");
     let tx_clone = tx.clone();
     let sp_id_clone = sp_id.clone();
     tokio::task::spawn(async move { goal_scheduler(&sp_id_clone, tx_clone).await.unwrap() });
