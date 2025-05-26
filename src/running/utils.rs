@@ -18,6 +18,11 @@ pub fn generate_runner_state_variables(name: &str) -> State {
     let plan_duration = fv!(&&format!("{}_plan_duration", name)); // does nothing for now
     let plan_current_step = iv!(&&format!("{}_plan_current_step", name)); // Index of the currently exec. operation in the plan
     let planner_information = v!(&&format!("{}_planner_information", name)); // current information about the plan
+    let plan_runner_information = v!(&&format!("{}_plan_runner_information", name)); // current information about the plan
+    let goal_runner_information = v!(&&format!("{}_goal_runner_information", name)); // current information about the plan
+    let sop_runner_information = v!(&&format!("{}_sop_runner_information", name)); // current information about the plan
+    let main_runner_information = v!(&&format!("{}_main_runner_information", name)); // current information about the plan
+    let goal_scheduler_information = v!(&&format!("{}_goal_scheduler_information", name)); // current information about the plan
     let replanned = bv!(&&format!("{}_replanned", name)); // boolean for tracking the planner triggering
     let replan_counter_total = iv!(&&format!("{}_replan_counter_total", name)); // How many times has the planner been called
     let replan_counter = iv!(&&format!("{}_replan_counter", name)); // How many times has the planner tried to replan for the same problem
@@ -45,6 +50,11 @@ pub fn generate_runner_state_variables(name: &str) -> State {
     state = state.add(assign!(plan_duration, SPValue::Float64(FloatOrUnknown::UNKNOWN)));
     state = state.add(assign!(plan_current_step, SPValue::Int64(IntOrUnknown::UNKNOWN)));
     state = state.add(assign!(planner_information, SPValue::String(StringOrUnknown::UNKNOWN)));
+    state = state.add(assign!(plan_runner_information, SPValue::String(StringOrUnknown::UNKNOWN)));
+    state = state.add(assign!(goal_runner_information, SPValue::String(StringOrUnknown::UNKNOWN)));
+    state = state.add(assign!(sop_runner_information, SPValue::String(StringOrUnknown::UNKNOWN)));
+    state = state.add(assign!(main_runner_information, SPValue::String(StringOrUnknown::UNKNOWN)));
+    state = state.add(assign!(goal_scheduler_information, SPValue::String(StringOrUnknown::UNKNOWN)));
     state = state.add(assign!(replanned, SPValue::Bool(BoolOrUnknown::UNKNOWN)));
     state = state.add(assign!(replan_counter, SPValue::Int64(IntOrUnknown::UNKNOWN)));
     state = state.add(assign!(replan_counter_total, SPValue::Int64(IntOrUnknown::UNKNOWN)));

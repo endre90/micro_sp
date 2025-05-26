@@ -280,6 +280,7 @@ pub async fn sop_runner(
 
     // For nicer logging
     let mut sop_state_old = "".to_string();
+    let mut sop_old: Vec<String> = vec![];
     // let mut operation_state_old = "".to_string();
     // let mut operation_information_old = "".to_string();
 
@@ -326,6 +327,20 @@ pub async fn sop_runner(
                 .find(|sop| sop.id == sop_id.to_string())
                 .unwrap()
                 .to_owned();
+
+                if sop_old != sop.sop {
+                    log::info!(
+                        target: &format!("{}_sop_runner", sp_id),
+                        "Got a sop:\n{}",
+                        sop.sop.iter()
+                            .enumerate()
+                            .map(|(index, step)| format!("       {} -> {}", index + 1, step))
+                            .collect::<Vec<String>>()
+                            .join("\n")
+                    );
+                    sop_old = sop.sop.clone()
+                }
+
             match ActionRequestState::from_str(&sop_state) {
                 ActionRequestState::Initial => {}
                 ActionRequestState::Executing => {
@@ -337,8 +352,6 @@ pub async fn sop_runner(
                             .unwrap()
                             .to_owned();
 
-
-                        // Might be a problem here if we are cycling the same operation from 2 different places
                         new_state = cycle_operation(
                             &format!("{sp_id}_sop"),
                             operation.clone(),
@@ -351,11 +364,12 @@ pub async fn sop_runner(
                         );
                         match OperationState::from_str(&operation_state) {
                             OperationState::Completed => {
-                                log::info!(target: &format!("{}_sop_runner", sp_id), "completed ASDFASDF");
+                                log::info!(target: &format!("{}_sop_runner", sp_id), "Completed: {}.", operation.name);
                                 sop_current_step = sop_current_step + 1;
                             }
                             // If retries have need exhausted, fail the sop
                             OperationState::Abandoned => {
+                                log::info!(target: &format!("{}_sop_runner", sp_id), "Abandoned: {}.", operation.name);
                                 sop_state = ActionRequestState::Failed.to_string();
                             }
                             _ => (),

@@ -83,7 +83,7 @@ pub async fn planner_ticker(
         }
 
         if planner_information_old != planner_information {
-            log::info!(target: &format!("{}_planner_ticker", sp_id), "Planner info: {planner_information}");
+            log::info!(target: &format!("{}_planner_ticker", sp_id), "{planner_information}");
             planner_information_old = planner_information.clone()
         }
 
