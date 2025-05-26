@@ -78,8 +78,8 @@ impl CurrentGoalState {
             "cancelled" => CurrentGoalState::Cancelled,
             "completed" => CurrentGoalState::Completed,
             _ => {
-                log::error!(target: &&format!("goal_priority"), 
-                    "Unknown goal state {}, defaulting to empty.", x);
+                // log::error!(target: &&format!("goal_priority"), 
+                //     "Unknown goal state {}, defaulting to empty.", x);
                     CurrentGoalState::Empty
             }
         }
