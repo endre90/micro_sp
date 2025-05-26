@@ -39,14 +39,24 @@ peg::parser!(pub grammar pred_parser() for str {
         / _ "\"" n:$(!['"'] [_])* "\"" _ { // Quoted string
             SPWrapped::SPValue(n.into_iter().collect::<Vec<_>>().join("").to_spvalue())
         }
-        / _ n:$(['0'..='9']+ "." ['0'..='9']+) !(['a'..='z' | 'A'..='Z' | '0'..='9' | '_']) _ { // Float
+        // MODIFIED Float rule: Added "-"? to allow optional negative sign
+        / _ n:$("-"? ['0'..='9']+ "." ['0'..='9']+) !(['a'..='z' | 'A'..='Z' | '0'..='9' | '_']) _ { // Float
             let f: f64 = n.parse().expect("Failed to parse float");
             SPWrapped::SPValue(f.to_spvalue())
         }
-        / _ n:$(['0'..='9']+) !(['a'..='z' | 'A'..='Z' | '0'..='9' | '_']) _ { // Integer
+        // MODIFIED Integer rule: Added "-"? to allow optional negative sign
+        / _ n:$("-"? ['0'..='9']+) !(['a'..='z' | 'A'..='Z' | '0'..='9' | '_']) _ { // Integer
             let i: i64 = n.parse().expect("Failed to parse integer");
             SPWrapped::SPValue(i.to_spvalue())
         }
+        // / _ n:$(['0'..='9']+ "." ['0'..='9']+) !(['a'..='z' | 'A'..='Z' | '0'..='9' | '_']) _ { // Float
+        //     let f: f64 = n.parse().expect("Failed to parse float");
+        //     SPWrapped::SPValue(f.to_spvalue())
+        // }
+        // / _ n:$(['0'..='9']+) !(['a'..='z' | 'A'..='Z' | '0'..='9' | '_']) _ { // Integer
+        //     let i: i64 = n.parse().expect("Failed to parse integer");
+        //     SPWrapped::SPValue(i.to_spvalue())
+        // }
         / _ n:$(['a'..='z' | 'A'..='Z' | '0'..='9' | '_']+) _ {
             SPWrapped::SPValue(n.to_spvalue())
         }
@@ -162,14 +172,19 @@ mod tests {
             pred_parser::value("19.123", &s),
             Ok(SPWrapped::SPValue(19.123.to_spvalue()))
         );
+        let asdf = -19.123;
+        assert_eq!(
+            pred_parser::value("-19.123", &s),
+            Ok(SPWrapped::SPValue(asdf.to_spvalue()))
+        );
         assert_eq!(
             pred_parser::value("hej", &s),
             Ok(SPWrapped::SPValue("hej".to_spvalue()))
         );
 
         assert_eq!(
-            pred_parser::value("[0.3, 0.7, 12.67]", &s),
-            Ok(SPWrapped::SPValue(vec![0.3, 0.7, 12.67].to_spvalue()))
+            pred_parser::value("[0.3, 0.7, -12.67]", &s),
+            Ok(SPWrapped::SPValue(vec![0.3, 0.7, -12.67].to_spvalue()))
         );
 
         assert_eq!(
