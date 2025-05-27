@@ -50,7 +50,7 @@ peg::parser!(pub grammar pred_parser() for str {
             let i: i64 = n.parse().expect("Failed to parse integer");
             SPWrapped::SPValue(i.to_spvalue())
         }
-        / _ n:$(['a'..='z' | 'A'..='Z' | '0'..='9' | '_']+) _ {
+        / _ n:$(['a'..='z' | 'A'..='Z' | '0'..='9' | '_' | '-']+) _ {
             SPWrapped::SPValue(n.to_spvalue())
         }
 
