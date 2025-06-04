@@ -1,0 +1,91 @@
+Date : 2025-05-29 19:45:05
+Directory : /home/endre/rust_crates/micro_sp
+Total : 51 files,  7773 codes, 1677 comments, 1134 blanks, all 10584 lines
+
+Languages
++----------+------------+------------+------------+------------+------------+
+| language | files      | code       | comment    | blank      | total      |
++----------+------------+------------+------------+------------+------------+
+| Rust     |         44 |      7,623 |      1,677 |      1,131 |     10,431 |
+| JSON     |          6 |        138 |          0 |          0 |        138 |
+| Markdown |          1 |         12 |          0 |          3 |         15 |
++----------+------------+------------+------------+------------+------------+
+
+Directories
++----------------------------------------------------------------------------+------------+------------+------------+------------+------------+
+| path                                                                       | files      | code       | comment    | blank      | total      |
++----------------------------------------------------------------------------+------------+------------+------------+------------+------------+
+| .                                                                          |         51 |      7,773 |      1,677 |      1,134 |     10,584 |
+| . (Files)                                                                  |          1 |         12 |          0 |          3 |         15 |
+| src                                                                        |         50 |      7,761 |      1,677 |      1,131 |     10,569 |
+| src (Files)                                                                |          1 |         49 |          1 |          8 |         58 |
+| src/core                                                                   |          8 |      1,924 |         92 |        248 |      2,264 |
+| src/macros                                                                 |          6 |        167 |          9 |         17 |        193 |
+| src/modelling                                                              |          8 |      1,625 |        452 |        191 |      2,268 |
+| src/planning                                                               |          3 |        399 |          4 |         21 |        424 |
+| src/running                                                                |          9 |      2,006 |        774 |        355 |      3,135 |
+| src/transforms                                                             |         13 |      1,538 |        342 |        286 |      2,166 |
+| src/transforms (Files)                                                     |          5 |      1,199 |        313 |        188 |      1,700 |
+| src/transforms/examples                                                    |          8 |        339 |         29 |         98 |        466 |
+| src/transforms/examples (Files)                                            |          2 |        201 |         29 |         98 |        328 |
+| src/transforms/examples/data                                               |          6 |        138 |          0 |          0 |        138 |
+| src/utils                                                                  |          2 |         53 |          3 |          5 |         61 |
++----------------------------------------------------------------------------+------------+------------+------------+------------+------------+
+
+Files
++----------------------------------------------------------------------------+----------+------------+------------+------------+------------+
+| filename                                                                   | language | code       | comment    | blank      | total      |
++----------------------------------------------------------------------------+----------+------------+------------+------------+------------+
+| /home/endre/rust_crates/micro_sp/README.md                                 | Markdown |         12 |          0 |          3 |         15 |
+| /home/endre/rust_crates/micro_sp/src/core/mod.rs                           | Rust     |          7 |          0 |          1 |          8 |
+| /home/endre/rust_crates/micro_sp/src/core/sp_assignment.rs                 | Rust     |         98 |          6 |         18 |        122 |
+| /home/endre/rust_crates/micro_sp/src/core/sp_goal.rs                       | Rust     |        100 |          2 |         11 |        113 |
+| /home/endre/rust_crates/micro_sp/src/core/sp_state.rs                      | Rust     |        476 |         20 |         54 |        550 |
+| /home/endre/rust_crates/micro_sp/src/core/sp_value.rs                      | Rust     |        803 |         10 |        105 |        918 |
+| /home/endre/rust_crates/micro_sp/src/core/sp_variable.rs                   | Rust     |         99 |         46 |         20 |        165 |
+| /home/endre/rust_crates/micro_sp/src/core/sp_wrapped.rs                    | Rust     |        213 |          4 |         21 |        238 |
+| /home/endre/rust_crates/micro_sp/src/core/structs.rs                       | Rust     |        128 |          4 |         18 |        150 |
+| /home/endre/rust_crates/micro_sp/src/lib.rs                                | Rust     |         49 |          1 |          8 |         58 |
+| /home/endre/rust_crates/micro_sp/src/macros/action.rs                      | Rust     |          6 |          0 |          1 |          7 |
+| /home/endre/rust_crates/micro_sp/src/macros/mod.rs                         | Rust     |          5 |          0 |          1 |          6 |
+| /home/endre/rust_crates/micro_sp/src/macros/predicate.rs                   | Rust     |         48 |          0 |          5 |         53 |
+| /home/endre/rust_crates/micro_sp/src/macros/sp_assignment.rs               | Rust     |          6 |          0 |          1 |          7 |
+| /home/endre/rust_crates/micro_sp/src/macros/sp_variable.rs                 | Rust     |         72 |          9 |          7 |         88 |
+| /home/endre/rust_crates/micro_sp/src/macros/transition.rs                  | Rust     |         30 |          0 |          2 |         32 |
+| /home/endre/rust_crates/micro_sp/src/modelling/action.rs                   | Rust     |         94 |          2 |         15 |        111 |
+| /home/endre/rust_crates/micro_sp/src/modelling/mod.rs                      | Rust     |          7 |          0 |          0 |          7 |
+| /home/endre/rust_crates/micro_sp/src/modelling/model.rs                    | Rust     |         34 |         30 |          4 |         68 |
+| /home/endre/rust_crates/micro_sp/src/modelling/operation.rs                | Rust     |        240 |         20 |         21 |        281 |
+| /home/endre/rust_crates/micro_sp/src/modelling/parser.rs                   | Rust     |        297 |          6 |         34 |        337 |
+| /home/endre/rust_crates/micro_sp/src/modelling/predicate.rs                | Rust     |        465 |         10 |         34 |        509 |
+| /home/endre/rust_crates/micro_sp/src/modelling/sops.rs                     | Rust     |          9 |         70 |          7 |         86 |
+| /home/endre/rust_crates/micro_sp/src/modelling/transition.rs               | Rust     |        479 |        314 |         76 |        869 |
+| /home/endre/rust_crates/micro_sp/src/planning/mod.rs                       | Rust     |        245 |          1 |         14 |        260 |
+| /home/endre/rust_crates/micro_sp/src/planning/operation.rs                 | Rust     |         72 |          1 |          3 |         76 |
+| /home/endre/rust_crates/micro_sp/src/planning/transition.rs                | Rust     |         82 |          2 |          4 |         88 |
+| /home/endre/rust_crates/micro_sp/src/running/auto_runner.rs                | Rust     |         61 |          3 |         10 |         74 |
+| /home/endre/rust_crates/micro_sp/src/running/goal_runner.rs                | Rust     |        132 |         47 |         32 |        211 |
+| /home/endre/rust_crates/micro_sp/src/running/goal_scheduler.rs             | Rust     |        178 |        375 |         50 |        603 |
+| /home/endre/rust_crates/micro_sp/src/running/main_runner.rs                | Rust     |         87 |         44 |         27 |        158 |
+| /home/endre/rust_crates/micro_sp/src/running/mod.rs                        | Rust     |          8 |          1 |          0 |          9 |
+| /home/endre/rust_crates/micro_sp/src/running/operation_runner.rs           | Rust     |        337 |        207 |         67 |        611 |
+| /home/endre/rust_crates/micro_sp/src/running/planner_ticker.rs             | Rust     |        163 |         10 |         15 |        188 |
+| /home/endre/rust_crates/micro_sp/src/running/state_manager.rs              | Rust     |        916 |         53 |        136 |      1,105 |
+| /home/endre/rust_crates/micro_sp/src/running/utils.rs                      | Rust     |        124 |         34 |         18 |        176 |
+| /home/endre/rust_crates/micro_sp/src/transforms/cycles.rs                  | Rust     |        255 |         52 |         50 |        357 |
+| /home/endre/rust_crates/micro_sp/src/transforms/examples/data/chair.json   | JSON     |         22 |          0 |          0 |         22 |
+| /home/endre/rust_crates/micro_sp/src/transforms/examples/data/couch.json   | JSON     |         22 |          0 |          0 |         22 |
+| /home/endre/rust_crates/micro_sp/src/transforms/examples/data/floor.json   | JSON     |         30 |          0 |          0 |         30 |
+| /home/endre/rust_crates/micro_sp/src/transforms/examples/data/food.json    | JSON     |         22 |          0 |          0 |         22 |
+| /home/endre/rust_crates/micro_sp/src/transforms/examples/data/plate.json   | JSON     |         21 |          0 |          0 |         21 |
+| /home/endre/rust_crates/micro_sp/src/transforms/examples/data/table.json   | JSON     |         21 |          0 |          0 |         21 |
+| /home/endre/rust_crates/micro_sp/src/transforms/examples/space_tree.rs     | Rust     |        102 |          2 |         44 |        148 |
+| /home/endre/rust_crates/micro_sp/src/transforms/examples/space_tree_ros.rs | Rust     |         99 |         27 |         54 |        180 |
+| /home/endre/rust_crates/micro_sp/src/transforms/loading.rs                 | Rust     |        255 |         54 |         31 |        340 |
+| /home/endre/rust_crates/micro_sp/src/transforms/lookup.rs                  | Rust     |        631 |         32 |         75 |        738 |
+| /home/endre/rust_crates/micro_sp/src/transforms/mod.rs                     | Rust     |          4 |          0 |          0 |          4 |
+| /home/endre/rust_crates/micro_sp/src/transforms/treeviz.rs                 | Rust     |         54 |        175 |         32 |        261 |
+| /home/endre/rust_crates/micro_sp/src/utils/logger.rs                       | Rust     |         52 |          3 |          5 |         60 |
+| /home/endre/rust_crates/micro_sp/src/utils/mod.rs                          | Rust     |          1 |          0 |          0 |          1 |
+| Total                                                                      |          |      7,773 |      1,677 |      1,134 |     10,584 |
++----------------------------------------------------------------------------+----------+------------+------------+------------+------------+

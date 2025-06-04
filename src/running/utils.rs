@@ -36,8 +36,10 @@ pub fn generate_runner_state_variables(name: &str) -> State {
     let sop_id = v!(&&format!("{}_sop_id", name));
     let sop_state = v!(&&format!("{}_sop_state", name));
     let start_time = tv!(&&format!("{}_start_time", name));
+    let fb_request_trigger = bv!(&&format!("{}_fb_request_trigger", name));
+    let fb_request_state = v!(&&format!("{}_fb_request_state", name));
+    let fb_id = v!(&&format!("{}_fb_id", name));
     
-
     // Initialize values
     state = state.add(assign!(runner_state, SPValue::String(StringOrUnknown::UNKNOWN)));
     state = state.add(assign!(current_goal_predicate, SPValue::String(StringOrUnknown::UNKNOWN)));
@@ -69,6 +71,9 @@ pub fn generate_runner_state_variables(name: &str) -> State {
     state = state.add(assign!(sop_request_trigger, SPValue::Bool(BoolOrUnknown::UNKNOWN)));
     state = state.add(assign!(start_time, SPValue::Time(TimeOrUnknown::UNKNOWN)));
     state = state.add(assign!(sop_current_step, SPValue::Int64(IntOrUnknown::Int64(0))));
+    state = state.add(assign!(fb_request_state, SPValue::String(StringOrUnknown::UNKNOWN)));
+    state = state.add(assign!(fb_request_trigger, SPValue::Bool(BoolOrUnknown::UNKNOWN)));
+    state = state.add(assign!(fb_id, SPValue::String(StringOrUnknown::UNKNOWN)));
 
     // Define variables to keep track of the processes
     let state_manager_online = bv!(&&format!("state_manager_online"));
