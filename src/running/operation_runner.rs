@@ -187,6 +187,15 @@ pub async fn plan_runner(
         let state = response_rx.await?;
         let mut new_state = state.clone();
 
+        let mut replan_trigger = state.get_bool_or_default_to_false(
+            &format!("{}_planner_ticker", sp_id),
+            &format!("{}_replan_trigger", sp_id),
+        );
+        let mut replanned = state.get_bool_or_default_to_false(
+            &format!("{}_planner_ticker", sp_id),
+            &format!("{}_replanned", sp_id),
+        );
+
         let mut plan_state = state.get_string_or_default_to_unknown(
             &format!("{}_plan_runner", sp_id),
             &format!("{}_plan_state", sp_id),
@@ -216,6 +225,7 @@ pub async fn plan_runner(
             PlanState::Initial => {
                 plan_state = PlanState::Executing.to_string();
                 plan_current_step = 0;
+                replan_trigger = false;
             }
             PlanState::Executing => {
                 if plan.len() > plan_current_step as usize {
@@ -258,7 +268,11 @@ pub async fn plan_runner(
                 &format!("{}_plan_current_step", sp_id),
                 plan_current_step.to_spvalue(),
             )
-            .update(&format!("{}_plan", sp_id), plan.to_spvalue());
+            .update(&format!("{}_plan", sp_id), plan.to_spvalue())
+            .update(
+                &format!("{}_replan_trigger", sp_id),
+                replan_trigger.to_spvalue(),
+            );
 
         let modified_state = state.get_diff_partial_state(&new_state);
         command_sender

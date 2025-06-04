@@ -87,19 +87,6 @@ pub async fn planner_ticker(
             planner_information_old = planner_information.clone()
         }
 
-        if plan_old != plan {
-            log::info!(
-                target: &format!("{}_planner_ticker", sp_id),
-                "Got a plan:\n{}",
-                plan.iter()
-                    .enumerate()
-                    .map(|(index, step)| format!("       {} -> {}", index + 1, step))
-                    .collect::<Vec<String>>()
-                    .join("\n")
-            );
-            plan_old = plan.clone()
-        }
-
         match (replan_trigger, replanned) {
             (true, true) => {
                 planner_information = "Planner triggered and (re)planned.".to_string();
@@ -108,7 +95,6 @@ pub async fn planner_ticker(
             }
             (true, false) => {
                 plan_current_step = 0;
-                // replan_trigger = false; // temporary try to fix
                 if replan_counter < MAX_REPLAN_RETRIES {
                     let goal = state.extract_goal(sp_id);
                     replan_counter = replan_counter + 1;
@@ -136,6 +122,18 @@ pub async fn planner_ticker(
                             plan_state = PlanState::Initial.to_string();
                             replanned = true;
                             plan_counter = plan_counter + 1;
+                            if plan_old != plan {
+                                log::info!(
+                                    target: &format!("{}_planner_ticker", sp_id),
+                                    "Got a plan:\n{}",
+                                    plan.iter()
+                                        .enumerate()
+                                        .map(|(index, step)| format!("       {} -> {}", index + 1, step))
+                                        .collect::<Vec<String>>()
+                                        .join("\n")
+                                );
+                                plan_old = plan.clone()
+                            }
                         }
                     }
                 } else {
