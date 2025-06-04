@@ -108,6 +108,7 @@ pub async fn planner_ticker(
             }
             (true, false) => {
                 plan_current_step = 0;
+                replan_trigger = false; // temporary try to fix
                 if replan_counter < MAX_REPLAN_RETRIES {
                     let goal = state.extract_goal(sp_id);
                     replan_counter = replan_counter + 1;
