@@ -14,13 +14,22 @@ pub struct Plan {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum PlanState {
+    // Empty,
     Initial,
     Executing,
-    Paused,
+    // Paused,
     Failed,
-    NotFound,
+    // NotFound,
     Completed,
     // Cancelled,
+    UNKNOWN,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum PlannerState {
+    Found,
+    NotFound,
+    Ready,
     UNKNOWN,
 }
 
@@ -30,14 +39,21 @@ impl Default for PlanState {
     }
 }
 
+impl Default for PlannerState {
+    fn default() -> Self {
+        PlannerState::UNKNOWN
+    }
+}
+
 impl PlanState {
     pub fn from_str(x: &str) -> PlanState {
         match x {
+            // "empty" => PlanState::Empty,
             "initial" => PlanState::Initial,
             "executing" => PlanState::Executing,
-            "paused" => PlanState::Paused,
+            // "paused" => PlanState::Paused,
             "failed" => PlanState::Failed,
-            "not_found" => PlanState::NotFound,
+            // "not_found" => PlanState::NotFound,
             "completed" => PlanState::Completed,
             // "cancelled" => PlanState::Cancelled,
             _ => PlanState::UNKNOWN,
@@ -45,14 +61,34 @@ impl PlanState {
     }
     pub fn to_spvalue(self) -> SPValue {
         match self {
+            // PlanState::Empty => "empty".to_spvalue(),
             PlanState::Initial => "initial".to_spvalue(),
             PlanState::Executing => "executing".to_spvalue(),
-            PlanState::Paused => "paused".to_spvalue(),
+            // PlanState::Paused => "paused".to_spvalue(),
             PlanState::Failed => "failed".to_spvalue(),
-            PlanState::NotFound => "not_found".to_spvalue(),
+            // PlanState::NotFound => "not_found".to_spvalue(),
             PlanState::Completed => "completed".to_spvalue(),
             // PlanState::Cancelled => "cancelled".to_spvalue(),
             PlanState::UNKNOWN => "UNKNOWN".to_spvalue(),
+        }
+    }
+}
+
+impl PlannerState {
+    pub fn from_str(x: &str) -> PlannerState {
+        match x {
+            "found" => PlannerState::Found,
+            "not_found" => PlannerState::NotFound,
+            "ready" => PlannerState::Ready,
+            _ => PlannerState::UNKNOWN,
+        }
+    }
+    pub fn to_spvalue(self) -> SPValue {
+        match self {
+            PlannerState::Found => "found".to_spvalue(),
+            PlannerState::NotFound => "not_found".to_spvalue(),
+            PlannerState::Ready => "ready".to_spvalue(),
+            PlannerState::UNKNOWN => "UNKNOWN".to_spvalue(),
         }
     }
 }
@@ -61,13 +97,25 @@ impl fmt::Display for PlanState {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             PlanState::UNKNOWN => write!(f, "UNKNOWN"),
+            // PlanState::Empty => write!(f, "empty"),
             PlanState::Initial => write!(f, "initial"),
             PlanState::Executing => write!(f, "executing"),
-            PlanState::Paused => write!(f, "paused"),
+            // PlanState::Paused => write!(f, "paused"),
             PlanState::Failed => write!(f, "failed"),
-            PlanState::NotFound => write!(f, "not_found"),
+            // PlanState::NotFound => write!(f, "not_found"),
             PlanState::Completed => write!(f, "completed"),
             // PlanState::Cancelled => write!(f, "cancelled"),
+        }
+    }
+}
+
+impl fmt::Display for PlannerState {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            PlannerState::UNKNOWN => write!(f, "UNKNOWN"),
+            PlannerState::Found => write!(f, "found"),
+            PlannerState::NotFound => write!(f, "not_found"),
+            PlannerState::Ready => write!(f, "ready"),
         }
     }
 }

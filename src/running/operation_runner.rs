@@ -191,7 +191,7 @@ pub async fn plan_runner(
             &format!("{}_planner_ticker", sp_id),
             &format!("{}_replan_trigger", sp_id),
         );
-        let mut replanned = state.get_bool_or_default_to_false(
+        let replanned = state.get_bool_or_default_to_false(
             &format!("{}_planner_ticker", sp_id),
             &format!("{}_replanned", sp_id),
         );
@@ -224,7 +224,6 @@ pub async fn plan_runner(
         match PlanState::from_str(&plan_state) {
             PlanState::Initial => {
                 plan_state = PlanState::Executing.to_string();
-                plan_current_step = 0;
                 replan_trigger = false;
             }
             PlanState::Executing => {
@@ -255,9 +254,9 @@ pub async fn plan_runner(
                     plan_state = PlanState::Completed.to_string();
                 }
             }
-            PlanState::Paused => {}
+            // PlanState::Paused => {}
             PlanState::Failed => {}
-            PlanState::NotFound => {}
+            // PlanState::NotFound => {}
             PlanState::Completed => {}
             PlanState::UNKNOWN => {}
         }
@@ -342,18 +341,18 @@ pub async fn sop_runner(
                 .unwrap()
                 .to_owned();
 
-                if sop_old != sop.sop {
-                    log::info!(
-                        target: &format!("{}_sop_runner", sp_id),
-                        "Got a sop:\n{}",
-                        sop.sop.iter()
-                            .enumerate()
-                            .map(|(index, step)| format!("       {} -> {}", index + 1, step))
-                            .collect::<Vec<String>>()
-                            .join("\n")
-                    );
-                    sop_old = sop.sop.clone()
-                }
+            if sop_old != sop.sop {
+                log::info!(
+                    target: &format!("{}_sop_runner", sp_id),
+                    "Got a sop:\n{}",
+                    sop.sop.iter()
+                        .enumerate()
+                        .map(|(index, step)| format!("       {} -> {}", index + 1, step))
+                        .collect::<Vec<String>>()
+                        .join("\n")
+                );
+                sop_old = sop.sop.clone()
+            }
 
             match ActionRequestState::from_str(&sop_state) {
                 ActionRequestState::Initial => {}
@@ -390,7 +389,6 @@ pub async fn sop_runner(
                         }
                     } else {
                         sop_state = ActionRequestState::Succeeded.to_string();
-                        
                     }
                 }
                 ActionRequestState::Succeeded => {
@@ -445,14 +443,9 @@ pub async fn planned_operation_runner(
     let mut plan_state_old = "".to_string();
     let mut operation_state_old = "".to_string();
     let mut operation_information_old = "".to_string();
+    let mut plan_current_step_old = 0;
 
     log::info!(target: &&format!("{}_operation_runner", sp_id), "Online.");
-    // command_sender
-    //     .send(StateManagement::Set((
-    //         format!("{}_single_operation_runner_online", sp_id),
-    //         SPValue::Bool(BoolOrUnknown::Bool(true)),
-    //     )))
-    //     .await?;
 
     loop {
         let (response_tx, response_rx) = oneshot::channel();
@@ -461,6 +454,11 @@ pub async fn planned_operation_runner(
             .await?;
         let state = response_rx.await?;
         let mut new_state = state.clone();
+
+        let mut planner_state = state.get_string_or_default_to_unknown(
+            &format!("{}_operation_runner", sp_id),
+            &format!("{}_planner_state", sp_id),
+        );
 
         let mut plan_state = state.get_string_or_default_to_unknown(
             &format!("{}_operation_runner", sp_id),
@@ -487,10 +485,18 @@ pub async fn planned_operation_runner(
             plan_state_old = plan_state.clone()
         }
 
+        // Log only when something changes and not every tick
+        if plan_current_step_old != plan_current_step {
+            log::info!(target: &format!("{}_operation_runner", sp_id), "Plan current step: {plan_current_step}.");
+            plan_current_step_old = plan_current_step
+        }
+
         match PlanState::from_str(&plan_state) {
             PlanState::Initial => {
-                plan_state = PlanState::Executing.to_string();
-                plan_current_step = 0;
+                if planner_state == PlannerState::Found.to_string() {
+                    plan_state = PlanState::Executing.to_string();
+                    plan_current_step = 0;
+                }
             }
             PlanState::Executing => {
                 if plan.len() > plan_current_step as usize {
@@ -596,16 +602,23 @@ pub async fn planned_operation_runner(
                     plan_state = PlanState::Completed.to_string();
                 }
             }
-            PlanState::Paused => {}
-            PlanState::Failed => {}
-            PlanState::NotFound => {}
-            PlanState::Completed => {}
+            // PlanState::Paused => {}
+            PlanState::Failed => {
+                planner_state = PlannerState::Ready.to_string();
+            }
+            // PlanState::NotFound => {}
+            PlanState::Completed => {
+                planner_state = PlannerState::Ready.to_string();
+            }
             // PlanState::Cancelled => {}
-            PlanState::UNKNOWN => {}
+            PlanState::UNKNOWN => {
+                plan_state = PlanState::Initial.to_string();
+            }
         }
 
         new_state = new_state
             .update(&format!("{}_plan_state", sp_id), plan_state.to_spvalue())
+            .update(&format!("{}_planner_state", sp_id), planner_state.to_spvalue())
             .update(
                 &format!("{}_plan_current_step", sp_id),
                 plan_current_step.to_spvalue(),

@@ -15,6 +15,7 @@ pub fn generate_runner_state_variables(name: &str) -> State {
     let plan_exists = bv!(&&format!("{}_plan_exists", name)); // does nothing for now
     let plan_name = v!(&&format!("{}_plan_name", name)); // same as model name, should add nanoid!
     let plan_state = v!(&&format!("{}_plan_state", name)); // Initial, Executing, Failed, Completed, Unknown
+    let planner_state = v!(&&format!("{}_planner_state", name)); // Initial, Executing, Failed, Completed, Unknown
     let plan_duration = fv!(&&format!("{}_plan_duration", name)); // does nothing for now
     let plan_current_step = iv!(&&format!("{}_plan_current_step", name)); // Index of the currently exec. operation in the plan
     let planner_information = v!(&&format!("{}_planner_information", name)); // current information about the plan
@@ -49,6 +50,7 @@ pub fn generate_runner_state_variables(name: &str) -> State {
     state = state.add(assign!(plan_exists, SPValue::Bool(BoolOrUnknown::UNKNOWN)));
     state = state.add(assign!(plan_name, SPValue::String(StringOrUnknown::UNKNOWN)));
     state = state.add(assign!(plan_state, SPValue::String(StringOrUnknown::UNKNOWN)));
+    state = state.add(assign!(planner_state, SPValue::String(StringOrUnknown::UNKNOWN)));
     state = state.add(assign!(plan_duration, SPValue::Float64(FloatOrUnknown::UNKNOWN)));
     state = state.add(assign!(plan_current_step, SPValue::Int64(IntOrUnknown::UNKNOWN)));
     state = state.add(assign!(planner_information, SPValue::String(StringOrUnknown::UNKNOWN)));

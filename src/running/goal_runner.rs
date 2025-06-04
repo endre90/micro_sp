@@ -122,26 +122,26 @@ pub async fn goal_runner(
                         //     .send(StateManagement::SetPartialState(modified_state))
                         //     .await?;
                     }
-                    PlanState::NotFound => {
-                        // For now we fail, but maybe later we can don something about this
-                        // Like change something so that the goal remains the same but we try to find
-                        // another plan that doesn't fail
+                    // PlanState::NotFound => {
+                    //     // For now we fail, but maybe later we can don something about this
+                    //     // Like change something so that the goal remains the same but we try to find
+                    //     // another plan that doesn't fail
 
-                        // TODO: store this goal in a failed goals ARCHIVE and continue with the schedule
-                        // Also mention the reason, log time, etc. Maybe operator can do this instead.
+                    //     // TODO: store this goal in a failed goals ARCHIVE and continue with the schedule
+                    //     // Also mention the reason, log time, etc. Maybe operator can do this instead.
 
-                        current_goal_state = CurrentGoalState::Failed.to_string();
+                    //     current_goal_state = CurrentGoalState::Failed.to_string();
 
-                        // let new_state = state.update(
-                        //     &format!("{}_current_goal_state", sp_id),
-                        //     current_goal_state.to_spvalue(),
-                        // );
+                    //     // let new_state = state.update(
+                    //     //     &format!("{}_current_goal_state", sp_id),
+                    //     //     current_goal_state.to_spvalue(),
+                    //     // );
 
-                        // let modified_state = state.get_diff_partial_state(&new_state);
-                        // command_sender
-                        //     .send(StateManagement::SetPartialState(modified_state))
-                        //     .await?;
-                    }
+                    //     // let modified_state = state.get_diff_partial_state(&new_state);
+                    //     // command_sender
+                    //     //     .send(StateManagement::SetPartialState(modified_state))
+                    //     //     .await?;
+                    // }
                     PlanState::Completed => {
                         current_goal_state = CurrentGoalState::Completed.to_string();
 
