@@ -71,8 +71,8 @@ pub fn generate_runner_state_variables(name: &str) -> State {
     state = state.add(assign!(sop_request_trigger, SPValue::Bool(BoolOrUnknown::UNKNOWN)));
     state = state.add(assign!(start_time, SPValue::Time(TimeOrUnknown::UNKNOWN)));
     state = state.add(assign!(sop_current_step, SPValue::Int64(IntOrUnknown::Int64(0))));
-    state = state.add(assign!(fb_request_state, SPValue::String(StringOrUnknown::UNKNOWN)));
-    state = state.add(assign!(fb_request_trigger, SPValue::Bool(BoolOrUnknown::UNKNOWN)));
+    state = state.add(assign!(fb_request_state, SPValue::String(StringOrUnknown::String("initial".to_string()))));
+    state = state.add(assign!(fb_request_trigger, SPValue::Bool(BoolOrUnknown::Bool(false))));
     state = state.add(assign!(fb_id, SPValue::String(StringOrUnknown::UNKNOWN)));
 
     // Define variables to keep track of the processes
