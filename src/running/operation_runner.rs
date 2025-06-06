@@ -520,7 +520,7 @@ pub async fn planned_operation_runner(
                     }
 
                     if operation_information_old != operation_information {
-                        log::info!(target: &format!("{}_operation_runner", sp_id), "Info: {}.", operation_information);
+                        log::info!(target: &format!("{}_operation_runner", sp_id), "{}.", operation_information);
                         operation_information_old = operation_information.clone()
                     }
 
@@ -543,7 +543,7 @@ pub async fn planned_operation_runner(
                                 .await;
                                 new_state = operation.start_running(&new_state);
                                 operation_information =
-                                    format!("Operation '{}' started execution.", operation.name);
+                                    format!("Operation '{}' started execution", operation.name);
                             } else {
                                 new_state = operation.block_running(&new_state);
                             }
@@ -553,10 +553,10 @@ pub async fn planned_operation_runner(
                             if eval {
                                 new_state = operation.start_running(&new_state);
                                 operation_information =
-                                    format!("Operation '{}' started execution.", operation.name);
+                                    format!("Operation '{}' started execution", operation.name);
                             } else {
                                 operation_information = format!(
-                                    "Operation '{}' can't start yet, blocked by guard: {}.",
+                                    "Operation '{}' can't start yet, blocked by guard: {}",
                                     operation.name, operation.preconditions[idx].runner_guard
                                 );
                             }
@@ -577,26 +577,40 @@ pub async fn planned_operation_runner(
                                 None => (),
                             }
 
-                            if operation.can_be_failed(&state) {
+                            if operation.can_be_completed(&state) {
+                                new_state = operation.clone().complete_running(&new_state);
+                                operation_information = "Completing operation.".to_string();
+                            } else if operation.can_be_failed(&state) {
                                 new_state = operation.clone().fail_running(&new_state);
-                                operation_information = format!("Failing {}.", operation.name);
+                                operation_information = "Failing operation.".to_string();
                             } else {
-                                let (eval, idx) = operation.can_be_completed_with_transition_index(&state);
-                                tokio::time::sleep(Duration::from_millis(
-                                    operation.postconditions[idx].delay_ms,
-                                ))
-                                .await;
-                                if eval {
-                                    new_state = operation.clone().complete_running(&new_state);
-                                    operation_information = format!("Completing {}.", operation.name);
-                                } else {
-                                    operation_information = format!("Waiting for {} to be completed.", operation.name);
-                                }
+                                operation_information = "Waiting to be completed.".to_string();
                             }
+
+                            // if operation.can_be_failed(&state) {
+                            //     new_state = operation.clone().fail_running(&new_state);
+                            //     operation_information = format!("Failing {}.", operation.name);
+                            // } else {
+                            //     let (eval, idx) =
+                            //         operation.can_be_completed_with_transition_index(&state);
+                            //     tokio::time::sleep(Duration::from_millis(
+                            //         operation.postconditions[idx].delay_ms,
+                            //     ))
+                            //     .await;
+                            //     if eval {
+                            //         new_state = operation.clone().complete_running(&new_state);
+                            //         operation_information =
+                            //             format!("Completing {}.", operation.name);
+                            //     } else {
+                            //         operation_information =
+                            //             format!("Waiting for {} to be completed.", operation.name);
+                            //     }
+                            // }
                         }
                         OperationState::Completed => {
                             new_state = operation.reinitialize_running(&state);
-                            operation_information = format!("Operation {} completed, reinitializeing.", operation.name);
+                            operation_information =
+                                format!("Operation {} completed, reinitializeing.", operation.name);
                             new_state = new_state.update(
                                 &format!("{}_retry_counter", operation.name),
                                 0.to_spvalue(),
@@ -628,8 +642,9 @@ pub async fn planned_operation_runner(
                                     &format!("{}_retry_counter", operation.name),
                                     0.to_spvalue(),
                                 );
-                                operation_information =
-                                    format!("Operation failed, no more retries left. Unrecoverable.");
+                                operation_information = format!(
+                                    "Operation failed, no more retries left. Unrecoverable."
+                                );
                             }
                         }
                         OperationState::Unrecoverable => {
