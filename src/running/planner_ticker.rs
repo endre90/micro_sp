@@ -143,15 +143,6 @@ pub async fn planner_ticker(
                                                 .collect::<Vec<String>>()
                                                 .join("\n")
                                         );
-                                        // log::info!(
-                                        //     target: &format!("{}_planner", sp_id),
-                                        //     "Got a plan:\n{}",
-                                        //     plan.iter()
-                                        //         .enumerate()
-                                        //         .map(|(index, step)| format!("       {} -> {}", index + 1, step))
-                                        //         .collect::<Vec<String>>()
-                                        //         .join("\n")
-                                        // );
                                         plan_old = plan.clone()
                                     }
                                 }

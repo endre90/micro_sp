@@ -274,7 +274,6 @@ impl Operation {
 
     /// Timeout an executing the operation.
     pub fn timeout_running(&self, state: &State) -> State {
-        log::error!(target: &format!("micro_sp"), "HAS TO MOVE TO TIMEOUT STATE HERE!");
         let assignment = state.get_assignment(&self.name);
         if assignment.val == OperationState::Executing.to_spvalue() {
             if self.timeout_transitions.len() > 0 {
