@@ -487,6 +487,7 @@ pub async fn planned_operation_runner(
                     plan_state = PlanState::Executing.to_string();
                     plan_current_step = 0;
                 }
+                planner_state = PlannerState::Ready.to_string();
             }
             PlanState::Executing => {
                 if plan.len() > plan_current_step as usize {
@@ -658,6 +659,7 @@ pub async fn planned_operation_runner(
             // PlanState::Cancelled => {}
             PlanState::UNKNOWN => {
                 plan_state = PlanState::Initial.to_string();
+                planner_state = PlannerState::Ready.to_string();
             }
         }
 
