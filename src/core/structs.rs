@@ -26,6 +26,19 @@ pub enum PlanState {
 }
 
 #[derive(Debug, Clone, PartialEq)]
+pub enum SOPState {
+    // Empty,
+    Initial,
+    Executing,
+    // Paused,
+    Failed,
+    // NotFound,
+    Completed,
+    // Cancelled,
+    UNKNOWN,
+}
+
+#[derive(Debug, Clone, PartialEq)]
 pub enum PlannerState {
     Found,
     NotFound,
@@ -36,6 +49,12 @@ pub enum PlannerState {
 impl Default for PlanState {
     fn default() -> Self {
         PlanState::UNKNOWN
+    }
+}
+
+impl Default for SOPState {
+    fn default() -> Self {
+        SOPState::UNKNOWN
     }
 }
 
@@ -74,6 +93,35 @@ impl PlanState {
     }
 }
 
+impl SOPState {
+    pub fn from_str(x: &str) -> SOPState {
+        match x {
+            // "empty" => SOPState::Empty,
+            "initial" => SOPState::Initial,
+            "executing" => SOPState::Executing,
+            // "paused" => SOPState::Paused,
+            "failed" => SOPState::Failed,
+            // "not_found" => SOPState::NotFound,
+            "completed" => SOPState::Completed,
+            // "cancelled" => SOPState::Cancelled,
+            _ => SOPState::UNKNOWN,
+        }
+    }
+    pub fn to_spvalue(self) -> SPValue {
+        match self {
+            // SOPState::Empty => "empty".to_spvalue(),
+            SOPState::Initial => "initial".to_spvalue(),
+            SOPState::Executing => "executing".to_spvalue(),
+            // SOPState::Paused => "paused".to_spvalue(),
+            SOPState::Failed => "failed".to_spvalue(),
+            // SOPState::NotFound => "not_found".to_spvalue(),
+            SOPState::Completed => "completed".to_spvalue(),
+            // SOPState::Cancelled => "cancelled".to_spvalue(),
+            SOPState::UNKNOWN => "UNKNOWN".to_spvalue(),
+        }
+    }
+}
+
 impl PlannerState {
     pub fn from_str(x: &str) -> PlannerState {
         match x {
@@ -105,6 +153,22 @@ impl fmt::Display for PlanState {
             // PlanState::NotFound => write!(f, "not_found"),
             PlanState::Completed => write!(f, "completed"),
             // PlanState::Cancelled => write!(f, "cancelled"),
+        }
+    }
+}
+
+impl fmt::Display for SOPState {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            SOPState::UNKNOWN => write!(f, "UNKNOWN"),
+            // SOPState::Empty => write!(f, "empty"),
+            SOPState::Initial => write!(f, "initial"),
+            SOPState::Executing => write!(f, "executing"),
+            // SOPState::Paused => write!(f, "paused"),
+            SOPState::Failed => write!(f, "failed"),
+            // SOPState::NotFound => write!(f, "not_found"),
+            SOPState::Completed => write!(f, "completed"),
+            // SOPState::Cancelled => write!(f, "cancelled"),
         }
     }
 }

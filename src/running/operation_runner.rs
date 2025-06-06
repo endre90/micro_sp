@@ -272,8 +272,16 @@ use tokio::{
 //     }
 // }
 
+
+
+
+
+
+
+
+
 // // Super simple for now only sequences, later extend with alternative, paralell, loops, etc.
-// pub async fn sop_runner(
+// pub async fn old_sop_runner(
 //     sp_id: &str,
 //     model: &Model,
 //     command_sender: mpsc::Sender<StateManagement>,
@@ -321,6 +329,11 @@ use tokio::{
 //             sop_state_old = sop_state.clone()
 //         }
 
+
+
+
+
+//         // Old, lets try the new
 //         if sop_request_trigger {
 //             sop_state = ActionRequestState::Executing.to_string();
 //             // sop_current_step = 0;
