@@ -569,7 +569,7 @@ pub async fn planned_operation_runner(
                                             .saturating_sub(operation_start_time);
                                         if elapsed_ms >= timeout {
                                             operation_information = format!(
-                                                "Operation '{}' timed out.",
+                                                "Operation '{}' timed out",
                                                 operation.name
                                             );
                                             new_state = operation.timeout_running(&state);
@@ -578,7 +578,7 @@ pub async fn planned_operation_runner(
                                                 new_state =
                                                     operation.clone().fail_running(&new_state);
                                                 operation_information =
-                                                    format!("Failing {}.", operation.name);
+                                                    format!("Failing {}", operation.name);
                                             } else {
                                                 let (eval, idx) = operation
                                                     .can_be_completed_with_transition_index(&state);
@@ -591,10 +591,10 @@ pub async fn planned_operation_runner(
                                                         .clone()
                                                         .complete_running(&new_state);
                                                     operation_information =
-                                                        format!("Completing {}.", operation.name);
+                                                        format!("Completing {}", operation.name);
                                                 } else {
                                                     operation_information = format!(
-                                                        "Waiting for {} to be completed.",
+                                                        "Waiting for {} to be completed",
                                                         operation.name
                                                     );
                                                 }
@@ -606,7 +606,7 @@ pub async fn planned_operation_runner(
                                     if operation.can_be_failed(&state) {
                                         new_state = operation.clone().fail_running(&new_state);
                                         operation_information =
-                                            format!("Failing {}.", operation.name);
+                                            format!("Failing {}", operation.name);
                                     } else {
                                         let (eval, idx) = operation
                                             .can_be_completed_with_transition_index(&state);
@@ -618,10 +618,10 @@ pub async fn planned_operation_runner(
                                             new_state =
                                                 operation.clone().complete_running(&new_state);
                                             operation_information =
-                                                format!("Completing {}.", operation.name);
+                                                format!("Completing {}", operation.name);
                                         } else {
                                             operation_information = format!(
-                                                "Waiting for {} to be completed.",
+                                                "Waiting for {} to be completed",
                                                 operation.name
                                             );
                                         }
@@ -632,7 +632,7 @@ pub async fn planned_operation_runner(
                         OperationState::Completed => {
                             new_state = operation.reinitialize_running(&state);
                             operation_information =
-                                format!("Operation {} completed, reinitializeing.", operation.name);
+                                format!("Operation {} completed, reinitializeing", operation.name);
                             new_state = new_state.update(
                                 &format!("{}_retry_counter", operation.name),
                                 0.to_spvalue(),
@@ -644,13 +644,13 @@ pub async fn planned_operation_runner(
                         OperationState::Timedout => {
                             new_state = operation.unrecover_running(&state);
                             operation_information =
-                                format!("Timedout {}. Unrecoverable.", operation.name);
+                                format!("Timedout {}. Unrecoverable", operation.name);
                         }
                         OperationState::Failed => {
                             if operation_retry_counter < operation.retries {
                                 operation_retry_counter = operation_retry_counter + 1;
                                 operation_information = format!(
-                                    "Retrying '{}'. Retry nr. {} out of {}.",
+                                    "Retrying '{}'. Retry nr. {} out of {}",
                                     operation.name, operation_retry_counter, operation.retries
                                 );
                                 new_state = operation.clone().retry_running(&new_state);
@@ -665,7 +665,7 @@ pub async fn planned_operation_runner(
                                     0.to_spvalue(),
                                 );
                                 operation_information = format!(
-                                    "Operation failed, no more retries left. Unrecoverable."
+                                    "Operation failed, no more retries left. Unrecoverable"
                                 );
                             }
                         }
