@@ -568,11 +568,11 @@ pub async fn planned_operation_runner(
                                         let elapsed_ms = now_as_millis_i64()
                                             .saturating_sub(operation_start_time);
                                         if elapsed_ms >= timeout {
+                                            new_state = operation.timeout_running(&new_state);
                                             operation_information = format!(
                                                 "Operation '{}' timed out",
                                                 operation.name
                                             );
-                                            new_state = operation.timeout_running(&new_state);
                                         } else {
                                             if operation.can_be_failed(&new_state) {
                                                 new_state =
@@ -714,9 +714,9 @@ pub async fn planned_operation_runner(
             )
             .update(&format!("{}_plan", sp_id), plan.to_spvalue());
 
-        let modified_state = state.get_diff_partial_state(&new_state);
+        // let modified_state = state.get_diff_partial_state(&new_state);
         command_sender
-            .send(StateManagement::SetPartialState(modified_state))
+            .send(StateManagement::SetPartialState(new_state))
             .await?;
 
         interval.tick().await;

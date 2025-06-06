@@ -312,7 +312,7 @@ impl Operation {
 
     pub fn reinitialize_running(&self, state: &State) -> State {
         let assignment = state.get_assignment(&self.name);
-        if assignment.val == OperationState::Completed.to_spvalue() {
+        if assignment.val == OperationState::Completed.to_spvalue() || assignment.val == OperationState::Unrecoverable.to_spvalue(){
             let action = Action::new(assignment.var, OperationState::Initial.to_spvalue().wrap());
             action.assign(&state)
         } else {
