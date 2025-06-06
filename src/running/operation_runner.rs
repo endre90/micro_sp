@@ -531,7 +531,7 @@ pub async fn planned_operation_runner(
 
                     match OperationState::from_str(&operation_state) {
                         OperationState::Initial => {
-                            let (eval, idx) = operation.eval_running_with_transition_index(&state);
+                            let (eval, idx) = operation.eval_running_with_transition_index(&new_state);
                             if eval {
                                 new_state = new_state.update(
                                     &format!("{}_start_time", operation.name),
@@ -549,7 +549,7 @@ pub async fn planned_operation_runner(
                             }
                         }
                         OperationState::Blocked => {
-                            let (eval, idx) = operation.eval_running_with_transition_index(&state);
+                            let (eval, idx) = operation.eval_running_with_transition_index(&new_state);
                             if eval {
                                 new_state = operation.start_running(&new_state);
                                 operation_information =
@@ -572,16 +572,16 @@ pub async fn planned_operation_runner(
                                                 "Operation '{}' timed out",
                                                 operation.name
                                             );
-                                            new_state = operation.timeout_running(&state);
+                                            new_state = operation.timeout_running(&new_state);
                                         } else {
-                                            if operation.can_be_failed(&state) {
+                                            if operation.can_be_failed(&new_state) {
                                                 new_state =
                                                     operation.clone().fail_running(&new_state);
                                                 operation_information =
                                                     format!("Failing {}", operation.name);
                                             } else {
                                                 let (eval, idx) = operation
-                                                    .can_be_completed_with_transition_index(&state);
+                                                    .can_be_completed_with_transition_index(&new_state);
                                                 tokio::time::sleep(Duration::from_millis(
                                                     operation.postconditions[idx].delay_ms,
                                                 ))
@@ -603,13 +603,13 @@ pub async fn planned_operation_runner(
                                     }
                                 }
                                 None => {
-                                    if operation.can_be_failed(&state) {
+                                    if operation.can_be_failed(&new_state) {
                                         new_state = operation.clone().fail_running(&new_state);
                                         operation_information =
                                             format!("Failing {}", operation.name);
                                     } else {
                                         let (eval, idx) = operation
-                                            .can_be_completed_with_transition_index(&state);
+                                            .can_be_completed_with_transition_index(&new_state);
                                         tokio::time::sleep(Duration::from_millis(
                                             operation.postconditions[idx].delay_ms,
                                         ))
@@ -630,7 +630,7 @@ pub async fn planned_operation_runner(
                             }
                         }
                         OperationState::Completed => {
-                            new_state = operation.reinitialize_running(&state);
+                            new_state = operation.reinitialize_running(&new_state);
                             operation_information =
                                 format!("Operation {} completed, reinitializeing", operation.name);
                             new_state = new_state.update(
@@ -642,7 +642,7 @@ pub async fn planned_operation_runner(
                             plan_current_step = plan_current_step + 1;
                         }
                         OperationState::Timedout => {
-                            new_state = operation.unrecover_running(&state);
+                            new_state = operation.unrecover_running(&new_state);
                             operation_information =
                                 format!("Timedout {}. Unrecoverable", operation.name);
                         }
@@ -659,7 +659,7 @@ pub async fn planned_operation_runner(
                                     operation_retry_counter.to_spvalue(),
                                 );
                             } else {
-                                new_state = operation.unrecover_running(&state);
+                                new_state = operation.unrecover_running(&new_state);
                                 new_state = new_state.update(
                                     &format!("{}_retry_counter", operation.name),
                                     0.to_spvalue(),
@@ -671,7 +671,7 @@ pub async fn planned_operation_runner(
                         }
                         OperationState::Unrecoverable => {
                             plan_state = PlanState::Failed.to_string();
-                            new_state = operation.reinitialize_running(&state);
+                            new_state = operation.reinitialize_running(&new_state);
                             operation_information = format!("Failing the plan: {:?}", plan);
                         }
                         OperationState::UNKNOWN => (),
