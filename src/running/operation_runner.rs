@@ -650,10 +650,12 @@ pub async fn planned_operation_runner(
             }
             // PlanState::Paused => {}
             PlanState::Failed => {
+                plan_state = PlanState::Initial.to_string();
                 planner_state = PlannerState::Ready.to_string();
             }
             // PlanState::NotFound => {}
             PlanState::Completed => {
+                plan_state = PlanState::Initial.to_string();
                 planner_state = PlannerState::Ready.to_string();
             }
             // PlanState::Cancelled => {}
