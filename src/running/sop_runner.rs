@@ -49,13 +49,6 @@ pub async fn sop_runner(
             &format!("{}_sop_enabled", sp_id),
         );
 
-        let sop_struct = &model
-            .sops
-            .iter()
-            .find(|sop| sop.id == sop_id.to_string())
-            .unwrap()
-            .to_owned();
-
         // Log only when something changes and not every tick
         if sop_state_old != sop_state {
             log::info!(target: &format!("{}_sop_runner", sp_id), "SOP current state: {sop_state}.");
@@ -70,6 +63,13 @@ pub async fn sop_runner(
                 }
             }
             SOPState::Executing => {
+                let sop_struct = &model
+                    .sops
+                    .iter()
+                    .find(|sop| sop.id == sop_id.to_string())
+                    .unwrap()
+                    .to_owned();
+
                 if sop_old != sop_struct.sop {
                     log::info!(
                         target: &format!("{}_sop_runner", sp_id),
