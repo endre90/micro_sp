@@ -121,6 +121,7 @@ pub async fn planned_operation_runner(
                             let (eval, idx) =
                                 operation.eval_running_with_transition_index(&new_state);
                             if eval {
+                                log::error!(target: &format!("{}_operation_runner", sp_id), "INITIAL, EVALS TO TRUE.");
                                 new_state = new_state.update(
                                     &format!("{}_start_time", operation.name),
                                     now_as_millis_i64().to_spvalue(),
@@ -133,20 +134,24 @@ pub async fn planned_operation_runner(
                                 operation_information =
                                     format!("Operation '{}' started execution", operation.name);
                             } else {
+                                log::error!(target: &format!("{}_operation_runner", sp_id), "INITIAL, EVALS TO FALSE.");
                                 new_state = operation.block_running(&new_state);
                             }
                         }
                         OperationState::Blocked => {
-                            let eval = operation.eval_running(&new_state);
+                            let (eval, idx) =
+                                operation.eval_running_with_transition_index(&new_state);
                             if eval {
+                                log::error!(target: &format!("{}_operation_runner", sp_id), "BLOCKED, EVALS TO TRUE.");
                                 new_state = operation.start_running(&new_state);
                                 operation_information =
                                     format!("Operation '{}' started execution", operation.name);
                             } else {
+                                log::error!(target: &format!("{}_operation_runner", sp_id), "BLOCKED, EVALS TO FALSE.");
                                 operation_information = format!(
-                                    "Operation '{}' can't start yet, blocked by guard",
-                                    operation.name
-                                ); //, operation.preconditions[idx].runner_guard
+                                    "Operation '{}' can't start yet, blocked by guard: {}",
+                                    operation.name, operation.preconditions[idx].runner_guard
+                                );
                             }
                         }
                         OperationState::Executing => {
