@@ -531,7 +531,8 @@ pub async fn planned_operation_runner(
 
                     match OperationState::from_str(&operation_state) {
                         OperationState::Initial => {
-                            let (eval, idx) = operation.eval_running_with_transition_index(&new_state);
+                            let (eval, idx) =
+                                operation.eval_running_with_transition_index(&new_state);
                             if eval {
                                 new_state = new_state.update(
                                     &format!("{}_start_time", operation.name),
@@ -549,7 +550,8 @@ pub async fn planned_operation_runner(
                             }
                         }
                         OperationState::Blocked => {
-                            let (eval, idx) = operation.eval_running_with_transition_index(&new_state);
+                            let (eval, idx) =
+                                operation.eval_running_with_transition_index(&new_state);
                             if eval {
                                 new_state = operation.start_running(&new_state);
                                 operation_information =
@@ -564,42 +566,38 @@ pub async fn planned_operation_runner(
                         OperationState::Executing => {
                             match operation.timeout_ms {
                                 Some(timeout) => {
-                                    if operation_start_time > 0 {
-                                        let elapsed_ms = now_as_millis_i64()
-                                            .saturating_sub(operation_start_time);
-                                        if elapsed_ms >= timeout {
-                                            new_state = operation.timeout_running(&new_state);
-                                            operation_information = format!(
-                                                "Operation '{}' timed out",
-                                                operation.name
-                                            );
+                                    // if operation_start_time > 0 {
+                                    let elapsed_ms =
+                                        now_as_millis_i64().saturating_sub(operation_start_time);
+                                    if elapsed_ms >= timeout {
+                                        new_state = operation.timeout_running(&new_state);
+                                        operation_information =
+                                            format!("Operation '{}' timed out", operation.name);
+                                    } else {
+                                        if operation.can_be_failed(&new_state) {
+                                            new_state = operation.clone().fail_running(&new_state);
+                                            operation_information =
+                                                format!("Failing {}", operation.name);
                                         } else {
-                                            if operation.can_be_failed(&new_state) {
+                                            let (eval, idx) = operation
+                                                .can_be_completed_with_transition_index(&new_state);
+                                            tokio::time::sleep(Duration::from_millis(
+                                                operation.postconditions[idx].delay_ms,
+                                            ))
+                                            .await;
+                                            if eval {
                                                 new_state =
-                                                    operation.clone().fail_running(&new_state);
+                                                    operation.clone().complete_running(&new_state);
                                                 operation_information =
-                                                    format!("Failing {}", operation.name);
+                                                    format!("Completing {}", operation.name);
                                             } else {
-                                                let (eval, idx) = operation
-                                                    .can_be_completed_with_transition_index(&new_state);
-                                                tokio::time::sleep(Duration::from_millis(
-                                                    operation.postconditions[idx].delay_ms,
-                                                ))
-                                                .await;
-                                                if eval {
-                                                    new_state = operation
-                                                        .clone()
-                                                        .complete_running(&new_state);
-                                                    operation_information =
-                                                        format!("Completing {}", operation.name);
-                                                } else {
-                                                    operation_information = format!(
-                                                        "Waiting for {} to be completed",
-                                                        operation.name
-                                                    );
-                                                }
+                                                operation_information = format!(
+                                                    "Waiting for {} to be completed",
+                                                    operation.name
+                                                );
                                             }
                                         }
+                                        // }
                                     }
                                 }
                                 None => {
