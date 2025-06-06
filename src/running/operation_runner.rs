@@ -558,24 +558,25 @@ pub async fn planned_operation_runner(
                                 new_state = operation.start_running(&new_state);
                                 operation_information =
                                     format!("Operation '{}' started execution", operation.name);
-                            } else {
-                                new_state = operation.block_running(&new_state);
-                            }
+                            } 
+                            // else {
+                                // new_state = operation.block_running(&new_state);
+                            // }
                         }
-                        OperationState::Blocked => {
-                            let (eval, idx) =
-                                operation.eval_running_with_transition_index(&new_state);
-                            if eval {
-                                new_state = operation.start_running(&new_state);
-                                operation_information =
-                                    format!("Operation '{}' started execution", operation.name);
-                            } else {
-                                operation_information = format!(
-                                    "Operation '{}' can't start yet, blocked by guard: {}",
-                                    operation.name, operation.preconditions[idx].runner_guard
-                                );
-                            }
-                        }
+                        // OperationState::Blocked => {
+                        //     let (eval, idx) =
+                        //         operation.eval_running_with_transition_index(&new_state);
+                        //     if eval {
+                        //         new_state = operation.start_running(&new_state);
+                        //         operation_information =
+                        //             format!("Operation '{}' started execution", operation.name);
+                        //     } else {
+                        //         operation_information = format!(
+                        //             "Operation '{}' can't start yet, blocked by guard: {}",
+                        //             operation.name, operation.preconditions[idx].runner_guard
+                        //         );
+                        //     }
+                        // }
                         OperationState::Executing => {
                             match operation.timeout_ms {
                                 Some(timeout) => {
