@@ -1,3 +1,5 @@
+use std::time::{SystemTime, UNIX_EPOCH};
+
 use crate::*;
 
 // If coverability_tracking is true, generate variables to track how many
@@ -148,6 +150,13 @@ pub fn reset_all_operations(state: &State) -> State {
         }
     });
     mut_state
+}
+
+pub fn now_as_millis_i64() -> i64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_millis() as i64)
+        .unwrap_or(0)
 }
 
 // If an operation has to be generated per item or per order

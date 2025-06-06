@@ -1,4 +1,4 @@
-pub static MAX_ALLOWED_OPERATION_DURATION_MS: u128 = 36000000; // milliseconds
+pub static MAX_ALLOWED_OPERATION_DURATION_MS: i64 = 600000; // milliseconds
 pub static MAX_REPLAN_RETRIES: i64 = 3;
 pub static MAX_RECURSION_DEPTH: u64 = 1000;
 

@@ -257,12 +257,7 @@ fn extract_transform(json: &Value) -> Option<SPTransform> {
 
 #[test]
 fn test_load_and_deserialize_from_file() {
-    fn initialize_logging() {
-        std::env::set_var("RUST_LOG", "warn");
-        let _ = env_logger::builder().is_test(true).try_init();
-    }
-
-    initialize_logging();
+    initialize_env_logger();
 
     log::warn!("Starting the test_deserialize_transform_stamped test...");
 

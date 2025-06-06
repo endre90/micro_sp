@@ -28,8 +28,10 @@ pub struct Transition {
     pub name: String,
     pub guard: Predicate,
     pub runner_guard: Predicate,
+    pub pre_action_delay_ms: u64,
     pub actions: Vec<Action>,
     pub runner_actions: Vec<Action>,
+    pub post_action_delay_ms: u64,
 }
 
 // impl Hash for Transition {
@@ -63,15 +65,19 @@ impl Transition {
         name: &str,
         guard: Predicate,
         runner_guard: Predicate,
+        pre_action_delay_ms: u64,
         actions: Vec<Action>,
         runner_actions: Vec<Action>,
+        post_action_delay_ms: u64,
     ) -> Transition {
         Transition {
             name: name.to_string(),
             guard,
             runner_guard,
+            pre_action_delay_ms,
             actions,
             runner_actions,
+            post_action_delay_ms,
         }
     }
 
@@ -80,8 +86,10 @@ impl Transition {
         name: &str,
         guard: &str,
         runner_guard: &str,
+        pre_action_delay_ms: u64,
         actions: Vec<&str>,
         runner_actions: Vec<&str>,
+        post_action_delay_ms: u64,
         state: &State,
     ) -> Transition {
         Transition::new(
@@ -106,9 +114,10 @@ impl Transition {
                     Predicate::FALSE
                 }
             },
+            pre_action_delay_ms,
             actions
                 .iter()
-                .map(|action| match pred_parser::action(action, state){
+                .map(|action| match pred_parser::action(action, state) {
                     Ok(action_def) => action_def,
                     Err(e) => {
                         log::error!(target: &&format!("transition_parser"), 
@@ -132,12 +141,21 @@ impl Transition {
                     }
                 })
                 .collect::<Vec<Action>>(),
+            post_action_delay_ms,
         )
     }
 
     ///
     pub fn empty() -> Transition {
-        Transition::new("empty", Predicate::FALSE, Predicate::FALSE, vec![], vec![])
+        Transition::new(
+            "empty",
+            Predicate::FALSE,
+            Predicate::FALSE,
+            0,
+            vec![],
+            vec![],
+            0,
+        )
     }
 
     pub fn eval_planning(self, state: &State) -> bool {
@@ -194,8 +212,10 @@ impl Transition {
                 Some(x) => x,
                 None => Predicate::TRUE,
             },
+            pre_action_delay_ms: self.pre_action_delay_ms,
             actions: r_actions,
             runner_actions: r_runner_actions,
+            post_action_delay_ms: self.post_action_delay_ms,
         }
     }
 
@@ -226,8 +246,10 @@ impl Default for Transition {
             name: "unkown".to_string(),
             guard: Predicate::TRUE,
             runner_guard: Predicate::TRUE,
+            pre_action_delay_ms: 0,
             actions: vec![],
             runner_actions: vec![],
+            post_action_delay_ms: 0,
         }
     }
 }
@@ -313,15 +335,19 @@ mod tests {
             "gains_weight",
             Predicate::TRUE,
             Predicate::TRUE,
+            0,
             vec![a1.clone()],
             vec![],
+            0,
         );
         let t2 = Transition::new(
             "gains_weight",
             Predicate::TRUE,
             Predicate::TRUE,
+            0,
             vec![a1],
             vec![],
+            0,
         );
         assert_eq!(t1, t2);
     }
@@ -353,16 +379,20 @@ mod tests {
             "gains_weight",
             "true",
             "true",
+            0,
             vec!("var:weight <- 85.0", "var:height <- 190"),
             Vec::<&str>::new(),
+            0,
             &s
         );
         let t2 = t!(
             "gains_weight",
             "true",
             "false",
+            0,
             vec!("var:weight <- 85.0"),
             Vec::<&str>::new(),
+            0,
             &s
         );
         assert!(t1.eval_running(&s));
@@ -377,8 +407,10 @@ mod tests {
             "gains_weight",
             "true",
             "var:weight == 85.0",
+            0,
             vec!("var:weight <- 85.0", "var:height <- 190"),
             Vec::<&str>::new(),
+            0,
             &s
         );
         assert!(t1.eval_running(&s));

@@ -1,5 +1,3 @@
-use std::time::SystemTime;
-
 use crate::*;
 use tokio::{
     sync::{mpsc, oneshot},
@@ -8,7 +6,7 @@ use tokio::{
 
 pub async fn goal_runner(
     sp_id: &str,
-    model: &Model,
+    _model: &Model,
     command_sender: mpsc::Sender<StateManagement>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let mut interval = interval(Duration::from_millis(100));
