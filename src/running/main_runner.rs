@@ -104,11 +104,11 @@ pub async fn main_runner(sp_id: &String, model: Model, tx: mpsc::Sender<StateMan
             .unwrap()
     });
 
-    log::info!(target: &format!("{sp_id}_micro_sp"), "Spawning goal runner.");
-    let model_clone = model.clone();
-    let tx_clone = tx.clone();
-    let sp_id_clone = sp_id.clone();
-    tokio::task::spawn(async move { goal_runner(&sp_id_clone, &model_clone, tx_clone).await.unwrap() });
+    // log::info!(target: &format!("{sp_id}_micro_sp"), "Spawning goal runner.");
+    // let model_clone = model.clone();
+    // let tx_clone = tx.clone();
+    // let sp_id_clone = sp_id.clone();
+    // tokio::task::spawn(async move { goal_runner(&sp_id_clone, &model_clone, tx_clone).await.unwrap() });
 
     // log::info!(target: &format!("{sp_id}_micro_sp"), "Spawning goal scheduler.");
     // let tx_clone = tx.clone();
