@@ -714,9 +714,9 @@ pub async fn planned_operation_runner(
             )
             .update(&format!("{}_plan", sp_id), plan.to_spvalue());
 
-        // let modified_state = state.get_diff_partial_state(&new_state);
+        let modified_state = state.get_diff_partial_state(&new_state);
         command_sender
-            .send(StateManagement::SetPartialState(new_state))
+            .send(StateManagement::SetPartialState(modified_state))
             .await?;
 
         interval.tick().await;
