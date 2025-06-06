@@ -281,17 +281,17 @@ pub async fn sop_runner(
             }
             // PlanState::Paused => {}
             SOPState::Failed => {
-                sop_state = SOPState::Initial.to_string();
+                // sop_state = SOPState::Initial.to_string();
                 // planner_state = PlannerState::Ready.to_string();
             }
             // PlanState::NotFound => {}
             SOPState::Completed => {
-                sop_state = SOPState::Initial.to_string();
+                // sop_state = SOPState::Initial.to_string();
                 // planner_state = PlannerState::Ready.to_string();
             }
             // PlanState::Cancelled => {}
             SOPState::UNKNOWN => {
-                sop_state = SOPState::Initial.to_string();
+                // sop_state = SOPState::Initial.to_string();
                 // planner_state = PlannerState::Ready.to_string();
             }
         }
