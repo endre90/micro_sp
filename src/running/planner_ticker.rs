@@ -24,7 +24,7 @@ pub async fn planner_ticker(
     let mut planner_information_old = "".to_string();
     let mut plan_old: Vec<String> = vec![];
 
-    log::info!(target: &&format!("{}_planner_ticker", sp_id), "Online.");
+    log::info!(target: &&format!("{}_planner", sp_id), "Online.");
 
     loop {
         let (response_tx, response_rx) = oneshot::channel();
@@ -33,39 +33,39 @@ pub async fn planner_ticker(
             .await?;
         let state = response_rx.await?;
         let mut replan_trigger = state.get_bool_or_default_to_false(
-            &format!("{}_planner_ticker", sp_id),
+            &format!("{}_planner", sp_id),
             &format!("{}_replan_trigger", sp_id),
         );
         let mut replanned = state.get_bool_or_default_to_false(
-            &format!("{}_planner_ticker", sp_id),
+            &format!("{}_planner", sp_id),
             &format!("{}_replanned", sp_id),
         );
         let mut plan_counter = state.get_int_or_default_to_zero(
-            &format!("{}_planner_ticker", sp_id),
+            &format!("{}_planner", sp_id),
             &format!("{}_plan_counter", sp_id),
         );
         let mut replan_counter = state.get_int_or_default_to_zero(
-            &format!("{}_planner_ticker", sp_id),
+            &format!("{}_planner", sp_id),
             &format!("{}_replan_counter", sp_id),
         );
         let mut replan_counter_total = state.get_int_or_default_to_zero(
-            &format!("{}_planner_ticker", sp_id),
+            &format!("{}_planner", sp_id),
             &format!("{}_replan_counter_total", sp_id),
         );
         // let mut plan_state = state.get_string_or_default_to_unknown(
-        //     &format!("{}_planner_ticker", sp_id),
+        //     &format!("{}_planner", sp_id),
         //     &format!("{}_plan_state", sp_id),
         // );
         let mut planner_state = state.get_string_or_default_to_unknown(
-            &format!("{}_planner_ticker", sp_id),
+            &format!("{}_planner", sp_id),
             &format!("{}_planner_state", sp_id),
         );
         // let mut plan_current_step = state.get_int_or_default_to_zero(
-        //     &format!("{}_planner_ticker", sp_id),
+        //     &format!("{}_planner", sp_id),
         //     &format!("{}_plan_current_step", sp_id),
         // );
         let plan_of_sp_values = state.get_array_or_default_to_empty(
-            &format!("{}_planner_ticker", sp_id),
+            &format!("{}_planner", sp_id),
             &format!("{}_plan", sp_id),
         );
 
@@ -76,24 +76,23 @@ pub async fn planner_ticker(
             .collect();
 
         let mut planner_information = state.get_string_or_default_to_unknown(
-            &format!("{}_planner_ticker", sp_id),
+            &format!("{}_planner", sp_id),
             &format!("{}_planner_information", sp_id),
         );
 
         // Log only when something changes and not every tick
         // if plan_current_step_old != plan_current_step {
-        //     log::info!(target: &format!("{}_planner_ticker", sp_id), "Plan current step: {plan_current_step}.");
+        //     log::info!(target: &format!("{}_planner", sp_id), "Plan current step: {plan_current_step}.");
         //     plan_current_step_old = plan_current_step
         // }
 
         if planner_information_old != planner_information {
-            log::info!(target: &format!("{}_planner_ticker", sp_id), "{planner_information}");
+            log::info!(target: &format!("{}_planner", sp_id), "{planner_information}");
             planner_information_old = planner_information.clone()
         }
 
         match (replan_trigger, replanned) {
             (true, true) => {
-                planner_information = "Planner triggered and (re)planned.".to_string();
                 replan_trigger = false;
                 replanned = false;
             }
@@ -137,15 +136,22 @@ pub async fn planner_ticker(
                                     replanned = true;
                                     plan_counter = plan_counter + 1;
                                     if plan_old != plan {
-                                        log::info!(
-                                            target: &format!("{}_planner_ticker", sp_id),
-                                            "Got a plan:\n{}",
+                                        planner_information = format!("Got a plan:\n{}",
                                             plan.iter()
                                                 .enumerate()
                                                 .map(|(index, step)| format!("       {} -> {}", index + 1, step))
                                                 .collect::<Vec<String>>()
                                                 .join("\n")
                                         );
+                                        // log::info!(
+                                        //     target: &format!("{}_planner", sp_id),
+                                        //     "Got a plan:\n{}",
+                                        //     plan.iter()
+                                        //         .enumerate()
+                                        //         .map(|(index, step)| format!("       {} -> {}", index + 1, step))
+                                        //         .collect::<Vec<String>>()
+                                        //         .join("\n")
+                                        // );
                                         plan_old = plan.clone()
                                     }
                                 }
