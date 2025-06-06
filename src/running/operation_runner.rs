@@ -570,11 +570,13 @@ pub async fn planned_operation_runner(
                                     let elapsed_ms =
                                         now_as_millis_i64().saturating_sub(operation_start_time);
                                     if elapsed_ms >= timeout {
+                                        log::error!(target: &format!("{}_operation_runner", sp_id), "HAS TO TIMEOUT HERE!");
                                         new_state = operation.timeout_running(&new_state);
                                         operation_information =
                                             format!("Operation '{}' timed out", operation.name);
                                     } else {
                                         if operation.can_be_failed(&new_state) {
+                                            log::error!(target: &format!("{}_operation_runner", sp_id), "HAS TO FAIL HERE!");
                                             new_state = operation.clone().fail_running(&new_state);
                                             operation_information =
                                                 format!("Failing {}", operation.name);
@@ -586,6 +588,7 @@ pub async fn planned_operation_runner(
                                             ))
                                             .await;
                                             if eval {
+                                                log::error!(target: &format!("{}_operation_runner", sp_id), "HAS TO COMPLETE HERE!");
                                                 new_state =
                                                     operation.clone().complete_running(&new_state);
                                                 operation_information =
