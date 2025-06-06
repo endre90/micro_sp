@@ -28,10 +28,9 @@ pub struct Transition {
     pub name: String,
     pub guard: Predicate,
     pub runner_guard: Predicate,
-    pub pre_action_delay_ms: u64,
+    pub delay_ms: u64,
     pub actions: Vec<Action>,
     pub runner_actions: Vec<Action>,
-    pub post_action_delay_ms: u64,
 }
 
 // impl Hash for Transition {
@@ -65,19 +64,17 @@ impl Transition {
         name: &str,
         guard: Predicate,
         runner_guard: Predicate,
-        pre_action_delay_ms: u64,
+        delay_ms: u64,
         actions: Vec<Action>,
         runner_actions: Vec<Action>,
-        post_action_delay_ms: u64,
     ) -> Transition {
         Transition {
             name: name.to_string(),
             guard,
             runner_guard,
-            pre_action_delay_ms,
+            delay_ms,
             actions,
             runner_actions,
-            post_action_delay_ms,
         }
     }
 
@@ -86,10 +83,9 @@ impl Transition {
         name: &str,
         guard: &str,
         runner_guard: &str,
-        pre_action_delay_ms: u64,
+        delay_ms: u64,
         actions: Vec<&str>,
         runner_actions: Vec<&str>,
-        post_action_delay_ms: u64,
         state: &State,
     ) -> Transition {
         Transition::new(
@@ -114,7 +110,7 @@ impl Transition {
                     Predicate::FALSE
                 }
             },
-            pre_action_delay_ms,
+            delay_ms,
             actions
                 .iter()
                 .map(|action| match pred_parser::action(action, state) {
@@ -141,7 +137,6 @@ impl Transition {
                     }
                 })
                 .collect::<Vec<Action>>(),
-            post_action_delay_ms,
         )
     }
 
@@ -154,7 +149,6 @@ impl Transition {
             0,
             vec![],
             vec![],
-            0,
         )
     }
 
@@ -212,10 +206,9 @@ impl Transition {
                 Some(x) => x,
                 None => Predicate::TRUE,
             },
-            pre_action_delay_ms: self.pre_action_delay_ms,
+            delay_ms: self.delay_ms,
             actions: r_actions,
             runner_actions: r_runner_actions,
-            post_action_delay_ms: self.post_action_delay_ms,
         }
     }
 
@@ -246,10 +239,9 @@ impl Default for Transition {
             name: "unkown".to_string(),
             guard: Predicate::TRUE,
             runner_guard: Predicate::TRUE,
-            pre_action_delay_ms: 0,
+            delay_ms: 0,
             actions: vec![],
             runner_actions: vec![],
-            post_action_delay_ms: 0,
         }
     }
 }
@@ -338,7 +330,6 @@ mod tests {
             0,
             vec![a1.clone()],
             vec![],
-            0,
         );
         let t2 = Transition::new(
             "gains_weight",
@@ -347,7 +338,6 @@ mod tests {
             0,
             vec![a1],
             vec![],
-            0,
         );
         assert_eq!(t1, t2);
     }
@@ -382,7 +372,6 @@ mod tests {
             0,
             vec!("var:weight <- 85.0", "var:height <- 190"),
             Vec::<&str>::new(),
-            0,
             &s
         );
         let t2 = t!(
@@ -392,7 +381,6 @@ mod tests {
             0,
             vec!("var:weight <- 85.0"),
             Vec::<&str>::new(),
-            0,
             &s
         );
         assert!(t1.eval_running(&s));
@@ -410,7 +398,6 @@ mod tests {
             0,
             vec!("var:weight <- 85.0", "var:height <- 190"),
             Vec::<&str>::new(),
-            0,
             &s
         );
         assert!(t1.eval_running(&s));

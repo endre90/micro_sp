@@ -537,7 +537,7 @@ pub async fn planned_operation_runner(
                                     now_as_millis_i64().to_spvalue(),
                                 );
                                 tokio::time::sleep(Duration::from_millis(
-                                    operation.preconditions[idx].pre_action_delay_ms,
+                                    operation.preconditions[idx].delay_ms,
                                 ))
                                 .await;
                                 new_state = operation.start_running(&new_state);
@@ -576,14 +576,21 @@ pub async fn planned_operation_runner(
                                 None => (),
                             }
 
-                            if operation.can_be_completed(&state) {
-                                new_state = operation.clone().complete_running(&new_state);
-                                operation_information = format!("Completing {}.", operation.name);
-                            } else if operation.can_be_failed(&state) {
+                            if operation.can_be_failed(&state) {
                                 new_state = operation.clone().fail_running(&new_state);
                                 operation_information = format!("Failing {}.", operation.name);
                             } else {
-                                operation_information = format!("Waiting for {} to be completed.", operation.name);
+                                let (eval, idx) = operation.can_be_completed_with_transition_index(&state);
+                                tokio::time::sleep(Duration::from_millis(
+                                    operation.postconditions[idx].delay_ms,
+                                ))
+                                .await;
+                                if eval {
+                                    new_state = operation.clone().complete_running(&new_state);
+                                    operation_information = format!("Completing {}.", operation.name);
+                                } else {
+                                    operation_information = format!("Waiting for {} to be completed.", operation.name);
+                                }
                             }
                         }
                         OperationState::Completed => {

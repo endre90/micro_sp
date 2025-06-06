@@ -148,6 +148,18 @@ impl Operation {
     }
 
     /// Check the running postondition guard.
+    pub fn can_be_completed_with_transition_index(&self, state: &State) -> (bool, usize) {
+        if state.get_value(&self.name) == OperationState::Executing.to_spvalue() {
+            for (index, postcondition) in self.postconditions.iter().enumerate() {
+                if postcondition.clone().eval_running(state) {
+                    return (true, index);
+                }
+            }
+        }
+        (false, 0)
+    }
+
+    /// Check the running postondition guard.
     pub fn can_be_completed(&self, state: &State) -> bool {
         if state.get_value(&self.name) == OperationState::Executing.to_spvalue() {
             for postcondition in &self.postconditions {

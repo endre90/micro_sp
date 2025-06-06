@@ -154,7 +154,6 @@ mod tests {
                 "var:ur_tcp_id <- svt_tcp"
             ),
             Vec::<&str>::new(),
-            0,
             &state
         )),
         vec!(t!(
@@ -167,7 +166,6 @@ mod tests {
                 "var:ur_current_pose <- b"
             ),
             Vec::<&str>::new(),
-            0,
             &state
         )),
         vec!(),
@@ -191,7 +189,6 @@ mod tests {
                 "var:ur_tcp_id <- svt_tcp"
             ),
             Vec::<&str>::new(),
-            0,
             &state
         )),
         vec!(t!(
@@ -204,7 +201,6 @@ mod tests {
                 "var:ur_current_pose <- c"
             ),
             Vec::<&str>::new(),
-            0,
             &state
         )),
         vec!(),
@@ -228,7 +224,6 @@ mod tests {
                 "var:ur_tcp_id <- svt_tcp"
             ),
             Vec::<&str>::new(),
-            0,
             &state
         )),
         vec!(t!(
@@ -241,7 +236,6 @@ mod tests {
                 "var:ur_current_pose <- d"
             ),
             Vec::<&str>::new(),
-            0,
             &state
         )),
         vec!(),
