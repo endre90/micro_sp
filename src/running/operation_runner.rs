@@ -577,35 +577,35 @@ pub async fn planned_operation_runner(
                                 None => (),
                             }
 
-                            if operation.can_be_completed(&state) {
-                                new_state = operation.clone().complete_running(&new_state);
-                                operation_information = "Completing operation.".to_string();
-                            } else if operation.can_be_failed(&state) {
-                                new_state = operation.clone().fail_running(&new_state);
-                                operation_information = "Failing operation.".to_string();
-                            } else {
-                                operation_information = "Waiting to be completed.".to_string();
-                            }
-
-                            // if operation.can_be_failed(&state) {
+                            // if operation.can_be_completed(&state) {
+                            //     new_state = operation.clone().complete_running(&new_state);
+                            //     operation_information = "Completing operation.".to_string();
+                            // } else if operation.can_be_failed(&state) {
                             //     new_state = operation.clone().fail_running(&new_state);
-                            //     operation_information = format!("Failing {}.", operation.name);
+                            //     operation_information = "Failing operation.".to_string();
                             // } else {
-                            //     let (eval, idx) =
-                            //         operation.can_be_completed_with_transition_index(&state);
-                            //     tokio::time::sleep(Duration::from_millis(
-                            //         operation.postconditions[idx].delay_ms,
-                            //     ))
-                            //     .await;
-                            //     if eval {
-                            //         new_state = operation.clone().complete_running(&new_state);
-                            //         operation_information =
-                            //             format!("Completing {}.", operation.name);
-                            //     } else {
-                            //         operation_information =
-                            //             format!("Waiting for {} to be completed.", operation.name);
-                            //     }
+                            //     operation_information = "Waiting to be completed.".to_string();
                             // }
+
+                            if operation.can_be_failed(&state) {
+                                new_state = operation.clone().fail_running(&new_state);
+                                operation_information = format!("Failing {}.", operation.name);
+                            } else {
+                                let (eval, idx) =
+                                    operation.can_be_completed_with_transition_index(&state);
+                                tokio::time::sleep(Duration::from_millis(
+                                    operation.postconditions[idx].delay_ms,
+                                ))
+                                .await;
+                                if eval {
+                                    new_state = operation.clone().complete_running(&new_state);
+                                    operation_information =
+                                        format!("Completing {}.", operation.name);
+                                } else {
+                                    operation_information =
+                                        format!("Waiting for {} to be completed.", operation.name);
+                                }
+                            }
                         }
                         OperationState::Completed => {
                             new_state = operation.reinitialize_running(&state);
