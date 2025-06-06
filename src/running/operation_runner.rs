@@ -272,14 +272,6 @@ use tokio::{
 //     }
 // }
 
-
-
-
-
-
-
-
-
 // // Super simple for now only sequences, later extend with alternative, paralell, loops, etc.
 // pub async fn old_sop_runner(
 //     sp_id: &str,
@@ -328,10 +320,6 @@ use tokio::{
 //             log::info!(target: &format!("{}_sop_runner", sp_id), "SOP current state: {sop_state}.");
 //             sop_state_old = sop_state.clone()
 //         }
-
-
-
-
 
 //         // Old, lets try the new
 //         if sop_request_trigger {
@@ -558,23 +546,21 @@ pub async fn planned_operation_runner(
                                 new_state = operation.start_running(&new_state);
                                 operation_information =
                                     format!("Operation '{}' started execution", operation.name);
-                            } 
-                            else {
+                            } else {
                                 new_state = operation.block_running(&new_state);
                             }
                         }
                         OperationState::Blocked => {
-                            let (eval, idx) =
-                                operation.eval_running_with_transition_index(&new_state);
+                            let eval = operation.eval_running(&new_state);
                             if eval {
                                 new_state = operation.start_running(&new_state);
                                 operation_information =
                                     format!("Operation '{}' started execution", operation.name);
                             } else {
                                 operation_information = format!(
-                                    "Operation '{}' can't start yet, blocked by guard: {}",
-                                    operation.name, operation.preconditions[idx].runner_guard
-                                );
+                                    "Operation '{}' can't start yet, blocked by guard",
+                                    operation.name
+                                ); //, operation.preconditions[idx].runner_guard
                             }
                         }
                         OperationState::Executing => {
