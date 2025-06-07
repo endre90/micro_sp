@@ -255,6 +255,7 @@ pub async fn redis_state_manager(
                                             transform: new_transform,
                                             metadata: sp_tf_stamped.metadata,
                                         };
+                                        log::warn!(target: &&format!("redis_state_manager"), "MOVING '{name}' to {:?}", updated_sp_tf_stamped);
                                         if let Err(e) = con
                                             .set::<_, String, Value>(
                                                 &format!("{name}"),

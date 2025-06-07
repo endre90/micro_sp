@@ -236,7 +236,7 @@ impl PartialEq for Transition {
 impl Default for Transition {
     fn default() -> Self {
         Transition {
-            name: "unkown".to_string(),
+            name: "unknown".to_string(),
             guard: Predicate::TRUE,
             runner_guard: Predicate::TRUE,
             delay_ms: 0,
