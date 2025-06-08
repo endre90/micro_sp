@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc;
 
-use crate::*;
+use crate::{transforms::interface::tf_interface, *};
 use std::fmt;
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash, Serialize, Deserialize)]
@@ -53,7 +53,7 @@ impl fmt::Display for RunnerState {
 }
 
 // Run everything and provide a model
-pub async fn main_runner(sp_id: &String, model: Model, tx: mpsc::Sender<StateManagement>,) {
+pub async fn main_runner(sp_id: &String, model: Model, tx: mpsc::Sender<StateManagement>) {
     // Logs from extern crates to stdout
     // initialize_env_logger();
 
@@ -87,13 +87,21 @@ pub async fn main_runner(sp_id: &String, model: Model, tx: mpsc::Sender<StateMan
     let model_clone = model.clone();
     let tx_clone = tx.clone();
     let sp_id_clone = sp_id.clone();
-    tokio::task::spawn(async move { sop_runner(&sp_id_clone, &model_clone, tx_clone).await.unwrap() });
+    tokio::task::spawn(async move {
+        sop_runner(&sp_id_clone, &model_clone, tx_clone)
+            .await
+            .unwrap()
+    });
 
     log::info!(target:  &format!("{sp_id}_micro_sp"), "Spawning combined operation runner.");
     let model_clone = model.clone();
     let tx_clone = tx.clone();
     // let sp_id_clone = sp_id.clone();
-    tokio::task::spawn(async move { planned_operation_runner(&model_clone, tx_clone).await.unwrap() });
+    tokio::task::spawn(async move {
+        planned_operation_runner(&model_clone, tx_clone)
+            .await
+            .unwrap()
+    });
 
     log::info!(target: &format!("{sp_id}_micro_sp"), "Spawning auto transition runner");
     let model_clone = model.clone();
@@ -103,6 +111,11 @@ pub async fn main_runner(sp_id: &String, model: Model, tx: mpsc::Sender<StateMan
             .await
             .unwrap()
     });
+
+    log::info!(target: &format!("{sp_id}_micro_sp"), "Spawning TF interface");
+    let tx_clone = tx.clone();
+    let sp_id_clone = sp_id.clone();
+    tokio::task::spawn(async move { tf_interface(&sp_id_clone, tx_clone).await.unwrap() });
 
     // log::info!(target: &format!("{sp_id}_micro_sp"), "Spawning goal runner.");
     // let model_clone = model.clone();
