@@ -1,6 +1,7 @@
 use crate::*;
 use serde::{Deserialize, Serialize};
 use std::hash::{Hash, Hasher};
+use std::time::SystemTime;
 use std::{collections::HashMap, fmt};
 
 /// Represents the current state of the system.
@@ -175,6 +176,31 @@ impl State {
         }
     }
 
+    pub fn get_transform_or_unknown(&self, target: &str, name: &str) -> TransformOrUnknown {
+        match self.get_value(name) {
+            SPValue::Transform(f) => f,
+            _ => {
+                log::error!(target: target, "Couldn't get transform '{}' from the state, resulting to UNKNOWN.", name);
+                TransformOrUnknown::UNKNOWN
+            }
+        }
+    }
+
+    pub fn get_transform_or_default_to_default(&self, target: &str, name: &str) -> SPTransformStamped {
+        match self.get_transform_or_unknown(target, name) {
+            TransformOrUnknown::Transform(t) => t,
+            _ => SPTransformStamped { 
+                active_transform: false, 
+                enable_transform: false, 
+                time_stamp: SystemTime::now(), 
+                parent_frame_id: "".to_string(), 
+                child_frame_id: "".to_string(), 
+                transform: SPTransform::default(), 
+                metadata: MapOrUnknown::UNKNOWN 
+            },
+        }
+    }
+
     pub fn get_float_or_default_to_zero(&self, target: &str, name: &str) -> f64 {
         match self.get_float_or_unknown(target, name) {
             FloatOrUnknown::Float64(f) => f.into_inner(),
@@ -281,16 +307,6 @@ impl State {
             _ => {
                 log::error!(target: target, "Couldn't get time '{}' from the state, resulting to UNKNOWN.", name);
                 TimeOrUnknown::UNKNOWN
-            }
-        }
-    }
-
-    pub fn get_transform_or_unknown(&self, target: &str, name: &str) -> TransformOrUnknown {
-        match self.get_value(name) {
-            SPValue::Transform(t) => t,
-            _ => {
-                log::error!(target: target, "Couldn't get transform '{}' from the state, resulting to UNKNOWN.", name);
-                TransformOrUnknown::UNKNOWN
             }
         }
     }

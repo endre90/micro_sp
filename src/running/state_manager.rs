@@ -7,7 +7,7 @@ use std::env;
 use crate::*;
 use redis::{AsyncCommands, Client, Value};
 use tokio::sync::{mpsc, oneshot};
-use tokio::time::{interval, Duration};
+use tokio::time::{Duration, interval};
 
 /// Available commands that the async tasks can ask from the state manager.
 pub enum StateManagement {
@@ -19,6 +19,9 @@ pub enum StateManagement {
     MoveTransform(String, SPTransform),
     LoadTransformScenario(String), // overlay?
     GetAllTransforms(oneshot::Sender<HashMap<String, SPTransformStamped>>),
+
+    /// ew parent, child
+    ReparentTransform((String, String, oneshot::Sender<bool>)),
 
     /// Parent -> Child
     LookupTransform((String, String, oneshot::Sender<Option<SPTransformStamped>>)), // Try to remove the transform prefix
@@ -288,6 +291,65 @@ pub async fn redis_state_manager(
                 }
             }
 
+            StateManagement::ReparentTransform((
+                // old_parent_frame_id,
+                new_parent_frame_id,
+                child_frame_id,
+                response_sender,
+            )) => {
+                let buffer = get_all_transforms(con.clone()).await;
+                if let Some(transform) = buffer.get(&child_frame_id) {
+                    let mut temp = transform.clone();
+                    temp.parent_frame_id = new_parent_frame_id.clone();
+                    if check_would_produce_cycle(&temp, &buffer) {
+                        log::error!(
+                            "Transform '{}' would produce cycle if reparented, no action taken.",
+                            child_frame_id
+                        );
+                    } else {
+                        match lookup_transform_with_root(
+                            &new_parent_frame_id,
+                            &child_frame_id,
+                            "world",
+                            &buffer,
+                        ) {
+                            Some(lookup_tf) => {
+                                temp.transform = lookup_tf.transform;
+                                if let Err(e) = con
+                                    .set::<_, String, Value>(
+                                        &child_frame_id,
+                                        serde_json::to_string(&temp.to_spvalue()).unwrap(),
+                                    )
+                                    .await
+                                {
+                                    error_tracker = 26;
+                                    error = format!(
+                                        "Failed to reparent transform {} with error: {}.",
+                                        child_frame_id, e
+                                    );
+                                } else {
+                                    log::info!(
+                                        "Reparented transform '{}' from to '{}'.",
+                                        child_frame_id,
+                                        new_parent_frame_id
+                                    );
+                                    let _ = response_sender.send(true);
+                                }
+                            }
+                            None => {
+                                log::error!("Failed to lookup during reparenting.");
+                                let _ = response_sender.send(false);
+                            }
+                        };
+                    }
+                } else {
+                    log::error!(
+                        "Can't reparent transform '{}' because it doesn't exist.",
+                        child_frame_id
+                    );
+                }
+            }
+
             StateManagement::LoadTransformScenario(path) => {
                 match list_frames_in_dir(&path) {
                     Ok(list) => {
@@ -505,7 +567,7 @@ mod tests {
     use serial_test::serial;
     use tokio::sync::{mpsc, oneshot};
 
-    use testcontainers::{core::ContainerPort, runners::AsyncRunner, ImageExt};
+    use testcontainers::{ImageExt, core::ContainerPort, runners::AsyncRunner};
 
     use testcontainers_modules::redis::Redis;
 
@@ -1051,13 +1113,13 @@ mod tests {
             .expect("failed");
         let recv_state = response_rx.await.expect("failed");
 
-        let floor_moved = match recv_state.get_transform_or_unknown(&format!("test_case"), &format!("floor"))
-        {
-            TransformOrUnknown::Transform(t) => t,
-            TransformOrUnknown::UNKNOWN => {
-                panic!("failed")
-            }
-        };
+        let floor_moved =
+            match recv_state.get_transform_or_unknown(&format!("test_case"), &format!("floor")) {
+                TransformOrUnknown::Transform(t) => t,
+                TransformOrUnknown::UNKNOWN => {
+                    panic!("failed")
+                }
+            };
 
         let assert_t = SPTransform {
             translation: SPTranslation {
@@ -1072,7 +1134,6 @@ mod tests {
                 w: OrderedFloat(0.0),
             },
         };
-
 
         assert_eq!(assert_t, floor_moved.transform);
     }
