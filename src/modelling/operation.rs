@@ -13,7 +13,7 @@ use crate::*;
 #[derive(Debug, PartialEq, Clone, Eq, Hash, Serialize, Deserialize)]
 pub enum OperationState {
     Initial,
-    Blocked,
+    // Blocked,
     Executing,
     Completed,
     Timedout,
@@ -32,7 +32,7 @@ impl OperationState {
     pub fn from_str(x: &str) -> OperationState {
         match x {
             "initial" => OperationState::Initial,
-            "blocked" => OperationState::Blocked,
+            // "blocked" => OperationState::Blocked,
             "executing" => OperationState::Executing,
             "timedout" => OperationState::Timedout,
             "failed" => OperationState::Failed,
@@ -50,7 +50,7 @@ impl fmt::Display for OperationState {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             OperationState::Initial => write!(f, "initial"),
-            OperationState::Blocked => write!(f, "blocked"),
+            // OperationState::Blocked => write!(f, "blocked"),
             OperationState::Executing => write!(f, "executing"),
             OperationState::Timedout => write!(f, "timedout"),
             OperationState::Failed => write!(f, "failed"),
@@ -195,16 +195,17 @@ impl Operation {
         false
     }
 
-    pub fn block_running(&self, state: &State) -> State {
-        let assignment = state.get_assignment(&self.name);
-        if assignment.val == OperationState::Initial.to_spvalue() {
-            let action = Action::new(assignment.var, OperationState::Blocked.to_spvalue().wrap());
-            action.assign(&state)
-        } else {
-            log::error!(target: &&format!("micro_sp"), "Can't block an operation which is not in its initial state.");
-            state.clone()
-        }
-    }
+    // /// Start executing the operation. Check for eval_running() first.
+    // pub fn block_running(&self, state: &State) -> State {
+    //     let assignment = state.get_assignment(&self.name);
+    //     if assignment.val == OperationState::Initial.to_spvalue() {
+    //         let action = Action::new(assignment.var, OperationState::Blocked.to_spvalue().wrap());
+    //         action.assign(&state)
+    //     } else {
+    //         log::error!(target: &&format!("micro_sp"), "Can't block an operation which is not in its initial state.");
+    //         state.clone()
+    //     }
+    // }
 
     /// Start executing the operation. Check for eval_running() first.
     pub fn start_running(&self, state: &State) -> State {
