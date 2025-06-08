@@ -78,8 +78,8 @@ pub fn generate_runner_state_variables(name: &str) -> State {
     state = state.add(assign!(sop_enabled, SPValue::Bool(BoolOrUnknown::UNKNOWN)));
     state = state.add(assign!(start_time, SPValue::Int64(IntOrUnknown::UNKNOWN)));
     state = state.add(assign!(sop_current_step, SPValue::Int64(IntOrUnknown::Int64(0))));
-    state = state.add(assign!(tf_request_trigger, SPValue::Bool(BoolOrUnknown::UNKNOWN)));
-    state = state.add(assign!(tf_request_state, SPValue::String(StringOrUnknown::UNKNOWN)));
+    state = state.add(assign!(tf_request_trigger, SPValue::Bool(BoolOrUnknown::Bool(false))));
+    state = state.add(assign!(tf_request_state, SPValue::String(StringOrUnknown::String("initial".to_string()))));
     state = state.add(assign!(tf_command, SPValue::String(StringOrUnknown::UNKNOWN)));
     state = state.add(assign!(tf_parent, SPValue::String(StringOrUnknown::UNKNOWN)));
     state = state.add(assign!(tf_child, SPValue::String(StringOrUnknown::UNKNOWN)));
