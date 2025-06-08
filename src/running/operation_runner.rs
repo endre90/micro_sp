@@ -70,11 +70,14 @@ pub async fn planned_operation_runner(
 
         match PlanState::from_str(&plan_state) {
             PlanState::Initial => {
-                if planner_state == PlannerState::Found.to_string() {
-                    plan_state = PlanState::Executing.to_string();
-                    plan_current_step = 0;
-                }
-                planner_state = PlannerState::Ready.to_string();
+
+                plan_current_step = 0;
+                plan_state = PlanState::Executing.to_string();
+                // if planner_state == PlannerState::Found.to_string() {
+                //     plan_state = PlanState::Executing.to_string();
+                //     plan_current_step = 0;
+                // }
+                // planner_state = PlannerState::Ready.to_string();
             }
             PlanState::Executing => {
                 if plan.len() > plan_current_step as usize {

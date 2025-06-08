@@ -56,10 +56,10 @@ pub async fn planner_ticker(
         //     &format!("{}_planner", sp_id),
         //     &format!("{}_plan_state", sp_id),
         // );
-        let mut planner_state = state.get_string_or_default_to_unknown(
-            &format!("{}_planner", sp_id),
-            &format!("{}_planner_state", sp_id),
-        );
+        // let mut planner_state = state.get_string_or_default_to_unknown(
+        //     &format!("{}_planner", sp_id),
+        //     &format!("{}_planner_state", sp_id),
+        // );
         // let mut plan_current_step = state.get_int_or_default_to_zero(
         //     &format!("{}_planner", sp_id),
         //     &format!("{}_plan_current_step", sp_id),
@@ -98,15 +98,16 @@ pub async fn planner_ticker(
                 replanned = false;
             }
             (true, false) => {
-                plan = vec!();
-                match PlannerState::from_str(&planner_state) {
-                    PlannerState::Found => {
-                        // Waiting for the operation runner to reset state back to ready
-                    }
-                    PlannerState::NotFound => {
-                        // Waiting for the operation runner to reset state back to ready
-                    }
-                    PlannerState::Ready => {
+                // Reset all operations here?
+                // plan = vec!();
+                // match PlannerState::from_str(&planner_state) {
+                //     PlannerState::Found => {
+                //         // Waiting for the operation runner to reset state back to ready
+                //     }
+                //     PlannerState::NotFound => {
+                //         // Waiting for the operation runner to reset state back to ready
+                //     }
+                //     PlannerState::Ready => {
                         if replan_counter < MAX_REPLAN_RETRIES {
                             let goal = state.extract_goal(sp_id);
                             replan_counter = replan_counter + 1;
@@ -122,9 +123,9 @@ pub async fn planner_ticker(
                                 planner_information = format!(
                             "Planner triggered (try {replan_counter}/{MAX_REPLAN_RETRIES}): No plan was found."
                         );
-                                planner_state = PlannerState::NotFound.to_string();
+                                // planner_state = PlannerState::NotFound.to_string();
                             } else {
-                                planner_state = PlannerState::Found.to_string();
+                                // planner_state = PlannerState::Found.to_string();
                                 replan_counter = 0;
                                 if new_plan.length == 0 {
                                     planner_information = format!(
@@ -150,18 +151,18 @@ pub async fn planner_ticker(
                                 }
                             }
                         } else {
-                            planner_state = PlannerState::NotFound.to_string();
+                            // planner_state = PlannerState::NotFound.to_string();
                             planner_information = "Max allowed replan retries reached.".to_string();
                             replan_trigger = false;
                             replanned = false;
                         }
                     }
-                    PlannerState::UNKNOWN => {
-                        plan = vec!();
-                        planner_state = PlannerState::Ready.to_string();
-                    }
-                }
-            }
+                    // PlannerState::UNKNOWN => {
+                    //     // plan = vec!();
+                    //     planner_state = PlannerState::Ready.to_string();
+                    // }
+                // }
+            // }
 
             (false, _) => {
                 planner_information = "Planner is not triggered".to_string();
@@ -184,10 +185,10 @@ pub async fn planner_ticker(
                 &format!("{}_replan_counter", sp_id),
                 replan_counter.to_spvalue(),
             )
-            .update(
-                &format!("{}_planner_state", sp_id),
-                planner_state.to_spvalue(),
-            )
+            // .update(
+            //     &format!("{}_planner_state", sp_id),
+            //     planner_state.to_spvalue(),
+            // )
             .update(&format!("{}_plan", sp_id), plan.to_spvalue())
             .update(
                 &format!("{}_planner_information", sp_id),
