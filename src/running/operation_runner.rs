@@ -347,7 +347,8 @@ pub async fn planned_operation_runner(
                 &format!("{}_plan_current_step", sp_id),
                 plan_current_step.to_spvalue(),
             )
-            .update(&format!("{}_plan", sp_id), plan.to_spvalue());
+            // .update(&format!("{}_plan", sp_id), plan.to_spvalue())
+            ;
 
         let modified_state = state.get_diff_partial_state(&new_state);
         command_sender
