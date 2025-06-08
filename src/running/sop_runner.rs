@@ -170,7 +170,7 @@ pub async fn sop_runner(
                         OperationState::Executing => {
                             match operation.timeout_ms {
                                 Some(timeout) => {
-                                    // if operation_start_time > 0 {
+                                    if operation_start_time > 0 {
                                     let elapsed_ms =
                                         now_as_millis_i64().saturating_sub(operation_start_time);
                                     if elapsed_ms >= timeout {
@@ -204,7 +204,7 @@ pub async fn sop_runner(
                                                 );
                                             }
                                         }
-                                        // }
+                                        }
                                     }
                                 }
                                 None => {
