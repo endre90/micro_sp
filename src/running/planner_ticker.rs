@@ -93,7 +93,7 @@ pub async fn planner_ticker(
 
         match (replan_trigger, replanned) {
             (true, true) => {
-                plan = vec!();
+                // plan = vec!();
                 replan_trigger = false;
                 replanned = false;
             }
@@ -164,7 +164,6 @@ pub async fn planner_ticker(
             }
 
             (false, _) => {
-                
                 planner_information = "Planner is not triggered".to_string();
                 replanned = false;
             }
