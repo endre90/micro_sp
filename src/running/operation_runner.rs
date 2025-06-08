@@ -80,7 +80,7 @@ pub async fn planned_operation_runner(
         if replan_trigger && !replanned {
             plan_current_step = 0;
             plan = vec!();
-            plan_state = PlanState::Initial.to_string();
+            // plan_state = PlanState::Initial.to_string();
             new_state = reset_all_operations(&new_state);
         }
 
