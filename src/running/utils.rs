@@ -39,9 +39,12 @@ pub fn generate_runner_state_variables(name: &str) -> State {
     let sop_id = v!(&&format!("{}_sop_id", name));
     let sop_state = v!(&&format!("{}_sop_state", name));
     let start_time = iv!(&&format!("{}_start_time", name));
-    // let fb_request_trigger = bv!(&&format!("{}_fb_request_trigger", name));
-    // let fb_request_state = v!(&&format!("{}_fb_request_state", name));
-    // let fb_id = v!(&&format!("{}_fb_id", name));
+    let tf_request_trigger = bv!(&&format!("{}_tf_request_trigger", name));
+    let tf_request_state = v!(&&format!("{}_tf_request_state", name));
+    let tf_command = v!(&&format!("{}_tf_command", name));
+    let tf_parent = v!(&&format!("{}_tf_parent", name));
+    let tf_child = v!(&&format!("{}_tf_child", name));
+    let tf_lookup_result = tfv!(&&format!("{}_tf_lookup_result", name));
     
     // Initialize values
     state = state.add(assign!(runner_state, SPValue::String(StringOrUnknown::UNKNOWN)));
@@ -75,9 +78,13 @@ pub fn generate_runner_state_variables(name: &str) -> State {
     state = state.add(assign!(sop_enabled, SPValue::Bool(BoolOrUnknown::UNKNOWN)));
     state = state.add(assign!(start_time, SPValue::Int64(IntOrUnknown::UNKNOWN)));
     state = state.add(assign!(sop_current_step, SPValue::Int64(IntOrUnknown::Int64(0))));
-    // state = state.add(assign!(fb_request_state, SPValue::String(StringOrUnknown::String("initial".to_string()))));
-    // state = state.add(assign!(fb_request_trigger, SPValue::Bool(BoolOrUnknown::Bool(false))));
-    // state = state.add(assign!(fb_id, SPValue::String(StringOrUnknown::UNKNOWN)));
+    state = state.add(assign!(tf_request_trigger, SPValue::Bool(BoolOrUnknown::UNKNOWN)));
+    state = state.add(assign!(tf_request_state, SPValue::String(StringOrUnknown::UNKNOWN)));
+    state = state.add(assign!(tf_command, SPValue::String(StringOrUnknown::UNKNOWN)));
+    state = state.add(assign!(tf_parent, SPValue::String(StringOrUnknown::UNKNOWN)));
+    state = state.add(assign!(tf_child, SPValue::String(StringOrUnknown::UNKNOWN)));
+    state = state.add(assign!(tf_lookup_result, SPValue::Transform(TransformOrUnknown::UNKNOWN)));
+
 
     // Define variables to keep track of the processes
     let state_manager_online = bv!(&&format!("state_manager_online"));

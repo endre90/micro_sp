@@ -84,6 +84,7 @@ pub async fn tf_interface(
                             )))
                             .await?;
                         match response_rx.await? {
+                            // NICE WAY TO PROPAGATE SUCCESS/FAILURE
                             true => {
                                 request_state = ServiceRequestState::Succeeded.to_string();
                             }
