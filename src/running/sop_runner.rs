@@ -239,18 +239,18 @@ pub async fn sop_runner(
                         OperationState::Executing => {
                             if operation.can_be_completed(&state) {
                                 new_state = operation.clone().complete_running(&new_state);
-                                operation_information = "Completing operation.".to_string();
+                                operation_information = "Completing operation".to_string();
                             } else if operation.can_be_failed(&state) {
                                 new_state = operation.clone().fail_running(&new_state);
-                                operation_information = "Failing operation.".to_string();
+                                operation_information = "Failing operation".to_string();
                             } else {
-                                operation_information = "Waiting to be completed.".to_string();
+                                operation_information = "Waiting to be completed".to_string();
                             }
                         }
                         OperationState::Completed => {
                             new_state = operation.reinitialize_running(&new_state);
                             operation_information =
-                                format!("Operation {} completed, reinitializeing", operation.name);
+                                format!("Operation {} completed, reinitializing", operation.name);
                             new_state = new_state.update(
                                 &format!("{}_retry_counter", operation.name),
                                 0.to_spvalue(),
