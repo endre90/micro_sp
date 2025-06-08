@@ -251,6 +251,7 @@ pub async fn planned_operation_runner(
                         //         }
                         //     }
                         // }
+                        //
                         OperationState::Executing => {
                             if operation.can_be_completed(&state) {
                                 new_state = operation.clone().complete_running(&new_state);
