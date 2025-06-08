@@ -93,10 +93,12 @@ pub async fn planner_ticker(
 
         match (replan_trigger, replanned) {
             (true, true) => {
+                plan = vec!();
                 replan_trigger = false;
                 replanned = false;
             }
             (true, false) => {
+                plan = vec!();
                 match PlannerState::from_str(&planner_state) {
                     PlannerState::Found => {
                         // Waiting for the operation runner to reset state back to ready
@@ -155,12 +157,14 @@ pub async fn planner_ticker(
                         }
                     }
                     PlannerState::UNKNOWN => {
+                        plan = vec!();
                         planner_state = PlannerState::Ready.to_string();
                     }
                 }
             }
 
             (false, _) => {
+                
                 planner_information = "Planner is not triggered".to_string();
                 replanned = false;
             }
