@@ -144,18 +144,23 @@ pub async fn sop_runner(
                             }
                         }
                         OperationState::Blocked => {
-                            let (eval, idx) =
-                                operation.eval_running_with_transition_index(&new_state);
-                            if eval {
+                            if operation.eval_running(&new_state) {
                                 new_state = operation.start_running(&new_state);
                                 operation_information =
                                     format!("Operation '{}' started execution", operation.name);
-                            } else {
-                                operation_information = format!(
-                                    "Operation '{}' can't start yet, blocked by guard: {}",
-                                    operation.name, operation.preconditions[idx].runner_guard
-                                );
                             }
+                            // let (eval, idx) =
+                            //     operation.eval_running_with_transition_index(&new_state);
+                            // if eval {
+                            //     new_state = operation.start_running(&new_state);
+                            //     operation_information =
+                            //         format!("Operation '{}' started execution", operation.name);
+                            // } else {
+                            //     operation_information = format!(
+                            //         "Operation '{}' can't start yet, blocked by guard: {}",
+                            //         operation.name, operation.preconditions[idx].runner_guard
+                            //     );
+                            // }
                         }
                         OperationState::Executing => {
                             match operation.timeout_ms {

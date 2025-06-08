@@ -139,21 +139,26 @@ pub async fn planned_operation_runner(
                             }
                         }
                         OperationState::Blocked => {
-                            let (eval, idx) =
-                                operation.eval_running_with_transition_index(&new_state);
-                            if eval {
-                                log::error!(target: &format!("{}_operation_runner", sp_id), "BLOCKED, EVALS TO TRUE.");
+                            if operation.eval_running(&new_state) {
                                 new_state = operation.start_running(&new_state);
                                 operation_information =
                                     format!("Operation '{}' started execution", operation.name);
-                            } else {
-                                log::error!(target: &format!("{}_operation_runner", sp_id), "BLOCKED, EVALS TO FALSE.");
-                                log::error!(target: &format!("{}_operation_runner", sp_id), "GUARD: {}", operation.preconditions[idx].runner_guard);
-                                operation_information = format!(
-                                    "Operation '{}' can't start yet, blocked by guard: {}",
-                                    operation.name, operation.preconditions[idx].runner_guard
-                                );
                             }
+                            // let (eval, idx) =
+                            //     operation.eval_running_with_transition_index(&new_state);
+                            // if eval {
+                            //     log::error!(target: &format!("{}_operation_runner", sp_id), "BLOCKED, EVALS TO TRUE.");
+                            //     new_state = operation.start_running(&new_state);
+                            //     operation_information =
+                            //         format!("Operation '{}' started execution", operation.name);
+                            // } else {
+                            //     log::error!(target: &format!("{}_operation_runner", sp_id), "BLOCKED, EVALS TO FALSE.");
+                            //     log::error!(target: &format!("{}_operation_runner", sp_id), "GUARD: {}", operation.preconditions[idx].runner_guard);
+                            //     operation_information = format!(
+                            //         "Operation '{}' can't start yet, blocked by guard: {}",
+                            //         operation.name, operation.preconditions[idx].runner_guard
+                            //     );
+                            // }
                         }
                         OperationState::Executing => {
                             match operation.timeout_ms {
