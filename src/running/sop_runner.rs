@@ -124,26 +124,6 @@ pub async fn sop_runner(
 
                     match OperationState::from_str(&operation_state) {
                         OperationState::Initial => {
-                            let (eval, idx) =
-                                operation.eval_running_with_transition_index(&new_state);
-                            if eval {
-                                new_state = new_state.update(
-                                    &format!("{}_start_time", operation.name),
-                                    now_as_millis_i64().to_spvalue(),
-                                );
-                                tokio::time::sleep(Duration::from_millis(
-                                    operation.preconditions[idx].delay_ms,
-                                ))
-                                .await;
-                                new_state = operation.start_running(&new_state);
-                                operation_information =
-                                    format!("Operation '{}' started execution", operation.name);
-                            } 
-                            else {
-                                new_state = operation.block_running(&new_state);
-                            }
-                        }
-                        OperationState::Blocked => {
                             if operation.eval_running(&new_state) {
                                 new_state = operation.start_running(&new_state);
                                 operation_information =
@@ -152,16 +132,41 @@ pub async fn sop_runner(
                             // let (eval, idx) =
                             //     operation.eval_running_with_transition_index(&new_state);
                             // if eval {
+                            //     new_state = new_state.update(
+                            //         &format!("{}_start_time", operation.name),
+                            //         now_as_millis_i64().to_spvalue(),
+                            //     );
+                            //     tokio::time::sleep(Duration::from_millis(
+                            //         operation.preconditions[idx].delay_ms,
+                            //     ))
+                            //     .await;
                             //     new_state = operation.start_running(&new_state);
                             //     operation_information =
                             //         format!("Operation '{}' started execution", operation.name);
-                            // } else {
-                            //     operation_information = format!(
-                            //         "Operation '{}' can't start yet, blocked by guard: {}",
-                            //         operation.name, operation.preconditions[idx].runner_guard
-                            //     );
+                            // }
+                            // else {
+                            //     new_state = operation.block_running(&new_state);
                             // }
                         }
+                        // OperationState::Blocked => {
+                        //     if operation.eval_running(&new_state) {
+                        //         new_state = operation.start_running(&new_state);
+                        //         operation_information =
+                        //             format!("Operation '{}' started execution", operation.name);
+                        //     }
+                        //     // let (eval, idx) =
+                        //     //     operation.eval_running_with_transition_index(&new_state);
+                        //     // if eval {
+                        //     //     new_state = operation.start_running(&new_state);
+                        //     //     operation_information =
+                        //     //         format!("Operation '{}' started execution", operation.name);
+                        //     // } else {
+                        //     //     operation_information = format!(
+                        //     //         "Operation '{}' can't start yet, blocked by guard: {}",
+                        //     //         operation.name, operation.preconditions[idx].runner_guard
+                        //     //     );
+                        //     // }
+                        // }
                         OperationState::Executing => {
                             match operation.timeout_ms {
                                 Some(timeout) => {
