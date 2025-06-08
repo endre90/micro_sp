@@ -50,7 +50,16 @@ pub async fn planned_operation_runner(
             &format!("{}_plan", sp_id),
         );
 
-        let plan: Vec<String> = plan_of_sp_values
+        let replan_trigger = state.get_bool_or_default_to_false(
+            &format!("{}_planner", sp_id),
+            &format!("{}_replan_trigger", sp_id),
+        );
+        let replanned = state.get_bool_or_default_to_false(
+            &format!("{}_planner", sp_id),
+            &format!("{}_replanned", sp_id),
+        );
+
+        let mut plan: Vec<String> = plan_of_sp_values
             .iter()
             .filter(|val| val.is_string())
             .map(|y| y.to_string())
@@ -66,6 +75,12 @@ pub async fn planned_operation_runner(
         if plan_current_step_old != plan_current_step {
             log::info!(target: &format!("{}_operation_runner", sp_id), "Plan current step: {plan_current_step}.");
             plan_current_step_old = plan_current_step
+        }
+
+        if replan_trigger && !replanned {
+            plan_current_step = 0;
+            plan = vec!();
+            plan_state = PlanState::Initial.to_string();
         }
 
         match PlanState::from_str(&plan_state) {
