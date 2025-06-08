@@ -145,7 +145,7 @@ pub fn reset_all_operations(state: &State) -> State {
     let state = state.clone();
     let mut mut_state = state.clone();
     state.state.iter().for_each(|(k, _)| {
-        if k.starts_with("") {
+        if k.starts_with("operation_") {
             mut_state = mut_state.update(&k, "initial".to_spvalue());
         }
     });

@@ -81,6 +81,7 @@ pub async fn planned_operation_runner(
             plan_current_step = 0;
             plan = vec!();
             plan_state = PlanState::Initial.to_string();
+            new_state = reset_all_operations(&new_state);
         }
 
         match PlanState::from_str(&plan_state) {
