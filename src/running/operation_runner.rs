@@ -265,7 +265,7 @@ pub async fn planned_operation_runner(
                             }
                         }
                         OperationState::Completed => {
-                            new_state = operation.reinitialize_running(&new_state);
+                            // new_state = operation.reinitialize_running(&new_state);
                             operation_information =
                                 format!("Operation {} completed, reinitializing", operation.name);
                             new_state = new_state.update(
@@ -322,16 +322,28 @@ pub async fn planned_operation_runner(
             }
             // PlanState::Paused => {}
             PlanState::Failed => {
+                plan_current_step = 0;
+                plan = vec!();
+                // plan_state = PlanState::Initial.to_string();
+                new_state = reset_all_operations(&new_state);
                 plan_state = PlanState::Initial.to_string();
                 planner_state = PlannerState::Ready.to_string();
             }
             // PlanState::NotFound => {}
             PlanState::Completed => {
+                plan_current_step = 0;
+                plan = vec!();
+                // plan_state = PlanState::Initial.to_string();
+                new_state = reset_all_operations(&new_state);
                 plan_state = PlanState::Initial.to_string();
                 planner_state = PlannerState::Ready.to_string();
             }
             // PlanState::Cancelled => {}
             PlanState::UNKNOWN => {
+                plan_current_step = 0;
+                plan = vec!();
+                // plan_state = PlanState::Initial.to_string();
+                new_state = reset_all_operations(&new_state);
                 plan_state = PlanState::Initial.to_string();
                 planner_state = PlannerState::Ready.to_string();
             }
