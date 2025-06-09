@@ -31,7 +31,7 @@ pub async fn planner_ticker(
         command_sender
             .send(StateManagement::GetState(response_tx))
             .await?;
-        let state = response_rx.await?;
+        let mut state = response_rx.await?;
         let mut replan_trigger = state.get_bool_or_default_to_false(
             &format!("{}_planner", sp_id),
             &format!("{}_replan_trigger", sp_id),
@@ -52,18 +52,18 @@ pub async fn planner_ticker(
             &format!("{}_planner", sp_id),
             &format!("{}_replan_counter_total", sp_id),
         );
-        // let mut plan_state = state.get_string_or_default_to_unknown(
-        //     &format!("{}_planner", sp_id),
-        //     &format!("{}_plan_state", sp_id),
-        // );
-        // let mut planner_state = state.get_string_or_default_to_unknown(
-        //     &format!("{}_planner", sp_id),
-        //     &format!("{}_planner_state", sp_id),
-        // );
-        // let mut plan_current_step = state.get_int_or_default_to_zero(
-        //     &format!("{}_planner", sp_id),
-        //     &format!("{}_plan_current_step", sp_id),
-        // );
+        let mut plan_state = state.get_string_or_default_to_unknown(
+            &format!("{}_planner", sp_id),
+            &format!("{}_plan_state", sp_id),
+        );
+        let mut planner_state = state.get_string_or_default_to_unknown(
+            &format!("{}_planner", sp_id),
+            &format!("{}_planner_state", sp_id),
+        );
+        let mut plan_current_step = state.get_int_or_default_to_zero(
+            &format!("{}_planner", sp_id),
+            &format!("{}_plan_current_step", sp_id),
+        );
         let plan_of_sp_values = state.get_array_or_default_to_empty(
             &format!("{}_planner", sp_id),
             &format!("{}_plan", sp_id),
@@ -93,21 +93,22 @@ pub async fn planner_ticker(
 
         match (replan_trigger, replanned) {
             (true, true) => {
-                // plan = vec!();
                 replan_trigger = false;
                 replanned = false;
             }
             (true, false) => {
-                // Reset all operations here?
-                // plan = vec!();
-                // match PlannerState::from_str(&planner_state) {
-                //     PlannerState::Found => {
-                //         // Waiting for the operation runner to reset state back to ready
-                //     }
-                //     PlannerState::NotFound => {
-                //         // Waiting for the operation runner to reset state back to ready
-                //     }
-                //     PlannerState::Ready => {
+            plan_current_step = 0;
+            plan = vec!();
+            plan_state = PlanState::Initial.to_string();
+            state = reset_all_operations(&state);
+                match PlannerState::from_str(&planner_state) {
+                    PlannerState::Found => {
+                        // Waiting for the operation runner to reset state back to ready
+                    }
+                    PlannerState::NotFound => {
+                        // Waiting for the operation runner to reset state back to ready
+                    }
+                    PlannerState::Ready => {
                         if replan_counter < MAX_REPLAN_RETRIES {
                             let goal = state.extract_goal(sp_id);
                             replan_counter = replan_counter + 1;
@@ -157,12 +158,13 @@ pub async fn planner_ticker(
                             replanned = false;
                         }
                     }
-                    // PlannerState::UNKNOWN => {
-                    //     // plan = vec!();
-                    //     planner_state = PlannerState::Ready.to_string();
-                    // }
-                // }
-            // }
+                
+                    PlannerState::UNKNOWN => {
+                        // plan = vec!();
+                        planner_state = PlannerState::Ready.to_string();
+                    }
+                }
+            }
 
             (false, _) => {
                 planner_information = "Planner is not triggered".to_string();
@@ -185,10 +187,14 @@ pub async fn planner_ticker(
                 &format!("{}_replan_counter", sp_id),
                 replan_counter.to_spvalue(),
             )
-            // .update(
-            //     &format!("{}_planner_state", sp_id),
-            //     planner_state.to_spvalue(),
-            // )
+            .update(
+                &format!("{}_planner_state", sp_id),
+                planner_state.to_spvalue(),
+            )
+            .update(
+                &format!("{}_plan_state", sp_id),
+                plan_state.to_spvalue(),
+            )
             .update(&format!("{}_plan", sp_id), plan.to_spvalue())
             .update(
                 &format!("{}_planner_information", sp_id),
@@ -197,6 +203,10 @@ pub async fn planner_ticker(
             .update(
                 &format!("{}_replan_counter_total", sp_id),
                 replan_counter_total.to_spvalue(),
+            )
+            .update(
+                &format!("{}_plan_current_step", sp_id),
+                plan_current_step.to_spvalue(),
             );
 
         let modified_state = state.get_diff_partial_state(&new_state);

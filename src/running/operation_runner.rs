@@ -50,16 +50,16 @@ pub async fn planned_operation_runner(
             &format!("{}_plan", sp_id),
         );
 
-        let replan_trigger = state.get_bool_or_default_to_false(
-            &format!("{}_planner", sp_id),
-            &format!("{}_replan_trigger", sp_id),
-        );
-        let replanned = state.get_bool_or_default_to_false(
-            &format!("{}_planner", sp_id),
-            &format!("{}_replanned", sp_id),
-        );
+        // let replan_trigger = state.get_bool_or_default_to_false(
+        //     &format!("{}_planner", sp_id),
+        //     &format!("{}_replan_trigger", sp_id),
+        // );
+        // let replanned = state.get_bool_or_default_to_false(
+        //     &format!("{}_planner", sp_id),
+        //     &format!("{}_replanned", sp_id),
+        // );
 
-        let mut plan: Vec<String> = plan_of_sp_values
+        let plan: Vec<String> = plan_of_sp_values
             .iter()
             .filter(|val| val.is_string())
             .map(|y| y.to_string())
@@ -77,22 +77,22 @@ pub async fn planned_operation_runner(
             plan_current_step_old = plan_current_step
         }
 
-        if replan_trigger && !replanned {
-            plan_current_step = 0;
-            plan = vec!();
-            // plan_state = PlanState::Initial.to_string();
-            new_state = reset_all_operations(&new_state);
-        }
+        // if replan_trigger && !replanned {
+        //     plan_current_step = 0;
+        //     plan = vec!();
+        //     // plan_state = PlanState::Initial.to_string();
+        //     new_state = reset_all_operations(&new_state);
+        // }
 
         match PlanState::from_str(&plan_state) {
             PlanState::Initial => {
 
-                plan_current_step = 0;
-                plan_state = PlanState::Executing.to_string();
-                // if planner_state == PlannerState::Found.to_string() {
-                //     plan_state = PlanState::Executing.to_string();
-                //     plan_current_step = 0;
-                // }
+                // plan_current_step = 0;
+                // plan_state = PlanState::Executing.to_string();
+                if planner_state == PlannerState::Found.to_string() {
+                    plan_state = PlanState::Executing.to_string();
+                    plan_current_step = 0;
+                }
                 // planner_state = PlannerState::Ready.to_string();
             }
             PlanState::Executing => {
@@ -323,7 +323,7 @@ pub async fn planned_operation_runner(
             // PlanState::Paused => {}
             PlanState::Failed => {
                 plan_current_step = 0;
-                plan = vec!();
+                // plan = vec!();
                 // plan_state = PlanState::Initial.to_string();
                 new_state = reset_all_operations(&new_state);
                 plan_state = PlanState::Initial.to_string();
@@ -332,7 +332,7 @@ pub async fn planned_operation_runner(
             // PlanState::NotFound => {}
             PlanState::Completed => {
                 plan_current_step = 0;
-                plan = vec!();
+                // plan = vec!();
                 // plan_state = PlanState::Initial.to_string();
                 new_state = reset_all_operations(&new_state);
                 plan_state = PlanState::Initial.to_string();
@@ -341,7 +341,7 @@ pub async fn planned_operation_runner(
             // PlanState::Cancelled => {}
             PlanState::UNKNOWN => {
                 plan_current_step = 0;
-                plan = vec!();
+                // plan = vec!();
                 // plan_state = PlanState::Initial.to_string();
                 new_state = reset_all_operations(&new_state);
                 plan_state = PlanState::Initial.to_string();
