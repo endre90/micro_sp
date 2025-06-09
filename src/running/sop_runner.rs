@@ -70,27 +70,23 @@ pub async fn sop_runner(
                     .unwrap()
                     .to_owned();
 
-                if sop_old != sop_struct.sop {
+                let sop_names_list: Vec<String> = sop_struct.sop.iter().map(|op| op.name.clone()).collect();
+                if sop_old != sop_names_list {
                     sop_current_step = 0;
                     log::info!(
                         target: &format!("{}_sop_runner", sp_id),
                         "Got a sop:\n{}",
-                        sop_struct.sop.iter()
+                        sop_names_list.iter()
                             .enumerate()
                             .map(|(index, step)| format!("       {} -> {}", index + 1, step))
                             .collect::<Vec<String>>()
                             .join("\n")
                     );
-                    sop_old = sop_struct.sop.clone()
+                    sop_old = sop_names_list
                 }
 
                 if sop_struct.sop.len() > sop_current_step as usize {
-                    let operation = &model
-                        .operations
-                        .iter()
-                        .find(|op| op.name == sop_struct.sop[sop_current_step as usize].to_string())
-                        .unwrap()
-                        .to_owned();
+                    let operation = sop_struct.sop[sop_current_step as usize].clone();
 
                     let operation_state = state.get_string_or_default_to_unknown(
                         &format!("{}_sop_runner", sp_id),

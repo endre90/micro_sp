@@ -1,5 +1,7 @@
 use serde::{Deserialize, Serialize};
 
+use crate::Operation;
+
 // I look a SOPS as function blocks with a rigid structure, sort of as a high level operation
 // Maybe, just maybe, we can also have a "Planned" variant that should use a planner within a certain domain to get a sequence???
 // #[derive(Debug, PartialEq, Clone, Eq, Hash, Serialize, Deserialize)]
@@ -11,10 +13,16 @@ use serde::{Deserialize, Serialize};
 //     // Planned(Vec<SOP>), ?? Maybe
 // }
 
+// #[derive(Debug, PartialEq, Clone, Eq, Hash, Serialize, Deserialize)]
+// pub struct SOPStruct {
+//     pub id: String,
+//     pub sop: Vec<String>,
+// }
+
 #[derive(Debug, PartialEq, Clone, Eq, Hash, Serialize, Deserialize)]
 pub struct SOPStruct {
     pub id: String,
-    pub sop: Vec<String>,
+    pub sop: Vec<Operation>,
 }
 
 // There is a way to extract all predicates and take actions in sp-rust,
