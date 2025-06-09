@@ -107,10 +107,10 @@ pub fn generate_operation_state_variables(model: &Model, coverability_tracking: 
 
     for sop in &model.sops {
         for operation in &sop.sop {
-            let operation_state = v!(&&format!("{}_sop", operation.name)); // Initial, Executing, Failed, Completed, Unknown
-            let operation_information = v!(&&format!("{}_sop_information", operation.name));
-            let operation_start_time = iv!(&&format!("{}_sop_start_time", operation.name)); // to timeout if it takes too long
-            let operation_retry_counter = iv!(&&format!("{}_sop_retry_counter", operation.name)); // without scrapping the current plan, how many times has an operation retried
+            let operation_state = v!(&&format!("{}", operation.name)); // Initial, Executing, Failed, Completed, Unknown
+            let operation_information = v!(&&format!("{}_information", operation.name));
+            let operation_start_time = iv!(&&format!("{}_start_time", operation.name)); // to timeout if it takes too long
+            let operation_retry_counter = iv!(&&format!("{}_retry_counter", operation.name)); // without scrapping the current plan, how many times has an operation retried
             state = state.add(assign!(operation_state, "initial".to_spvalue()));
             state = state.add(assign!(operation_information, SPValue::String(StringOrUnknown::UNKNOWN)));
             state = state.add(assign!(operation_start_time, SPValue::Int64(IntOrUnknown::UNKNOWN)));
