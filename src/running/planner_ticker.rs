@@ -114,28 +114,25 @@ pub async fn planner_ticker(
                             replan_counter = replan_counter + 1;
                             replan_counter_total = replan_counter_total + 1;
                             let state_clone = state.clone();
+                            log::info!(target: &format!("{}_planner", sp_id), "Starting to plan.");
                             let new_plan = bfs_operation_planner(
                                 state_clone,
                                 goal,
                                 model.operations.clone(),
-                                30,
+                                20,
                             );
                             if !new_plan.found {
-                                planner_information = format!(
-                            "Planner triggered (try {replan_counter}/{MAX_REPLAN_RETRIES}): No plan was found."
-                        );
+                                log::info!(target: &format!("{}_planner", sp_id), "Planner triggered (try {replan_counter}/{MAX_REPLAN_RETRIES}): No plan was found.");
                                 planner_state = PlannerState::NotFound.to_string();
                             } else {
+                                log::info!(target: &format!("{}_planner", sp_id), "Planning completed.");
                                 planner_state = PlannerState::Found.to_string();
                                 replan_counter = 0;
                                 if new_plan.length == 0 {
-                                    planner_information = format!(
-                                "Planner triggered (try {replan_counter}/{MAX_REPLAN_RETRIES}): We are already in the goal, no action will be taken."
-                            );
+                                    log::info!(target: &format!("{}_planner", sp_id), "Planner triggered (try {replan_counter}/{MAX_REPLAN_RETRIES}): We are already in the goal, no action will be taken.");
                                 } else {
-                                    planner_information = format!(
-                                "Planner triggered (try {replan_counter}/{MAX_REPLAN_RETRIES}): A new plan was found."
-                            );
+                                    log::info!(target: &format!("{}_planner", sp_id), "Planning completed (try {replan_counter}/{MAX_REPLAN_RETRIES}). A new plan was found.");
+                                
                                     plan = new_plan.plan;
                                     replanned = true;
                                     plan_counter = plan_counter + 1;
