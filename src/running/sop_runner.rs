@@ -71,6 +71,7 @@ pub async fn sop_runner(
                     .to_owned();
 
                 if sop_old != sop_struct.sop {
+                    sop_current_step = 0;
                     log::info!(
                         target: &format!("{}_sop_runner", sp_id),
                         "Got a sop:\n{}",
