@@ -193,8 +193,8 @@ impl State {
                 active_transform: false, 
                 enable_transform: false, 
                 time_stamp: SystemTime::now(), 
-                parent_frame_id: "".to_string(), 
-                child_frame_id: "".to_string(), 
+                parent_frame_id: "world".to_string(), 
+                child_frame_id: "failed_lookup".to_string(), 
                 transform: SPTransform::default(), 
                 metadata: MapOrUnknown::UNKNOWN 
             },
