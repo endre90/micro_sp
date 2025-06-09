@@ -124,9 +124,9 @@ pub async fn planner_ticker(
                                 planner_information = format!(
                             "Planner triggered (try {replan_counter}/{MAX_REPLAN_RETRIES}): No plan was found."
                         );
-                                // planner_state = PlannerState::NotFound.to_string();
+                                planner_state = PlannerState::NotFound.to_string();
                             } else {
-                                // planner_state = PlannerState::Found.to_string();
+                                planner_state = PlannerState::Found.to_string();
                                 replan_counter = 0;
                                 if new_plan.length == 0 {
                                     planner_information = format!(
