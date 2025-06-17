@@ -13,16 +13,6 @@ pub async fn sop_runner(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let mut interval = interval(Duration::from_millis(100));
 
-    // Find the specific SOP definition this runner is responsible for, once at the start.
-    // This assumes your `Model` has a way to look up a SOP by its ID.
-    let root_sop = model
-        .sops
-        .iter()
-        .find(|sop| sop.id == sp_id) // This assumes your SOP struct in the model has an `id` field.
-        .ok_or_else(|| format!("SOP with id '{}' not found in model", sp_id))?
-        // .sop
-        .clone();
-
     log::info!(target: &format!("{}_sop_runner", sp_id), "Online and managing SOP.");
 
     loop {
@@ -40,6 +30,22 @@ pub async fn sop_runner(
             &format!("{}_sop_runner", sp_id),
             &format!("{}_sop_state", sp_id),
         );
+
+        let sop_id = state.get_string_or_default_to_unknown(
+            &format!("{}_sop_runner", sp_id),
+            &format!("{}_sop_id", sp_id),
+        );
+
+        // Find the specific SOP definition this runner is responsible for, once at the start.
+        // This assumes your `Model` has a way to look up a SOP by its ID.
+        let root_sop = model
+            .sops
+            .iter()
+            .find(|sop| sop.id == sop_id) // This assumes your SOP struct in the model has an `id` field.
+            .ok_or_else(|| format!("SOP with id '{}' not found in model", sp_id))?
+            // .sop
+            .clone();
+
         // let mut sop_overall_state =
         //     SOPState::from_str(&state.get_string_or_default(&sop_state_key, "Initial"));
 
