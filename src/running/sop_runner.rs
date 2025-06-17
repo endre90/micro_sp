@@ -38,13 +38,13 @@ pub async fn sop_runner(
 
         // Find the specific SOP definition this runner is responsible for, once at the start.
         // This assumes your `Model` has a way to look up a SOP by its ID.
-        let root_sop = model
-            .sops
-            .iter()
-            .find(|sop| sop.id == sop_id) // This assumes your SOP struct in the model has an `id` field.
-            .ok_or_else(|| format!("SOP with id '{}' not found in model", sp_id))?
-            // .sop
-            .clone();
+        // let root_sop = model
+        //     .sops
+        //     .iter()
+        //     .find(|sop| sop.id == sop_id) // This assumes your SOP struct in the model has an `id` field.
+        //     .ok_or_else(|| format!("SOP with id '{}' not found in model", sop_id))?
+        //     // .sop
+        //     .clone();
 
         // let mut sop_overall_state =
         //     SOPState::from_str(&state.get_string_or_default(&sop_state_key, "Initial"));
@@ -58,7 +58,12 @@ pub async fn sop_runner(
                 );
                 if sop_enabled {
                     log::info!(target: &format!("{}_sop_runner", sp_id), "SOP enabled. Transitioning to Executing.");
-
+                    let root_sop = &model
+                        .sops
+                        .iter()
+                        .find(|sop| sop.id == sop_id.to_string())
+                        .unwrap()
+                        .to_owned();
                     // Initialize the stack with the root SOP.
                     let initial_stack = vec![root_sop.sop.clone()];
                     let stack_key = format!("{}_sop_stack", sp_id);
@@ -74,6 +79,12 @@ pub async fn sop_runner(
                 }
             }
             SOPState::Executing => {
+                let root_sop = &model
+                    .sops
+                    .iter()
+                    .find(|sop| sop.id == sop_id.to_string())
+                    .unwrap()
+                    .to_owned();
                 // Fetch the current execution stack.
                 let mut stack_json = state.get_string_or_value(
                     &format!("{}_sop_runner", sp_id),
