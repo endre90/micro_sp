@@ -306,7 +306,7 @@ pub async fn planned_operation_runner(
                         }
                         OperationState::Unrecoverable => {
                             plan_state = PlanState::Failed.to_string();
-                            new_state = operation.reinitialize_running(&new_state);
+                            // new_state = operation.reinitialize_running(&new_state); // reinitialize globally when new plan is found
                             operation_information = format!("Failing the plan: {:?}", plan);
                         }
                         OperationState::UNKNOWN => (),

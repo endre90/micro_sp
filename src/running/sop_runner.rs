@@ -13,6 +13,9 @@ pub async fn sop_runner(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let mut interval = interval(Duration::from_millis(100));
 
+    let mut operation_state_old = "".to_string();
+    let mut operation_information_old = "".to_string();
+
     log::info!(target: &format!("{}_sop_runner", sp_id), "Online and managing SOP.");
 
     loop {

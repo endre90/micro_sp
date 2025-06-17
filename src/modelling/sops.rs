@@ -37,6 +37,9 @@ pub fn run_sop_tick(
 ) -> (State, String) {
     // Returns the new state and the new stack_json
 
+    let mut operation_state_old = "".to_string();
+    let mut operation_information_old = "".to_string();
+
     let mut new_state = state.clone();
 
     // 1. Deserialize the stack. Initialize if it's empty or invalid.
@@ -53,7 +56,9 @@ pub fn run_sop_tick(
 
     // 2. Pop ONE item from the stack to process in this tick.
     let current_sop = stack.pop().unwrap();
-    log::info!("Popped SOP node for processing: {:?}", current_sop);
+    // log::info!("Popped SOP node for processing: {:?}", current_sop);
+
+    
 
     // 3. Apply the execution logic for the popped node.
     match &current_sop {
@@ -72,6 +77,17 @@ pub fn run_sop_tick(
                 &format!("{}_sop_runner", sp_id),
                 &format!("{}_retry_counter", operation.name),
             );
+
+            // Log only when something changes and not every tick
+            if operation_state_old != operation_state {
+                log::info!(target: &format!("{}_operation_runner", sp_id), "Current state of operation {}: {}.", operation.name, operation_state);
+                operation_state_old = operation_state.clone()
+            }
+
+            if operation_information_old != operation_information {
+                log::info!(target: &format!("{}_operation_runner", sp_id), "{}.", operation_information);
+                operation_information_old = operation_information.clone()
+            }
 
             match OperationState::from_str(&operation_state) {
                 OperationState::Initial => {
@@ -126,7 +142,7 @@ pub fn run_sop_tick(
                     }
                 }
                 OperationState::Unrecoverable => {
-                    new_state = operation.reinitialize_running(&new_state);
+                    // new_state = operation.reinitialize_running(&new_state); // reinitialize globally when sop is done
                     operation_information = format!("Failing the sop: {:?}", root_sop);
                 }
                 OperationState::UNKNOWN => (),
