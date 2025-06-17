@@ -74,6 +74,22 @@ pub struct Operation {
     pub reset_transitions: Vec<Transition>,
 }
 
+impl Default for Operation {
+    fn default() -> Self {
+        Operation { 
+            name: "unknown".to_string(), 
+            state: OperationState::UNKNOWN, 
+            timeout_ms: None, 
+            retries: 0, 
+            preconditions: Vec::new(), 
+            postconditions: Vec::new(), 
+            fail_transitions: Vec::new(), 
+            timeout_transitions: Vec::new(), 
+            reset_transitions: Vec::new(), 
+        }
+    }
+}
+
 impl Operation {
     pub fn new(
         name: &str,

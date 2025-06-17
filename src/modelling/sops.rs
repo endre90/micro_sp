@@ -1,6 +1,7 @@
 use crate::Operation;
 use crate::*;
 use serde::{Deserialize, Serialize};
+use termtree::Tree;
 
 // I look at SOPS as function blocks with a rigid structure, sort of as a high level operation
 // Maybe, just maybe, we can also have a "Planned" variant that should use a planner within a certain domain to get a sequence???
@@ -37,14 +38,11 @@ pub fn run_sop_tick(
 ) -> (State, String) {
     // Returns the new state and the new stack_json
 
-    let mut operation_state_old = "".to_string();
-    let mut operation_information_old = "".to_string();
-
     let mut new_state = state.clone();
 
     // 1. Deserialize the stack. Initialize if it's empty or invalid.
     let mut stack: Vec<SOP> = serde_json::from_str(&stack_json).unwrap_or_else(|_| {
-        log::info!("Stack is empty or invalid, initializing with root SOP.");
+        log::info!("SOP ttack is empty or invalid, initializing with root SOP.");
         vec![root_sop.clone()]
     });
 
@@ -53,14 +51,8 @@ pub fn run_sop_tick(
         log::info!("SOP execution is complete.");
         return (new_state, serde_json::to_string(&stack).unwrap());
     }
-
-    // 2. Pop ONE item from the stack to process in this tick.
     let current_sop = stack.pop().unwrap();
-    // log::info!("Popped SOP node for processing: {:?}", current_sop);
 
-    
-
-    // 3. Apply the execution logic for the popped node.
     match &current_sop {
         SOP::Operation(operation) => {
             let operation_state = state.get_string_or_default_to_unknown(
@@ -77,18 +69,6 @@ pub fn run_sop_tick(
                 &format!("{}_sop_runner", sp_id),
                 &format!("{}_retry_counter", operation.name),
             );
-
-            // // this doesnt work here because operation gets removed from the stack as soon as it gets completed
-            // // Log only when something changes and not every tick
-            // if operation_state_old != operation_state {
-            //     log::info!(target: &format!("{}_operation_runner", sp_id), "Current state of operation {}: {}.", operation.name, operation_state);
-            //     operation_state_old = operation_state.clone()
-            // }
-
-            // if operation_information_old != operation_information {
-            //     log::info!(target: &format!("{}_operation_runner", sp_id), "{}.", operation_information);
-            //     operation_information_old = operation_information.clone()
-            // }
 
             match OperationState::from_str(&operation_state) {
                 OperationState::Initial => {
@@ -130,8 +110,12 @@ pub fn run_sop_tick(
                 OperationState::Failed => {
                     if operation_retry_counter < operation.retries {
                         operation_retry_counter = operation_retry_counter + 1;
-                        log::info!("Retrying '{}'. Retry nr. {} out of {}",
-                            operation.name, operation_retry_counter, operation.retries);
+                        log::info!(
+                            "Retrying '{}'. Retry nr. {} out of {}",
+                            operation.name,
+                            operation_retry_counter,
+                            operation.retries
+                        );
                         operation_information = format!(
                             "Retrying '{}'. Retry nr. {} out of {}",
                             operation.name, operation_retry_counter, operation.retries
@@ -184,12 +168,12 @@ pub fn run_sop_tick(
                 // THE FIX:
                 // First, push the parent Sequence back onto the stack so we can re-evaluate it
                 // after the child is processed. This prevents the stack from emptying prematurely.
-                log::info!("Re-queuing the parent Sequence to manage subsequent steps.");
+                // log::info!("Re-queuing the parent Sequence to manage subsequent steps.");
                 stack.push(current_sop.clone()); // `current_sop` is this Sequence instance
 
                 // Then, push the specific step that needs to be processed onto the stack.
                 // This will be the next thing to be executed.
-                log::info!("Pushing next sequence step for execution: {:?}", sub_sop);
+                // log::info!("Pushing next sequence step for execution: {:?}", sub_sop);
                 stack.push(sub_sop.clone());
             } else {
                 // CASE 2: The sequence IS finished.
@@ -340,6 +324,56 @@ fn can_sop_start(sp_id: &str, sop: &SOP, state: &State) -> bool {
     }
 }
 
+fn build_sop_tree(sop: &SOP) -> Tree<String> {
+    match sop {
+        // A leaf node in the tree
+        SOP::Operation(op) => {
+            let label = format!("Operation: {}", op.name);
+            Tree::new(label)
+        }
+
+        // A branch node for sequential operations
+        SOP::Sequence(sops) => {
+            let mut tree = Tree::new("Sequence".to_string());
+            for child_sop in sops {
+                tree.push(build_sop_tree(child_sop));
+            }
+            tree
+        }
+
+        // A branch node for parallel operations
+        SOP::Parallel(sops) => {
+            let mut tree = Tree::new("Parallel".to_string());
+            for child_sop in sops {
+                tree.push(build_sop_tree(child_sop));
+            }
+            tree
+        }
+
+        // A branch node for alternative operations
+        SOP::Alternative(sops) => {
+            let mut tree = Tree::new("Alternative".to_string());
+            for child_sop in sops {
+                tree.push(build_sop_tree(child_sop));
+            }
+            tree
+        }
+    }
+}
+
+/// Creates a visual representation of a SOP tree and prints it to the console.
+///
+/// This is the main entry point for visualizing a SOP.
+///
+/// # Arguments
+/// * `root_sop`: The root of the SOP structure you want to visualize.
+/// * `title`: A title to print above the tree.
+pub fn visualize_sop(root_sop: &SOP, title: &str) {
+    println!("\n--- {} ---", title);
+    let tree = build_sop_tree(root_sop);
+    println!("{}", tree);
+}
+
 // // To exec the pseudo async
 // // Inside your main async loop
 // loop {
@@ -399,3 +433,56 @@ fn can_sop_start(sp_id: &str, sop: &SOP, state: &State) -> bool {
 
 //     interval.tick().await;
 // }
+
+
+
+#[cfg(test)]
+mod tests {
+    use super::*; // Import everything from the parent module
+
+    #[test]
+    fn test_visualize_sop() {
+        // 1. Create a complex SOP structure for demonstration.
+        let example_sop = SOP::Sequence(vec![
+            SOP::Operation(Box::new(Operation {
+                name: "StartGripper".to_string(),
+                ..Default::default()
+                
+            })),
+            SOP::Parallel(vec![
+                SOP::Operation(Box::new(Operation {
+                    name: "MoveToTarget".to_string(),
+                    ..Default::default()
+                })),
+                SOP::Sequence(vec![
+                    SOP::Operation(Box::new(Operation {
+                        name: "RotateWrist".to_string(),
+                        ..Default::default()
+                    })),
+                    SOP::Operation(Box::new(Operation {
+                        name: "CheckPressure".to_string(),
+                        ..Default::default()
+                    })),
+                ]),
+            ]),
+            SOP::Alternative(vec![
+                SOP::Operation(Box::new(Operation {
+                    name: "CloseGripperHard".to_string(),
+                    ..Default::default()
+                })),
+                SOP::Operation(Box::new(Operation {
+                    name: "CloseGripperSoft".to_string(),
+                    ..Default::default()
+                })),
+            ]),
+            SOP::Operation(Box::new(Operation {
+                name: "RetractArm".to_string(),
+                ..Default::default()
+            })),
+        ]);
+
+        // 2. Call the visualization function.
+        //    When you run `cargo test -- --nocapture`, this tree will be printed.
+        visualize_sop(&example_sop, "Execution Plan Visualization");
+    }
+}
