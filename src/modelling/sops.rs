@@ -42,7 +42,7 @@ pub fn run_sop_tick(
 
     // 1. Deserialize the stack. Initialize if it's empty or invalid.
     let mut stack: Vec<SOP> = serde_json::from_str(&stack_json).unwrap_or_else(|_| {
-        log::info!("SOP ttack is empty or invalid, initializing with root SOP.");
+        log::info!("SOP stack is empty or invalid, initializing with root SOP.");
         vec![root_sop.clone()]
     });
 
@@ -328,7 +328,7 @@ fn build_sop_tree(sop: &SOP) -> Tree<String> {
     match sop {
         // A leaf node in the tree
         SOP::Operation(op) => {
-            let label = format!("       Operation: {}", op.name);
+            let label = format!("Operation: {}", op.name);
             Tree::new(label)
         }
 
@@ -370,7 +370,11 @@ fn build_sop_tree(sop: &SOP) -> Tree<String> {
 /// * `title`: A title to print above the tree.
 pub fn visualize_sop(root_sop: &SOP) {
     let tree = build_sop_tree(root_sop);
-    println!("{}", tree);
+    for line in tree.to_string().lines() {
+        // Print the indent string before printing the line from the tree
+        println!("        {}", line);
+    }
+    // println!("{}", tree);
 }
 
 // // To exec the pseudo async
