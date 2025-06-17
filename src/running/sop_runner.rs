@@ -75,7 +75,7 @@ pub async fn sop_runner(
                     // Set the overall state to Executing.
                     sop_overall_state = SOPState::Executing.to_string();
                     new_state =
-                        new_state.update(&format!("{}_sop_runner", sp_id), false.to_spvalue()); // Consume the enable trigger
+                        new_state.update(&format!("{}_sop_state", sp_id), false.to_spvalue()); // Consume the enable trigger
                 }
             }
             SOPState::Executing => {
@@ -88,7 +88,7 @@ pub async fn sop_runner(
                 // Fetch the current execution stack.
                 let mut stack_json = state.get_string_or_value(
                     &format!("{}_sop_runner", sp_id),
-                    &format!("{}_stack_json", sp_id),
+                    &format!("{}_sop_stack", sp_id),
                     "[]".to_string(),
                 );
 
