@@ -372,9 +372,60 @@ pub fn visualize_sop(root_sop: &SOP) {
     let tree = build_sop_tree(root_sop);
     for line in tree.to_string().lines() {
         // Print the indent string before printing the line from the tree
-        println!("        {}", line);
+        println!("       {}", line);
     }
     // println!("{}", tree);
+}
+
+pub fn uniquify_sop_operations(sop: SOP) -> SOP {
+    match sop {
+        // Base case: We found an Operation.
+        SOP::Operation(op) => {
+            // Generate a short, unique ID.
+            let unique_id = nanoid::nanoid!(6); 
+
+            // Create the new, unique name.
+            let new_name = format!("{}_{}", op.name, unique_id);
+            println!("Transforming '{}' -> '{}'", op.name, new_name);
+
+            // Return a new Operation SOP with the updated name.
+            SOP::Operation(Box::new(Operation { 
+                name: new_name,
+                state: op.state,
+                timeout_ms: op.timeout_ms,
+                retries: op.retries,
+                preconditions: op.preconditions,
+                postconditions: op.postconditions,
+                fail_transitions: op.fail_transitions,
+                timeout_transitions: op.timeout_transitions,
+                reset_transitions: op.reset_transitions, 
+            }))
+        }
+
+        // Recursive cases: We found a container.
+        // We process the children and then rebuild the container.
+        SOP::Sequence(sops) => {
+            let unique_children = sops
+                .into_iter() // Consumes the vector
+                .map(uniquify_sop_operations) // Recursively call on each child
+                .collect(); // Collect into a new Vec<SOP>
+            SOP::Sequence(unique_children)
+        }
+        SOP::Parallel(sops) => {
+            let unique_children = sops
+                .into_iter()
+                .map(uniquify_sop_operations)
+                .collect();
+            SOP::Parallel(unique_children)
+        }
+        SOP::Alternative(sops) => {
+            let unique_children = sops
+                .into_iter()
+                .map(uniquify_sop_operations)
+                .collect();
+            SOP::Alternative(unique_children)
+        }
+    }
 }
 
 // // To exec the pseudo async

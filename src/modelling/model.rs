@@ -1,5 +1,5 @@
-use serde::{Deserialize, Serialize};
 use crate::*;
+use serde::{Deserialize, Serialize};
 
 /// A model contains behavior that defines what a system is capable of doing.
 #[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
@@ -20,18 +20,27 @@ impl Model {
         Model {
             name: name.to_string(),
             auto_transitions,
-            sops,
-            operations: operations.iter().map(|o| Operation { 
-                name: format!("operation_{}", o.name), 
-                timeout_ms: o.timeout_ms, 
-                retries: o.retries, 
-                preconditions: o.preconditions.clone(), 
-                postconditions: o.postconditions.clone(), 
-                fail_transitions: o.fail_transitions.clone(), 
-                timeout_transitions: o.timeout_transitions.clone(), 
-                reset_transitions: o.reset_transitions.clone(),
-                state: o.state.clone()
-             }).collect()
+            sops: sops
+                .iter()
+                .map(|sop| SOPStruct {
+                    id: sop.id.clone(),
+                    sop: uniquify_sop_operations(sop.sop.clone()),
+                })
+                .collect(),
+            operations: operations
+                .iter()
+                .map(|o| Operation {
+                    name: format!("operation_{}", o.name),
+                    timeout_ms: o.timeout_ms,
+                    retries: o.retries,
+                    preconditions: o.preconditions.clone(),
+                    postconditions: o.postconditions.clone(),
+                    fail_transitions: o.fail_transitions.clone(),
+                    timeout_transitions: o.timeout_transitions.clone(),
+                    reset_transitions: o.reset_transitions.clone(),
+                    state: o.state.clone(),
+                })
+                .collect(),
         }
     }
 
