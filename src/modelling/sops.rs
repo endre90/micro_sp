@@ -56,7 +56,7 @@ pub fn run_sop_tick(
     log::info!("Popped SOP node for processing: {:?}", current_sop);
 
     // 3. Apply the execution logic for the popped node.
-    match current_sop {
+    match &current_sop {
         SOP::Operation(operation) => {
             let operation_state = state.get_string_or_default_to_unknown(
                 &format!("{}_sop_runner", sp_id),
@@ -141,20 +141,47 @@ pub fn run_sop_tick(
         }
 
         SOP::Sequence(sops) => {
-            log::info!("Finding next step in a Sequence node.");
-            let mut found_active_child = false;
-            for sub_sop in sops.iter() {
-                if !is_sop_completed(sp_id, sub_sop, &new_state) {
-                    log::info!("Pushing next sequence step: {:?}", sub_sop);
-                    stack.push(sub_sop.clone());
-                    found_active_child = true;
-                    break; // Only push the first unfinished one.
-                }
-            }
-            if !found_active_child {
-                log::info!("Sequence is complete.");
+            log::info!("Evaluating a Sequence node.");
+            
+            // Find the first sub-SOP that is not yet completed.
+            let next_sop_to_run = sops.iter().find(|sub_sop| !is_sop_completed(sp_id, sub_sop, &new_state));
+        
+            if let Some(sub_sop) = next_sop_to_run {
+                // --- THIS IS THE KEY FIX ---
+                // 1. Push the Sequence container itself back onto the stack.
+                //    This ensures that after the child is processed, the Sequence will be
+                //    re-evaluated to find the next step.
+                log::info!("Re-queuing the parent Sequence to continue later.");
+                stack.push(current_sop.clone()); // current_sop is this Sequence
+        
+                // 2. Push the specific, non-completed child onto the stack.
+                //    This will be the next item processed in the next tick.
+                log::info!("Pushing next sequence step for execution: {:?}", sub_sop);
+                stack.push(sub_sop.clone());
+        
+            } else {
+                // If no sub_sop is found, it means all children are completed.
+                // We do *not* push the Sequence back on the stack, allowing it to be consumed.
+                // If the stack becomes empty after this, the sequence is truly finished.
+                log::info!("Sequence is complete. It will not be re-queued.");
             }
         }
+
+        // SOP::Sequence(sops) => {
+        //     log::info!("Finding next step in a Sequence node.");
+        //     let mut found_active_child = false;
+        //     for sub_sop in sops.iter() {
+        //         if !is_sop_completed(sp_id, sub_sop, &new_state) {
+        //             log::info!("Pushing next sequence step: {:?}", sub_sop);
+        //             stack.push(sub_sop.clone());
+        //             found_active_child = true;
+        //             break; // Only push the first unfinished one.
+        //         }
+        //     }
+        //     if !found_active_child {
+        //         log::info!("Sequence is complete.");
+        //     }
+        // }
 
         SOP::Parallel(sops) => {
             log::info!("Dispatching all unfinished children of a Parallel node.");
