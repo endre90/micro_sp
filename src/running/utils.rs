@@ -38,6 +38,7 @@ pub fn generate_runner_state_variables(name: &str) -> State {
     let sop_current_step = iv!(&&format!("{}_sop_current_step", name));
     let sop_id = v!(&&format!("{}_sop_id", name));
     let sop_state = v!(&&format!("{}_sop_state", name));
+    let sop_stack = v!(&&format!("{}_sop_stack", name));
     let start_time = iv!(&&format!("{}_start_time", name));
     let tf_request_trigger = bv!(&&format!("{}_tf_request_trigger", name));
     let tf_request_state = v!(&&format!("{}_tf_request_state", name));
@@ -76,6 +77,7 @@ pub fn generate_runner_state_variables(name: &str) -> State {
     // state = state.add(assign!(sop_request_state, SPValue::String(StringOrUnknown::UNKNOWN)));
     state = state.add(assign!(sop_id, SPValue::String(StringOrUnknown::UNKNOWN)));
     state = state.add(assign!(sop_state, SPValue::String(StringOrUnknown::UNKNOWN)));
+    state = state.add(assign!(sop_stack, SPValue::String(StringOrUnknown::UNKNOWN)));
     state = state.add(assign!(sop_enabled, SPValue::Bool(BoolOrUnknown::UNKNOWN)));
     state = state.add(assign!(start_time, SPValue::Int64(IntOrUnknown::UNKNOWN)));
     state = state.add(assign!(sop_current_step, SPValue::Int64(IntOrUnknown::Int64(0))));
