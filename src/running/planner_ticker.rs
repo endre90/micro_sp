@@ -103,9 +103,11 @@ pub async fn planner_ticker(
             state = reset_all_operations(&state);
                 match PlannerState::from_str(&planner_state) {
                     PlannerState::Found => {
+                        // plan_state = PlanState::Initial.to_string();
                         // Waiting for the operation runner to reset state back to ready
                     }
                     PlannerState::NotFound => {
+                        // plan_state = PlanState::Initial.to_string();
                         // Waiting for the operation runner to reset state back to ready
                     }
                     PlannerState::Ready => {

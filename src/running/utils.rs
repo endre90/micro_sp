@@ -45,6 +45,7 @@ pub fn generate_runner_state_variables(name: &str) -> State {
     let tf_parent = v!(&&format!("{}_tf_parent", name));
     let tf_child = v!(&&format!("{}_tf_child", name));
     let tf_lookup_result = tfv!(&&format!("{}_tf_lookup_result", name));
+    let tf_insert_transform = tfv!(&&format!("{}_tf_insert_transform", name));
     
     // Initialize values
     state = state.add(assign!(runner_state, SPValue::String(StringOrUnknown::UNKNOWN)));
@@ -84,7 +85,7 @@ pub fn generate_runner_state_variables(name: &str) -> State {
     state = state.add(assign!(tf_parent, SPValue::String(StringOrUnknown::UNKNOWN)));
     state = state.add(assign!(tf_child, SPValue::String(StringOrUnknown::UNKNOWN)));
     state = state.add(assign!(tf_lookup_result, SPValue::Transform(TransformOrUnknown::UNKNOWN)));
-
+    state = state.add(assign!(tf_insert_transform, SPValue::Transform(TransformOrUnknown::UNKNOWN)));
 
     // Define variables to keep track of the processes
     let state_manager_online = bv!(&&format!("state_manager_online"));
@@ -105,8 +106,31 @@ pub fn generate_operation_state_variables(model: &Model, coverability_tracking: 
     let mut state = State::new();
     // operations should be put in the initial state once they are part of the plan
 
+    fn get_all_operations(sop: &SOP) -> Vec<Operation> {
+        let mut operations = Vec::new();
+        get_all_operations_recursive(sop, &mut operations);
+        operations
+    }
+
+    fn get_all_operations_recursive(sop: &SOP, operations: &mut Vec<Operation>) {
+        match sop {
+            // Base case: We found an operation. Clone it and add it to our list.
+            SOP::Operation(op) => {
+                operations.push(*op.clone());
+            }
+            // Recursive step: This is a container. Iterate through its children
+            // and call this function on each of them.
+            SOP::Sequence(sops) | SOP::Parallel(sops) | SOP::Alternative(sops) => {
+                for child_sop in sops {
+                    get_all_operations_recursive(child_sop, operations);
+                }
+            }
+        }
+    }
+
     for sop in &model.sops {
-        for operation in &sop.sop {
+        let ops_in_sop = get_all_operations(&sop.sop);
+        for operation in ops_in_sop {
             let operation_state = v!(&&format!("{}", operation.name)); // Initial, Executing, Failed, Completed, Unknown
             let operation_information = v!(&&format!("{}_information", operation.name));
             let operation_start_time = iv!(&&format!("{}_start_time", operation.name)); // to timeout if it takes too long

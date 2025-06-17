@@ -15,7 +15,8 @@ pub enum StateManagement {
     Get((String, oneshot::Sender<Option<SPValue>>)), // maybe respond here with the old value instead of option
     SetPartialState(State),
     Set((String, SPValue)),
-    InsertTransform((String, SPTransformStamped)),
+    // InsertTransform((SPTransformStamped, oneshot::Sender<bool>)),
+    InsertTransform(SPTransformStamped),
     MoveTransform(String, SPTransform),
     LoadTransformScenario(String), // overlay?
     GetAllTransforms(oneshot::Sender<HashMap<String, SPTransformStamped>>),
@@ -238,8 +239,8 @@ pub async fn redis_state_manager(
                 }
             }
 
-            StateManagement::InsertTransform((name, transform)) => {
-                (error_tracker, error) = insert_transform(name, transform, con.clone()).await;
+            StateManagement::InsertTransform(transform) => {
+                (error_tracker, error) = insert_transform(transform.child_frame_id.clone(), transform, con.clone()).await;
             }
 
             StateManagement::MoveTransform(name, new_transform) => {
@@ -854,12 +855,20 @@ mod tests {
             };
         });
 
-        tx.send(StateManagement::InsertTransform((
-            transform.child_frame_id.clone(),
-            transform,
-        )))
+        
+        // tx.send(StateManagement::Get(("z".to_string(), response_tx)))
+        //     .await
+        //     .expect("failed");
+        // let recv_z = response_rx.await.expect("failed");
+
+
+        // let (response_tx, response_rx) = oneshot::channel();
+        tx.send(StateManagement::InsertTransform(
+            transform
+        ))
         .await
         .expect("failed");
+        // let _successfull_insert  = response_rx.await.expect("failed");
 
         let (response_tx, response_rx) = oneshot::channel();
         tx.send(StateManagement::GetState(response_tx))
