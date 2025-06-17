@@ -78,21 +78,23 @@ pub fn run_sop_tick(
                 &format!("{}_retry_counter", operation.name),
             );
 
-            // Log only when something changes and not every tick
-            if operation_state_old != operation_state {
-                log::info!(target: &format!("{}_operation_runner", sp_id), "Current state of operation {}: {}.", operation.name, operation_state);
-                operation_state_old = operation_state.clone()
-            }
+            // // this doesnt work here because operation gets removed from the stack as soon as it gets completed
+            // // Log only when something changes and not every tick
+            // if operation_state_old != operation_state {
+            //     log::info!(target: &format!("{}_operation_runner", sp_id), "Current state of operation {}: {}.", operation.name, operation_state);
+            //     operation_state_old = operation_state.clone()
+            // }
 
-            if operation_information_old != operation_information {
-                log::info!(target: &format!("{}_operation_runner", sp_id), "{}.", operation_information);
-                operation_information_old = operation_information.clone()
-            }
+            // if operation_information_old != operation_information {
+            //     log::info!(target: &format!("{}_operation_runner", sp_id), "{}.", operation_information);
+            //     operation_information_old = operation_information.clone()
+            // }
 
             match OperationState::from_str(&operation_state) {
                 OperationState::Initial => {
                     if operation.eval_running(&new_state) {
                         new_state = operation.start_running(&new_state);
+                        log::info!("Operation '{}' started execution", operation.name);
                         operation_information =
                             format!("Operation '{}' started execution", operation.name);
                     }
@@ -101,17 +103,21 @@ pub fn run_sop_tick(
                     if operation.can_be_completed(&state) {
                         new_state = operation.clone().complete_running(&new_state);
                         operation_information = "Completing operation".to_string();
+                        log::info!("Completing operation '{}'", operation.name);
                     } else if operation.can_be_failed(&state) {
                         new_state = operation.clone().fail_running(&new_state);
                         operation_information = "Failing operation".to_string();
+                        log::info!("Failing operation '{}'", operation.name);
                     } else {
                         operation_information = "Waiting to be completed".to_string();
+                        log::info!("Operation '{}' waiting to be completed", operation.name);
                     }
                 }
                 OperationState::Completed => {
                     // new_state = operation.reinitialize_running(&new_state);
                     operation_information =
                         format!("Operation {} completed, reinitializing", operation.name);
+                    log::info!("Operation '{}' completed", operation.name);
                     new_state = new_state
                         .update(&format!("{}_retry_counter", operation.name), 0.to_spvalue());
                     new_state =
@@ -124,6 +130,8 @@ pub fn run_sop_tick(
                 OperationState::Failed => {
                     if operation_retry_counter < operation.retries {
                         operation_retry_counter = operation_retry_counter + 1;
+                        log::info!("Retrying '{}'. Retry nr. {} out of {}",
+                            operation.name, operation_retry_counter, operation.retries);
                         operation_information = format!(
                             "Retrying '{}'. Retry nr. {} out of {}",
                             operation.name, operation_retry_counter, operation.retries
@@ -137,6 +145,7 @@ pub fn run_sop_tick(
                         new_state = operation.unrecover_running(&new_state);
                         new_state = new_state
                             .update(&format!("{}_retry_counter", operation.name), 0.to_spvalue());
+                        log::info!("Operation failed, no more retries left. Unrecoverable");
                         operation_information =
                             format!("Operation failed, no more retries left. Unrecoverable");
                     }
@@ -144,6 +153,7 @@ pub fn run_sop_tick(
                 OperationState::Unrecoverable => {
                     // new_state = operation.reinitialize_running(&new_state); // reinitialize globally when sop is done
                     operation_information = format!("Failing the sop: {:?}", root_sop);
+                    log::info!("Failing the sop: {:?}", root_sop);
                 }
                 OperationState::UNKNOWN => (),
             }
