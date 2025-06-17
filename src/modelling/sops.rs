@@ -137,7 +137,7 @@ pub fn run_sop_tick(
                 OperationState::Unrecoverable => {
                     // new_state = operation.reinitialize_running(&new_state); // reinitialize globally when sop is done
                     operation_information = format!("Failing the sop: {:?}", root_sop);
-                    log::info!("Failing the sop: {:?}", root_sop);
+                    log::info!("Failing the sop: {:?}", visualize_sop(root_sop));
                 }
                 OperationState::UNKNOWN => (),
             }
@@ -328,7 +328,7 @@ fn build_sop_tree(sop: &SOP) -> Tree<String> {
     match sop {
         // A leaf node in the tree
         SOP::Operation(op) => {
-            let label = format!("Operation: {}", op.name);
+            let label = format!("       Operation: {}", op.name);
             Tree::new(label)
         }
 
@@ -368,8 +368,7 @@ fn build_sop_tree(sop: &SOP) -> Tree<String> {
 /// # Arguments
 /// * `root_sop`: The root of the SOP structure you want to visualize.
 /// * `title`: A title to print above the tree.
-pub fn visualize_sop(root_sop: &SOP, title: &str) {
-    println!("\n--- {} ---", title);
+pub fn visualize_sop(root_sop: &SOP) {
     let tree = build_sop_tree(root_sop);
     println!("{}", tree);
 }
@@ -483,6 +482,6 @@ mod tests {
 
         // 2. Call the visualization function.
         //    When you run `cargo test -- --nocapture`, this tree will be printed.
-        visualize_sop(&example_sop, "Execution Plan Visualization");
+        visualize_sop(&example_sop);
     }
 }

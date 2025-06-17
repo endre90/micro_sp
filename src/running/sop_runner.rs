@@ -13,6 +13,8 @@ pub async fn sop_runner(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let mut interval = interval(Duration::from_millis(100));
 
+    let mut sop_old = SOP::Operation(Box::new(Operation::default()));
+
     log::info!(target: &format!("{}_sop_runner", sp_id), "Online and managing SOP.");
 
     loop {
@@ -95,6 +97,13 @@ pub async fn sop_runner(
                 // *** THIS IS THE CORE CALL TO YOUR NEW TICK FUNCTION ***
                 let (updated_state, new_stack_json) =
                     run_sop_tick(sp_id, &state, stack_json, &root_sop.sop);
+
+                // Log only when something changes and not every tick
+                if sop_old != root_sop.sop {
+                    log::info!("Got SOP:");
+                    log::info!("{:?}", visualize_sop(&root_sop.sop));
+                    sop_old = root_sop.sop.clone()
+                }
 
                 new_state = updated_state;
 
