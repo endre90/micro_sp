@@ -152,7 +152,7 @@ pub fn run_sop_tick(
 
         // In your `match current_sop { ... }`
         SOP::Sequence(sops) => {
-            log::info!("Evaluating a Sequence node to find the next step.");
+            // log::info!("Evaluating a Sequence node to find the next step.");
 
             // Your logic of finding the first unfinished step is correct.
             // We can express it concisely with `find()`.
@@ -386,8 +386,7 @@ pub fn uniquify_sop_operations(sop: SOP) -> SOP {
 
             // Create the new, unique name.
             let new_name = format!("{}_{}", op.name, unique_id);
-            println!("Transforming '{}' -> '{}'", op.name, new_name);
-
+           
             // Return a new Operation SOP with the updated name.
             SOP::Operation(Box::new(Operation { 
                 name: new_name,
