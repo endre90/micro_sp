@@ -46,7 +46,7 @@ pub fn generate_runner_state_variables(name: &str) -> State {
     let tf_parent = v!(&&format!("{}_tf_parent", name));
     let tf_child = v!(&&format!("{}_tf_child", name));
     let tf_lookup_result = tfv!(&&format!("{}_tf_lookup_result", name));
-    let tf_insert_transform = tfv!(&&format!("{}_tf_insert_transform", name));
+    let tf_insert_transforms = av!(&&format!("{}_tf_insert_transforms", name));
     
     // Initialize values
     state = state.add(assign!(runner_state, SPValue::String(StringOrUnknown::UNKNOWN)));
@@ -87,7 +87,7 @@ pub fn generate_runner_state_variables(name: &str) -> State {
     state = state.add(assign!(tf_parent, SPValue::String(StringOrUnknown::UNKNOWN)));
     state = state.add(assign!(tf_child, SPValue::String(StringOrUnknown::UNKNOWN)));
     state = state.add(assign!(tf_lookup_result, SPValue::Transform(TransformOrUnknown::UNKNOWN)));
-    state = state.add(assign!(tf_insert_transform, SPValue::Transform(TransformOrUnknown::UNKNOWN)));
+    state = state.add(assign!(tf_insert_transforms, SPValue::Array(ArrayOrUnknown::UNKNOWN)));
 
     // Define variables to keep track of the processes
     let state_manager_online = bv!(&&format!("state_manager_online"));
