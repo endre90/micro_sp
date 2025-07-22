@@ -21,7 +21,7 @@ pub enum StateManagement {
     LoadTransformScenario(String), // overlay?
     GetAllTransforms(oneshot::Sender<HashMap<String, SPTransformStamped>>),
 
-    /// ew parent, child
+    /// parent, child, success
     ReparentTransform((String, String, oneshot::Sender<bool>)),
 
     /// Parent -> Child
@@ -239,7 +239,8 @@ pub async fn redis_state_manager(
                 }
             }
 
-            StateManagement::InsertTransform(transform) => {
+            // StateManagement::InsertTransform((transform, response_sender)) => {
+                StateManagement::InsertTransform(transform) => {
                 (error_tracker, error) = insert_transform(transform.child_frame_id.clone(), transform, con.clone()).await;
             }
 
@@ -467,6 +468,7 @@ async fn insert_transform(
     name: String,
     transform: SPTransformStamped,
     mut con: MultiplexedConnection,
+    // response_sender: std::sync::mpsc::Sender<bool>
 ) -> (i32, String) {
     let mut error_tracker = 0;
     let mut error: String = "".to_string();
@@ -487,6 +489,7 @@ async fn insert_transform(
                                             transf,
                                         )) => {
                                             buffer.insert(key, transf);
+                                            // let _ = response_sender.send(true);
                                         }
                                         _ => (),
                                     },

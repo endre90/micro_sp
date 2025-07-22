@@ -100,6 +100,28 @@ pub async fn tf_interface(
                             }
                         }
                     }
+
+                    "insert" => {
+                        // let (response_tx, response_rx) = oneshot::channel();
+                        command_sender
+                            .send(StateManagement::InsertTransform(
+                                tf_insert_transform))
+                            .await?;
+                        request_state = ServiceRequestState::Succeeded.to_string();
+                        // match response_rx.await? {
+                        //     // NICE WAY TO PROPAGATE SUCCESS/FAILURE
+                        //     true => {
+                        //         request_state = ServiceRequestState::Succeeded.to_string();
+                        //     }
+                        //     false => {
+                        //         log::error!(target: &format!("{}_tf_interface", sp_id), 
+                        //             "Failed to reparent {} to {}.", child, parent);
+                        //         request_state = ServiceRequestState::Failed.to_string();
+                        //     }
+                        // }
+                    }
+
+                    // BETTER, DO LIKE THIS IN THE FUTURE
                     // "insert" => {
                     //     let (response_tx, response_rx) = oneshot::channel();
                     //     command_sender
@@ -111,7 +133,7 @@ pub async fn tf_interface(
                     //             request_state = ServiceRequestState::Succeeded.to_string();
                     //         }
                     //         false => {
-                    //             log::error!(target: &format!("{}_tf_interface", sp_id), 
+                    //             log::error!(target: &format!("{}_tf_interface", sp_id),
                     //                 "Failed to reparent {} to {}.", child, parent);
                     //             request_state = ServiceRequestState::Failed.to_string();
                     //         }
