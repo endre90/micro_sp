@@ -4,6 +4,9 @@ use tokio::{
     time::{Duration, interval},
 };
 
+pub fn update_tf_from_state(state: &mut State, sp_id: &str) {
+    // ... your implementation code goes here ...
+}
 pub async fn tf_interface(
     sp_id: &str,
     command_sender: mpsc::Sender<StateManagement>,
@@ -52,9 +55,14 @@ pub async fn tf_interface(
                     &format!("{}_tf_lookup_result", sp_id),
                 );
 
-                let tf_insert_transform = state.get_transform_or_default_to_default(
+                // let tf_insert_transform = state.get_transform_or_default_to_default(
+                //     &format!("{}_tf_interface", sp_id),
+                //     &format!("{}_tf_insert_transform", sp_id),
+                // );
+
+                let tf_insert_transforms = state.get_array_or_default_to_empty(
                     &format!("{}_tf_interface", sp_id),
-                    &format!("{}_tf_insert_transform", sp_id),
+                    &format!("{}_tf_insert_transforms", sp_id),
                 );
 
                 match command.as_str() {
@@ -103,10 +111,19 @@ pub async fn tf_interface(
 
                     "insert" => {
                         // let (response_tx, response_rx) = oneshot::channel();
-                        command_sender
-                            .send(StateManagement::InsertTransform(
-                                tf_insert_transform))
-                            .await?;
+                        for transform in tf_insert_transforms {
+                            match transform {
+                                SPValue::Transform(tf_or_unknown) => match tf_or_unknown {
+                                    TransformOrUnknown::Transform(t) => {
+                                        command_sender
+                                            .send(StateManagement::InsertTransform(t))
+                                            .await?;
+                                    }
+                                    TransformOrUnknown::UNKNOWN => (),
+                                },
+                                _ => ()
+                            }
+                        }
                         request_state = ServiceRequestState::Succeeded.to_string();
                         // match response_rx.await? {
                         //     // NICE WAY TO PROPAGATE SUCCESS/FAILURE
@@ -114,7 +131,7 @@ pub async fn tf_interface(
                         //         request_state = ServiceRequestState::Succeeded.to_string();
                         //     }
                         //     false => {
-                        //         log::error!(target: &format!("{}_tf_interface", sp_id), 
+                        //         log::error!(target: &format!("{}_tf_interface", sp_id),
                         //             "Failed to reparent {} to {}.", child, parent);
                         //         request_state = ServiceRequestState::Failed.to_string();
                         //     }
