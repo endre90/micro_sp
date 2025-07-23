@@ -112,7 +112,7 @@ fn convert_metadata_value(metadata_val: &Value) -> MapOrUnknown {
                     log::error!(target: &&format!("redis_state_manager"), "Couldn't convert, skipping.");
                 }
             }
-            entries.sort_by(|a,b| a.0.cmp(&b.0));
+            entries.sort_by(|a, b| a.0.cmp(&b.0));
             MapOrUnknown::Map(entries)
         }
         _ => MapOrUnknown::UNKNOWN,
@@ -173,6 +173,63 @@ pub fn load_new_scenario(scenario: &Vec<String>) -> HashMap<String, SPTransformS
                 },
             );
         }
+    }
+
+    transforms_stamped
+}
+
+pub fn load_new_scenario_no_check(scenario: &Vec<String>) -> HashMap<String, SPTransformStamped> {
+    let mut transforms_stamped = HashMap::new();
+
+    for path in scenario {
+        let json = match load_json_from_file(path) {
+            Some(json) => json,
+            None => continue,
+        };
+
+        let child_frame_id = match extract_string_field(&json, "child_frame_id") {
+            Some(id) => id,
+            None => continue,
+        };
+
+        let parent_frame_id = match extract_string_field(&json, "parent_frame_id") {
+            Some(id) => id,
+            None => continue,
+        };
+
+        let transform = match extract_transform(&json) {
+            Some(transform) => transform,
+            None => continue,
+        };
+
+        let metadata = json["metadata"].clone();
+
+        let active_transform = if let Some(Value::Bool(val)) = metadata.get("active_transform") {
+            *val
+        } else {
+            println!("active_transform not found or not a bool. Defaulting to true.");
+            true
+        };
+
+        let enable_transform = if let Some(Value::Bool(val)) = metadata.get("enable_transform") {
+            *val
+        } else {
+            println!("enable_transform not found or not a bool. Defaulting to true.");
+            true
+        };
+
+        transforms_stamped.insert(
+            child_frame_id.clone(),
+            SPTransformStamped {
+                active_transform,
+                enable_transform,
+                time_stamp: SystemTime::now(),
+                child_frame_id,
+                parent_frame_id,
+                transform,
+                metadata: convert_metadata_value(&metadata),
+            },
+        );
     }
 
     transforms_stamped
