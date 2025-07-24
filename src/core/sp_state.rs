@@ -38,14 +38,15 @@ impl Hash for State {
 impl State {
     /// Create and returns a new State instance.
     pub fn new() -> State {
-        let mut state = HashMap::new();
-        state.insert("empty".to_string(), SPAssignment::new(
-            SPVariable {
-                name: "empty".to_string(),
-                value_type: SPValueType::Bool,
-            },
-            false.to_spvalue(),
-        ));
+        let state = HashMap::new();
+        // WHY WAS THIS NECESSARY? I FORGOT!
+        // state.insert("empty".to_string(), SPAssignment::new(
+        //     SPVariable {
+        //         name: "empty".to_string(),
+        //         value_type: SPValueType::Bool,
+        //     },
+        //     false.to_spvalue(),
+        // ));
         State {
             state
         }
@@ -466,7 +467,9 @@ mod tests {
     #[test]
     fn test_state_new() {
         let new_state = State::new();
-        assert_eq!(new_state.state.len(), 1) // Has the empty var
+        assert_eq!(new_state.state.len(), 0)
+        // assert_eq!(new_state.state.len(), 1) // Has the empty var WHY?
+        
     }
 
     #[test]

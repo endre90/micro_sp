@@ -1,152 +1,159 @@
 use crate::*;
-use tokio::{
-    sync::{mpsc, oneshot},
-    time::{Duration, interval},
-};
+use redis::aio::MultiplexedConnection;
+use tokio::time::{Duration, interval};
 
-// New, experimental:
-/// The main async task that drives the SOP execution tick by tick.
 pub async fn sop_runner(
     sp_id: &str,
     model: &Model,
-    command_sender: mpsc::Sender<StateManagement>,
+    mut con: MultiplexedConnection,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let mut interval = interval(Duration::from_millis(100));
+    let log_target = &format!("{}_sop_runner", sp_id);
 
-    let mut sop_old = SOP::Operation(Box::new(Operation::default()));
-
-    log::info!(target: &format!("{}_sop_runner", sp_id), "Online and managing SOP.");
+    log::info!(target: log_target, "Online and managing SOP.");
 
     loop {
-        // 1. Fetch the latest state from the state manager.
-        let (response_tx, response_rx) = oneshot::channel();
-        command_sender
-            .send(StateManagement::GetState(response_tx))
-            .await?;
-        let state = response_rx.await?;
-        let mut new_state = state.clone();
+        if let Some(state) = redis_get_state(&mut con).await {
+            let old_stack_json = state.get_string_or_value(
+                &format!("{}_sop_runner", sp_id),
+                &format!("{}_sop_stack", sp_id),
+                "[]".to_string(),
+            );
 
-        // 2. Determine the overall state of the SOP (Executing, Completed, etc.).
-        // let sop_state_key = format!("{}_sop_state", sp_id);
-        let mut sop_overall_state = state.get_string_or_default_to_unknown(
-            &format!("{}_sop_runner", sp_id),
-            &format!("{}_sop_state", sp_id),
-        );
+            let new_state = process_sop_tick(sp_id, model, &state)?;
 
+            let new_stack_json = new_state.get_string_or_value(
+                &format!("{}_sop_runner", sp_id),
+                &format!("{}_sop_stack", sp_id),
+                "[]".to_string(),
+            );
+            if old_stack_json != new_stack_json
+                && !new_stack_json.is_empty()
+                && new_stack_json != "[]"
+            {
+                let sop_id = new_state.get_string_or_default_to_unknown(
+                    &format!("{}_sop_runner", sp_id),
+                    &format!("{}_sop_id", sp_id),
+                );
+                if let Some(root_sop) = model.sops.iter().find(|s| s.id == sop_id) {
+                    log::info!(target: log_target, "SOP execution state changed. Current structure:");
+                    log::info!(target: log_target, "{:?}", visualize_sop(&root_sop.sop));
+                }
+            }
+
+            let modified_state = state.get_diff_partial_state(&new_state);
+            if !modified_state.state.is_empty() {
+                redis_set_state(&mut con, modified_state).await;
+            }
+        }
+
+        interval.tick().await;
+    }
+}
+
+fn process_sop_tick(
+    sp_id: &str,
+    model: &Model,
+    state: &State,
+) -> Result<State, Box<dyn std::error::Error>> {
+    let mut new_state = state.clone();
+    let mut sop_overall_state = state.get_string_or_default_to_unknown(
+        &format!("{}_sop_runner", sp_id),
+        &format!("{}_sop_state", sp_id),
+    );
+
+    match SOPState::from_str(&sop_overall_state) {
+        SOPState::Initial => {
+            handle_sop_initial(sp_id, model, state, &mut new_state, &mut sop_overall_state)?;
+        }
+        SOPState::Executing => {
+            handle_sop_executing(sp_id, model, state, &mut new_state, &mut sop_overall_state);
+        }
+        SOPState::Completed | SOPState::Failed => {}
+        SOPState::UNKNOWN => {
+            log::warn!(target: &format!("{}_sop_runner", sp_id), "SOP in UNKNOWN state. Resetting.");
+            sop_overall_state = SOPState::Initial.to_string();
+        }
+    }
+
+    new_state = new_state.update(
+        &format!("{}_sop_state", sp_id),
+        sop_overall_state.to_spvalue(),
+    );
+    Ok(new_state)
+}
+
+fn handle_sop_initial(
+    sp_id: &str,
+    model: &Model,
+    state: &State,
+    new_state: &mut State,
+    sop_overall_state: &mut String,
+) -> Result<(), Box<dyn std::error::Error>> {
+    if state.get_bool_or_default_to_false(
+        &format!("{}_sop_runner", sp_id),
+        &format!("{}_sop_enabled", sp_id),
+    ) {
+        log::info!(target: &format!("{}_sop_runner", sp_id), "SOP enabled. Transitioning to Executing.");
         let sop_id = state.get_string_or_default_to_unknown(
             &format!("{}_sop_runner", sp_id),
             &format!("{}_sop_id", sp_id),
         );
 
-        // Find the specific SOP definition this runner is responsible for, once at the start.
-        // This assumes your `Model` has a way to look up a SOP by its ID.
-        // let root_sop = model
-        //     .sops
-        //     .iter()
-        //     .find(|sop| sop.id == sop_id) // This assumes your SOP struct in the model has an `id` field.
-        //     .ok_or_else(|| format!("SOP with id '{}' not found in model", sop_id))?
-        //     // .sop
-        //     .clone();
+        let root_sop = model
+            .sops
+            .iter()
+            .find(|sop| sop.id == sop_id)
+            .ok_or_else(|| format!("SOP with id '{}' not found in model", sop_id))?;
 
-        // let mut sop_overall_state =
-        //     SOPState::from_str(&state.get_string_or_default(&sop_state_key, "Initial"));
-
-        // 3. Act based on the overall SOP state.
-        match SOPState::from_str(&sop_overall_state) {
-            SOPState::Initial => {
-                let mut sop_enabled = state.get_bool_or_default_to_false(
-                    &format!("{}_sop_runner", sp_id),
-                    &format!("{}_sop_enabled", sp_id),
-                );
-                if sop_enabled {
-                    log::info!(target: &format!("{}_sop_runner", sp_id), "SOP enabled. Transitioning to Executing.");
-                    let root_sop = &model
-                        .sops
-                        .iter()
-                        .find(|sop| sop.id == sop_id.to_string())
-                        .unwrap()
-                        .to_owned();
-                    // Initialize the stack with the root SOP.
-                    let initial_stack = vec![root_sop.sop.clone()];
-                    let stack_key = format!("{}_sop_stack", sp_id);
-                    new_state = new_state.update(
-                        &stack_key,
-                        serde_json::to_string(&initial_stack)?.to_spvalue(),
-                    );
-
-                    // Set the overall state to Executing.
-                    sop_overall_state = SOPState::Executing.to_string();
-                    new_state =
-                        new_state.update(&format!("{}_sop_state", sp_id), false.to_spvalue()); // Consume the enable trigger
-                }
-            }
-            SOPState::Executing => {
-                let root_sop = &model
-                    .sops
-                    .iter()
-                    .find(|sop| sop.id == sop_id.to_string())
-                    .unwrap()
-                    .to_owned();
-                // Fetch the current execution stack.
-                let mut stack_json = state.get_string_or_value(
-                    &format!("{}_sop_runner", sp_id),
-                    &format!("{}_sop_stack", sp_id),
-                    "[]".to_string(),
-                );
-
-                // *** THIS IS THE CORE CALL TO YOUR NEW TICK FUNCTION ***
-                let (updated_state, new_stack_json) =
-                    run_sop_tick(sp_id, &state, stack_json, &root_sop.sop);
-
-                // Log only when something changes and not every tick
-                if sop_old != root_sop.sop {
-                    log::info!("Got SOP:");
-                    log::info!("{:?}", visualize_sop(&root_sop.sop));
-                    sop_old = root_sop.sop.clone()
-                }
-
-                new_state = updated_state;
-
-                // Persist the new stack state for the next tick.
-                new_state =
-                    new_state.update(&format!("{}_sop_stack", sp_id), new_stack_json.to_spvalue());
-
-                // Check for terminal conditions.
-                if new_stack_json == "[]" {
-                    log::info!(target: &format!("{}_sop_runner", sp_id), "Execution stack is empty. SOP is Completed.");
-                    sop_overall_state = SOPState::Completed.to_string();
-                } else if is_sop_failed(sp_id, &root_sop.sop, &new_state) {
-                    log::error!(target: &format!("{}_sop_runner", sp_id), "Unrecoverable error detected in an operation. SOP has Failed.");
-                    sop_overall_state = SOPState::Failed.to_string();
-                }
-            }
-            // For terminal states, the runner will idle until the state is reset externally.
-            SOPState::Completed => { /* SOP is done. Do nothing. */ }
-            SOPState::Failed => { /* SOP has failed. Do nothing. */ }
-            SOPState::UNKNOWN => {
-                log::warn!(target: &format!("{}_sop_runner", sp_id), "SOP is in an UNKNOWN state. Resetting to Initial.");
-                sop_overall_state = SOPState::Initial.to_string();
-            }
-        }
-
-        // 4. Update the overall SOP state variable.
-        new_state = new_state.update(
-            &format!("{}_sop_state", sp_id),
-            sop_overall_state.to_string().to_spvalue(),
+        let initial_stack = vec![root_sop.sop.clone()];
+        *new_state = new_state.update(
+            &format!("{}_sop_stack", sp_id),
+            serde_json::to_string(&initial_stack)?.to_spvalue(),
         );
+        *new_state = new_state.update(&format!("{}_sop_enabled", sp_id), false.to_spvalue());
+        *sop_overall_state = SOPState::Executing.to_string();
+    }
+    Ok(())
+}
 
-        // 5. Commit all changes made during this tick to the central state manager.
-        let modified_state = state.get_diff_partial_state(&new_state);
-        command_sender
-            .send(StateManagement::SetPartialState(modified_state))
-            .await?;
+/// Handles the `Executing` state logic.
+fn handle_sop_executing(
+    sp_id: &str,
+    model: &Model,
+    state: &State,
+    new_state: &mut State,
+    sop_overall_state: &mut String,
+) {
+    let sop_id = state.get_string_or_default_to_unknown(
+        &format!("{}_sop_runner", sp_id),
+        &format!("{}_sop_id", sp_id),
+    );
+    let stack_json = state.get_string_or_value(sp_id, "sop_stack", "[]".to_string());
 
-        // 6. Wait for the next tick.
-        interval.tick().await;
+    let Some(root_sop) = model.sops.iter().find(|s| s.id == sop_id) else {
+        log::error!(target: &format!("{}_sop_runner", sp_id), "SOP with id '{}' not found in model. Failing.", sop_id);
+        *sop_overall_state = SOPState::Failed.to_string();
+        return;
+    };
+
+    // *** THIS IS THE CORE CALL TO YOUR RECURSIVE TICK FUNCTION ***
+    let (updated_state, new_stack_json) = run_sop_tick(sp_id, state, stack_json, &root_sop.sop);
+    *new_state = updated_state;
+
+    // Persist the new stack state for the next tick.
+    *new_state = new_state.update(&format!("{}_sop_stack", sp_id), new_stack_json.to_spvalue());
+
+    // Check for terminal conditions.
+    if new_stack_json == "[]" {
+        log::info!(target: &format!("{}_sop_runner", sp_id), "Execution stack empty. SOP Completed.");
+        *sop_overall_state = SOPState::Completed.to_string();
+    } else if is_sop_failed(sp_id, &root_sop.sop, new_state) {
+        log::error!(target: &format!("{}_sop_runner", sp_id), "Unrecoverable error detected. SOP Failed.");
+        *sop_overall_state = SOPState::Failed.to_string();
     }
 }
 
-/// Helper function to detect if any operation within the SOP has become unrecoverable.
 fn is_sop_failed(sp_id: &str, sop: &SOP, state: &State) -> bool {
     match sop {
         SOP::Operation(operation) => {
@@ -156,15 +163,173 @@ fn is_sop_failed(sp_id: &str, sop: &SOP, state: &State) -> bool {
             );
             OperationState::from_str(&op_state_str) == OperationState::Unrecoverable
         }
-        SOP::Sequence(sops) | SOP::Parallel(sops) | SOP::Alternative(sops) => {
-            // If any child in any branch has failed, the entire SOP is considered failed.
-            sops.iter()
-                .any(|child_sop| is_sop_failed(sp_id, child_sop, state))
-        }
+        SOP::Sequence(sops) | SOP::Parallel(sops) | SOP::Alternative(sops) => sops
+            .iter()
+            .any(|child_sop| is_sop_failed(sp_id, child_sop, state)),
     }
 }
 
-// Old, working
+// New, experimental (Now actually old working):
+// The main async task that drives the SOP execution tick by tick.
+// pub async fn sop_runner(
+//     sp_id: &str,
+//     model: &Model,
+//     command_sender: mpsc::Sender<StateManagement>,
+// ) -> Result<(), Box<dyn std::error::Error>> {
+//     let mut interval = interval(Duration::from_millis(100));
+
+//     let mut sop_old = SOP::Operation(Box::new(Operation::default()));
+
+//     log::info!(target: &format!("{}_sop_runner", sp_id), "Online and managing SOP.");
+
+//     loop {
+//         // 1. Fetch the latest state from the state manager.
+//         let (response_tx, response_rx) = oneshot::channel();
+//         command_sender
+//             .send(StateManagement::GetState(response_tx))
+//             .await?;
+//         let state = response_rx.await?;
+//         let mut new_state = state.clone();
+
+//         // 2. Determine the overall state of the SOP (Executing, Completed, etc.).
+//         // let sop_state_key = format!("{}_sop_state", sp_id);
+//         let mut sop_overall_state = state.get_string_or_default_to_unknown(
+//             &format!("{}_sop_runner", sp_id),
+//             &format!("{}_sop_state", sp_id),
+//         );
+
+//         let sop_id = state.get_string_or_default_to_unknown(
+//             &format!("{}_sop_runner", sp_id),
+//             &format!("{}_sop_id", sp_id),
+//         );
+
+//         // Find the specific SOP definition this runner is responsible for, once at the start.
+//         // This assumes your `Model` has a way to look up a SOP by its ID.
+//         // let root_sop = model
+//         //     .sops
+//         //     .iter()
+//         //     .find(|sop| sop.id == sop_id) // This assumes your SOP struct in the model has an `id` field.
+//         //     .ok_or_else(|| format!("SOP with id '{}' not found in model", sop_id))?
+//         //     // .sop
+//         //     .clone();
+
+//         // let mut sop_overall_state =
+//         //     SOPState::from_str(&state.get_string_or_default(&sop_state_key, "Initial"));
+
+//         // 3. Act based on the overall SOP state.
+//         match SOPState::from_str(&sop_overall_state) {
+//             SOPState::Initial => {
+//                 let mut sop_enabled = state.get_bool_or_default_to_false(
+//                     &format!("{}_sop_runner", sp_id),
+//                     &format!("{}_sop_enabled", sp_id),
+//                 );
+//                 if sop_enabled {
+//                     log::info!(target: &format!("{}_sop_runner", sp_id), "SOP enabled. Transitioning to Executing.");
+//                     let root_sop = &model
+//                         .sops
+//                         .iter()
+//                         .find(|sop| sop.id == sop_id.to_string())
+//                         .unwrap()
+//                         .to_owned();
+//                     // Initialize the stack with the root SOP.
+//                     let initial_stack = vec![root_sop.sop.clone()];
+//                     let stack_key = format!("{}_sop_stack", sp_id);
+//                     new_state = new_state.update(
+//                         &stack_key,
+//                         serde_json::to_string(&initial_stack)?.to_spvalue(),
+//                     );
+
+//                     // Set the overall state to Executing.
+//                     sop_overall_state = SOPState::Executing.to_string();
+//                     new_state =
+//                         new_state.update(&format!("{}_sop_state", sp_id), false.to_spvalue()); // Consume the enable trigger
+//                 }
+//             }
+//             SOPState::Executing => {
+//                 let root_sop = &model
+//                     .sops
+//                     .iter()
+//                     .find(|sop| sop.id == sop_id.to_string())
+//                     .unwrap()
+//                     .to_owned();
+//                 // Fetch the current execution stack.
+//                 let mut stack_json = state.get_string_or_value(
+//                     &format!("{}_sop_runner", sp_id),
+//                     &format!("{}_sop_stack", sp_id),
+//                     "[]".to_string(),
+//                 );
+
+//                 // *** THIS IS THE CORE CALL TO YOUR NEW TICK FUNCTION ***
+//                 let (updated_state, new_stack_json) =
+//                     run_sop_tick(sp_id, &state, stack_json, &root_sop.sop);
+
+//                 // Log only when something changes and not every tick
+//                 if sop_old != root_sop.sop {
+//                     log::info!("Got SOP:");
+//                     log::info!("{:?}", visualize_sop(&root_sop.sop));
+//                     sop_old = root_sop.sop.clone()
+//                 }
+
+//                 new_state = updated_state;
+
+//                 // Persist the new stack state for the next tick.
+//                 new_state =
+//                     new_state.update(&format!("{}_sop_stack", sp_id), new_stack_json.to_spvalue());
+
+//                 // Check for terminal conditions.
+//                 if new_stack_json == "[]" {
+//                     log::info!(target: &format!("{}_sop_runner", sp_id), "Execution stack is empty. SOP is Completed.");
+//                     sop_overall_state = SOPState::Completed.to_string();
+//                 } else if is_sop_failed(sp_id, &root_sop.sop, &new_state) {
+//                     log::error!(target: &format!("{}_sop_runner", sp_id), "Unrecoverable error detected in an operation. SOP has Failed.");
+//                     sop_overall_state = SOPState::Failed.to_string();
+//                 }
+//             }
+//             // For terminal states, the runner will idle until the state is reset externally.
+//             SOPState::Completed => { /* SOP is done. Do nothing. */ }
+//             SOPState::Failed => { /* SOP has failed. Do nothing. */ }
+//             SOPState::UNKNOWN => {
+//                 log::warn!(target: &format!("{}_sop_runner", sp_id), "SOP is in an UNKNOWN state. Resetting to Initial.");
+//                 sop_overall_state = SOPState::Initial.to_string();
+//             }
+//         }
+
+//         // 4. Update the overall SOP state variable.
+//         new_state = new_state.update(
+//             &format!("{}_sop_state", sp_id),
+//             sop_overall_state.to_string().to_spvalue(),
+//         );
+
+//         // 5. Commit all changes made during this tick to the central state manager.
+//         let modified_state = state.get_diff_partial_state(&new_state);
+//         command_sender
+//             .send(StateManagement::SetPartialState(modified_state))
+//             .await?;
+
+//         // 6. Wait for the next tick.
+//         interval.tick().await;
+//     }
+// }
+
+// Helper function to detect if any operation within the SOP has become unrecoverable.
+// fn is_sop_failed(sp_id: &str, sop: &SOP, state: &State) -> bool {
+//     match sop {
+//         SOP::Operation(operation) => {
+//             let op_state_str = state.get_string_or_default_to_unknown(
+//                 &format!("{}_sop_runner", sp_id),
+//                 &operation.name,
+//             );
+//             OperationState::from_str(&op_state_str) == OperationState::Unrecoverable
+//         }
+//         SOP::Sequence(sops) | SOP::Parallel(sops) | SOP::Alternative(sops) => {
+//             // If any child in any branch has failed, the entire SOP is considered failed.
+//             sops.iter()
+//                 .any(|child_sop| is_sop_failed(sp_id, child_sop, state))
+//         }
+//     }
+// }
+
+// Super old, working
 // pub async fn sop_runner(
 //     sp_id: &str,
 //     model: &Model,

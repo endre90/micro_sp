@@ -1,73 +1,134 @@
-use crate::*;
-use tokio::{
-    sync::{mpsc, oneshot},
-    time::{interval, Duration},
-};
+use crate::{Model, redis_get_state, redis_set_state};
+use redis::aio::MultiplexedConnection;
+use std::time::Duration;
+use tokio::time::interval;
 
-/// Automatic transitions should be taken as soon as their guard becomes true.
 pub async fn auto_transition_runner(
     name: &str,
     model: &Model,
-    command_sender: mpsc::Sender<StateManagement>,
+    mut con: MultiplexedConnection,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let mut interval = interval(Duration::from_millis(100));
     let model = model.clone();
+    let log_target = format!("{}_auto_runner", name);
 
-    log::info!(target: &&format!("{}_auto_runner", name), "Online.");
+    log::info!(target: &log_target, "Online.");
 
     loop {
-        let (response_tx, response_rx) = oneshot::channel();
-        command_sender.send(StateManagement::GetState(response_tx)).await?;
-        let state = response_rx.await?;
+        if let Some(state) = redis_get_state(&mut con).await {
+            for t in &model.auto_transitions {
+                if !t.to_owned().eval_running(&state) {
+                    continue;
+                }
 
-        for t in &model.auto_transitions {
-            if t.clone().eval_running(&state) {
-                let new_state = t.clone().take_running(&state);
-                log::info!(target: &&format!("{}_auto_runner", name), "Executed auto transition: '{}'.", t.name);
+                let new_state = t.to_owned().take_running(&state);
+                log::info!(
+                    target: &log_target,
+                    "Executed auto transition: '{}'.", t.name
+                );
 
                 let modified_state = state.get_diff_partial_state(&new_state);
-                command_sender
-                    .send(StateManagement::SetPartialState(modified_state))
-                    .await?;
+                redis_set_state(&mut con, modified_state).await;
             }
         }
         interval.tick().await;
     }
 }
 
+// Automatic transitions should be taken as soon as their guard becomes true.
+// OLD
+// pub async fn auto_transition_runner(
+//     name: &str,
+//     model: &Model,
+//     command_sender: mpsc::Sender<StateManagement>,
+// ) -> Result<(), Box<dyn std::error::Error>> {
+//     let mut interval = interval(Duration::from_millis(100));
+//     let model = model.clone();
 
-/// Run operations automatically without a planner. 
-/// Taken as soon as the guard becomes true.
-pub async fn auto_operation_runner(
-    name: &str,
-    model: &Model,
-    command_sender: mpsc::Sender<StateManagement>,
-) -> Result<(), Box<dyn std::error::Error>> {
-    let mut interval = interval(Duration::from_millis(100));
-    let model = model.clone();
-    loop {
-        let (response_tx, response_rx) = oneshot::channel();
-        command_sender.send(StateManagement::GetState(response_tx)).await?;
-        let state = response_rx.await?;
+//     log::info!(target: &&format!("{}_auto_runner", name), "Online.");
 
-        for o in &model.operations {
-            if o.eval_running(&state) {
-                let new_state = o.start_running(&state);
-                log::info!(target: &&format!("{}_auto_runner", name), "Started auto operation: '{}'.", o.name);
+//     loop {
+//         let (response_tx, response_rx) = oneshot::channel();
+//         command_sender.send(StateManagement::GetState(response_tx)).await?;
+//         let state = response_rx.await?;
 
-                let modified_state = state.get_diff_partial_state(&new_state);
-                command_sender
-                    .send(StateManagement::SetPartialState(modified_state))
-                    .await?;
-            } else if o.can_be_completed(&state) {
-                let new_state = o.complete_running(&state);
-                log::info!(target: &&format!("{}_auto_runner", name), "Completed auto operation: '{}'.", o.name);
-                let modified_state = state.get_diff_partial_state(&new_state);
-                command_sender
-                    .send(StateManagement::SetPartialState(modified_state))
-                    .await?;
-            }
-        }
-        interval.tick().await;
-    }
-}
+//         for t in &model.auto_transitions {
+//             if t.clone().eval_running(&state) {
+//                 let new_state = t.clone().take_running(&state);
+//                 log::info!(target: &&format!("{}_auto_runner", name), "Executed auto transition: '{}'.", t.name);
+
+//                 let modified_state = state.get_diff_partial_state(&new_state);
+//                 command_sender
+//                     .send(StateManagement::SetPartialState(modified_state))
+//                     .await?;
+//             }
+//         }
+//         interval.tick().await;
+//     }
+// }
+
+// NEW
+// pub async fn auto_transition_runner(
+//     name: &str,
+//     model: &Model,
+//     con: &mut MultiplexedConnection
+// ) -> Result<(), Box<dyn std::error::Error>> {
+//     let mut interval = interval(Duration::from_millis(100));
+//     let model = model.clone();
+
+//     log::info!(target: &&format!("{}_auto_runner", name), "Online.");
+
+//     loop {
+//         match redis_get_state(con).await {
+//             Some(state) => {for t in &model.auto_transitions {
+//                 if t.clone().eval_running(&state) {
+//                     let new_state = t.clone().take_running(&state);
+//                     log::info!(target: &&format!("{}_auto_runner", name), "Executed auto transition: '{}'.", t.name);
+
+//                     let modified_state = state.get_diff_partial_state(&new_state);
+//                     redis_set_state(con, modified_state).await
+//                 }
+//             }}
+//             None => ()
+//         }
+//         interval.tick().await;
+//     }
+// }
+
+// Run operations automatically without a planner.
+// Taken as soon as the guard becomes true.
+// pub async fn auto_operation_runner(
+//     name: &str,
+//     model: &Model,
+//     command_sender: mpsc::Sender<StateManagement>,
+// ) -> Result<(), Box<dyn std::error::Error>> {
+//     let mut interval = interval(Duration::from_millis(100));
+//     let model = model.clone();
+//     loop {
+//         let (response_tx, response_rx) = oneshot::channel();
+//         command_sender
+//             .send(StateManagement::GetState(response_tx))
+//             .await?;
+//         let state = response_rx.await?;
+
+//         for o in &model.operations {
+//             if o.eval_running(&state) {
+//                 let new_state = o.start_running(&state);
+//                 log::info!(target: &&format!("{}_auto_runner", name), "Started auto operation: '{}'.", o.name);
+
+//                 let modified_state = state.get_diff_partial_state(&new_state);
+//                 command_sender
+//                     .send(StateManagement::SetPartialState(modified_state))
+//                     .await?;
+//             } else if o.can_be_completed(&state) {
+//                 let new_state = o.complete_running(&state);
+//                 log::info!(target: &&format!("{}_auto_runner", name), "Completed auto operation: '{}'.", o.name);
+//                 let modified_state = state.get_diff_partial_state(&new_state);
+//                 command_sender
+//                     .send(StateManagement::SetPartialState(modified_state))
+//                     .await?;
+//             }
+//         }
+//         interval.tick().await;
+//     }
+// }
