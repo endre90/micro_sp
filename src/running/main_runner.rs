@@ -54,7 +54,7 @@ impl fmt::Display for RunnerState {
 }
 
 // Run everything and provide a model
-pub async fn main_runner(sp_id: &String, model: Model, con: &mut MultiplexedConnection) {
+pub async fn main_runner(sp_id: &String, model: Model, con: MultiplexedConnection,) {
     // Logs from extern crates to stdout
     // initialize_env_logger();
 
