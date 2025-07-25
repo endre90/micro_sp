@@ -1,11 +1,12 @@
+use std::sync::Arc;
 use crate::*;
-use redis::aio::MultiplexedConnection;
+use redis::AsyncCommands;
 use tokio::time::{Duration, interval};
 
 pub async fn planner_ticker(
     sp_id: &str,
     model: &Model,
-    mut con: MultiplexedConnection,
+    connection_manager: &Arc<ConnectionManager>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let mut interval = interval(Duration::from_millis(500));
     let log_target = &format!("{}_planner", sp_id);
@@ -41,38 +42,41 @@ pub async fn planner_ticker(
         model
             .operations
             .iter()
-            .flat_map(|op| {
-                vec![
-                    format!("{}", op.name),
-                ]
-            })
+            .flat_map(|op| vec![format!("{}", op.name)])
             .collect::<Vec<String>>(),
     );
 
     loop {
-        if let Some(state) = redis_get_state_for_keys(&mut con, &keys).await {
-            let old_info = state.get_string_or_default_to_unknown(
-                &format!("{}_planner", sp_id),
-                &format!("{}_planner_information", sp_id),
-            );
+        interval.tick().await;
+        let mut con = connection_manager.get_connection().await;
 
-            let new_state = process_planner_tick(sp_id, &model, &state);
+        if let Err(e) = con.set::<_, _, ()>("heartbeat", "alive").await {
+            handle_redis_error(&e, &log_target, connection_manager).await;
+            continue;
+        }
+        let state = match redis_get_state_for_keys(&mut con, &keys).await {
+            Some(s) => s,
+            None => continue,
+        };
+        let old_info = state.get_string_or_default_to_unknown(
+            &format!("{}_planner", sp_id),
+            &format!("{}_planner_information", sp_id),
+        );
 
-            let new_info = new_state.get_string_or_default_to_unknown(
-                &format!("{}_planner", sp_id),
-                &format!("{}_planner_information", sp_id),
-            );
-            if old_info != new_info && !new_info.is_empty() {
-                log::info!(target: log_target, "{}", new_info);
-            }
+        let new_state = process_planner_tick(sp_id, &model, &state);
 
-            let modified_state = state.get_diff_partial_state(&new_state);
-            if !modified_state.state.is_empty() {
-                redis_set_state(&mut con, modified_state).await;
-            }
+        let new_info = new_state.get_string_or_default_to_unknown(
+            &format!("{}_planner", sp_id),
+            &format!("{}_planner_information", sp_id),
+        );
+        if old_info != new_info && !new_info.is_empty() {
+            log::info!(target: log_target, "{}", new_info);
         }
 
-        interval.tick().await;
+        let modified_state = state.get_diff_partial_state(&new_state);
+        if !modified_state.state.is_empty() {
+            redis_set_state(&mut con, modified_state).await;
+        }
     }
 }
 

@@ -1,16 +1,18 @@
+use std::sync::Arc;
 use crate::*;
-use redis::aio::MultiplexedConnection;
+use redis::AsyncCommands;
 use tokio::time::{Duration, interval};
 
 pub async fn planned_operation_runner(
     model: &Model,
-    mut con: MultiplexedConnection,
+    connection_manager: &Arc<ConnectionManager>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let sp_id = &model.name;
+    let log_target = format!("{}_operation_runner", sp_id);
     let mut interval = interval(Duration::from_millis(250));
 
     // Get only the relevant keys from the state
-    log::info!(target: &format!("{}_operation_runner", sp_id), "Online.");
+    log::info!(target: &log_target, "Online.");
     let mut keys: Vec<String> = model
         .operations
         .iter()
@@ -41,33 +43,41 @@ pub async fn planned_operation_runner(
     );
 
     loop {
-        if let Some(state) = redis_get_state_for_keys(&mut con, &keys).await {
-            let new_state = process_plan_tick(sp_id, &model, &state);
-            let modified_state = state.get_diff_partial_state(&new_state);
-            redis_set_state(&mut con, modified_state).await;
-        }
-
         interval.tick().await;
+        let mut con = connection_manager.get_connection().await;
+
+        if let Err(e) = con.set::<_, _, ()>("heartbeat", "alive").await {
+            handle_redis_error(&e, &log_target, connection_manager).await;
+            continue;
+        }
+        let state = match redis_get_state_for_keys(&mut con, &keys).await {
+            Some(s) => s,
+            None => continue,
+        };
+
+        let new_state = process_plan_tick(sp_id, &model, &state, &log_target);
+        let modified_state = state.get_diff_partial_state(&new_state);
+        redis_set_state(&mut con, modified_state).await;
     }
 }
 
-fn process_plan_tick(sp_id: &str, model: &Model, state: &State) -> State {
+fn process_plan_tick(sp_id: &str, model: &Model, state: &State, log_target: &str) -> State {
     let mut new_state = state.clone();
     let mut planner_state = state.get_string_or_default_to_unknown(
-        &format!("{}_operation_runner", sp_id),
+        &log_target,
         &format!("{}_planner_state", sp_id),
     );
 
     let mut plan_state_str = state.get_string_or_default_to_unknown(
-        &format!("{}_operation_runner", sp_id),
+        &log_target,
         &format!("{}_plan_state", sp_id),
     );
     let mut plan_current_step = state.get_int_or_default_to_zero(
-        &format!("{}_operation_runner", sp_id),
+        &log_target,
         &format!("{}_plan_current_step", sp_id),
     );
     let plan_of_sp_values = state.get_array_or_default_to_empty(
-        &format!("{}_operation_runner", sp_id),
+        &log_target,
         &format!("{}_plan", sp_id),
     );
 
@@ -91,9 +101,9 @@ fn process_plan_tick(sp_id: &str, model: &Model, state: &State) -> State {
                     &mut plan_state_str,
                     &mut plan_current_step,
                     op_name,
-                    sp_id,
                     model,
                     state,
+                    log_target
                 );
             } else {
                 plan_state_str = PlanState::Completed.to_string();
@@ -129,9 +139,9 @@ fn process_operation(
     plan_state_str: &mut String,
     plan_current_step: &mut i64,
     op_name: &str,
-    sp_id: &str,
     model: &Model,
     state: &State,
+    log_target: &str
 ) {
     let Some(operation) = model.operations.iter().find(|op| op.name == op_name) else {
         log::error!("Operation '{}' not found in model!", op_name);
@@ -140,17 +150,17 @@ fn process_operation(
     };
 
     let operation_state_str = state.get_string_or_default_to_unknown(
-        &format!("{}_operation_runner", sp_id),
+        &log_target,
         &format!("{}", operation.name),
     );
 
     let old_operation_information = state.get_string_or_default_to_unknown(
-        &format!("{}_operation_runner", sp_id),
+        &log_target,
         &format!("{}_information", operation.name),
     );
 
     let mut operation_retry_counter = state.get_int_or_default_to_zero(
-        &format!("{}_operation_runner", sp_id),
+        &log_target,
         &format!("{}_retry_counter", operation.name),
     );
 
@@ -210,7 +220,7 @@ fn process_operation(
     }
 
     if new_op_info != old_operation_information {
-        log::info!(target: &format!("{}_operation_runner", sp_id), "{}", new_op_info);
+        log::info!(target: &log_target, "{}", new_op_info);
     }
 
     *new_state = new_state.update(
@@ -238,7 +248,7 @@ fn process_operation(
 //     let mut operation_information_old = "".to_string();
 //     let mut plan_current_step_old = 0;
 
-//     log::info!(target: &&format!("{}_operation_runner", sp_id), "Online.");
+//     log::info!(target: &&log_target, "Online.");
 
 //     loop {
 //         let (response_tx, response_rx) = oneshot::channel();
@@ -249,20 +259,20 @@ fn process_operation(
 //         let mut new_state = state.clone();
 
 //         let mut planner_state = state.get_string_or_default_to_unknown(
-//             &format!("{}_operation_runner", sp_id),
+//             &log_target,
 //             &format!("{}_planner_state", sp_id),
 //         );
 
 //         let mut plan_state = state.get_string_or_default_to_unknown(
-//             &format!("{}_operation_runner", sp_id),
+//             &log_target,
 //             &format!("{}_plan_state", sp_id),
 //         );
 //         let mut plan_current_step = state.get_int_or_default_to_zero(
-//             &format!("{}_operation_runner", sp_id),
+//             &log_target,
 //             &format!("{}_plan_current_step", sp_id),
 //         );
 //         let plan_of_sp_values = state.get_array_or_default_to_empty(
-//             &format!("{}_operation_runner", sp_id),
+//             &log_target,
 //             &format!("{}_plan", sp_id),
 //         );
 
@@ -283,13 +293,13 @@ fn process_operation(
 
 //         // Log only when something changes and not every tick
 //         if plan_state_old != plan_state {
-//             log::info!(target: &format!("{}_operation_runner", sp_id), "Plan current state: {plan_state}.");
+//             log::info!(target: &log_target, "Plan current state: {plan_state}.");
 //             plan_state_old = plan_state.clone()
 //         }
 
 //         // Log only when something changes and not every tick
 //         if plan_current_step_old != plan_current_step {
-//             log::info!(target: &format!("{}_operation_runner", sp_id), "Plan current step: {plan_current_step}.");
+//             log::info!(target: &log_target, "Plan current step: {plan_current_step}.");
 //             plan_current_step_old = plan_current_step
 //         }
 
@@ -321,33 +331,33 @@ fn process_operation(
 //                         .to_owned();
 
 //                     let operation_state = state.get_string_or_default_to_unknown(
-//                         &format!("{}_operation_runner", sp_id),
+//                         &log_target,
 //                         &format!("{}", operation.name),
 //                     );
 
 //                     let mut operation_information = state.get_string_or_default_to_unknown(
-//                         &format!("{}_operation_runner", sp_id),
+//                         &log_target,
 //                         &format!("{}_information", operation.name),
 //                     );
 
 //                     let mut operation_retry_counter = state.get_int_or_default_to_zero(
-//                         &format!("{}_operation_runner", sp_id),
+//                         &log_target,
 //                         &format!("{}_retry_counter", operation.name),
 //                     );
 
 //                     // Log only when something changes and not every tick
 //                     if operation_state_old != operation_state {
-//                         log::info!(target: &format!("{}_operation_runner", sp_id), "Current state of operation {}: {}.", operation.name, operation_state);
+//                         log::info!(target: &log_target, "Current state of operation {}: {}.", operation.name, operation_state);
 //                         operation_state_old = operation_state.clone()
 //                     }
 
 //                     if operation_information_old != operation_information {
-//                         log::info!(target: &format!("{}_operation_runner", sp_id), "{}.", operation_information);
+//                         log::info!(target: &log_target, "{}.", operation_information);
 //                         operation_information_old = operation_information.clone()
 //                     }
 
 //                     // let operation_start_time = state.get_int_or_default_to_zero(
-//                     //     &format!("{}_operation_runner", sp_id),
+//                     //     &log_target,
 //                     //     &format!("{}_start_time", operation.name),
 //                     // );
 
@@ -361,7 +371,7 @@ fn process_operation(
 //                         //     let (eval, idx) =
 //                         //         operation.eval_running_with_transition_index(&new_state);
 //                         //     if eval {
-//                         //         log::error!(target: &format!("{}_operation_runner", sp_id), "INITIAL, EVALS TO TRUE.");
+//                         //         log::error!(target: &log_target, "INITIAL, EVALS TO TRUE.");
 //                         //         new_state = new_state.update(
 //                         //             &format!("{}_start_time", operation.name),
 //                         //             now_as_millis_i64().to_spvalue(),
@@ -374,7 +384,7 @@ fn process_operation(
 //                         //         operation_information =
 //                         //             format!("Operation '{}' started execution", operation.name);
 //                         //     } else {
-//                         //         log::error!(target: &format!("{}_operation_runner", sp_id), "INITIAL, EVALS TO FALSE.");
+//                         //         log::error!(target: &log_target, "INITIAL, EVALS TO FALSE.");
 //                         //         new_state = operation.block_running(&new_state);
 //                         //     }
 //                         // }
@@ -387,13 +397,13 @@ fn process_operation(
 //                             // let (eval, idx) =
 //                             //     operation.eval_running_with_transition_index(&new_state);
 //                             // if eval {
-//                             //     log::error!(target: &format!("{}_operation_runner", sp_id), "BLOCKED, EVALS TO TRUE.");
+//                             //     log::error!(target: &log_target, "BLOCKED, EVALS TO TRUE.");
 //                             //     new_state = operation.start_running(&new_state);
 //                             //     operation_information =
 //                             //         format!("Operation '{}' started execution", operation.name);
 //                             // } else {
-//                             //     log::error!(target: &format!("{}_operation_runner", sp_id), "BLOCKED, EVALS TO FALSE.");
-//                             //     log::error!(target: &format!("{}_operation_runner", sp_id), "GUARD: {}", operation.preconditions[idx].runner_guard);
+//                             //     log::error!(target: &log_target, "BLOCKED, EVALS TO FALSE.");
+//                             //     log::error!(target: &log_target, "GUARD: {}", operation.preconditions[idx].runner_guard);
 //                             //     operation_information = format!(
 //                             //         "Operation '{}' can't start yet, blocked by guard: {}",
 //                             //         operation.name, operation.preconditions[idx].runner_guard
@@ -408,13 +418,13 @@ fn process_operation(
 //                         //             let elapsed_ms =
 //                         //                 now_as_millis_i64().saturating_sub(operation_start_time);
 //                         //             if elapsed_ms >= timeout {
-//                         //                 // log::error!(target: &format!("{}_operation_runner", sp_id), "HAS TO TIMEOUT HERE!");
+//                         //                 // log::error!(target: &log_target, "HAS TO TIMEOUT HERE!");
 //                         //                 new_state = operation.timeout_running(&new_state);
 //                         //                 operation_information =
 //                         //                     format!("Operation '{}' timed out", operation.name);
 //                         //             } else {
 //                         //                 if operation.can_be_failed(&new_state) {
-//                         //                     // log::error!(target: &format!("{}_operation_runner", sp_id), "HAS TO FAIL HERE!");
+//                         //                     // log::error!(target: &log_target, "HAS TO FAIL HERE!");
 //                         //                     new_state = operation.clone().fail_running(&new_state);
 //                         //                     operation_information =
 //                         //                         format!("Failing {}", operation.name);
@@ -426,7 +436,7 @@ fn process_operation(
 //                         //                     ))
 //                         //                     .await;
 //                         //                     if eval {
-//                         //                         // log::error!(target: &format!("{}_operation_runner", sp_id), "HAS TO COMPLETE HERE!");
+//                         //                         // log::error!(target: &log_target, "HAS TO COMPLETE HERE!");
 //                         //                         new_state =
 //                         //                             operation.clone().complete_running(&new_state);
 //                         //                         operation_information =

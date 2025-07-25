@@ -1,9 +1,6 @@
-use redis::aio::MultiplexedConnection;
-use serde::{Deserialize, Serialize};
-// use tokio::sync::mpsc;
-
 use crate::*;
-use std::fmt;
+use serde::{Deserialize, Serialize};
+use std::{fmt, sync::Arc};
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash, Serialize, Deserialize)]
 pub enum RunnerState {
@@ -54,7 +51,11 @@ impl fmt::Display for RunnerState {
 }
 
 // Run everything and provide a model
-pub async fn main_runner(sp_id: &String, model: Model, con: MultiplexedConnection) {
+pub async fn main_runner(
+    sp_id: &String,
+    model: Model,
+    connection_manager: &Arc<ConnectionManager>,
+) {
     // Logs from extern crates to stdout
     // initialize_env_logger();
 
@@ -70,10 +71,10 @@ pub async fn main_runner(sp_id: &String, model: Model, con: MultiplexedConnectio
 
     log::info!(target: &format!("{sp_id}_micro_sp"), "Spawning planner.");
     let model_clone = model.clone();
-    let con_clone = con.clone();
+    let con_clone = connection_manager.clone();
     let sp_id_clone = sp_id.clone();
     tokio::task::spawn(async move {
-        planner_ticker(&sp_id_clone, &model_clone, con_clone)
+        planner_ticker(&sp_id_clone, &model_clone, &con_clone)
             .await
             .unwrap()
     });
@@ -86,28 +87,28 @@ pub async fn main_runner(sp_id: &String, model: Model, con: MultiplexedConnectio
 
     log::info!(target:  &format!("{sp_id}_micro_sp"), "Spawning SOP runner.");
     let model_clone = model.clone();
-    let con_clone = con.clone();
+    let con_clone = connection_manager.clone();
     let sp_id_clone = sp_id.clone();
     tokio::task::spawn(async move {
-        sop_runner(&sp_id_clone, &model_clone, con_clone)
+        sop_runner(&sp_id_clone, &model_clone, &con_clone)
             .await
             .unwrap()
     });
 
     log::info!(target:  &format!("{sp_id}_micro_sp"), "Spawning combined operation runner.");
     let model_clone = model.clone();
-    let con_clone = con.clone();
+    let con_clone = connection_manager.clone();
     tokio::task::spawn(async move {
-        planned_operation_runner(&model_clone, con_clone)
+        planned_operation_runner(&model_clone, &con_clone)
             .await
             .unwrap()
     });
 
     log::info!(target: &format!("{sp_id}_micro_sp"), "Spawning auto transition runner");
     let model_clone = model.clone();
-    let con_clone = con.clone();
+    let con_clone = connection_manager.clone();
     tokio::task::spawn(async move {
-        auto_transition_runner(&model_clone.name, &model_clone, con_clone)
+        auto_transition_runner(&model_clone.name, &model_clone, &con_clone)
             .await
             .unwrap()
     });

@@ -2,6 +2,7 @@ pub mod auto_runner;
 pub mod operation_runner;
 pub mod planner_ticker;
 pub mod state_manager_new;
+pub mod connection_manager;
 // pub mod state_manager;
 // pub mod goal_scheduler;
 // pub mod goal_runner;
