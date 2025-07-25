@@ -12,12 +12,22 @@ pub async fn sop_runner(
 
     log::info!(target: log_target, "Online and managing SOP.");
 
+    let mut keys = vec![];
+
     // Get only the relevant keys from the state
-    let mut keys: Vec<String> = model
+    let sop_keys: Vec<String> = model
         .sops
         .iter()
         .flat_map(|sop_struct| sop_struct.sop.get_all_var_keys())
         .collect();
+    keys.extend(sop_keys);
+
+    let op_keys: Vec<String> = model
+        .operations
+        .iter()
+        .flat_map(|t| t.get_all_var_keys())
+        .collect();
+    keys.extend(op_keys);
 
     // We also need some of the planner vars
     keys.extend(vec![
