@@ -7,7 +7,7 @@ pub async fn planned_operation_runner(
     mut con: MultiplexedConnection,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let sp_id = &model.name;
-    let mut interval = interval(Duration::from_millis(100));
+    let mut interval = interval(Duration::from_millis(250));
 
     // Get only the relevant keys from the state
     log::info!(target: &format!("{}_operation_runner", sp_id), "Online.");

@@ -7,7 +7,7 @@ pub async fn sop_runner(
     model: &Model,
     mut con: MultiplexedConnection,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let mut interval = interval(Duration::from_millis(100));
+    let mut interval = interval(Duration::from_millis(250));
     let log_target = &format!("{}_sop_runner", sp_id);
 
     log::info!(target: log_target, "Online and managing SOP.");
@@ -70,36 +70,62 @@ pub async fn sop_runner(
     //         .collect::<Vec<String>>(),
     // );
 
+    // loop {
+    //     if let Some(state) = redis_get_full_state(&mut con).await {
+    //         let old_stack_json = state.get_string_or_value(
+    //             &format!("{}_sop_runner", sp_id),
+    //             &format!("{}_sop_stack", sp_id),
+    //             "[]".to_string(),
+    //         );
+
+    //         let new_state = process_sop_tick(sp_id, model, &state)?;
+
+    //         let new_stack_json = new_state.get_string_or_value(
+    //             &format!("{}_sop_runner", sp_id),
+    //             &format!("{}_sop_stack", sp_id),
+    //             "[]".to_string(),
+    //         );
+    //         if old_stack_json != new_stack_json
+    //             && !new_stack_json.is_empty()
+    //             && new_stack_json != "[]"
+    //         {
+    //             let sop_id = new_state.get_string_or_default_to_unknown(
+    //                 &format!("{}_sop_runner", sp_id),
+    //                 &format!("{}_sop_id", sp_id),
+    //             );
+
+    //             if let Some(root_sop) = model.sops.iter().find(|s| s.id == sop_id) {
+    //                 log::info!(target: log_target, "{:?}", visualize_sop(&root_sop.sop));
+    //             }
+    //         }
+
+    //         let modified_state = state.get_diff_partial_state(&new_state);
+    //         if !modified_state.state.is_empty() {
+    //             redis_set_state(&mut con, modified_state).await;
+    //         }
+    //     }
+
+    //     interval.tick().await;
+    // }
+
+    let mut old_sop_id = String::new();
+
     loop {
         if let Some(state) = redis_get_full_state(&mut con).await {
-            let old_stack_json = state.get_string_or_value(
-                &format!("{}_sop_runner", sp_id),
-                &format!("{}_sop_stack", sp_id),
-                "[]".to_string(),
-            );
+            let current_sop_id =
+                state.get_string_or_default_to_unknown(log_target, &format!("{}_sop_id", sp_id));
 
-            let new_state = process_sop_tick(sp_id, model, &state)?;
-
-            let new_stack_json = new_state.get_string_or_value(
-                &format!("{}_sop_runner", sp_id),
-                &format!("{}_sop_stack", sp_id),
-                "[]".to_string(),
-            );
-            if old_stack_json != new_stack_json
-                && !new_stack_json.is_empty()
-                && new_stack_json != "[]"
-            {
-                let sop_id = new_state.get_string_or_default_to_unknown(
-                    &format!("{}_sop_runner", sp_id),
-                    &format!("{}_sop_id", sp_id),
-                );
-
-                if let Some(root_sop) = model.sops.iter().find(|s| s.id == sop_id) {
+            if old_sop_id != current_sop_id && !current_sop_id.is_empty() {
+                if let Some(root_sop) = model.sops.iter().find(|s| s.id == current_sop_id) {
+                    log::info!(target: log_target, "Now executing new SOP '{}':", current_sop_id);
                     log::info!(target: log_target, "{:?}", visualize_sop(&root_sop.sop));
                 }
+                old_sop_id = current_sop_id;
             }
 
+            let new_state = process_sop_tick(sp_id, model, &state)?;
             let modified_state = state.get_diff_partial_state(&new_state);
+
             if !modified_state.state.is_empty() {
                 redis_set_state(&mut con, modified_state).await;
             }
