@@ -32,6 +32,8 @@ pub async fn planner_ticker(
         format!("{}_plan_counter", sp_id),
         format!("{}_replan_counter", sp_id),
         format!("{}_replan_counter_total", sp_id),
+        format!("{}_current_goal_state", sp_id),
+        format!("{}_current_goal_predicate", sp_id),
     ]);
 
     loop {

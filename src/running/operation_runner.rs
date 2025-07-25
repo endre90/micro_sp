@@ -17,7 +17,7 @@ pub async fn planned_operation_runner(
         .flat_map(|t| t.get_all_var_keys())
         .collect();
 
-    // We also need the planner vars
+    // We also need some of the planner vars
     keys.extend(vec![
         format!("{}_planner_state", sp_id),
         format!("{}_plan_state", sp_id),
