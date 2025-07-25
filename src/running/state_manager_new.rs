@@ -72,8 +72,16 @@ pub async fn redis_get_full_state(con: &mut MultiplexedConnection) -> Option<Sta
     Some(build_state_from_redis(keys, values))
 }
 
-pub async fn redis_get_state_for_keys(con: &mut MultiplexedConnection, keys: &Vec<String>) -> Option<State> {
-    let values: Vec<Option<String>> = match con.mget(&keys).await {
+pub async fn redis_get_state_for_keys(
+    con: &mut MultiplexedConnection,
+    keys: &Vec<String>,
+) -> Option<State> {
+
+    if keys.is_empty() {
+        return Some(State::new());
+    }
+
+    let values: Vec<Option<String>> = match con.mget(keys).await {
         Ok(v) => v,
         Err(e) => {
             log::error!("Failed to get values from Redis: {e}");
@@ -81,8 +89,9 @@ pub async fn redis_get_state_for_keys(con: &mut MultiplexedConnection, keys: &Ve
         }
     };
 
-    Some(build_state_from_redis(keys.iter().map(|k| k.to_string()).collect(), values))
+    Some(build_state_from_redis(keys.clone(), values))
 }
+
 
 pub fn build_state_from_redis(keys: Vec<String>, values: Vec<Option<String>>) -> State {
     let mut state_map = HashMap::new();
