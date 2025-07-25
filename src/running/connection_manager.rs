@@ -5,6 +5,8 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 use tokio::time::Duration;
 
+use crate::{redis_set_state, State};
+
 pub struct ConnectionManager {
     connection: Arc<RwLock<MultiplexedConnection>>,
     redis_addr: String,
@@ -15,9 +17,9 @@ impl ConnectionManager {
         let redis_host = env::var("REDIS_HOST").unwrap_or_else(|_| "127.0.0.1".to_string());
         let redis_port = env::var("REDIS_PORT").unwrap_or_else(|_| "6379".to_string());
         let redis_addr = format!("redis://{}:{}", redis_host, redis_port);
-        
+
         log::info!(target: "redis_manager", "Connecting to Redis at {}...", redis_addr);
-        
+
         loop {
             match Self::try_connect(&redis_addr).await {
                 Ok(connection) => {
@@ -47,7 +49,7 @@ impl ConnectionManager {
     // Replaces the dead connection with a new one
     pub async fn reconnect(&self) {
         log::warn!(target: "redis_manager", "Redis connection lost. Attempting to reconnect...");
-        
+
         // Get a write lock to replace the connection.
         // This ensures only one task tries to reconnect at a time
         let mut connection_guard = self.connection.write().await;
@@ -57,7 +59,7 @@ impl ConnectionManager {
                 Ok(new_connection) => {
                     *connection_guard = new_connection;
                     log::info!(target: "redis_manager", "Redis re-connection successful.");
-                    return; 
+                    return;
                 }
                 Err(e) => {
                     log::error!(target: "redis_manager", "Reconnect failed: {}. Retrying in 3s...", e);
@@ -78,5 +80,26 @@ pub async fn handle_redis_error(
         connection_manager.reconnect().await;
     } else {
         log::error!(target: log_target, "An unexpected Redis error occurred: {}", e);
+    }
+}
+
+pub async fn restore_state_from_snapshot(
+    con: &mut MultiplexedConnection,
+    last_known_state: &Arc<RwLock<Option<State>>>,
+    log_target: &str,
+) {
+    let snapshot = last_known_state.read().await;
+
+    if let Some(state_to_restore) = &*snapshot {
+        log::warn!(
+            target: log_target,
+            "Redis is empty. Repopulating with the last known state."
+        );
+        redis_set_state(con, state_to_restore.clone()).await;
+    } else {
+        log::debug!(
+            target: log_target,
+            "Redis is empty and no snapshot exists yet. Waiting for initial state."
+        );
     }
 }
