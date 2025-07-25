@@ -36,6 +36,19 @@ pub async fn planner_ticker(
         format!("{}_current_goal_predicate", sp_id),
     ]);
 
+    // And the operation names
+    keys.extend(
+        model
+            .operations
+            .iter()
+            .flat_map(|op| {
+                vec![
+                    format!("{}", op.name),
+                ]
+            })
+            .collect::<Vec<String>>(),
+    );
+
     loop {
         if let Some(state) = redis_get_state_for_keys(&mut con, &keys).await {
             let old_info = state.get_string_or_default_to_unknown(

@@ -12,45 +12,63 @@ pub async fn sop_runner(
 
     log::info!(target: log_target, "Online and managing SOP.");
 
-    let mut keys = vec![];
+    // let mut keys = vec![];
 
-    // Get only the relevant keys from the state
-    let sop_keys: Vec<String> = model
-        .sops
-        .iter()
-        .flat_map(|sop_struct| sop_struct.sop.get_all_var_keys())
-        .collect();
-    keys.extend(sop_keys);
+    // // Get only the relevant keys from the state
+    // let sop_keys: Vec<String> = model
+    //     .sops
+    //     .iter()
+    //     .flat_map(|sop_struct| sop_struct.sop.get_all_var_keys())
+    //     .collect();
+    // keys.extend(sop_keys);
 
-    let op_keys: Vec<String> = model
-        .operations
-        .iter()
-        .flat_map(|t| t.get_all_var_keys())
-        .collect();
-    keys.extend(op_keys);
+    // let op_keys: Vec<String> = model
+    //     .operations
+    //     .iter()
+    //     .flat_map(|t| t.get_all_var_keys())
+    //     .collect();
+    // keys.extend(op_keys);
 
-    // We also need some of the planner vars
-    keys.extend(vec![
-        format!("{}_sop_stack", sp_id),
-        format!("{}_sop_id", sp_id),
-        format!("{}_sop_state", sp_id),
-        format!("{}_sop_enabled", sp_id),
-    ]);
+    // // And the operation names
+    // keys.extend(
+    //     model
+    //         .operations
+    //         .iter()
+    //         .flat_map(|op| vec![format!("{}", op.name)])
+    //         .collect::<Vec<String>>(),
+    // );
 
-    // And the vars to keep trask of operation states
-    keys.extend(
-        model
-            .operations
-            .iter()
-            .flat_map(|op| {
-                vec![
-                    format!("{}", op.name),
-                    format!("{}_information", op.name),
-                    format!("{}_retry_counter", op.name),
-                ]
-            })
-            .collect::<Vec<String>>(),
-    );
+    // // And the operation names
+    // keys.extend(
+    //     model
+    //         .operations
+    //         .iter()
+    //         .flat_map(|op| vec![format!("{}", op.name)])
+    //         .collect::<Vec<String>>(),
+    // );
+
+    // // We also need some of the planner vars
+    // keys.extend(vec![
+    //     format!("{}_sop_stack", sp_id),
+    //     format!("{}_sop_id", sp_id),
+    //     format!("{}_sop_state", sp_id),
+    //     format!("{}_sop_enabled", sp_id),
+    // ]);
+
+    // // And the vars to keep trask of operation states
+    // keys.extend(
+    //     model
+    //         .operations
+    //         .iter()
+    //         .flat_map(|op| {
+    //             vec![
+    //                 format!("{}", op.name),
+    //                 format!("{}_information", op.name),
+    //                 format!("{}_retry_counter", op.name),
+    //             ]
+    //         })
+    //         .collect::<Vec<String>>(),
+    // );
 
     loop {
         if let Some(state) = redis_get_full_state(&mut con).await {

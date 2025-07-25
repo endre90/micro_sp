@@ -29,6 +29,18 @@ impl SOP {
             }
         }
     }
+    pub fn get_all_operation_names(&self) -> Vec<String> {
+        let mut operations: Vec<String> = vec![];
+        match self {
+            SOP::Operation(op) => operations.push(op.name.clone()),
+            SOP::Sequence(sops) | SOP::Parallel(sops) | SOP::Alternative(sops) => {
+                sops.iter().for_each(|s| {
+                    s.get_all_operation_names();
+                });
+            }
+        };
+        operations
+    }
 }
 
 /// Creates a visual representation of a SOP tree and prints it to the console.
