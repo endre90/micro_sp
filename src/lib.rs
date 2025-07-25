@@ -31,11 +31,13 @@ pub use crate::running::auto_runner::*;
 pub use crate::running::sop_runner::*;
 pub use crate::running::operation_runner::*;
 pub use crate::running::planner_ticker::*;
-pub use crate::running::state_manager_new::*;
-pub use crate::running::connection_manager::*;
-// pub use crate::running::state_manager::*;
 pub use crate::running::main_runner::*;
 pub use crate::running::utils::*;
+
+pub mod management;
+pub use crate::management::snapshot::*;
+pub use crate::management::state::*;
+pub use crate::management::connection::*;
 
 // pub mod transforms;
 // pub use crate::transforms::cycles::*;
