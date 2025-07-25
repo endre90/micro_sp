@@ -33,31 +33,6 @@ pub struct Transition {
     pub runner_actions: Vec<Action>,
 }
 
-// impl Hash for Transition {
-//     fn hash<H: Hasher>(&self, s: &mut H) {
-//         self.guard.hash(s);
-//         self.runner_guard.hash(s);
-//         self.actions
-//         //     .keys()
-//         //     .into_iter()
-//         //     .map(|x| x.to_owned())
-//         //     .collect::<Vec<String>>()
-//         //     .hash(s);
-//         // self.state
-//         //     .values()
-//         //     .into_iter()
-//         //     .map(|x| x.var.to_owned())
-//         //     .collect::<Vec<SPVariable>>()
-//         //     .hash(s);
-//         // self.state
-//         //     .values()
-//         //     .into_iter()
-//         //     .map(|x| x.val.to_owned())
-//         //     .collect::<Vec<SPValue>>()
-//         //     .hash(s);
-//     }
-// }
-
 impl Transition {
     /// Define a new transition. Use parse() instead.
     pub fn new(
@@ -214,13 +189,24 @@ impl Transition {
 
     // TODO: test...
     pub fn contains_planning(self, var: &String) -> bool {
-        let guard_vars: Vec<String> = get_predicate_vars_all(&self.guard)
-            .iter()
-            .map(|p| p.name.to_owned())
-            .collect();
+        let guard_vars: Vec<String> = self.guard.get_predicate_var_keys();
         let actions_vars: Vec<String> =
             self.actions.iter().map(|a| a.var.name.to_owned()).collect();
         guard_vars.contains(var) || actions_vars.contains(var)
+    }
+
+        // TODO: test...
+    pub fn get_all_var_keys(&self) -> Vec<String> {
+        let mut all_keys: Vec<String> = self.guard.get_predicate_var_keys()
+            .into_iter()
+            .chain(self.runner_guard.get_predicate_var_keys())
+            .chain(self.actions.iter().map(|a| a.var.name.clone()))
+            .chain(self.runner_actions.iter().map(|a| a.var.name.clone()))
+            .collect();
+    
+        all_keys.sort(); 
+        all_keys.dedup();
+        all_keys
     }
 }
 
@@ -247,35 +233,15 @@ impl Default for Transition {
 }
 
 // TODO: test
-pub fn get_transition_vars_all(trans: &Transition) -> Vec<SPVariable> {
-    let mut s = Vec::new();
-    let guard_vars = get_predicate_vars_all(&trans.guard);
-    let runner_guard_vars = get_predicate_vars_all(&trans.runner_guard);
-    let action_vars: Vec<SPVariable> = trans.actions.iter().map(|x| x.var.to_owned()).collect();
-    let runner_action_vars: Vec<SPVariable> = trans
-        .runner_actions
-        .iter()
-        .map(|x| x.var.to_owned())
-        .collect();
-    s.extend(guard_vars);
-    s.extend(runner_guard_vars);
-    s.extend(action_vars);
-    s.extend(runner_action_vars);
-    s.sort();
-    s.dedup();
-    s
-}
-
-// TODO: test
-pub fn get_transition_model_vars_all(model: &Vec<Transition>) -> Vec<SPVariable> {
-    let mut s = Vec::new();
-    model
-        .iter()
-        .for_each(|x| s.extend(get_transition_vars_all(x)));
-    s.sort();
-    s.dedup();
-    s
-}
+// pub fn get_transition_model_vars_all(model: &Vec<Transition>) -> Vec<SPVariable> {
+//     let mut s = Vec::new();
+//     model
+//         .iter()
+//         .for_each(|x| s.extend(get_transition_vars_all(x)));
+//     s.sort();
+//     s.dedup();
+//     s
+// }
 
 impl fmt::Display for Transition {
     fn fmt(&self, fmtr: &mut fmt::Formatter<'_>) -> fmt::Result {

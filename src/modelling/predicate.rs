@@ -155,76 +155,68 @@ impl Predicate {
             }
         }
     }
-}
 
-// TODO: test...
-pub fn get_predicate_vars_all(pred: &Predicate) -> Vec<SPVariable> {
-    let mut s = Vec::new();
-    match pred {
-        Predicate::TRUE => {}
-        Predicate::FALSE => {}
-        Predicate::AND(x) => s.extend(x.iter().flat_map(|p| get_predicate_vars_all(p))),
-        Predicate::OR(x) => s.extend(x.iter().flat_map(|p| get_predicate_vars_all(p))),
-        Predicate::NOT(x) => s.extend(get_predicate_vars_all(x)),
-        Predicate::EQ(x, y) => {
-            match x {
-                SPWrapped::SPVariable(vx) => s.push(vx.to_owned()),
-                _ => (),
+    pub fn get_predicate_vars(&self) -> Vec<SPVariable> {
+        let mut vars = match self {
+            Predicate::AND(preds) | Predicate::OR(preds) => {
+                preds.iter().flat_map(|p| p.get_predicate_vars()).collect()
             }
-            match y {
-                SPWrapped::SPVariable(vy) => s.push(vy.to_owned()),
-                _ => (),
+            Predicate::NOT(p) => p.get_predicate_vars(),
+            Predicate::EQ(lhs, rhs) | Predicate::NEQ(lhs, rhs) => {
+                let mut found = Vec::new();
+                if let SPWrapped::SPVariable(v) = lhs {
+                    found.push(v.clone());
+                }
+                if let SPWrapped::SPVariable(v) = rhs {
+                    found.push(v.clone());
+                }
+                found
             }
-        }
-        Predicate::NEQ(x, y) => {
-            match x {
-                SPWrapped::SPVariable(vx) => s.push(vx.to_owned()),
-                _ => (),
-            }
-            match y {
-                SPWrapped::SPVariable(vy) => s.push(vy.to_owned()),
-                _ => (),
-            }
-        }
-    }
-    s.sort();
-    s.dedup();
-    s
-}
+            Predicate::TRUE | Predicate::FALSE => vec![],
+        };
 
-pub fn get_predicate_vars(pred: &Predicate) -> Vec<SPVariable> {
-    let mut s = Vec::new();
-    match pred {
-        Predicate::TRUE => {}
-        Predicate::FALSE => {}
-        Predicate::AND(x) => s.extend(x.iter().flat_map(|p| get_predicate_vars(p))),
-        Predicate::OR(x) => s.extend(x.iter().flat_map(|p| get_predicate_vars(p))),
-        Predicate::NOT(x) => s.extend(get_predicate_vars(x)),
-        Predicate::EQ(x, y) => {
-            match x {
-                SPWrapped::SPVariable(vx) => s.push(vx.to_owned()),
-                _ => (),
-            }
-            match y {
-                SPWrapped::SPVariable(vy) => s.push(vy.to_owned()),
-                _ => (),
-            }
-        }
-        Predicate::NEQ(x, y) => {
-            match x {
-                SPWrapped::SPVariable(vx) => s.push(vx.to_owned()),
-                _ => (),
-            }
-            match y {
-                SPWrapped::SPVariable(vy) => s.push(vy.to_owned()),
-                _ => (),
-            }
-        }
+        vars.sort();
+        vars.dedup();
+        vars
     }
-    s.sort();
-    s.dedup();
-    s
+
+    pub fn get_predicate_var_keys(&self) -> Vec<String> {
+        self.get_predicate_vars().iter().map(|var| var.name.to_owned()).collect()
+    }
+
+    // let mut s = Vec::new();
+    // match self {
+    //     Predicate::TRUE => {}
+    //     Predicate::FALSE => {}
+    //     Predicate::AND(x) => s.extend(x.iter().flat_map(|p| self.get_predicate_vars(p))),
+    //     Predicate::OR(x) => s.extend(x.iter().flat_map(|p| get_predicate_vars(p))),
+    //     Predicate::NOT(x) => s.extend(get_predicate_vars(x)),
+    //     Predicate::EQ(x, y) => {
+    //         match x {
+    //             SPWrapped::SPVariable(vx) => s.push(vx.to_owned()),
+    //             _ => (),
+    //         }
+    //         match y {
+    //             SPWrapped::SPVariable(vy) => s.push(vy.to_owned()),
+    //             _ => (),
+    //         }
+    //     }
+    //     Predicate::NEQ(x, y) => {
+    //         match x {
+    //             SPWrapped::SPVariable(vx) => s.push(vx.to_owned()),
+    //             _ => (),
+    //         }
+    //         match y {
+    //             SPWrapped::SPVariable(vy) => s.push(vy.to_owned()),
+    //             _ => (),
+    //         }
+    //     }
+    // }
+    // s.sort();
+    // s.dedup();
+    // s
 }
+// }
 
 impl fmt::Display for Predicate {
     fn fmt(&self, fmtr: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -455,7 +447,7 @@ mod tests {
             "var:ur_action_trigger == false && var:ur_action_state == initial && var:ur_current_pose != a",
             &state,
         ).unwrap();
-        let vars = get_predicate_vars_all(&pred);
+        let vars = pred.get_predicate_vars();
         let vars_init = vec![
             v!("ur_action_state"),
             bv!("ur_action_trigger"),
@@ -471,7 +463,7 @@ mod tests {
             "var:ur_action_trigger == false && var:ur_action_state == initial && var:ur_current_pose != a",
             &state,
         ).unwrap();
-        let vars = get_predicate_vars(&pred);
+        let vars = pred.get_predicate_vars();
         let vars_init = vec![
             v!("ur_action_state"),
             bv!("ur_action_trigger"),

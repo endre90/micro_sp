@@ -1,4 +1,4 @@
-use crate::{Model, redis_get_state, redis_set_state};
+use crate::{Model, redis_get_state_for_keys, redis_set_state};
 use redis::aio::MultiplexedConnection;
 use std::time::Duration;
 use tokio::time::interval;
@@ -13,9 +13,14 @@ pub async fn auto_transition_runner(
     let log_target = format!("{}_auto_runner", name);
 
     log::info!(target: &log_target, "Online.");
+    let keys: Vec<String> = model
+        .auto_transitions
+        .iter()
+        .flat_map(|t| t.get_all_var_keys())
+        .collect();
 
     loop {
-        if let Some(state) = redis_get_state(&mut con).await {
+        if let Some(state) = redis_get_state_for_keys(&mut con, &keys).await {
             for t in &model.auto_transitions {
                 if !t.to_owned().eval_running(&state) {
                     continue;

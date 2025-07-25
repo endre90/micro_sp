@@ -9,10 +9,39 @@ pub async fn planned_operation_runner(
     let sp_id = &model.name;
     let mut interval = interval(Duration::from_millis(100));
 
+    // Get only the relevant keys from the state
     log::info!(target: &format!("{}_operation_runner", sp_id), "Online.");
+    let mut keys: Vec<String> = model
+        .operations
+        .iter()
+        .flat_map(|t| t.get_all_var_keys())
+        .collect();
+
+    // We also need the planner vars
+    keys.extend(vec![
+        format!("{}_planner_state", sp_id),
+        format!("{}_plan_state", sp_id),
+        format!("{}_plan_current_step", sp_id),
+        format!("{}_plan", sp_id),
+    ]);
+
+    // And the vars to keep trask of operation states
+    keys.extend(
+        model
+            .operations
+            .iter()
+            .flat_map(|op| {
+                vec![
+                    format!("{}", op.name),
+                    format!("{}_information", op.name),
+                    format!("{}_retry_counter", op.name),
+                ]
+            })
+            .collect::<Vec<String>>(),
+    );
 
     loop {
-        if let Some(state) = redis_get_state(&mut con).await {
+        if let Some(state) = redis_get_state_for_keys(&mut con, &keys).await {
             let new_state = process_plan_tick(sp_id, &model, &state);
             let modified_state = state.get_diff_partial_state(&new_state);
             redis_set_state(&mut con, modified_state).await;

@@ -336,6 +336,22 @@ impl Operation {
         }
     }
 
+    pub fn get_all_var_keys(&self) -> Vec<String> {
+        let mut all_keys: Vec<String> = self.preconditions
+            .iter()
+            .flat_map(|t| t.get_all_var_keys())
+            .chain(self.postconditions.iter().flat_map(|t| t.get_all_var_keys()))
+            .chain(self.fail_transitions.iter().flat_map(|t| t.get_all_var_keys()))
+            .chain(self.timeout_transitions.iter().flat_map(|t| t.get_all_var_keys()))
+            .chain(self.reset_transitions.iter().flat_map(|t| t.get_all_var_keys()))
+            .collect();
+
+        all_keys.sort_unstable();
+        all_keys.dedup();
+
+        all_keys
+    }
+
     // Tricky, wait with this, maybe we want to resrt when it failed.
     // Reset the completed operation. Check for can_be_reset() first.
     // pub fn reset_running(&self, state: &State) -> State {

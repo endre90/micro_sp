@@ -48,7 +48,7 @@ pub async fn get_redis_mpx_connection() -> MultiplexedConnection {
     }
 }
 
-pub async fn redis_get_state(con: &mut MultiplexedConnection) -> Option<State> {
+pub async fn redis_get_full_state(con: &mut MultiplexedConnection) -> Option<State> {
     let keys: Vec<String> = match con.keys("*").await {
         Ok(k) => k,
         Err(e) => {
@@ -70,6 +70,18 @@ pub async fn redis_get_state(con: &mut MultiplexedConnection) -> Option<State> {
     };
 
     Some(build_state_from_redis(keys, values))
+}
+
+pub async fn redis_get_state_for_keys(con: &mut MultiplexedConnection, keys: &Vec<String>) -> Option<State> {
+    let values: Vec<Option<String>> = match con.mget(&keys).await {
+        Ok(v) => v,
+        Err(e) => {
+            log::error!("Failed to get values from Redis: {e}");
+            return None;
+        }
+    };
+
+    Some(build_state_from_redis(keys.iter().map(|k| k.to_string()).collect(), values))
 }
 
 pub fn build_state_from_redis(keys: Vec<String>, values: Vec<Option<String>>) -> State {
@@ -240,7 +252,7 @@ mod tests {
 
         let mut con = get_redis_mpx_connection().await;
 
-        let state = redis_get_state(&mut con)
+        let state = redis_get_full_state(&mut con)
             .await
             .expect("redis_get_state should not fail on an empty DB");
 
@@ -263,7 +275,7 @@ mod tests {
 
         redis_set_state(&mut con, initial_state.clone()).await;
 
-        let retrieved_state = redis_get_state(&mut con)
+        let retrieved_state = redis_get_full_state(&mut con)
             .await
             .expect("Failed to get state");
 
@@ -293,7 +305,7 @@ mod tests {
 
         redis_set_state(&mut con, partial_update).await;
 
-        let final_state = redis_get_state(&mut con).await.unwrap();
+        let final_state = redis_get_full_state(&mut con).await.unwrap();
 
         let get_val = |s: &State, k: &str| s.state.get(k).unwrap().val.clone();
 

@@ -7,13 +7,35 @@ pub async fn planner_ticker(
     model: &Model,
     mut con: MultiplexedConnection,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let mut interval = interval(Duration::from_millis(100));
+    let mut interval = interval(Duration::from_millis(500));
     let log_target = &format!("{}_planner", sp_id);
 
     log::info!(target: log_target, "Online.");
 
+    // Get only the relevant keys from the state
+    log::info!(target: &format!("{}_operation_runner", sp_id), "Online.");
+    let mut keys: Vec<String> = model
+        .operations
+        .iter()
+        .flat_map(|t| t.get_all_var_keys())
+        .collect();
+
+    // We also need some of the planner vars
+    keys.extend(vec![
+        format!("{}_planner_information", sp_id),
+        format!("{}_planner_state", sp_id),
+        format!("{}_plan_state", sp_id),
+        format!("{}_plan_current_step", sp_id),
+        format!("{}_plan", sp_id),
+        format!("{}_replan_trigger", sp_id),
+        format!("{}_replanned", sp_id),
+        format!("{}_plan_counter", sp_id),
+        format!("{}_replan_counter", sp_id),
+        format!("{}_replan_counter_total", sp_id),
+    ]);
+
     loop {
-        if let Some(state) = redis_get_state(&mut con).await {
+        if let Some(state) = redis_get_state_for_keys(&mut con, &keys).await {
             let old_info = state.get_string_or_default_to_unknown(
                 &format!("{}_planner", sp_id),
                 &format!("{}_planner_information", sp_id),
@@ -133,13 +155,12 @@ fn process_planner_tick(sp_id: &str, model: &Model, state: &State) -> State {
 }
 
 fn handle_replan_request(
-    sp_id: &str, 
+    sp_id: &str,
     ctx: &mut PlannerContext,
     new_state: &mut State,
     model: &Model,
     state: &State,
 ) {
-    // First, reset parts of the state for the new plan.
     *new_state = reset_all_operations(new_state);
     ctx.plan = vec![];
 
@@ -154,7 +175,6 @@ fn handle_replan_request(
         return;
     }
 
-    // Perform the planning.
     ctx.replan_counter += 1;
     ctx.replan_counter_total += 1;
 
@@ -170,7 +190,7 @@ fn handle_replan_request(
     } else {
         ctx.planner_information = "Planning completed.".to_string();
         ctx.planner_state = PlannerState::Found.to_string();
-        ctx.replan_counter = 0; // Reset retry counter on success.
+        ctx.replan_counter = 0;
 
         if plan_result.length > 0 {
             ctx.replanned = true;
