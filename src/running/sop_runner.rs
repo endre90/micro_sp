@@ -34,9 +34,10 @@ pub async fn sop_runner(
                 let sop_id = new_state.get_string_or_default_to_unknown(
                     &format!("{}_sop_runner", sp_id),
                     &format!("{}_sop_id", sp_id),
+                
                 );
+
                 if let Some(root_sop) = model.sops.iter().find(|s| s.id == sop_id) {
-                    log::info!(target: log_target, "SOP execution state changed. Current structure:");
                     log::info!(target: log_target, "{:?}", visualize_sop(&root_sop.sop));
                 }
             }

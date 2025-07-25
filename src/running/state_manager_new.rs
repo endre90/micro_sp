@@ -69,7 +69,12 @@ pub async fn redis_get_state(con: &mut MultiplexedConnection) -> Option<State> {
         }
     };
 
+    Some(build_state_from_redis(keys, values))
+}
+
+pub fn build_state_from_redis(keys: Vec<String>, values: Vec<Option<String>>) -> State {
     let mut state_map = HashMap::new();
+
     for (key, maybe_value) in keys.into_iter().zip(values.into_iter()) {
         let Some(value_str) = maybe_value else {
             continue;
@@ -79,11 +84,11 @@ pub async fn redis_get_state(con: &mut MultiplexedConnection) -> Option<State> {
             let assignment = create_assignment(&key, sp_value);
             state_map.insert(key, assignment);
         } else {
-            log::warn!("Failed to deserialize value for key '{key}'.");
+            log::warn!("Failed to deserialize value for key '{}'.", key);
         }
     }
 
-    Some(State { state: state_map })
+    State { state: state_map }
 }
 
 pub async fn redis_get_sp_value(con: &mut MultiplexedConnection, var: &str) -> Option<SPValue> {
