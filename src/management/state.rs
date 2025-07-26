@@ -101,6 +101,10 @@ pub fn build_state_from_redis(keys: Vec<String>, values: Vec<Option<String>>) ->
             continue;
         };
 
+        if key == "heartbeat".to_string() {
+            continue;
+        }
+
         if let Ok(sp_value) = serde_json::from_str::<SPValue>(&value_str) {
             let assignment = create_assignment(&key, sp_value);
             state_map.insert(key, assignment);
