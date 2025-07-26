@@ -9,6 +9,7 @@ pub struct SnapshotManager {
     snapshot_path: PathBuf,
     in_memory_snapshot: Arc<RwLock<Option<State>>>,
     connection_manager: Arc<ConnectionManager>,
+    sync_interval_ms: u64
     // keys_to_monitor: Vec<String>,
 }
 
@@ -17,12 +18,14 @@ impl SnapshotManager {
     pub async fn new(
         snapshot_path: impl AsRef<Path>,
         connection_manager: Arc<ConnectionManager>,
+        sync_interval_ms: u64
         // keys_to_monitor: Vec<String>,
     ) -> Self {
         let manager = Self {
             snapshot_path: snapshot_path.as_ref().to_path_buf(),
             in_memory_snapshot: Arc::new(RwLock::new(None)),
             connection_manager,
+            sync_interval_ms
             // keys_to_monitor,
         };
         manager.load_from_disk().await;
@@ -53,7 +56,7 @@ impl SnapshotManager {
     /// The main task loop that periodically syncs state between Redis and the snapshot.
     pub async fn run_periodic_task(self) {
         let log_target = "snapshot_manager";
-        let mut sync_interval = interval(Duration::from_secs(5));
+        let mut sync_interval = interval(Duration::from_millis(self.sync_interval_ms));
 
         log::info!(target: log_target, "Periodic snapshot task started.");
 

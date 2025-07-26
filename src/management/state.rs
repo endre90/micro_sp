@@ -267,7 +267,7 @@ mod tests {
 
         println!("{:?}", state);
 
-        assert!(state.state.is_empty(), "State map should be empty");
+        assert!(state.state.iter().len() == 1, "State map should only have heartbeat");
     }
 
     #[tokio::test]
