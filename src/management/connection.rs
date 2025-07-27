@@ -5,7 +5,7 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 use tokio::time::Duration;
 
-use crate::{redis_set_state, State};
+use crate::{State, StateManager};
 
 pub struct ConnectionManager {
     connection: Arc<RwLock<MultiplexedConnection>>,
@@ -95,7 +95,7 @@ pub async fn restore_state_from_snapshot(
             target: log_target,
             "Redis is empty. Repopulating with the last known state."
         );
-        redis_set_state(con, state_to_restore.clone()).await;
+        StateManager::set_state(con, state_to_restore.clone()).await;
     } else {
         log::debug!(
             target: log_target,

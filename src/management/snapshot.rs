@@ -3,7 +3,7 @@ use std::sync::Arc;
 use tokio::fs;
 use tokio::sync::RwLock;
 use tokio::time::{interval, Duration};
-use crate::{redis_get_full_state, redis_set_state, ConnectionManager, State};
+use crate::{StateManager, ConnectionManager, State};
 
 pub struct SnapshotManager {
     snapshot_path: PathBuf,
@@ -65,8 +65,7 @@ impl SnapshotManager {
             let mut con = self.connection_manager.get_connection().await;
 
             // match redis_get_state_for_keys(&mut con, &self.keys_to_monitor).await {
-                match redis_get_full_state(&mut con).await {
-                // Case 1: Redis has state. Update snapshot if it's new.
+                match StateManager::get_full_state(&mut con).await {
                 Some(current_redis_state) => {
                     let snapshot_is_different = {
                         let snapshot = self.in_memory_snapshot.read().await;
@@ -78,12 +77,12 @@ impl SnapshotManager {
                         self.save_to_disk().await;
                     }
                 }
-                // Case 2: Redis is empty. Restore from our snapshot.
+                // Redis is empty. Restore from snapshot. Expermental
                 None => {
                     let snapshot = self.in_memory_snapshot.read().await;
                     if let Some(state_to_restore) = &*snapshot {
                         log::warn!(target: log_target, "Redis is empty. Repopulating from snapshot.");
-                        let _ = redis_set_state(&mut con, state_to_restore.clone()).await;
+                        let _ = StateManager::set_state(&mut con, state_to_restore.clone()).await;
                     }
                 }
             }

@@ -8,172 +8,173 @@ use crate::*;
 use redis::{AsyncCommands, Client, Value};
 use tokio::time::{Duration, interval};
 
-// New, untested
-pub async fn get_redis_mpx_connection() -> MultiplexedConnection {
-    let redis_host = env::var("REDIS_HOST").unwrap_or_else(|_| "127.0.0.1".to_string());
-    let redis_port = env::var("REDIS_PORT").unwrap_or_else(|_| "6379".to_string());
-    let redis_addr = format!("redis://{}:{}", redis_host, redis_port);
+pub struct StateManager {}
 
-    let mut interval = interval(Duration::from_millis(500));
-    let mut last_error: Option<String> = None;
+impl StateManager {
+    pub async fn get_redis_mpx_connection() -> MultiplexedConnection {
+        let redis_host = env::var("REDIS_HOST").unwrap_or_else(|_| "127.0.0.1".to_string());
+        let redis_port = env::var("REDIS_PORT").unwrap_or_else(|_| "6379".to_string());
+        let redis_addr = format!("redis://{}:{}", redis_host, redis_port);
 
-    log::warn!(
-        target: "redis_state_manager",
-        "Attempting to connect to Redis at {}. Retrying on failure...",
-        redis_addr
-    );
+        let mut interval = interval(Duration::from_millis(500));
+        let mut last_error: Option<String> = None;
 
-    loop {
-        let connection_result = async {
-            let client = Client::open(redis_addr.clone())?;
-            client.get_multiplexed_async_connection().await
-        }
-        .await;
+        log::warn!(
+            target: "redis_state_manager",
+            "Attempting to connect to Redis at {}. Retrying on failure...",
+            redis_addr
+        );
 
-        match connection_result {
-            Ok(connection) => {
-                log::info!(target: "redis_state_manager", "Redis connection established.");
-                return connection;
+        loop {
+            let connection_result = async {
+                let client = Client::open(redis_addr.clone())?;
+                client.get_multiplexed_async_connection().await
             }
-            Err(e) => {
-                let error_msg = e.to_string();
-                if last_error.as_ref() != Some(&error_msg) {
-                    log::error!(target: "redis_state_manager", "Connection failed: {}. Retrying...", error_msg);
-                    last_error = Some(error_msg);
+            .await;
+
+            match connection_result {
+                Ok(connection) => {
+                    log::info!(target: "redis_state_manager", "Redis connection established.");
+                    return connection;
+                }
+                Err(e) => {
+                    let error_msg = e.to_string();
+                    if last_error.as_ref() != Some(&error_msg) {
+                        log::error!(target: "redis_state_manager", "Connection failed: {}. Retrying...", error_msg);
+                        last_error = Some(error_msg);
+                    }
                 }
             }
+
+            interval.tick().await;
         }
-
-        interval.tick().await;
-    }
-}
-
-pub async fn redis_get_full_state(con: &mut MultiplexedConnection) -> Option<State> {
-    let keys: Vec<String> = match con.keys("*").await {
-        Ok(k) => k,
-        Err(e) => {
-            log::error!("Failed to get keys from Redis: {e}");
-            return None;
-        }
-    };
-
-    if keys.is_empty() {
-        return Some(State::new());
     }
 
-    let values: Vec<Option<String>> = match con.mget(&keys).await {
-        Ok(v) => v,
-        Err(e) => {
-            log::error!("Failed to get values from Redis: {e}");
-            return None;
-        }
-    };
-
-    Some(build_state_from_redis(keys, values))
-}
-
-pub async fn redis_get_state_for_keys(
-    con: &mut MultiplexedConnection,
-    keys: &Vec<String>,
-) -> Option<State> {
-
-    if keys.is_empty() {
-        return Some(State::new());
-    }
-
-    let values: Vec<Option<String>> = match con.mget(keys).await {
-        Ok(v) => v,
-        Err(e) => {
-            log::error!("Failed to get values from Redis: {e}");
-            return None;
-        }
-    };
-
-    Some(build_state_from_redis(keys.clone(), values))
-}
-
-
-pub fn build_state_from_redis(keys: Vec<String>, values: Vec<Option<String>>) -> State {
-    let mut state_map = HashMap::new();
-
-    for (key, maybe_value) in keys.into_iter().zip(values.into_iter()) {
-        let Some(value_str) = maybe_value else {
-            continue;
+    pub async fn get_full_state(con: &mut MultiplexedConnection) -> Option<State> {
+        let keys: Vec<String> = match con.keys("*").await {
+            Ok(k) => k,
+            Err(e) => {
+                log::error!("Failed to get keys from Redis: {e}");
+                return None;
+            }
         };
 
-        if key == "heartbeat".to_string() {
-            continue;
+        if keys.is_empty() {
+            return Some(State::new());
         }
 
-        if let Ok(sp_value) = serde_json::from_str::<SPValue>(&value_str) {
-            let assignment = create_assignment(&key, sp_value);
-            state_map.insert(key, assignment);
-        } else {
-            log::warn!("Failed to deserialize value for key '{}'.", key);
-        }
+        let values: Vec<Option<String>> = match con.mget(&keys).await {
+            Ok(v) => v,
+            Err(e) => {
+                log::error!("Failed to get values from Redis: {e}");
+                return None;
+            }
+        };
+
+        Some(StateManager::build_state(keys, values))
     }
 
-    State { state: state_map }
-}
+    pub async fn get_state_for_keys(
+        con: &mut MultiplexedConnection,
+        keys: &Vec<String>,
+    ) -> Option<State> {
+        if keys.is_empty() {
+            return Some(State::new());
+        }
 
-pub async fn redis_get_sp_value(con: &mut MultiplexedConnection, var: &str) -> Option<SPValue> {
-    let redis_result: Option<String> = match con.get(var).await {
-        Ok(value) => value,
-        Err(e) => {
-            log::error!("Failed to get '{var}' from Redis: {e}");
+        let values: Vec<Option<String>> = match con.mget(keys).await {
+            Ok(v) => v,
+            Err(e) => {
+                log::error!("Failed to get values from Redis: {e}");
+                return None;
+            }
+        };
+
+        Some(StateManager::build_state(keys.clone(), values))
+    }
+
+    pub fn build_state(keys: Vec<String>, values: Vec<Option<String>>) -> State {
+        let mut state_map = HashMap::new();
+
+        for (key, maybe_value) in keys.into_iter().zip(values.into_iter()) {
+            let Some(value_str) = maybe_value else {
+                continue;
+            };
+
+            if key == "heartbeat".to_string() {
+                continue;
+            }
+
+            if let Ok(sp_value) = serde_json::from_str::<SPValue>(&value_str) {
+                let assignment = create_assignment(&key, sp_value);
+                state_map.insert(key, assignment);
+            } else {
+                log::warn!("Failed to deserialize value for key '{}'.", key);
+            }
+        }
+
+        State { state: state_map }
+    }
+
+    pub async fn get_sp_value(con: &mut MultiplexedConnection, var: &str) -> Option<SPValue> {
+        let redis_result: Option<String> = match con.get(var).await {
+            Ok(value) => value,
+            Err(e) => {
+                log::error!("Failed to get '{var}' from Redis: {e}");
+                return None;
+            }
+        };
+
+        let Some(value_str) = redis_result else {
             return None;
-        }
-    };
+        };
 
-    let Some(value_str) = redis_result else {
-        return None;
-    };
-
-    match serde_json::from_str(&value_str) {
-        Ok(deserialized_value) => Some(deserialized_value),
-        Err(e) => {
-            log::error!("Deserializing value for '{var}' failed: {e}");
-            None
+        match serde_json::from_str(&value_str) {
+            Ok(deserialized_value) => Some(deserialized_value),
+            Err(e) => {
+                log::error!("Deserializing value for '{var}' failed: {e}");
+                None
+            }
         }
     }
-}
 
-pub async fn redis_set_state(con: &mut MultiplexedConnection, state: State) {
-    let items_to_set: Vec<(String, String)> = state
-        .state
-        .into_iter()
-        .filter_map(
-            |(key, assignment)| match serde_json::to_string(&assignment.val) {
-                Ok(value_str) => Some((key, value_str)),
-                Err(e) => {
-                    log::error!("Failed to serialize value for key '{key}': {e}");
-                    None
-                }
-            },
-        )
-        .collect();
+    pub async fn set_state(con: &mut MultiplexedConnection, state: State) {
+        let items_to_set: Vec<(String, String)> = state
+            .state
+            .into_iter()
+            .filter_map(
+                |(key, assignment)| match serde_json::to_string(&assignment.val) {
+                    Ok(value_str) => Some((key, value_str)),
+                    Err(e) => {
+                        log::error!("Failed to serialize value for key '{key}': {e}");
+                        None
+                    }
+                },
+            )
+            .collect();
 
-    if !items_to_set.is_empty() {
-        match con.mset::<_, String, Value>(&items_to_set).await {
+        if !items_to_set.is_empty() {
+            match con.mset::<_, String, Value>(&items_to_set).await {
+                Ok(_) => {}
+                Err(e) => log::error!("Redis MSET command failed: {e}"),
+            }
+        }
+    }
+
+    pub async fn set_sp_value(con: &mut MultiplexedConnection, key: &str, value: &SPValue) {
+        let value_str = match serde_json::to_string(value) {
+            Ok(s) => s,
+            Err(e) => {
+                log::error!("Failed to serialize value for key '{key}': {e}");
+                return;
+            }
+        };
+
+        match con.set::<_, _, ()>(key, value_str).await {
             Ok(_) => {}
-            Err(e) => log::error!("Redis MSET command failed: {e}"),
-        }
-    }
-}
-
-pub async fn redis_set_sp_value(con: &mut MultiplexedConnection, key: &str, value: &SPValue) {
-    let value_str = match serde_json::to_string(value) {
-        Ok(s) => s,
-        Err(e) => {
-            log::error!("Failed to serialize value for key '{key}': {e}");
-            return;
-        }
-    };
-
-    match con.set::<_, _, ()>(key, value_str).await {
-        Ok(_) => {}
-        Err(e) => {
-            log::error!("Redis SET command for key '{key}' failed: {e}");
+            Err(e) => {
+                log::error!("Redis SET command for key '{key}' failed: {e}");
+            }
         }
     }
 }
@@ -199,7 +200,6 @@ mod tests {
     use testcontainers::{ImageExt, core::ContainerPort, runners::AsyncRunner};
     use testcontainers_modules::redis::Redis;
 
-    /// Helper to create a dummy state for testing.
     fn dummy_state() -> State {
         let mut state = State::new();
         state
@@ -223,13 +223,13 @@ mod tests {
             .await
             .unwrap();
 
-        let mut con = get_redis_mpx_connection().await;
+        let mut con = StateManager::get_redis_mpx_connection().await;
         let key = "x";
         let value = 123.to_spvalue();
 
-        redis_set_sp_value(&mut con, key, &value).await;
+        StateManager::set_sp_value(&mut con, key, &value).await;
 
-        let retrieved = redis_get_sp_value(&mut con, key)
+        let retrieved = StateManager::get_sp_value(&mut con, key)
             .await
             .expect("Value should exist");
 
@@ -245,9 +245,9 @@ mod tests {
             .await
             .unwrap();
 
-        let mut con = get_redis_mpx_connection().await;
+        let mut con = StateManager::get_redis_mpx_connection().await;
 
-        let retrieved = redis_get_sp_value(&mut con, "key-does-not-exist").await;
+        let retrieved = StateManager::get_sp_value(&mut con, "key-does-not-exist").await;
         assert!(
             retrieved.is_none(),
             "Getting a non-existent key should return None"
@@ -263,15 +263,18 @@ mod tests {
             .await
             .unwrap();
 
-        let mut con = get_redis_mpx_connection().await;
+        let mut con = StateManager::get_redis_mpx_connection().await;
 
-        let state = redis_get_full_state(&mut con)
+        let state = StateManager::get_full_state(&mut con)
             .await
             .expect("redis_get_state should not fail on an empty DB");
 
         println!("{:?}", state);
 
-        assert!(state.state.iter().len() == 1, "State map should only have heartbeat");
+        assert!(
+            state.state.iter().len() == 1,
+            "State map should only have heartbeat"
+        );
     }
 
     #[tokio::test]
@@ -283,15 +286,16 @@ mod tests {
             .await
             .unwrap();
 
-        let mut con = get_redis_mpx_connection().await;
-        let initial_state = dummy_state();
+        let mut con = StateManager::get_redis_mpx_connection().await;
+        let mut initial_state = dummy_state();
 
-        redis_set_state(&mut con, initial_state.clone()).await;
+        StateManager::set_state(&mut con, initial_state.clone()).await;
 
-        let retrieved_state = redis_get_full_state(&mut con)
+        let retrieved_state = StateManager::get_full_state(&mut con)
             .await
             .expect("Failed to get state");
 
+        initial_state.state.remove("heartbeat").unwrap();
         assert_eq!(initial_state, retrieved_state);
     }
 
@@ -304,9 +308,9 @@ mod tests {
             .await
             .unwrap();
 
-        let mut con = get_redis_mpx_connection().await;
+        let mut con = StateManager::get_redis_mpx_connection().await;
 
-        redis_set_state(&mut con, dummy_state()).await;
+        StateManager::set_state(&mut con, dummy_state()).await;
 
         let mut partial_update = State::new();
         partial_update
@@ -316,9 +320,9 @@ mod tests {
             .state
             .insert("j".to_string(), assign!(iv!("j"), 100.to_spvalue()));
 
-        redis_set_state(&mut con, partial_update).await;
+        StateManager::set_state(&mut con, partial_update).await;
 
-        let final_state = redis_get_full_state(&mut con).await.unwrap();
+        let final_state = StateManager::get_full_state(&mut con).await.unwrap();
 
         let get_val = |s: &State, k: &str| s.state.get(k).unwrap().val.clone();
 
