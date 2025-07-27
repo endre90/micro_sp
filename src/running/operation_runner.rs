@@ -1,5 +1,4 @@
 use crate::*;
-use redis::AsyncCommands;
 use std::sync::Arc;
 use tokio::time::{interval, Duration};
 
@@ -44,12 +43,10 @@ pub async fn planned_operation_runner(
 
     // let last_known_state: Arc<RwLock<Option<State>>> = Arc::new(RwLock::new(None));
 
+    let mut con = connection_manager.get_connection().await;
     loop {
         interval.tick().await;
-        let mut con = connection_manager.get_connection().await;
-
-        if let Err(e) = con.set::<_, _, ()>("heartbeat", "alive").await {
-            handle_redis_error(&e, &log_target, connection_manager).await;
+        if !connection_manager.test_connection(&log_target).await {
             continue;
         }
         let state = match StateManager::get_state_for_keys(&mut con, &keys).await {

@@ -1,7 +1,6 @@
 use std::sync::Arc;
 
 use crate::*;
-use redis::AsyncCommands;
 use tokio::time::{Duration, interval};
 
 pub async fn sop_runner(
@@ -16,12 +15,10 @@ pub async fn sop_runner(
 
     let mut old_sop_id = String::new();
 
+    let mut con = connection_manager.get_connection().await;
     loop {
         interval.tick().await;
-        let mut con = connection_manager.get_connection().await;
-
-        if let Err(e) = con.set::<_, _, ()>("heartbeat", "alive").await {
-            handle_redis_error(&e, &log_target, connection_manager).await;
+        if !connection_manager.test_connection(&log_target).await {
             continue;
         }
         let state = match StateManager::get_full_state(&mut con).await {

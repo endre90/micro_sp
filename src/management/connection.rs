@@ -1,5 +1,5 @@
 use redis::aio::MultiplexedConnection;
-use redis::{Client, RedisResult};
+use redis::{AsyncCommands, Client, RedisResult};
 use std::env;
 use std::sync::Arc;
 use tokio::sync::RwLock;
@@ -44,6 +44,25 @@ impl ConnectionManager {
 
     pub async fn get_connection(&self) -> MultiplexedConnection {
         self.connection.read().await.clone()
+    }
+
+    pub async fn test_connection(&self, log_target: &str) -> bool {
+        if let Err(e) = self
+            .get_connection()
+            .await
+            .set::<_, _, ()>("heartbeat", "alive")
+            .await
+        {
+            if e.is_io_error() {
+                log::error!(target: log_target, "Redis command failed, triggering reconnect.");
+                self.reconnect().await;
+                return false;
+            } else {
+                log::error!(target: log_target, "An unexpected Redis error occurred: {}", e);
+                return false;
+            }
+        }
+        true
     }
 
     // Replaces the dead connection with a new one
