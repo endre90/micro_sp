@@ -39,11 +39,11 @@ pub use crate::management::snapshot::*;
 pub use crate::management::state::*;
 pub use crate::management::connection::*;
 
-// pub mod transforms;
-// pub use crate::transforms::cycles::*;
-// pub use crate::transforms::loading::*;
-// pub use crate::transforms::lookup::*;
-// pub use crate::transforms::treeviz::*;
+pub mod transforms;
+pub use crate::transforms::cycles::*;
+pub use crate::transforms::loading::*;
+pub use crate::transforms::lookup::*;
+pub use crate::transforms::treeviz::*;
 
 pub mod utils;
 pub use crate::utils::logger::*;
