@@ -92,25 +92,24 @@ pub async fn planner_ticker(
             Some(s) => s,
             None => continue,
         };
-        let old_info = state.get_string_or_default_to_unknown(
-            &log_target,
-            &format!("{}_planner_information", sp_id),
-        );
+        let old_info =
+            state.get_string_or_default_to_unknown(&format!("{}_planner_information", sp_id));
 
-        let new_state = process_planner_tick(sp_id, &model, &state, &log_target);
+        let new_state = process_planner_tick(sp_id, &model, &state);
 
-        let new_info = new_state.get_string_or_default_to_unknown(
-            &log_target,
-            &format!("{}_planner_information", sp_id),
-        );
+        let new_info =
+            new_state.get_string_or_default_to_unknown(&format!("{}_planner_information", sp_id));
         if old_info != new_info && !new_info.is_empty() {
             log::info!(target: log_target, "{}", new_info);
         }
 
-        let modified_state = state.get_diff_partial_state(&new_state);
-        if !modified_state.state.is_empty() {
-            StateManager::set_state(&mut con, &modified_state).await;
-        }
+        // let modified_state = state.get_diff_partial_state(&new_state);
+        // if !modified_state.state.is_empty() {
+        //     StateManager::set_state(&mut con, &modified_state).await;
+        // }
+        // let modified_state = state.get_diff_partial_state(&new_state);
+        // StateManager::set_state(con, &modified_state).await;
+        StateManager::set_state(&mut con, &new_state).await;
     }
 }
 
@@ -125,29 +124,23 @@ struct PlannerContext {
     planner_information: String,
 }
 
-fn process_planner_tick(sp_id: &str, model: &Model, state: &State, log_target: &str) -> State {
+fn process_planner_tick(sp_id: &str, model: &Model, state: &State) -> State {
     let mut ctx = PlannerContext {
-        replan_trigger: state
-            .get_bool_or_default_to_false(&log_target, &format!("{}_replan_trigger", sp_id)),
-        replanned: state.get_bool_or_default_to_false(&log_target, &format!("{}_replanned", sp_id)),
-        plan_counter: state
-            .get_int_or_default_to_zero(&log_target, &format!("{}_plan_counter", sp_id)),
-        replan_counter: state
-            .get_int_or_default_to_zero(&log_target, &format!("{}_replan_counter", sp_id)),
+        replan_trigger: state.get_bool_or_default_to_false(&format!("{}_replan_trigger", sp_id)),
+        replanned: state.get_bool_or_default_to_false(&format!("{}_replanned", sp_id)),
+        plan_counter: state.get_int_or_default_to_zero(&format!("{}_plan_counter", sp_id)),
+        replan_counter: state.get_int_or_default_to_zero(&format!("{}_replan_counter", sp_id)),
         replan_counter_total: state
-            .get_int_or_default_to_zero(&log_target, &format!("{}_replan_counter_total", sp_id)),
-        planner_state: state
-            .get_string_or_default_to_unknown(&log_target, &format!("{}_planner_state", sp_id)),
+            .get_int_or_default_to_zero(&format!("{}_replan_counter_total", sp_id)),
+        planner_state: state.get_string_or_default_to_unknown(&format!("{}_planner_state", sp_id)),
         plan: state
-            .get_array_or_default_to_empty(&log_target, &format!("{}_plan", sp_id))
+            .get_array_or_default_to_empty(&format!("{}_plan", sp_id))
             .iter()
             .filter(|val| val.is_string())
             .map(|y| y.to_string())
             .collect(),
-        planner_information: state.get_string_or_default_to_unknown(
-            &log_target,
-            &format!("{}_planner_information", sp_id),
-        ),
+        planner_information: state
+            .get_string_or_default_to_unknown(&format!("{}_planner_information", sp_id)),
     };
 
     let mut new_state = state.clone();

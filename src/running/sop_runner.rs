@@ -26,8 +26,7 @@ pub async fn sop_runner(
             None => continue,
         };
 
-        let current_sop_id =
-            state.get_string_or_default_to_unknown(log_target, &format!("{}_sop_id", sp_id));
+        let current_sop_id = state.get_string_or_default_to_unknown(&format!("{}_sop_id", sp_id));
 
         if old_sop_id != current_sop_id && !current_sop_id.is_empty() {
             if let Some(root_sop) = model.sops.iter().find(|s| s.id == current_sop_id) {
@@ -50,20 +49,32 @@ fn process_sop_tick(
     sp_id: &str,
     model: &Model,
     state: &State,
-    log_target: &str
+    log_target: &str,
 ) -> Result<State, Box<dyn std::error::Error>> {
     let mut new_state = state.clone();
-    let mut sop_overall_state = state.get_string_or_default_to_unknown(
-        &log_target,
-        &format!("{}_sop_state", sp_id),
-    );
+    let mut sop_overall_state =
+        state.get_string_or_default_to_unknown(&format!("{}_sop_state", sp_id));
 
     match SOPState::from_str(&sop_overall_state) {
         SOPState::Initial => {
-            handle_sop_initial(sp_id, model, state, &mut new_state, &mut sop_overall_state, &log_target)?;
+            handle_sop_initial(
+                sp_id,
+                model,
+                state,
+                &mut new_state,
+                &mut sop_overall_state,
+                &log_target,
+            )?;
         }
         SOPState::Executing => {
-            handle_sop_executing(sp_id, model, state, &mut new_state, &mut sop_overall_state, &log_target);
+            handle_sop_executing(
+                sp_id,
+                model,
+                state,
+                &mut new_state,
+                &mut sop_overall_state,
+                &log_target,
+            );
         }
         SOPState::Completed | SOPState::Failed => {}
         SOPState::UNKNOWN => {
@@ -85,17 +96,11 @@ fn handle_sop_initial(
     state: &State,
     new_state: &mut State,
     sop_overall_state: &mut String,
-    log_target: &str
+    log_target: &str,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    if state.get_bool_or_default_to_false(
-        &log_target,
-        &format!("{}_sop_enabled", sp_id),
-    ) {
+    if state.get_bool_or_default_to_false(&format!("{}_sop_enabled", sp_id)) {
         log::info!(target: &log_target, "SOP enabled. Transitioning to Executing.");
-        let sop_id = state.get_string_or_default_to_unknown(
-            &log_target,
-            &format!("{}_sop_id", sp_id),
-        );
+        let sop_id = state.get_string_or_default_to_unknown(&format!("{}_sop_id", sp_id));
 
         let root_sop = model
             .sops
@@ -120,14 +125,10 @@ fn handle_sop_executing(
     state: &State,
     new_state: &mut State,
     sop_overall_state: &mut String,
-    log_target: &str
+    log_target: &str,
 ) {
-    let sop_id = state.get_string_or_default_to_unknown(
-        &log_target,
-        &format!("{}_sop_id", sp_id),
-    );
-    let stack_json =
-        state.get_string_or_value(sp_id, &format!("{}_sop_stack", sp_id), "[]".to_string());
+    let sop_id = state.get_string_or_default_to_unknown(&format!("{}_sop_id", sp_id));
+    let stack_json = state.get_string_or_value(sp_id, "[]".to_string());
 
     let Some(root_sop) = model.sops.iter().find(|s| s.id == sop_id) else {
         log::error!(target: &log_target, "SOP with id '{}' not found in model. Failing.", sop_id);
@@ -135,7 +136,8 @@ fn handle_sop_executing(
         return;
     };
 
-    let (updated_state, new_stack_json) = run_sop_tick(sp_id, state, stack_json, &root_sop.sop, &log_target);
+    let (updated_state, new_stack_json) =
+        run_sop_tick(sp_id, state, stack_json, &root_sop.sop, &log_target);
     *new_state = updated_state;
 
     *new_state = new_state.update(&format!("{}_sop_stack", sp_id), new_stack_json.to_spvalue());
@@ -153,10 +155,7 @@ fn handle_sop_executing(
 fn is_sop_failed(sp_id: &str, sop: &SOP, state: &State, log_target: &str) -> bool {
     match sop {
         SOP::Operation(operation) => {
-            let op_state_str = state.get_string_or_default_to_unknown(
-                &log_target,
-                &operation.name,
-            );
+            let op_state_str = state.get_string_or_default_to_unknown(&operation.name);
             OperationState::from_str(&op_state_str) == OperationState::Unrecoverable
         }
         SOP::Sequence(sops) | SOP::Parallel(sops) | SOP::Alternative(sops) => sops
@@ -169,11 +168,9 @@ pub fn run_sop_tick(
     sp_id: &str,
     state: &State,
     stack_json: String,
-    root_sop: &SOP,    
-    log_target: &str
+    root_sop: &SOP,
+    log_target: &str,
 ) -> (State, String) {
-
-
     let mut new_state = state.clone();
 
     let mut stack: Vec<SOP> = serde_json::from_str(&stack_json).unwrap_or_else(|_| {
@@ -190,20 +187,14 @@ pub fn run_sop_tick(
 
     match &current_sop {
         SOP::Operation(operation) => {
-            let operation_state = state.get_string_or_default_to_unknown(
-                &log_target,
-                &format!("{}", operation.name),
-            );
+            let operation_state =
+                state.get_string_or_default_to_unknown(&format!("{}", operation.name));
 
-            let mut operation_information = state.get_string_or_default_to_unknown(
-                &log_target,
-                &format!("{}_information", operation.name),
-            );
+            let mut operation_information =
+                state.get_string_or_default_to_unknown(&format!("{}_information", operation.name));
 
-            let mut operation_retry_counter = state.get_int_or_default_to_zero(
-                &log_target,
-                &format!("{}_retry_counter", operation.name),
-            );
+            let mut operation_retry_counter =
+                state.get_int_or_default_to_zero(&format!("{}_retry_counter", operation.name));
 
             match OperationState::from_str(&operation_state) {
                 OperationState::Initial => {
@@ -355,10 +346,8 @@ pub fn run_sop_tick(
 fn is_sop_completed(sp_id: &str, sop: &SOP, state: &State, log_target: &str) -> bool {
     match sop {
         SOP::Operation(operation) => {
-            let operation_state = state.get_string_or_default_to_unknown(
-                &log_target,
-                &format!("{}", operation.name),
-            );
+            let operation_state =
+                state.get_string_or_default_to_unknown(&format!("{}", operation.name));
             OperationState::from_str(&operation_state) == OperationState::Completed
         }
         SOP::Sequence(sops) | SOP::Parallel(sops) => {
@@ -380,10 +369,8 @@ fn is_sop_completed(sp_id: &str, sop: &SOP, state: &State, log_target: &str) -> 
 fn is_sop_in_initial_state(sp_id: &str, sop: &SOP, state: &State, log_target: &str) -> bool {
     match sop {
         SOP::Operation(operation) => {
-            let operation_state = state.get_string_or_default_to_unknown(
-                &log_target,
-                &format!("{}", operation.name),
-            );
+            let operation_state =
+                state.get_string_or_default_to_unknown(&format!("{}", operation.name));
             OperationState::from_str(&operation_state) == OperationState::Initial
                 || OperationState::from_str(&operation_state) == OperationState::UNKNOWN
         }
@@ -404,17 +391,16 @@ fn is_sop_in_initial_state(sp_id: &str, sop: &SOP, state: &State, log_target: &s
 fn can_sop_start(sp_id: &str, sop: &SOP, state: &State, log_target: &str) -> bool {
     match sop {
         SOP::Operation(operation) => {
-            let operation_state = state.get_string_or_default_to_unknown(
-                &log_target,
-                &format!("{}", operation.name),
-            );
+            let operation_state =
+                state.get_string_or_default_to_unknown(&format!("{}", operation.name));
             (OperationState::from_str(&operation_state) == OperationState::Initial)
                 && operation.eval_running(state)
         }
         SOP::Sequence(sops) => {
             // A sequence can start if its very first element can start.
-            sops.first()
-                .map_or(false, |first_sop| can_sop_start(sp_id, first_sop, state, &log_target))
+            sops.first().map_or(false, |first_sop| {
+                can_sop_start(sp_id, first_sop, state, &log_target)
+            })
         }
         SOP::Parallel(sops) => {
             // A Parallel or Alternative block can start if any of its children can start.

@@ -34,10 +34,18 @@ impl Predicate {
                     state.get_value(&vx.name) == state.get_value(&vy.name)
                 }
                 (SPWrapped::SPVariable(vx), SPWrapped::SPValue(vy)) => {
-                    state.get_value(&vx.name) == vy
+                    if let Some(value) = state.get_value(&vx.name) {
+                        value == vy
+                    } else {
+                        false
+                    }
                 }
                 (SPWrapped::SPValue(vx), SPWrapped::SPVariable(vy)) => {
-                    vx == state.get_value(&vy.name)
+                    if let Some(value) = state.get_value(&vy.name) {
+                        vx == value
+                    } else {
+                        false
+                    }
                 }
                 (SPWrapped::SPValue(vx), SPWrapped::SPValue(vy)) => vx == vy,
             },
@@ -46,10 +54,18 @@ impl Predicate {
                     state.get_value(&vx.name) != state.get_value(&vy.name)
                 }
                 (SPWrapped::SPVariable(vx), SPWrapped::SPValue(vy)) => {
-                    state.get_value(&vx.name) != vy
+                    if let Some(value) = state.get_value(&vx.name) {
+                        value != vy
+                    } else {
+                        false
+                    }
                 }
                 (SPWrapped::SPValue(vx), SPWrapped::SPVariable(vy)) => {
-                    vx != state.get_value(&vy.name)
+                    if let Some(value) = state.get_value(&vy.name) {
+                        vx != value
+                    } else {
+                        false
+                    }
                 }
                 (SPWrapped::SPValue(vx), SPWrapped::SPValue(vy)) => vx != vy,
             },
@@ -280,11 +296,12 @@ mod tests {
     }
 
     #[test]
-    #[should_panic]
+    // Let's see...
+    // #[should_panic]
     fn test_predicate_eq_panic_not_in_state() {
         let state = State::from_vec(&john_doe());
         let eq1 = Predicate::EQ(v!("v1").wrap(), "John".wrap());
-        eq1.eval(&state);
+        assert_eq!(eq1.eval(&state), false);
     }
 
     #[test]

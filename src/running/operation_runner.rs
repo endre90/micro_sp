@@ -55,22 +55,23 @@ pub async fn planned_operation_runner(
         };
 
         let new_state = process_plan_tick(sp_id, &model, &state, &log_target);
-        let modified_state = state.get_diff_partial_state(&new_state);
-        StateManager::set_state(&mut con, &modified_state).await;
+        // let modified_state = state.get_diff_partial_state(&new_state);
+        // StateManager::set_state(con, &modified_state).await;
+        StateManager::set_state(&mut con, &new_state).await;
     }
 }
 
 fn process_plan_tick(sp_id: &str, model: &Model, state: &State, log_target: &str) -> State {
     let mut new_state = state.clone();
     let mut planner_state =
-        state.get_string_or_default_to_unknown(&log_target, &format!("{}_planner_state", sp_id));
+        state.get_string_or_default_to_unknown(&format!("{}_planner_state", sp_id));
 
     let mut plan_state_str =
-        state.get_string_or_default_to_unknown(&log_target, &format!("{}_plan_state", sp_id));
+        state.get_string_or_default_to_unknown(&format!("{}_plan_state", sp_id));
     let mut plan_current_step =
-        state.get_int_or_default_to_zero(&log_target, &format!("{}_plan_current_step", sp_id));
+        state.get_int_or_default_to_zero(&format!("{}_plan_current_step", sp_id));
     let plan_of_sp_values =
-        state.get_array_or_default_to_empty(&log_target, &format!("{}_plan", sp_id));
+        state.get_array_or_default_to_empty(&format!("{}_plan", sp_id));
 
     let plan: Vec<String> = plan_of_sp_values
         .iter()
@@ -141,13 +142,13 @@ fn process_operation(
     };
 
     let operation_state_str =
-        state.get_string_or_default_to_unknown(&log_target, &format!("{}", operation.name));
+        state.get_string_or_default_to_unknown(&format!("{}", operation.name));
 
     let old_operation_information = state
-        .get_string_or_default_to_unknown(&log_target, &format!("{}_information", operation.name));
+        .get_string_or_default_to_unknown(&format!("{}_information", operation.name));
 
     let mut operation_retry_counter =
-        state.get_int_or_default_to_zero(&log_target, &format!("{}_retry_counter", operation.name));
+        state.get_int_or_default_to_zero(&format!("{}_retry_counter", operation.name));
 
     let mut new_op_info = old_operation_information.clone();
 

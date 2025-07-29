@@ -119,13 +119,10 @@ mod tests {
             .expect("get_full_state should not fail with malformed data");
 
         assert_eq!(state.state.len(), 2, "State should contain 2 valid items");
-        assert_eq!(state.get_value(key1), value1);
-        assert_eq!(state.get_value(key2), value2);
+        assert_eq!(state.get_value(key1), Some(value1));
+        assert_eq!(state.get_value(key2), Some(value2));
 
-        let panic_result = std::panic::catch_unwind(|| {
-            state.get_value(malformed_key);
-        });
+        assert_eq!(state.get_value(malformed_key), None);
 
-        assert!(panic_result.is_err(), "Getting a non-spvalue should panic.");
     }
 }

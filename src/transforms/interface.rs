@@ -1,9 +1,7 @@
 use std::{collections::HashMap, sync::Arc};
 
 use crate::*;
-use tokio::{
-    time::{Duration, interval},
-};
+use tokio::time::{Duration, interval};
 
 pub async fn tf_interface(
     sp_id: &str,
@@ -12,7 +10,7 @@ pub async fn tf_interface(
     let mut interval = interval(Duration::from_millis(250));
     let log_target = format!("{}_tf_interface", sp_id);
 
-    log::info!(target: &log_target, "Online.");
+    log::info!(target: &log_target,  "Online.");
 
     let keys: Vec<String> = vec![
         format!("{}_tf_request_trigger", sp_id),
@@ -21,7 +19,7 @@ pub async fn tf_interface(
         format!("{}_tf_parent", sp_id),
         format!("{}_tf_child", sp_id),
         format!("{}_tf_lookup_result", sp_id),
-        format!("{}_tf_insert_transforms", sp_id)
+        format!("{}_tf_insert_transforms", sp_id),
     ];
 
     let mut con = connection_manager.get_connection().await;
@@ -35,48 +33,33 @@ pub async fn tf_interface(
             None => continue,
         };
 
-        let mut request_trigger = state.get_bool_or_default_to_false(
-            &log_target,
-            &format!("{}_tf_request_trigger", sp_id),
-        );
+        let mut request_trigger =
+            state.get_bool_or_default_to_false(&format!("{}_tf_request_trigger", sp_id));
 
-        let mut request_state = state.get_string_or_default_to_unknown(
-            &log_target,
-            &format!("{}_tf_request_state", sp_id),
-        );
+        let mut request_state =
+            state.get_string_or_default_to_unknown(&format!("{}_tf_request_state", sp_id));
 
         if request_trigger {
             request_trigger = false;
             if request_state == ServiceRequestState::Initial.to_string() {
-                let command = state.get_string_or_default_to_unknown(
-                    &log_target,
-                    &format!("{}_tf_command", sp_id),
-                );
+                let command =
+                    state.get_string_or_default_to_unknown(&format!("{}_tf_command", sp_id));
 
-                let parent = state.get_string_or_default_to_unknown(
-                    &log_target,
-                    &format!("{}_tf_parent", sp_id),
-                );
+                let parent =
+                    state.get_string_or_default_to_unknown(&format!("{}_tf_parent", sp_id));
 
-                let child = state.get_string_or_default_to_unknown(
-                    &log_target,
-                    &format!("{}_tf_child", sp_id),
-                );
+                let child = state.get_string_or_default_to_unknown(&format!("{}_tf_child", sp_id));
 
-                let mut tf_lookup_result = state.get_transform_or_default_to_default(
-                    &log_target,
-                    &format!("{}_tf_lookup_result", sp_id),
-                );
+                let mut tf_lookup_result = state
+                    .get_transform_or_default_to_default(&format!("{}_tf_lookup_result", sp_id));
 
                 // let tf_insert_transform = state.get_transform_or_default_to_default(
-                //     &log_target,
+                //
                 //     &format!("{}_tf_insert_transform", sp_id),
                 // );
 
-                let tf_insert_transforms = state.get_array_or_default_to_empty(
-                    &log_target,
-                    &format!("{}_tf_insert_transforms", sp_id),
-                );
+                let tf_insert_transforms =
+                    state.get_array_or_default_to_empty(&format!("{}_tf_insert_transforms", sp_id));
 
                 match command.as_str() {
                     "lookup" => {
@@ -86,22 +69,23 @@ pub async fn tf_interface(
                                 request_state = ServiceRequestState::Succeeded.to_string();
                             }
                             None => {
-                                log::error!(target: &log_target, 
+                                log::error!(target: &log_target,
                                     "Failed to lookup {} to {}.", parent, child);
                                 request_state = ServiceRequestState::Failed.to_string();
                             }
                         }
                     }
                     "reparent" => {
-                        match TransformsManager::reparent_transform(&mut con, &parent, &child).await {
+                        match TransformsManager::reparent_transform(&mut con, &parent, &child).await
+                        {
                             true => {
                                 request_state = ServiceRequestState::Succeeded.to_string();
                             }
                             false => {
-                                log::error!(target: &log_target, 
+                                log::error!(target:  &log_target,
                                     "Failed to reparent {} to {}.", child, parent);
                                 request_state = ServiceRequestState::Failed.to_string();
-                            }  
+                            }
                         }
                     }
 
@@ -115,7 +99,7 @@ pub async fn tf_interface(
                                     }
                                     TransformOrUnknown::UNKNOWN => (),
                                 },
-                                _ => ()
+                                _ => (),
                             }
                         }
                         TransformsManager::insert_transforms(&mut con, map).await;
@@ -126,7 +110,7 @@ pub async fn tf_interface(
                         //         request_state = ServiceRequestState::Succeeded.to_string();
                         //     }
                         //     false => {
-                        //         log::error!(target: &log_target,
+                        //         log::error!(target:
                         //             "Failed to reparent {} to {}.", child, parent);
                         //         request_state = ServiceRequestState::Failed.to_string();
                         //     }
@@ -145,14 +129,14 @@ pub async fn tf_interface(
                     //             request_state = ServiceRequestState::Succeeded.to_string();
                     //         }
                     //         false => {
-                    //             log::error!(target: &log_target,
+                    //             log::error!(target:
                     //                 "Failed to reparent {} to {}.", child, parent);
                     //             request_state = ServiceRequestState::Failed.to_string();
                     //         }
                     //     }
                     // }
                     _ => {
-                        log::error!(target: &log_target, 
+                        log::error!(target:  &log_target,
                             "TF interface command {} is invalid.", command);
                         request_state = ServiceRequestState::Failed.to_string()
                     }

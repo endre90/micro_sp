@@ -24,18 +24,13 @@ impl Action {
     }
 
     pub fn assign(self, state: &State) -> State {
-        match state.contains(&self.var.name) {
-            true => match self.var_or_val {
-                SPWrapped::SPVariable(x) => match state.contains(&x.name) {
-                    true => state
-                        .clone()
-                        .update(&self.var.name, state.get_value(&x.name)),
-                    false => panic!("Variable {:?} not in the state.", x.name),
-                },
-                SPWrapped::SPValue(x) => state.clone().update(&self.var.name, x),
-            },
-            false => panic!("Variable {} not in the state.", self.var.name),
-        }
+        let value_to_assign = match self.var_or_val {
+            SPWrapped::SPVariable(x) => state
+                .get_value(&x.name)
+                .unwrap_or_else(|| panic!("Source variable '{}' not in state.", x.name)),
+            SPWrapped::SPValue(x) => x,
+        };
+        state.update(&self.var.name, value_to_assign)
     }
 }
 
@@ -74,8 +69,8 @@ mod tests {
         let a2 = Action::new(weight.clone(), 85.0.wrap());
         let s_next_1 = a1.assign(&s);
         let s_next_2 = a2.assign(&s_next_1);
-        assert_eq!(s_next_1.get_value("weight"), 82.5.to_spvalue());
-        assert_eq!(s_next_2.get_value("weight"), 85.0.to_spvalue());
+        assert_eq!(s_next_1.get_value("weight"), Some(82.5.to_spvalue()));
+        assert_eq!(s_next_2.get_value("weight"), Some(85.0.to_spvalue()));
     }
 
     #[test]
@@ -95,8 +90,8 @@ mod tests {
         let a2 = a!(weight.clone(), 85.0.wrap());
         let s_next_1 = a1.assign(&s);
         let s_next_2 = a2.assign(&s_next_1);
-        assert_eq!(s_next_1.get_value("weight"), 82.5.to_spvalue());
-        assert_eq!(s_next_2.get_value("weight"), 85.0.to_spvalue());
+        assert_eq!(s_next_1.get_value("weight"), Some(82.5.to_spvalue()));
+        assert_eq!(s_next_2.get_value("weight"), Some(85.0.to_spvalue()));
     }
 
     #[test]

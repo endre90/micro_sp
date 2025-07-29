@@ -76,16 +76,16 @@ pub struct Operation {
 
 impl Default for Operation {
     fn default() -> Self {
-        Operation { 
-            name: "unknown".to_string(), 
-            state: OperationState::UNKNOWN, 
-            timeout_ms: None, 
-            retries: 0, 
-            preconditions: Vec::new(), 
-            postconditions: Vec::new(), 
-            fail_transitions: Vec::new(), 
-            timeout_transitions: Vec::new(), 
-            reset_transitions: Vec::new(), 
+        Operation {
+            name: "unknown".to_string(),
+            state: OperationState::UNKNOWN,
+            timeout_ms: None,
+            retries: 0,
+            preconditions: Vec::new(),
+            postconditions: Vec::new(),
+            fail_transitions: Vec::new(),
+            timeout_transitions: Vec::new(),
+            reset_transitions: Vec::new(),
         }
     }
 }
@@ -122,13 +122,16 @@ impl Operation {
 
     /// Check the guard of the planning precondidion transition.
     pub fn eval_planning(&self, state: &State) -> bool {
-        if state.get_value(&self.name) == OperationState::Initial.to_spvalue() {
-            for precondition in &self.preconditions {
-                if precondition.clone().eval_planning(state) {
-                    return true;
+        if let Some(value) = state.get_value(&self.name) {
+            if value == OperationState::Initial.to_spvalue() {
+                for precondition in &self.preconditions {
+                    if precondition.clone().eval_planning(state) {
+                        return true;
+                    }
                 }
             }
         }
+
         false
     }
 
@@ -141,10 +144,12 @@ impl Operation {
     }
 
     pub fn eval_running(&self, state: &State) -> bool {
-        if state.get_value(&self.name) == OperationState::Initial.to_spvalue() {
-            for precondition in &self.preconditions {
-                if precondition.clone().eval_running(state) {
-                    return true;
+        if let Some(value) = state.get_value(&self.name) {
+            if value == OperationState::Initial.to_spvalue() {
+                for precondition in &self.preconditions {
+                    if precondition.clone().eval_running(state) {
+                        return true;
+                    }
                 }
             }
         }
@@ -153,10 +158,12 @@ impl Operation {
 
     /// Check the guard and return a tuple: (is_enabled, index_of_enabled_transition)
     pub fn eval_running_with_transition_index(&self, state: &State) -> (bool, usize) {
-        if state.get_value(&self.name) == OperationState::Initial.to_spvalue() {
-            for (index, precondition) in self.preconditions.iter().enumerate() {
-                if precondition.clone().eval_running(state) {
-                    return (true, index);
+        if let Some(value) = state.get_value(&self.name) {
+            if value == OperationState::Initial.to_spvalue() {
+                for (index, precondition) in self.preconditions.iter().enumerate() {
+                    if precondition.clone().eval_running(state) {
+                        return (true, index);
+                    }
                 }
             }
         }
@@ -165,10 +172,12 @@ impl Operation {
 
     /// Check the running postondition guard.
     pub fn can_be_completed_with_transition_index(&self, state: &State) -> (bool, usize) {
-        if state.get_value(&self.name) == OperationState::Executing.to_spvalue() {
-            for (index, postcondition) in self.postconditions.iter().enumerate() {
-                if postcondition.clone().eval_running(state) {
-                    return (true, index);
+        if let Some(value) = state.get_value(&self.name) {
+            if value == OperationState::Executing.to_spvalue() {
+                for (index, postcondition) in self.postconditions.iter().enumerate() {
+                    if postcondition.clone().eval_running(state) {
+                        return (true, index);
+                    }
                 }
             }
         }
@@ -177,10 +186,12 @@ impl Operation {
 
     /// Check the running postondition guard.
     pub fn can_be_completed(&self, state: &State) -> bool {
-        if state.get_value(&self.name) == OperationState::Executing.to_spvalue() {
-            for postcondition in &self.postconditions {
-                if postcondition.clone().eval_running(&state) {
-                    return true;
+        if let Some(value) = state.get_value(&self.name) {
+            if value == OperationState::Executing.to_spvalue() {
+                for postcondition in &self.postconditions {
+                    if postcondition.clone().eval_running(&state) {
+                        return true;
+                    }
                 }
             }
         }
@@ -189,10 +200,12 @@ impl Operation {
 
     /// Check the running fail_transition guard.
     pub fn can_be_failed(&self, state: &State) -> bool {
-        if state.get_value(&self.name) == OperationState::Executing.to_spvalue() {
-            for fail_transition in &self.fail_transitions {
-                if fail_transition.clone().eval_running(&state) {
-                    return true;
+        if let Some(value) = state.get_value(&self.name) {
+            if value == OperationState::Executing.to_spvalue() {
+                for fail_transition in &self.fail_transitions {
+                    if fail_transition.clone().eval_running(&state) {
+                        return true;
+                    }
                 }
             }
         }
@@ -201,10 +214,12 @@ impl Operation {
 
     /// Check the running reset_transition guard.
     pub fn can_be_reset(&self, state: &State) -> bool {
-        if state.get_value(&self.name) == OperationState::Completed.to_spvalue() {
-            for reset_transition in &self.reset_transitions {
-                if reset_transition.clone().eval_running(&state) {
-                    return true;
+        if let Some(value) = state.get_value(&self.name) {
+            if value == OperationState::Completed.to_spvalue() {
+                for reset_transition in &self.reset_transitions {
+                    if reset_transition.clone().eval_running(&state) {
+                        return true;
+                    }
                 }
             }
         }
@@ -314,7 +329,7 @@ impl Operation {
     }
 
     /// Retry the execution of the operation, allows for retries without immediate replanning.
-    /// However, do we have to reset the variables before we can go back the initial state? 
+    /// However, do we have to reset the variables before we can go back the initial state?
     /// Otherwise we might end up in blocked.
     pub fn retry_running(&self, state: &State) -> State {
         let assignment = state.get_assignment(&self.name);
@@ -328,7 +343,9 @@ impl Operation {
 
     pub fn reinitialize_running(&self, state: &State) -> State {
         let assignment = state.get_assignment(&self.name);
-        if assignment.val == OperationState::Completed.to_spvalue() || assignment.val == OperationState::Unrecoverable.to_spvalue(){
+        if assignment.val == OperationState::Completed.to_spvalue()
+            || assignment.val == OperationState::Unrecoverable.to_spvalue()
+        {
             let action = Action::new(assignment.var, OperationState::Initial.to_spvalue().wrap());
             action.assign(&state)
         } else {
@@ -337,13 +354,30 @@ impl Operation {
     }
 
     pub fn get_all_var_keys(&self) -> Vec<String> {
-        let mut all_keys: Vec<String> = self.preconditions
+        let mut all_keys: Vec<String> = self
+            .preconditions
             .iter()
             .flat_map(|t| t.get_all_var_keys())
-            .chain(self.postconditions.iter().flat_map(|t| t.get_all_var_keys()))
-            .chain(self.fail_transitions.iter().flat_map(|t| t.get_all_var_keys()))
-            .chain(self.timeout_transitions.iter().flat_map(|t| t.get_all_var_keys()))
-            .chain(self.reset_transitions.iter().flat_map(|t| t.get_all_var_keys()))
+            .chain(
+                self.postconditions
+                    .iter()
+                    .flat_map(|t| t.get_all_var_keys()),
+            )
+            .chain(
+                self.fail_transitions
+                    .iter()
+                    .flat_map(|t| t.get_all_var_keys()),
+            )
+            .chain(
+                self.timeout_transitions
+                    .iter()
+                    .flat_map(|t| t.get_all_var_keys()),
+            )
+            .chain(
+                self.reset_transitions
+                    .iter()
+                    .flat_map(|t| t.get_all_var_keys()),
+            )
             .collect();
 
         all_keys.sort_unstable();

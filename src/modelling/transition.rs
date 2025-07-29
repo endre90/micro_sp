@@ -464,7 +464,7 @@ mod tests {
             vec!(a1, a2)
         );
         let s_next_1 = t1.take_planning(&s);
-        assert_eq!(s_next_1.get_value("weight"), 85.0.to_spvalue());
+        assert_eq!(s_next_1.get_value("weight"), Some(85.0.to_spvalue()));
     }
 
     #[test]
@@ -481,7 +481,7 @@ mod tests {
             vec!(a1, a3, a2)
         );
         let s_next_1 = t1.take_planning(&s);
-        assert_eq!(s_next_1.get_value("weight"), 87.5.to_spvalue());
+        assert_eq!(s_next_1.get_value("weight"), Some(87.5.to_spvalue()));
     }
 
     #[test]
@@ -496,7 +496,7 @@ mod tests {
             vec!(a2, a1)
         );
         let s_next_1 = t1.take_planning(&s);
-        assert_ne!(s_next_1.get_value("weight"), 85.0.to_spvalue());
+        assert_ne!(s_next_1.get_value("weight"), Some(85.0.to_spvalue()));
     }
 
     #[test]
