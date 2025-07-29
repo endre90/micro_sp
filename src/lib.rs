@@ -4,12 +4,10 @@ pub static MAX_RECURSION_DEPTH: u64 = 1000;
 
 pub mod core;
 pub use crate::core::sp_assignment::*;
-pub use crate::core::sp_goal::*;
 pub use crate::core::sp_state::*;
 pub use crate::core::sp_value::*;
 pub use crate::core::sp_variable::*;
 pub use crate::core::sp_wrapped::*;
-pub use crate::core::structs::*;
 
 pub mod modelling;
 pub use crate::modelling::action::*;
@@ -33,6 +31,7 @@ pub use crate::running::operation_runner::*;
 pub use crate::running::planner_ticker::*;
 pub use crate::running::main_runner::*;
 pub use crate::running::state_init::*;
+pub use crate::running::runner_states::*;
 
 pub mod management;
 pub use crate::management::snapshot::*;
