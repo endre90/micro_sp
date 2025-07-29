@@ -27,7 +27,7 @@ pub async fn tf_interface(
     let mut con = connection_manager.get_connection().await;
     loop {
         interval.tick().await;
-        if !connection_manager.test_connection(&log_target).await {
+        if let Err(_) = connection_manager.check_redis_health(&log_target).await {
             continue;
         }
         let state = match StateManager::get_state_for_keys(&mut con, &keys).await {
@@ -80,7 +80,7 @@ pub async fn tf_interface(
 
                 match command.as_str() {
                     "lookup" => {
-                        match StateManager::lookup_transform(&mut con, &parent, &child).await {
+                        match TransformsManager::lookup_transform(&mut con, &parent, &child).await {
                             Some(tf) => {
                                 tf_lookup_result = tf;
                                 request_state = ServiceRequestState::Succeeded.to_string();
@@ -93,7 +93,7 @@ pub async fn tf_interface(
                         }
                     }
                     "reparent" => {
-                        match StateManager::reparent_transform(&mut con, &parent, &child).await {
+                        match TransformsManager::reparent_transform(&mut con, &parent, &child).await {
                             true => {
                                 request_state = ServiceRequestState::Succeeded.to_string();
                             }
@@ -118,7 +118,7 @@ pub async fn tf_interface(
                                 _ => ()
                             }
                         }
-                        StateManager::insert_transforms(&mut con, map).await;
+                        TransformsManager::insert_transforms(&mut con, map).await;
                         request_state = ServiceRequestState::Succeeded.to_string();
                         // match response_rx.await? {
                         //     // NICE WAY TO PROPAGATE SUCCESS/FAILURE
@@ -173,7 +173,7 @@ pub async fn tf_interface(
                     );
 
                 let modified_state = state.get_diff_partial_state(&new_state);
-                StateManager::set_state(&mut con, modified_state).await;
+                StateManager::set_state(&mut con, &modified_state).await;
             }
         }
 

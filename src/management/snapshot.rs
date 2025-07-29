@@ -82,7 +82,7 @@ impl SnapshotManager {
                     let snapshot = self.in_memory_snapshot.read().await;
                     if let Some(state_to_restore) = &*snapshot {
                         log::warn!(target: log_target, "Redis is empty. Repopulating from snapshot.");
-                        let _ = StateManager::set_state(&mut con, state_to_restore.clone()).await;
+                        let _ = StateManager::set_state(&mut con, state_to_restore).await;
                     }
                 }
             }

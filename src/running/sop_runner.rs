@@ -18,7 +18,7 @@ pub async fn sop_runner(
     let mut con = connection_manager.get_connection().await;
     loop {
         interval.tick().await;
-        if !connection_manager.test_connection(&log_target).await {
+        if let Err(_) = connection_manager.check_redis_health(&log_target).await {
             continue;
         }
         let state = match StateManager::get_full_state(&mut con).await {
@@ -41,7 +41,7 @@ pub async fn sop_runner(
         let modified_state = state.get_diff_partial_state(&new_state);
 
         if !modified_state.state.is_empty() {
-            StateManager::set_state(&mut con, modified_state).await;
+            StateManager::set_state(&mut con, &modified_state).await;
         }
     }
 }

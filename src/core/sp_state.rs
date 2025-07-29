@@ -36,22 +36,20 @@ impl Hash for State {
 }
 
 impl State {
-    /// Create and returns a new State instance.
     pub fn new() -> State {
-        let mut state = HashMap::new();
-        state.insert("heartbeat".to_string(), SPAssignment::new(
-            SPVariable {
-                name: "heartbeat".to_string(),
-                value_type: SPValueType::String,
-            },
-            "unknown".to_spvalue(),
-        ));
+        let state = HashMap::new();
+        // state.insert("heartbeat".to_string(), SPAssignment::new(
+        //     SPVariable {
+        //         name: "heartbeat".to_string(),
+        //         value_type: SPValueType::String,
+        //     },
+        //     "unknown".to_spvalue(),
+        // ));
         State {
             state
         }
     }
 
-    /// Create a new State from a vector of (SPVariable, SPValue) tuples.
     pub fn from_vec(vec: &Vec<(SPVariable, SPValue)>) -> State {
         let mut state = HashMap::new();
         vec.iter().for_each(|(var, val)| {
@@ -82,6 +80,8 @@ impl State {
     }
 
     /// Make a new partial state that only consists of updates.
+    /// Questionable if this is necessary now that every task has only access
+    /// only to the necessary state.
     pub fn get_diff_partial_state(&self, new_state: &State) -> State {
         let mut modified = HashMap::new();
         for (key, new_assignment) in &new_state.state {
@@ -93,7 +93,6 @@ impl State {
         State { state: modified }
     }
 
-    /// Add an SPAssignment to the State, returning a new State.
     pub fn add(&self, assignment: SPAssignment) -> State {
         match self.state.clone().get(&assignment.var.name) {
             Some(_) => {
@@ -110,7 +109,7 @@ impl State {
     }
 
     /// Returns the SPValue of the variable with the given name from the state.
-    /// Panics if the variable is not in the state.
+    /// Panics if the variable is not in the state. Should remain panicking.
     pub fn get_value(&self, name: &str) -> SPValue {
         match self.state.clone().get(name) {
             None => panic!("Variable {} not in state!", name),
@@ -311,8 +310,6 @@ impl State {
         }
     }
 
-    /// Get the assignment of a variable in the state,
-    /// or panic if the variable is not found.
     pub fn get_assignment(&self, name: &str) -> SPAssignment {
         match self.state.clone().get(name) {
             None => panic!("Variable {} not in state!", name),
@@ -320,7 +317,6 @@ impl State {
         }
     }
 
-    /// Get all variables from the state.
     pub fn get_all_vars(&self) -> Vec<SPVariable> {
         self.state
             .iter()
@@ -328,12 +324,10 @@ impl State {
             .collect()
     }
 
-    /// Check whether a variable with the given name is contained in the state.
     pub fn contains(&self, name: &str) -> bool {
         self.state.clone().contains_key(name)
     }
 
-    /// Update the value of a variable and return a new State.
     pub fn update(&self, name: &str, val: SPValue) -> State {
         match self.state.get(name) {
             Some(assignment) => {
@@ -351,8 +345,6 @@ impl State {
         }
     }
 
-    /// Extend the state. If variables already exist, either keep
-    /// the existing values or overwrite them.
     pub fn extend(&self, other: State, overwrite_existing: bool) -> State {
         let existing = self.state.clone();
         let extension = other.state;
@@ -376,7 +368,6 @@ impl State {
         }
     }
 
-    /// Extract the goal predicate from the String value.
     pub fn extract_goal(&self, name: &str) -> Predicate {
         match self.state.get(&format!("{}_current_goal_predicate", name)) {
             Some(g_spvalue) => match &g_spvalue.val {
@@ -393,11 +384,9 @@ impl State {
     }
 }
 
-/// Displaying the State in a user-friendly way.
 impl fmt::Display for State {
     fn fmt(&self, fmtr: &mut fmt::Formatter<'_>) -> fmt::Result {
         let s: String = {
-            // let sorted = self.state.sort();
             let mut children: Vec<_> = self
                 .state
                 .iter()
@@ -466,7 +455,7 @@ mod tests {
     #[test]
     fn test_state_new() {
         let new_state = State::new();
-        assert_eq!(new_state.state.len(), 1)
+        assert_eq!(new_state.state.len(), 0)
         
     }
 

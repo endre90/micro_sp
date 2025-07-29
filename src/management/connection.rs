@@ -1,5 +1,5 @@
 use redis::aio::MultiplexedConnection;
-use redis::{AsyncCommands, Client, RedisResult};
+use redis::{Client, RedisError, RedisResult};
 use std::env;
 use std::sync::Arc;
 use tokio::sync::RwLock;
@@ -46,26 +46,23 @@ impl ConnectionManager {
         self.connection.read().await.clone()
     }
 
-    pub async fn test_connection(&self, log_target: &str) -> bool {
-        if let Err(e) = self
-            .get_connection()
-            .await
-            .set::<_, _, ()>("heartbeat", "alive")
-            .await
-        {
-            if e.is_io_error() {
-                log::error!(target: log_target, "Redis command failed, triggering reconnect.");
-                self.reconnect().await;
-                return false;
-            } else {
-                log::error!(target: log_target, "An unexpected Redis error occurred: {}", e);
-                return false;
+    pub async fn check_redis_health(&self, log_target: &str) -> redis::RedisResult<()> {
+        let mut con = self.get_connection().await;
+        match redis::cmd("PING").query_async::<()>(&mut con).await {
+            Ok(()) => Ok::<(), RedisError>(()),
+            Err(e) => {
+                if e.is_io_error() {
+                    log::error!(target: log_target, "Pinging Redis failed, triggering reconnect.");
+                    self.reconnect().await;
+                    return Err(e);
+                } else {
+                    log::error!(target: log_target, "An unexpected Redis error occurred: {}", e);
+                    return Err(e);
+                }
             }
         }
-        true
     }
 
-    // Replaces the dead connection with a new one
     pub async fn reconnect(&self) {
         log::warn!(target: "redis_manager", "Redis connection lost. Attempting to reconnect...");
 
@@ -82,25 +79,28 @@ impl ConnectionManager {
                 }
                 Err(e) => {
                     log::error!(target: "redis_manager", "Reconnect failed: {}. Retrying in 3s...", e);
-                    tokio::time::sleep(Duration::from_secs(3)).await;
+                    tokio::time::sleep(Duration::from_secs(5)).await;
                 }
             }
         }
     }
+
+    pub async fn handle_redis_error(
+        &self,
+        e: &redis::RedisError,
+        log_target: &str,
+    ) {
+        if e.is_io_error() {
+            log::error!(target: log_target, "Redis command failed, triggering reconnect.");
+            self.reconnect().await;
+        } else {
+            log::error!(target: log_target, "An unexpected Redis error occurred: {}", e);
+        }
+    }
+
 }
 
-pub async fn handle_redis_error(
-    e: &redis::RedisError,
-    log_target: &str,
-    connection_manager: &Arc<ConnectionManager>,
-) {
-    if e.is_io_error() {
-        log::error!(target: log_target, "Redis command failed, triggering reconnect.");
-        connection_manager.reconnect().await;
-    } else {
-        log::error!(target: log_target, "An unexpected Redis error occurred: {}", e);
-    }
-}
+
 
 pub async fn restore_state_from_snapshot(
     con: &mut MultiplexedConnection,
@@ -114,7 +114,7 @@ pub async fn restore_state_from_snapshot(
             target: log_target,
             "Redis is empty. Repopulating with the last known state."
         );
-        StateManager::set_state(con, state_to_restore.clone()).await;
+        StateManager::set_state(con, state_to_restore).await;
     } else {
         log::debug!(
             target: log_target,

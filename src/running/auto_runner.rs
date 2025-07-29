@@ -17,7 +17,7 @@ async fn process_single_transition(
     log::info!(target: log_target, "Executed auto transition: '{}'.", transition.name);
 
     let modified_state = state.get_diff_partial_state(&new_state);
-    StateManager::set_state(con, modified_state).await;
+    StateManager::set_state(con, &modified_state).await;
 }
 
 pub async fn auto_transition_runner(
@@ -41,7 +41,7 @@ pub async fn auto_transition_runner(
     let mut con = connection_manager.get_connection().await;
     loop {
         interval.tick().await;
-        if !connection_manager.test_connection(&log_target).await {
+        if let Err(_) = connection_manager.check_redis_health(&log_target).await {
             continue;
         }
         let state = match StateManager::get_state_for_keys(&mut con, &keys).await {
