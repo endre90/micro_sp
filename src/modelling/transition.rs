@@ -127,29 +127,29 @@ impl Transition {
         )
     }
 
-    pub fn eval_planning(self, state: &State) -> bool {
-        self.guard.eval(state)
+    pub fn eval_planning(self, state: &State, log_target: &str) -> bool {
+        self.guard.eval(state, &log_target)
     }
 
-    pub fn eval_running(self, state: &State) -> bool {
-        self.guard.eval(state) && self.runner_guard.eval(state)
+    pub fn eval_running(self, state: &State, log_target: &str) -> bool {
+        self.guard.eval(state, &log_target) && self.runner_guard.eval(state, &log_target)
     }
 
-    pub fn take_planning(self, state: &State) -> State {
+    pub fn take_planning(self, state: &State, log_target: &str) -> State {
         let mut new_state = state.clone();
         for a in self.actions {
-            new_state = a.assign(&new_state)
+            new_state = a.assign(&new_state, &log_target)
         }
         new_state
     }
 
-    pub fn take_running(self, state: &State) -> State {
+    pub fn take_running(self, state: &State, log_target: &str) -> State {
         let mut new_state = state.clone();
         for a in self.actions {
-            new_state = a.assign(&new_state)
+            new_state = a.assign(&new_state, &log_target)
         }
         for a in self.runner_actions {
-            new_state = a.assign(&new_state)
+            new_state = a.assign(&new_state, &log_target)
         }
         new_state
     }
@@ -324,8 +324,8 @@ mod tests {
         let a1 = a!(weight.clone(), 85.0.wrap());
         let t1 = t_plan!("gains_weight", Predicate::TRUE, vec!(a1.clone()));
         let t2 = t_plan!("gains_weight", Predicate::FALSE, vec!(a1));
-        assert!(t1.eval_planning(&s));
-        assert!(!t2.eval_planning(&s));
+        assert!(t1.eval_planning(&s, "t"));
+        assert!(!t2.eval_planning(&s, "t"));
     }
 
     #[test]
@@ -349,8 +349,8 @@ mod tests {
             Vec::<&str>::new(),
             &s
         );
-        assert!(t1.eval_running(&s));
-        assert!(!t2.eval_running(&s));
+        assert!(t1.eval_running(&s, "t"));
+        assert!(!t2.eval_running(&s, "t"));
     }
 
     #[test]
@@ -366,7 +366,7 @@ mod tests {
             Vec::<&str>::new(),
             &s
         );
-        assert!(t1.eval_running(&s));
+        assert!(t1.eval_running(&s, "t"));
     }
 
     // #[test]
@@ -426,8 +426,8 @@ mod tests {
             eq!(weight.wrap(), 82.5.wrap()),
             vec!(a2)
         );
-        let s_next_1 = t1.take_planning(&s);
-        let s_next_2 = t2.take_planning(&s_next_1);
+        let s_next_1 = t1.take_planning(&s, "t");
+        let s_next_2 = t2.take_planning(&s_next_1, "t");
         let new_state = s.clone().update("weight", 85.0.to_spvalue());
         assert_eq!(s_next_2, new_state);
     }
@@ -463,8 +463,8 @@ mod tests {
             eq!(weight.wrap(), 80.0.wrap()),
             vec!(a1, a2)
         );
-        let s_next_1 = t1.take_planning(&s);
-        assert_eq!(s_next_1.get_value("weight"), Some(85.0.to_spvalue()));
+        let s_next_1 = t1.take_planning(&s, "t");
+        assert_eq!(s_next_1.get_value("weight", "t"), Some(85.0.to_spvalue()));
     }
 
     #[test]
@@ -480,8 +480,8 @@ mod tests {
             eq!(weight.wrap(), 80.0.wrap()),
             vec!(a1, a3, a2)
         );
-        let s_next_1 = t1.take_planning(&s);
-        assert_eq!(s_next_1.get_value("weight"), Some(87.5.to_spvalue()));
+        let s_next_1 = t1.take_planning(&s, "t");
+        assert_eq!(s_next_1.get_value("weight", "t"), Some(87.5.to_spvalue()));
     }
 
     #[test]
@@ -495,8 +495,8 @@ mod tests {
             eq!(weight.wrap(), 80.0.wrap()),
             vec!(a2, a1)
         );
-        let s_next_1 = t1.take_planning(&s);
-        assert_ne!(s_next_1.get_value("weight"), Some(85.0.to_spvalue()));
+        let s_next_1 = t1.take_planning(&s, "t");
+        assert_ne!(s_next_1.get_value("weight", "t"), Some(85.0.to_spvalue()));
     }
 
     #[test]

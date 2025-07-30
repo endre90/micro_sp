@@ -8,6 +8,7 @@ pub fn bfs_operation_planner(
     goal: Predicate,
     model: Vec<Operation>,
     max_depth: usize,
+    log_target: &str
 ) -> PlanningResult {
     let now = Instant::now();
     let mut visited: HashSet<State> = HashSet::new();
@@ -34,7 +35,7 @@ pub fn bfs_operation_planner(
                         };
                     }
                 };
-                match goal.clone().eval(&s) {
+                match goal.clone().eval(&s, &log_target) {
                     true => {
                         break PlanningResult {
                             found: true,
@@ -56,10 +57,10 @@ pub fn bfs_operation_planner(
                                 visited.insert(s.clone());
                                 model
                                     .iter()
-                                    .for_each(|o| match o.clone().eval_planning(&s) {
+                                    .for_each(|o| match o.clone().eval_planning(&s, &log_target) {
                                         false => (),
                                         true => {
-                                            let next_s = o.clone().take_planning(&s);
+                                            let next_s = o.clone().take_planning(&s, &log_target);
                                             let mut next_p = path.clone();
                                             next_p.push(o.name.clone());
                                             stack.insert(0, (next_s, next_p));

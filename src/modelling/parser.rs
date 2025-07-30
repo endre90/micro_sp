@@ -7,7 +7,7 @@ peg::parser!(pub grammar pred_parser() for str {
 
     pub rule variable(state: &State) -> SPVariable =
     "var:" _ n:$(['a'..='z' | 'A'..='Z' | '0'..='9' | '_' | '/']+) {
-        state.get_assignment(n).var
+        state.get_assignment(n, "parser").var
     }
 
     pub rule array_element(state: &State) -> SPValue =
@@ -57,7 +57,7 @@ peg::parser!(pub grammar pred_parser() for str {
         // this is not tested
         / _ var:variable(&state) "+" _ n:$(['0'..='9']+) {
             let i: i64 = n.parse().unwrap();
-            let new_val = match state.get_value(&var.name) {
+            let new_val = match state.get_value(&var.name, "parser") {
                 Some(sp_value) => match sp_value {
                     SPValue::Int64(IntOrUnknown::Int64(val)) => (val + i).to_spvalue(),
                     _ => panic!("Can't increment non-integer variable")
@@ -216,7 +216,7 @@ mod tests {
         let s = State::from_vec(&john_doe());
         assert_eq!(
             pred_parser::variable("var: height", &s),
-            Ok(s.get_assignment("height").var)
+            Ok(s.get_assignment("height", "t").var)
         );
     }
 
@@ -293,15 +293,15 @@ mod tests {
         assert_eq!(pred_parser::pred(eq1, &s), Ok(or));
 
         let eq1 = "var:smart == TRUE || !(FALSE != var:smart)";
-        let hej = s.get_assignment("smart").var.wrap();
+        let hej = s.get_assignment("smart", "t").var.wrap();
         let eq2 = EQ(hej.clone(), true.to_spvalue().wrap());
         let eq3 = NEQ(false.to_spvalue().wrap(), hej);
         let or = OR(vec![eq2, NOT(Box::new(eq3))]);
         assert_eq!(pred_parser::pred(eq1, &s), Ok(or));
 
         let impl1 = " var:smart == TRUE ->  var:alive == FALSE || TRUE  ";
-        let hej = s.get_assignment("smart").var.wrap();
-        let hopp = s.get_assignment("alive").var.wrap();
+        let hej = s.get_assignment("smart", "t").var.wrap();
+        let hopp = s.get_assignment("alive", "t").var.wrap();
         let eq1 = EQ(hej, true.to_spvalue().wrap());
         let eq2 = EQ(hopp, false.to_spvalue().wrap());
         let impl2 = OR(vec![NOT(Box::new(eq1)), OR(vec![eq2, TRUE])]);

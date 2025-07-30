@@ -33,33 +33,40 @@ pub async fn tf_interface(
             None => continue,
         };
 
-        let mut request_trigger =
-            state.get_bool_or_default_to_false(&format!("{}_tf_request_trigger", sp_id));
+        let mut request_trigger = state
+            .get_bool_or_default_to_false(&format!("{}_tf_request_trigger", sp_id), &log_target);
 
-        let mut request_state =
-            state.get_string_or_default_to_unknown(&format!("{}_tf_request_state", sp_id));
+        let mut request_state = state
+            .get_string_or_default_to_unknown(&format!("{}_tf_request_state", sp_id), &log_target);
 
         if request_trigger {
             request_trigger = false;
             if request_state == ServiceRequestState::Initial.to_string() {
-                let command =
-                    state.get_string_or_default_to_unknown(&format!("{}_tf_command", sp_id));
+                let command = state.get_string_or_default_to_unknown(
+                    &format!("{}_tf_command", sp_id),
+                    &log_target,
+                );
 
-                let parent =
-                    state.get_string_or_default_to_unknown(&format!("{}_tf_parent", sp_id));
+                let parent = state
+                    .get_string_or_default_to_unknown(&format!("{}_tf_parent", sp_id), &log_target);
 
-                let child = state.get_string_or_default_to_unknown(&format!("{}_tf_child", sp_id));
+                let child = state
+                    .get_string_or_default_to_unknown(&format!("{}_tf_child", sp_id), &log_target);
 
-                let mut tf_lookup_result = state
-                    .get_transform_or_default_to_default(&format!("{}_tf_lookup_result", sp_id));
+                let mut tf_lookup_result = state.get_transform_or_default_to_default(
+                    &format!("{}_tf_lookup_result", sp_id),
+                    &log_target,
+                );
 
                 // let tf_insert_transform = state.get_transform_or_default_to_default(
                 //
                 //     &format!("{}_tf_insert_transform", sp_id),
                 // );
 
-                let tf_insert_transforms =
-                    state.get_array_or_default_to_empty(&format!("{}_tf_insert_transforms", sp_id));
+                let tf_insert_transforms = state.get_array_or_default_to_empty(
+                    &format!("{}_tf_insert_transforms", sp_id),
+                    &log_target,
+                );
 
                 match command.as_str() {
                     "lookup" => {

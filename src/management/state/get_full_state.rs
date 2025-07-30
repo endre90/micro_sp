@@ -25,12 +25,11 @@ pub(super) async fn get_full_state(con: &mut MultiplexedConnection) -> Option<St
     Some(StateManager::build_state(keys, values))
 }
 
-
 #[cfg(test)]
 mod tests {
     use crate::*;
     use serial_test::serial;
-    use testcontainers::{core::ContainerPort, runners::AsyncRunner, ImageExt};
+    use testcontainers::{ImageExt, core::ContainerPort, runners::AsyncRunner};
     use testcontainers_modules::redis::Redis;
 
     fn dummy_state() -> State {
@@ -83,7 +82,10 @@ mod tests {
             .await
             .expect("Failed to get full state");
 
-        assert_eq!(initial_state, retrieved_state, "Retrieved state should match the initial state");
+        assert_eq!(
+            initial_state, retrieved_state,
+            "Retrieved state should match the initial state"
+        );
         assert_eq!(retrieved_state.state.len(), 3);
     }
 
@@ -119,10 +121,10 @@ mod tests {
             .expect("get_full_state should not fail with malformed data");
 
         assert_eq!(state.state.len(), 2, "State should contain 2 valid items");
-        assert_eq!(state.get_value(key1), Some(value1));
-        assert_eq!(state.get_value(key2), Some(value2));
+        assert_eq!(state.get_value(key1, "t"), Some(value1));
+        assert_eq!(state.get_value(key2, "t"), Some(value2));
 
-        assert_eq!(state.get_value(malformed_key), None);
-
+        let result = std::panic::catch_unwind(|| state.get_value(malformed_key, "t"));
+        assert!(result.is_err(), "Was expected to panic, but it did not.");
     }
 }

@@ -92,13 +92,17 @@ pub async fn planner_ticker(
             Some(s) => s,
             None => continue,
         };
-        let old_info =
-            state.get_string_or_default_to_unknown(&format!("{}_planner_information", sp_id));
+        let old_info = state.get_string_or_default_to_unknown(
+            &format!("{}_planner_information", sp_id),
+            &log_target,
+        );
 
-        let new_state = process_planner_tick(sp_id, &model, &state);
+        let new_state = process_planner_tick(sp_id, &model, &state, &log_target);
 
-        let new_info =
-            new_state.get_string_or_default_to_unknown(&format!("{}_planner_information", sp_id));
+        let new_info = new_state.get_string_or_default_to_unknown(
+            &format!("{}_planner_information", sp_id),
+            &log_target,
+        );
         if old_info != new_info && !new_info.is_empty() {
             log::info!(target: log_target, "{}", new_info);
         }
@@ -124,23 +128,29 @@ struct PlannerContext {
     planner_information: String,
 }
 
-fn process_planner_tick(sp_id: &str, model: &Model, state: &State) -> State {
+fn process_planner_tick(sp_id: &str, model: &Model, state: &State, log_target: &str) -> State {
     let mut ctx = PlannerContext {
-        replan_trigger: state.get_bool_or_default_to_false(&format!("{}_replan_trigger", sp_id)),
-        replanned: state.get_bool_or_default_to_false(&format!("{}_replanned", sp_id)),
-        plan_counter: state.get_int_or_default_to_zero(&format!("{}_plan_counter", sp_id)),
-        replan_counter: state.get_int_or_default_to_zero(&format!("{}_replan_counter", sp_id)),
+        replan_trigger: state
+            .get_bool_or_default_to_false(&format!("{}_replan_trigger", sp_id), &log_target),
+        replanned: state.get_bool_or_default_to_false(&format!("{}_replanned", sp_id), &log_target),
+        plan_counter: state
+            .get_int_or_default_to_zero(&format!("{}_plan_counter", sp_id), &log_target),
+        replan_counter: state
+            .get_int_or_default_to_zero(&format!("{}_replan_counter", sp_id), &log_target),
         replan_counter_total: state
-            .get_int_or_default_to_zero(&format!("{}_replan_counter_total", sp_id)),
-        planner_state: state.get_string_or_default_to_unknown(&format!("{}_planner_state", sp_id)),
+            .get_int_or_default_to_zero(&format!("{}_replan_counter_total", sp_id), &log_target),
+        planner_state: state
+            .get_string_or_default_to_unknown(&format!("{}_planner_state", sp_id), &log_target),
         plan: state
-            .get_array_or_default_to_empty(&format!("{}_plan", sp_id))
+            .get_array_or_default_to_empty(&format!("{}_plan", sp_id), &log_target)
             .iter()
             .filter(|val| val.is_string())
             .map(|y| y.to_string())
             .collect(),
-        planner_information: state
-            .get_string_or_default_to_unknown(&format!("{}_planner_information", sp_id)),
+        planner_information: state.get_string_or_default_to_unknown(
+            &format!("{}_planner_information", sp_id),
+            &log_target,
+        ),
     };
 
     let mut new_state = state.clone();
@@ -152,7 +162,7 @@ fn process_planner_tick(sp_id: &str, model: &Model, state: &State) -> State {
         ctx.replan_trigger = false;
         ctx.replanned = false;
     } else {
-        handle_replan_request(&sp_id, &mut ctx, &mut new_state, model, state);
+        handle_replan_request(&sp_id, &mut ctx, &mut new_state, model, state, &log_target);
     }
 
     new_state
@@ -190,6 +200,7 @@ fn handle_replan_request(
     new_state: &mut State,
     model: &Model,
     state: &State,
+    log_target: &str
 ) {
     *new_state = reset_all_operations(new_state);
     ctx.plan = vec![];
@@ -209,7 +220,13 @@ fn handle_replan_request(
     ctx.replan_counter_total += 1;
 
     let goal = state.extract_goal(&sp_id);
-    let plan_result = bfs_operation_planner(state.clone(), goal, model.operations.clone(), 20);
+    let plan_result = bfs_operation_planner(
+        state.clone(),
+        goal,
+        model.operations.clone(),
+        20,
+        &log_target,
+    );
 
     if !plan_result.found {
         ctx.planner_information = format!(

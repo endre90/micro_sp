@@ -23,10 +23,10 @@ impl Action {
         Action { var, var_or_val }
     }
 
-    pub fn assign(self, state: &State) -> State {
+    pub fn assign(self, state: &State, log_target: &str) -> State {
         let value_to_assign = match self.var_or_val {
             SPWrapped::SPVariable(x) => state
-                .get_value(&x.name)
+                .get_value(&x.name, &log_target)
                 .unwrap_or_else(|| panic!("Source variable '{}' not in state.", x.name)),
             SPWrapped::SPValue(x) => x,
         };
@@ -67,10 +67,10 @@ mod tests {
         let weight = fv!("weight");
         let a1 = Action::new(weight.clone(), 82.5.wrap());
         let a2 = Action::new(weight.clone(), 85.0.wrap());
-        let s_next_1 = a1.assign(&s);
-        let s_next_2 = a2.assign(&s_next_1);
-        assert_eq!(s_next_1.get_value("weight"), Some(82.5.to_spvalue()));
-        assert_eq!(s_next_2.get_value("weight"), Some(85.0.to_spvalue()));
+        let s_next_1 = a1.assign(&s, "t");
+        let s_next_2 = a2.assign(&s_next_1, "t");
+        assert_eq!(s_next_1.get_value("weight", "t"), Some(82.5.to_spvalue()));
+        assert_eq!(s_next_2.get_value("weight", "t"), Some(85.0.to_spvalue()));
     }
 
     #[test]
@@ -79,7 +79,7 @@ mod tests {
         let s = State::from_vec(&john_doe());
         let bitrhyear = iv!("bitrhyear");
         let a1 = Action::new(bitrhyear.clone(), 1967.wrap());
-        a1.assign(&s);
+        a1.assign(&s, "t");
     }
 
     #[test]
@@ -88,10 +88,10 @@ mod tests {
         let weight = fv!("weight");
         let a1 = a!(weight.clone(), 82.5.wrap());
         let a2 = a!(weight.clone(), 85.0.wrap());
-        let s_next_1 = a1.assign(&s);
-        let s_next_2 = a2.assign(&s_next_1);
-        assert_eq!(s_next_1.get_value("weight"), Some(82.5.to_spvalue()));
-        assert_eq!(s_next_2.get_value("weight"), Some(85.0.to_spvalue()));
+        let s_next_1 = a1.assign(&s, "t");
+        let s_next_2 = a2.assign(&s_next_1, "t");
+        assert_eq!(s_next_1.get_value("weight", "t"), Some(82.5.to_spvalue()));
+        assert_eq!(s_next_2.get_value("weight", "t"), Some(85.0.to_spvalue()));
     }
 
     #[test]
@@ -100,6 +100,6 @@ mod tests {
         let s = State::from_vec(&john_doe());
         let bitrhyear = iv!("bitrhyear");
         let a1 = a!(bitrhyear.clone(), 1967.wrap());
-        a1.assign(&s);
+        a1.assign(&s, "t");
     }
 }

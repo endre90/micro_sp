@@ -123,22 +123,23 @@ impl State {
         }
     }
 
-    pub fn get_value(&self, name: &str) -> Option<SPValue> {
+    // Panics if the variable is not in the state. Should remain panicking.
+    pub fn get_value(&self, name: &str, log_target: &str) -> Option<SPValue> {
         match self.state.clone().get(name) {
             None => {
-                log::error!(target: "sp_state::get_value", "Variable {} not in state!", name);
-                None
+                log::error!(target: &log_target, "Variable {} not in state!", name);
+                panic!("Variable {} not in state!", name)
             }
             Some(x) => Some(x.val.clone()),
         }
     }
 
-    pub fn get_bool_or_unknown(&self, name: &str) -> BoolOrUnknown {
-        match self.get_value(name) {
+    pub fn get_bool_or_unknown(&self, name: &str, log_target: &str) -> BoolOrUnknown {
+        match self.get_value(name, &log_target) {
             Some(value) => match value {
                 SPValue::Bool(b) => b,
                 _ => {
-                    log::error!(target: "sp_state::get_bool_or_unknown", "Couldn't get boolean '{}' from the state, resulting to UNKNOWN.", name);
+                    log::error!(target: &log_target, "Couldn't get boolean '{}' from the state, resulting to UNKNOWN.", name);
                     BoolOrUnknown::UNKNOWN
                 }
             },
@@ -146,26 +147,26 @@ impl State {
         }
     }
 
-    pub fn get_bool_or_default_to_false(&self, name: &str) -> bool {
-        match self.get_bool_or_unknown(name) {
+    pub fn get_bool_or_default_to_false(&self, name: &str, log_target: &str) -> bool {
+        match self.get_bool_or_unknown(name, &log_target) {
             BoolOrUnknown::Bool(b) => b,
             _ => false,
         }
     }
 
-    pub fn get_bool_or_value(&self, name: &str, value: bool) -> bool {
-        match self.get_bool_or_unknown(name) {
+    pub fn get_bool_or_value(&self, name: &str, value: bool, log_target: &str) -> bool {
+        match self.get_bool_or_unknown(name, &log_target) {
             BoolOrUnknown::Bool(b) => b,
             _ => value,
         }
     }
 
-    pub fn get_int_or_unknown(&self, name: &str) -> IntOrUnknown {
-        match self.get_value(name) {
+    pub fn get_int_or_unknown(&self, name: &str, log_target: &str) -> IntOrUnknown {
+        match self.get_value(name, &log_target) {
             Some(value) => match value {
                 SPValue::Int64(i) => i,
                 _ => {
-                    log::error!(target: "sp_state::get_int_or_unknown", "Couldn't get int '{}' from the state, resulting to UNKNOWN.", name);
+                    log::error!(target: &log_target, "Couldn't get int '{}' from the state, resulting to UNKNOWN.", name);
                     IntOrUnknown::UNKNOWN
                 }
             },
@@ -173,26 +174,26 @@ impl State {
         }
     }
 
-    pub fn get_int_or_default_to_zero(&self, name: &str) -> i64 {
-        match self.get_int_or_unknown(name) {
+    pub fn get_int_or_default_to_zero(&self, name: &str, log_target: &str) -> i64 {
+        match self.get_int_or_unknown(name, &log_target) {
             IntOrUnknown::Int64(i) => i,
             _ => 0,
         }
     }
 
-    pub fn get_int_or_value(&self, name: &str, value: i64) -> i64 {
-        match self.get_int_or_unknown(name) {
+    pub fn get_int_or_value(&self, name: &str, value: i64, log_target: &str) -> i64 {
+        match self.get_int_or_unknown(name, &log_target) {
             IntOrUnknown::Int64(i) => i,
             _ => value,
         }
     }
 
-    pub fn get_float_or_unknown(&self, name: &str) -> FloatOrUnknown {
-        match self.get_value(name) {
+    pub fn get_float_or_unknown(&self, name: &str, log_target: &str) -> FloatOrUnknown {
+        match self.get_value(name, &log_target) {
             Some(value) => match value {
                 SPValue::Float64(f) => f,
                 _ => {
-                    log::error!(target: "sp_state::get_float_or_unknown", "Couldn't get float '{}' from the state, resulting to UNKNOWN.", name);
+                    log::error!(target: &log_target, "Couldn't get float '{}' from the state, resulting to UNKNOWN.", name);
                     FloatOrUnknown::UNKNOWN
                 }
             },
@@ -200,12 +201,12 @@ impl State {
         }
     }
 
-    pub fn get_transform_or_unknown(&self, name: &str) -> TransformOrUnknown {
-        match self.get_value(name) {
+    pub fn get_transform_or_unknown(&self, name: &str, log_target: &str) -> TransformOrUnknown {
+        match self.get_value(name, &log_target) {
             Some(value) => match value {
                 SPValue::Transform(f) => f,
                 _ => {
-                    log::error!(target: "sp_state::get_transform_or_unknown", "Couldn't get transform '{}' from the state, resulting to UNKNOWN.", name);
+                    log::error!(target: &log_target, "Couldn't get transform '{}' from the state, resulting to UNKNOWN.", name);
                     TransformOrUnknown::UNKNOWN
                 }
             },
@@ -216,8 +217,9 @@ impl State {
     pub fn get_transform_or_default_to_default(
         &self,
         name: &str,
+        log_target: &str,
     ) -> SPTransformStamped {
-        match self.get_transform_or_unknown(name) {
+        match self.get_transform_or_unknown(name, &log_target) {
             TransformOrUnknown::Transform(t) => t,
             _ => SPTransformStamped {
                 active_transform: false,
@@ -231,26 +233,26 @@ impl State {
         }
     }
 
-    pub fn get_float_or_default_to_zero(&self, name: &str) -> f64 {
-        match self.get_float_or_unknown(name) {
+    pub fn get_float_or_default_to_zero(&self, name: &str, log_target: &str) -> f64 {
+        match self.get_float_or_unknown(name, &log_target) {
             FloatOrUnknown::Float64(f) => f.into_inner(),
             _ => 0.0,
         }
     }
 
-    pub fn get_float_or_value(&self, name: &str, value: f64) -> f64 {
-        match self.get_float_or_unknown(name) {
+    pub fn get_float_or_value(&self, name: &str, value: f64, log_target: &str) -> f64 {
+        match self.get_float_or_unknown(name, &log_target) {
             FloatOrUnknown::Float64(f) => f.into_inner(),
             _ => value,
         }
     }
 
-    pub fn get_string_or_unknown(&self, name: &str) -> StringOrUnknown {
-        match self.get_value(name) {
+    pub fn get_string_or_unknown(&self, name: &str, log_target: &str) -> StringOrUnknown {
+        match self.get_value(name, &log_target) {
             Some(value) => match value {
                 SPValue::String(s) => s,
                 _ => {
-                    log::error!(target: "sp_state::get_string_or_unknown", "Couldn't get string '{}' from the state, resulting to UNKNOWN.", name);
+                    log::error!(target: &log_target, "Couldn't get string '{}' from the state, resulting to UNKNOWN.", name);
                     StringOrUnknown::UNKNOWN
                 }
             },
@@ -258,26 +260,26 @@ impl State {
         }
     }
 
-    pub fn get_string_or_default_to_unknown(&self, name: &str) -> String {
-        match self.get_string_or_unknown(name) {
+    pub fn get_string_or_default_to_unknown(&self, name: &str, log_target: &str) -> String {
+        match self.get_string_or_unknown(name, &log_target) {
             StringOrUnknown::String(s) => s,
             _ => SPValue::String(StringOrUnknown::UNKNOWN).to_string(),
         }
     }
 
-    pub fn get_string_or_value(&self, name: &str, value: String) -> String {
-        match self.get_string_or_unknown(name) {
+    pub fn get_string_or_value(&self, name: &str, value: String, log_target: &str) -> String {
+        match self.get_string_or_unknown(name, &log_target) {
             StringOrUnknown::String(s) => s,
             _ => value,
         }
     }
 
-    pub fn get_array_or_unknown(&self, name: &str) -> ArrayOrUnknown {
-        match self.get_value(name) {
+    pub fn get_array_or_unknown(&self, name: &str, log_target: &str) -> ArrayOrUnknown {
+        match self.get_value(name, &log_target) {
             Some(value) => match value {
                 SPValue::Array(a) => a,
                 _ => {
-                    log::error!(target: "sp_state::get_array_or_unknown", "Couldn't get array '{}' from the state, resulting to UNKNOWN.", name);
+                    log::error!(target: &log_target, "Couldn't get array '{}' from the state, resulting to UNKNOWN.", name);
                     ArrayOrUnknown::UNKNOWN
                 }
             },
@@ -285,8 +287,8 @@ impl State {
         }
     }
 
-    pub fn get_array_or_default_to_empty(&self, name: &str) -> Vec<SPValue> {
-        match self.get_array_or_unknown(name) {
+    pub fn get_array_or_default_to_empty(&self, name: &str, log_target: &str) -> Vec<SPValue> {
+        match self.get_array_or_unknown(name, &log_target) {
             ArrayOrUnknown::Array(a) => a,
             _ => {
                 vec![]
@@ -298,19 +300,20 @@ impl State {
         &self,
         name: &str,
         value: Vec<SPValue>,
+        log_target: &str,
     ) -> Vec<SPValue> {
-        match self.get_array_or_unknown(name) {
+        match self.get_array_or_unknown(name, &log_target) {
             ArrayOrUnknown::Array(a) => a,
             _ => value,
         }
     }
 
-    pub fn get_map_or_unknown(&self, name: &str) -> MapOrUnknown {
-        match self.get_value(name) {
+    pub fn get_map_or_unknown(&self, name: &str, log_target: &str) -> MapOrUnknown {
+        match self.get_value(name, &log_target) {
             Some(value) => match value {
                 SPValue::Map(m) => m,
                 _ => {
-                    log::error!(target: "sp_state::get_map_or_unknown", "Couldn't get map '{}' from the state, resulting to UNKNOWN.", name);
+                    log::error!(target: &log_target, "Couldn't get map '{}' from the state, resulting to UNKNOWN.", name);
                     MapOrUnknown::UNKNOWN
                 }
             },
@@ -318,8 +321,12 @@ impl State {
         }
     }
 
-    pub fn get_map_or_default_to_empty(&self, name: &str) -> Vec<(SPValue, SPValue)> {
-        match self.get_map_or_unknown(name) {
+    pub fn get_map_or_default_to_empty(
+        &self,
+        name: &str,
+        log_target: &str,
+    ) -> Vec<(SPValue, SPValue)> {
+        match self.get_map_or_unknown(name, &log_target) {
             MapOrUnknown::Map(m) => m,
             _ => {
                 vec![]
@@ -331,19 +338,20 @@ impl State {
         &self,
         name: &str,
         value: Vec<(SPValue, SPValue)>,
+        log_target: &str,
     ) -> Vec<(SPValue, SPValue)> {
-        match self.get_map_or_unknown(name) {
+        match self.get_map_or_unknown(name, &log_target) {
             MapOrUnknown::Map(m) => m,
             _ => value,
         }
     }
 
-    pub fn get_time_or_unknown(&self, name: &str) -> TimeOrUnknown {
-        match self.get_value(name) {
+    pub fn get_time_or_unknown(&self, name: &str, log_target: &str) -> TimeOrUnknown {
+        match self.get_value(name, &log_target) {
             Some(value) => match value {
                 SPValue::Time(t) => t,
                 _ => {
-                    log::error!(target: "sp_state::get_time_or_unknown", "Couldn't get time '{}' from the state, resulting to UNKNOWN.", name);
+                    log::error!(target: &log_target, "Couldn't get time '{}' from the state, resulting to UNKNOWN.", name);
                     TimeOrUnknown::UNKNOWN
                 }
             },
@@ -351,9 +359,12 @@ impl State {
         }
     }
 
-    pub fn get_assignment(&self, name: &str) -> SPAssignment {
+    pub fn get_assignment(&self, name: &str, log_target: &str) -> SPAssignment {
         match self.state.clone().get(name) {
-            None => panic!("Variable {} not in state!", name),
+            None => {
+                log::error!(target: &log_target, "Variable {} not in state!", name);
+                panic!("Variable {} not in state!", name)
+            }
             Some(x) => x.clone(),
         }
     }
@@ -510,8 +521,8 @@ mod tests {
     #[test]
     fn test_get_value_and_assignment() {
         let state = get_initial_state();
-        assert_eq!(state.get_value("height"), Some(185.to_spvalue()));
-        let assignment = state.get_assignment("height");
+        assert_eq!(state.get_value("height", "t"), Some(185.to_spvalue()));
+        let assignment = state.get_assignment("height", "t");
         assert_eq!(assignment.var.name, "height");
         assert_eq!(assignment.val, 185.to_spvalue());
     }
@@ -520,14 +531,14 @@ mod tests {
     #[should_panic]
     fn test_get_value_panic() {
         let state = State::new();
-        state.get_value( "nonexistent").unwrap();
+        state.get_value("nonexistent", "t").unwrap();
     }
 
     #[test]
     #[should_panic]
     fn test_get_assignment_panic() {
         let state = State::new();
-        state.get_assignment("nonexistent");
+        state.get_assignment("nonexistent", "t");
     }
 
     #[test]
@@ -545,7 +556,10 @@ mod tests {
     fn test_update() {
         let state = get_initial_state();
         let updated_state = state.update("height", 190.to_spvalue());
-        assert_eq!(updated_state.get_value("height"), Some(190.to_spvalue()));
+        assert_eq!(
+            updated_state.get_value("height", "t"),
+            Some(190.to_spvalue())
+        );
     }
 
     #[test]
@@ -665,7 +679,7 @@ mod tests {
             "The updated variable 'a' should be present"
         );
         assert_eq!(
-            updated_state.get_value("a"),
+            updated_state.get_value("a", "t"),
             Some(2.to_spvalue()),
             "The value of 'a' should be the new value"
         );
@@ -684,11 +698,14 @@ mod tests {
 
         let extended_overwrite = state1.extend(state2.clone(), true);
         assert_eq!(extended_overwrite.state.len(), 2);
-        assert_eq!(extended_overwrite.get_value("a"), Some(2.to_spvalue()));
+        assert_eq!(extended_overwrite.get_value("a", "t"), Some(2.to_spvalue()));
 
         let extended_no_overwrite = state1.extend(state2.clone(), false);
         assert_eq!(extended_no_overwrite.state.len(), 2);
-        assert_eq!(extended_no_overwrite.get_value("a"), Some(1.to_spvalue()));
+        assert_eq!(
+            extended_no_overwrite.get_value("a", "t"),
+            Some(1.to_spvalue())
+        );
     }
 
     #[test]
@@ -700,92 +717,103 @@ mod tests {
         )]);
 
         assert_eq!(
-            state.get_bool_or_unknown("smart"),
+            state.get_bool_or_unknown("smart", "t"),
             BoolOrUnknown::Bool(true)
         );
         assert_eq!(
-            wrong_type_state.get_bool_or_unknown("smart"),
+            wrong_type_state.get_bool_or_unknown("smart", "t"),
             BoolOrUnknown::UNKNOWN
         );
-        assert!(state.get_bool_or_default_to_false("smart"));
-        assert!(!wrong_type_state.get_bool_or_default_to_false("smart"));
-        assert!(state.get_bool_or_value("smart", false));
-        assert!(!wrong_type_state.get_bool_or_value("smart", false));
+        assert!(state.get_bool_or_default_to_false("smart", "t"));
+        assert!(!wrong_type_state.get_bool_or_default_to_false("smart", "t"));
+        assert!(state.get_bool_or_value("smart", false, "t"));
+        assert!(!wrong_type_state.get_bool_or_value("smart", false, "t"));
 
         assert_eq!(
-            state.get_int_or_unknown("height"),
+            state.get_int_or_unknown("height", "t"),
             IntOrUnknown::Int64(185)
         );
-        assert_eq!(state.get_int_or_default_to_zero("height"), 185);
-        assert_eq!(state.get_int_or_value("height", 0), 185);
+        assert_eq!(state.get_int_or_default_to_zero("height", "t"), 185);
+        assert_eq!(state.get_int_or_value("height", 0, "t"), 185);
 
         assert_eq!(
-            state.get_float_or_unknown("weight"),
+            state.get_float_or_unknown("weight", "t"),
             FloatOrUnknown::Float64(80.0.into())
         );
-        assert_eq!(state.get_float_or_default_to_zero("weight"), 80.0);
-        assert_eq!(state.get_float_or_value("weight", 0.0), 80.0);
+        assert_eq!(state.get_float_or_default_to_zero("weight", "t"), 80.0);
+        assert_eq!(state.get_float_or_value("weight", 0.0, "t"), 80.0);
 
         assert_eq!(
-            state.get_string_or_unknown("name"),
+            state.get_string_or_unknown("name", "t"),
             StringOrUnknown::String("John".to_string())
         );
         assert_eq!(
-            state.get_string_or_default_to_unknown("name"),
+            state.get_string_or_default_to_unknown("name", "t"),
             "John".to_string()
         );
         assert_eq!(
-            state.get_string_or_value("name", "".to_string()),
+            state.get_string_or_value("name", "".to_string(), "t"),
             "John".to_string()
         );
 
         assert_eq!(
-            state.get_array_or_unknown("items"),
+            state.get_array_or_unknown("items", "t"),
             ArrayOrUnknown::Array(vec![1.to_spvalue()])
         );
         assert_eq!(
-            state.get_array_or_default_to_empty("items"),
+            state.get_array_or_default_to_empty("items", "t"),
             vec![1.to_spvalue()]
         );
         assert_eq!(
-            state.get_array_or_value("items", vec![]),
+            state.get_array_or_value("items", vec![], "t"),
             vec![1.to_spvalue()]
         );
 
         assert_eq!(
-            state.get_map_or_unknown("data"),
+            state.get_map_or_unknown("data", "t"),
             MapOrUnknown::Map(vec![("a".to_spvalue(), "b".to_spvalue())])
         );
         assert_eq!(
-            state.get_map_or_default_to_empty("data"),
+            state.get_map_or_default_to_empty("data", "t"),
             vec![("a".to_spvalue(), "b".to_spvalue())]
         );
         assert_eq!(
-            state.get_map_or_value("data", vec![]),
+            state.get_map_or_value("data", vec![], "t"),
             vec![("a".to_spvalue(), "b".to_spvalue())]
         );
 
         assert!(matches!(
-            state.get_time_or_unknown("time"),
+            state.get_time_or_unknown("time", "t"),
             TimeOrUnknown::Time(_)
         ));
 
         assert!(matches!(
-            state.get_transform_or_unknown("pose"),
+            state.get_transform_or_unknown("pose", "t"),
             TransformOrUnknown::Transform(_)
         ));
-        let default_tf = state.get_transform_or_default_to_default("pose");
+        let default_tf = state.get_transform_or_default_to_default("pose", "t");
         assert_eq!(default_tf.parent_frame_id, "world");
     }
 
     #[test]
     fn test_getters_defaults() {
         let state = State::new();
-        assert_eq!(state.get_string_or_default_to_unknown("x"), "UNKNOWN");
-        assert_eq!(state.get_array_or_default_to_empty("x"), vec![]);
-        assert_eq!(state.get_map_or_default_to_empty("x"), vec![]);
-        let default_tf = state.get_transform_or_default_to_default("x");
-        assert_eq!(default_tf.child_frame_id, "failed_lookup");
+        let result = std::panic::catch_unwind(|| {
+            state.get_string_or_default_to_unknown("x", "t");
+        });
+        assert!(result.is_err(), "Was expected to panic, but it did not.");
+        let result = std::panic::catch_unwind(|| {
+            state.get_array_or_default_to_empty("x", "t");
+        });
+        assert!(result.is_err(), "Was expected to panic, but it did not.");
+        let result = std::panic::catch_unwind(|| {
+            state.get_map_or_default_to_empty("x", "t");
+        });
+        assert!(result.is_err(), "Was expected to panic, but it did not.");
+        let result = std::panic::catch_unwind(|| {
+            state.get_transform_or_default_to_default("x", "t");
+        });
+        assert!(result.is_err(), "Was expected to panic, but it did not.");
     }
 
     #[test]

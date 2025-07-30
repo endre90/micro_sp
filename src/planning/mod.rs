@@ -60,6 +60,7 @@ mod tests {
                 t7.clone(),
             ],
             10,
+            "t",
         );
         assert_eq!(result.found, true);
         assert_eq!(result.length, 3);
@@ -78,6 +79,7 @@ mod tests {
                 t7.clone(),
             ],
             10,
+            "t",
         );
         assert_eq!(result.found, true);
         assert_eq!(result.length, 0);
@@ -88,6 +90,7 @@ mod tests {
             eq!(&pos.wrap(), "f".wrap()),
             vec![t1.clone(), t2.clone()],
             10,
+            "t",
         );
         assert_eq!(result.found, false);
         assert_eq!(result.length, 0);
@@ -139,109 +142,100 @@ mod tests {
         let state = state.add(assign!(op_move_to_c, "initial".to_spvalue()));
         let state = state.add(assign!(op_move_to_d, "initial".to_spvalue()));
         let op_move_to_b = Operation::new(
-        "move_to_b",
-        None,
-        None,
-        vec!(t!(
-            "start_moving_to_b",
-            "var:ur_action_trigger == false && var:ur_action_state == initial && var:ur_current_pose != b",
-            "true",
-            0,
-            vec!(
-                "var:ur_command <- movej", 
-                "var:ur_action_trigger <- true", 
-                "var:ur_goal_feature_id <- b", 
-                "var:ur_tcp_id <- svt_tcp"
-            ),
-            Vec::<&str>::new(),
-            &state
-        )),
-        vec!(t!(
-            "complete_moving_to_b",
-            "var:ur_action_state == done",
-            "true",
-            0,
-            vec!(
-                "var:ur_action_trigger <- false", 
-                "var:ur_current_pose <- b"
-            ),
-            Vec::<&str>::new(),
-            &state
-        )),
-        vec!(),
-        vec!(),
-        vec!(),
-    );
+            "move_to_b",
+            None,
+            None,
+            vec![t!(
+                "start_moving_to_b",
+                "var:ur_action_trigger == false && var:ur_action_state == initial && var:ur_current_pose != b",
+                "true",
+                0,
+                vec!(
+                    "var:ur_command <- movej",
+                    "var:ur_action_trigger <- true",
+                    "var:ur_goal_feature_id <- b",
+                    "var:ur_tcp_id <- svt_tcp"
+                ),
+                Vec::<&str>::new(),
+                &state
+            )],
+            vec![t!(
+                "complete_moving_to_b",
+                "var:ur_action_state == done",
+                "true",
+                0,
+                vec!("var:ur_action_trigger <- false", "var:ur_current_pose <- b"),
+                Vec::<&str>::new(),
+                &state
+            )],
+            vec![],
+            vec![],
+            vec![],
+        );
 
         let op_move_to_c = Operation::new(
-        "move_to_c",
-        None,
-        None,
-        vec!(t!(
-            "start_moving_to_c",
-            "var:ur_action_trigger == false && var:ur_action_state == initial && var:ur_current_pose == b",
-            "true",
-            0,
-            vec!(
-                "var:ur_command <- movej", 
-                "var:ur_action_trigger <- true", 
-                "var:ur_goal_feature_id <- c", 
-                "var:ur_tcp_id <- svt_tcp"
-            ),
-            Vec::<&str>::new(),
-            &state
-        )),
-        vec!(t!(
-            "complete_moving_to_c",
-            "var:ur_action_state == done",
-            "true",
-            0,
-            vec!(
-                "var:ur_action_trigger <- false", 
-                "var:ur_current_pose <- c"
-            ),
-            Vec::<&str>::new(),
-            &state
-        )),
-        vec!(),
-        vec!(),
-        vec!(),
-    );
+            "move_to_c",
+            None,
+            None,
+            vec![t!(
+                "start_moving_to_c",
+                "var:ur_action_trigger == false && var:ur_action_state == initial && var:ur_current_pose == b",
+                "true",
+                0,
+                vec!(
+                    "var:ur_command <- movej",
+                    "var:ur_action_trigger <- true",
+                    "var:ur_goal_feature_id <- c",
+                    "var:ur_tcp_id <- svt_tcp"
+                ),
+                Vec::<&str>::new(),
+                &state
+            )],
+            vec![t!(
+                "complete_moving_to_c",
+                "var:ur_action_state == done",
+                "true",
+                0,
+                vec!("var:ur_action_trigger <- false", "var:ur_current_pose <- c"),
+                Vec::<&str>::new(),
+                &state
+            )],
+            vec![],
+            vec![],
+            vec![],
+        );
 
         let op_move_to_d = Operation::new(
-        "move_to_d",
-        None,
-        None,
-        vec!(t!(
-            "start_moving_to_d",
-            "var:ur_action_trigger == false && var:ur_action_state == initial && var:ur_current_pose == c",
-            "true",
-            0,
-            vec!(
-                "var:ur_command <- movej", 
-                "var:ur_action_trigger <- true", 
-                "var:ur_goal_feature_id <- d", 
-                "var:ur_tcp_id <- svt_tcp"
-            ),
-            Vec::<&str>::new(),
-            &state
-        )),
-        vec!(t!(
-            "complete_moving_to_d",
-            "var:ur_action_state == done",
-            "true",
-            0,
-            vec!(
-                "var:ur_action_trigger <- false", 
-                "var:ur_current_pose <- d"
-            ),
-            Vec::<&str>::new(),
-            &state
-        )),
-        vec!(),
-        vec!(),
-        vec!(),
-    );
+            "move_to_d",
+            None,
+            None,
+            vec![t!(
+                "start_moving_to_d",
+                "var:ur_action_trigger == false && var:ur_action_state == initial && var:ur_current_pose == c",
+                "true",
+                0,
+                vec!(
+                    "var:ur_command <- movej",
+                    "var:ur_action_trigger <- true",
+                    "var:ur_goal_feature_id <- d",
+                    "var:ur_tcp_id <- svt_tcp"
+                ),
+                Vec::<&str>::new(),
+                &state
+            )],
+            vec![t!(
+                "complete_moving_to_d",
+                "var:ur_action_state == done",
+                "true",
+                0,
+                vec!("var:ur_action_trigger <- false", "var:ur_current_pose <- d"),
+                Vec::<&str>::new(),
+                &state
+            )],
+            vec![],
+            vec![],
+            vec![],
+        );
 
         // Adding the opeation states in the model
         let m = Model::new(
@@ -252,13 +246,17 @@ mod tests {
                 op_move_to_b.clone(),
                 op_move_to_c.clone(),
                 op_move_to_d.clone(),
-            ]
+            ],
         );
 
         let goal = pred_parser::pred("var:ur_current_pose == d", &state).unwrap();
-        let result = bfs_operation_planner(state, goal, m.operations, 30);
+        let result = bfs_operation_planner(state, goal, m.operations, 30, "t");
         assert_eq!(
-            vec!("operation_move_to_b", "operation_move_to_c", "operation_move_to_d"),
+            vec!(
+                "operation_move_to_b",
+                "operation_move_to_c",
+                "operation_move_to_d"
+            ),
             result.plan
         );
     }

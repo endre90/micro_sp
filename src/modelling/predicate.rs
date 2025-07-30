@@ -22,26 +22,26 @@ pub enum Predicate {
 
 impl Predicate {
     /// Evaluate a predicate based on the given state.
-    pub fn eval(self, state: &State) -> bool {
+    pub fn eval(self, state: &State, log_target: &str) -> bool {
         match self {
             Predicate::TRUE => true,
             Predicate::FALSE => false,
-            Predicate::NOT(p) => !p.eval(&state.clone()),
-            Predicate::AND(p) => p.iter().all(|pp| pp.clone().eval(&state)),
-            Predicate::OR(p) => p.iter().any(|pp| pp.clone().eval(&state)),
+            Predicate::NOT(p) => !p.eval(&state.clone(), &log_target),
+            Predicate::AND(p) => p.iter().all(|pp| pp.clone().eval(&state, &log_target)),
+            Predicate::OR(p) => p.iter().any(|pp| pp.clone().eval(&state, &log_target)),
             Predicate::EQ(x, y) => match (x, y) {
                 (SPWrapped::SPVariable(vx), SPWrapped::SPVariable(vy)) => {
-                    state.get_value(&vx.name) == state.get_value(&vy.name)
+                    state.get_value(&vx.name, &log_target) == state.get_value(&vy.name, &log_target)
                 }
                 (SPWrapped::SPVariable(vx), SPWrapped::SPValue(vy)) => {
-                    if let Some(value) = state.get_value(&vx.name) {
+                    if let Some(value) = state.get_value(&vx.name, &log_target) {
                         value == vy
                     } else {
                         false
                     }
                 }
                 (SPWrapped::SPValue(vx), SPWrapped::SPVariable(vy)) => {
-                    if let Some(value) = state.get_value(&vy.name) {
+                    if let Some(value) = state.get_value(&vy.name, &log_target) {
                         vx == value
                     } else {
                         false
@@ -51,17 +51,17 @@ impl Predicate {
             },
             Predicate::NEQ(x, y) => match (x, y) {
                 (SPWrapped::SPVariable(vx), SPWrapped::SPVariable(vy)) => {
-                    state.get_value(&vx.name) != state.get_value(&vy.name)
+                    state.get_value(&vx.name, &log_target) != state.get_value(&vy.name, &log_target)
                 }
                 (SPWrapped::SPVariable(vx), SPWrapped::SPValue(vy)) => {
-                    if let Some(value) = state.get_value(&vx.name) {
+                    if let Some(value) = state.get_value(&vx.name, &log_target) {
                         value != vy
                     } else {
                         false
                     }
                 }
                 (SPWrapped::SPValue(vx), SPWrapped::SPVariable(vy)) => {
-                    if let Some(value) = state.get_value(&vy.name) {
+                    if let Some(value) = state.get_value(&vy.name, &log_target) {
                         vx != value
                     } else {
                         false
@@ -282,8 +282,8 @@ mod tests {
         let state = State::from_vec(&john_doe());
         let eq1 = Predicate::EQ(v!("name").wrap(), "John".wrap());
         let eq2 = Predicate::EQ(v!("name").wrap(), "Jack".wrap());
-        assert!(eq1.eval(&state));
-        assert_ne!(true, eq2.eval(&state));
+        assert!(eq1.eval(&state, "t"));
+        assert_ne!(true, eq2.eval(&state, "t"));
     }
 
     #[test]
@@ -291,17 +291,16 @@ mod tests {
         let state = State::from_vec(&john_doe());
         let neq1 = Predicate::NEQ(v!("name").wrap(), "John".wrap());
         let neq2 = Predicate::NEQ(v!("name").wrap(), "Jack".wrap());
-        assert_ne!(true, neq1.eval(&state));
-        assert!(neq2.eval(&state));
+        assert_ne!(true, neq1.eval(&state, "t"));
+        assert!(neq2.eval(&state, "t"));
     }
 
     #[test]
-    // Let's see...
-    // #[should_panic]
+    #[should_panic]
     fn test_predicate_eq_panic_not_in_state() {
         let state = State::from_vec(&john_doe());
         let eq1 = Predicate::EQ(v!("v1").wrap(), "John".wrap());
-        assert_eq!(eq1.eval(&state), false);
+        assert!(eq1.eval(&state, "t"));
     }
 
     #[test]
@@ -309,7 +308,7 @@ mod tests {
     fn test_predicate_eq_wrong_var() {
         let state = State::from_vec(&john_doe());
         let eq1 = Predicate::EQ(v!("name").wrap(), v!("surname").wrap());
-        assert!(eq1.eval(&state));
+        assert!(eq1.eval(&state, "t"));
     }
 
     #[test]
@@ -317,8 +316,8 @@ mod tests {
         let s1 = State::from_vec(&john_doe());
         let not = Predicate::NOT(Box::new(Predicate::EQ(bv!("smart").wrap(), false.wrap())));
         let notf = Predicate::NOT(Box::new(Predicate::EQ(bv!("smart").wrap(), true.wrap())));
-        assert!(not.eval(&s1));
-        assert!(!notf.eval(&s1));
+        assert!(not.eval(&s1, "t"));
+        assert!(!notf.eval(&s1, "t"));
     }
 
     #[test]
@@ -330,8 +329,8 @@ mod tests {
         let eqf = Predicate::EQ(iv!("height").wrap(), 175.wrap());
         let and = Predicate::AND(vec![eq.clone(), eq2.clone()]);
         let andf = Predicate::AND(vec![eq, eq2, eqf]);
-        assert!(and.eval(&s1));
-        assert!(!andf.eval(&s1));
+        assert!(and.eval(&s1, "t"));
+        assert!(!andf.eval(&s1, "t"));
     }
 
     #[test]
@@ -343,8 +342,8 @@ mod tests {
         let eqf = Predicate::EQ(iv!("height").wrap(), 175.wrap());
         let or = Predicate::OR(vec![eq.clone(), eq2.clone()]);
         let or2 = Predicate::OR(vec![eq, eq2, eqf]);
-        assert!(or.eval(&s1));
-        assert!(or2.eval(&s1));
+        assert!(or.eval(&s1, "t"));
+        assert!(or2.eval(&s1, "t"));
     }
 
     #[test]
@@ -366,7 +365,7 @@ mod tests {
             and,
             Predicate::NOT(Box::new(andf)),
         ]);
-        assert!(cmplx.eval(&s1));
+        assert!(cmplx.eval(&s1, "t"));
     }
 
     #[test]
@@ -374,8 +373,8 @@ mod tests {
         let state = State::from_vec(&john_doe());
         let eq1 = eq!(v!("name").wrap(), "John".wrap());
         let eq2 = eq!(v!("name").wrap(), "Jack".wrap());
-        assert!(eq1.eval(&state));
-        assert_ne!(true, eq2.eval(&state));
+        assert!(eq1.eval(&state, "t"));
+        assert_ne!(true, eq2.eval(&state, "t"));
     }
 
     #[test]
@@ -383,8 +382,8 @@ mod tests {
         let s1 = State::from_vec(&john_doe());
         let not = not!(eq!(bv!("smart").wrap(), false.wrap()));
         let notf = not!(eq!(bv!("smart").wrap(), true.wrap()));
-        assert!(not.eval(&s1));
-        assert!(!notf.eval(&s1));
+        assert!(not.eval(&s1, "t"));
+        assert!(!notf.eval(&s1, "t"));
     }
 
     #[test]
@@ -392,8 +391,8 @@ mod tests {
         let state = State::from_vec(&john_doe());
         let neq1 = neq!(v!("name").wrap(), "John".wrap());
         let neq2 = neq!(v!("name").wrap(), "Jack".wrap());
-        assert_ne!(true, neq1.eval(&state));
-        assert!(neq2.eval(&state));
+        assert_ne!(true, neq1.eval(&state, "t"));
+        assert!(neq2.eval(&state, "t"));
     }
 
     #[test]
@@ -405,8 +404,8 @@ mod tests {
         let eqf = eq!(iv!("height").wrap(), 175.wrap());
         let and = and!(vec![eq.clone(), eq2.clone()]);
         let andf = and!(vec![eq, eq2, eqf]);
-        assert!(and.eval(&s1));
-        assert!(!andf.eval(&s1));
+        assert!(and.eval(&s1, "t"));
+        assert!(!andf.eval(&s1, "t"));
     }
 
     #[test]
@@ -418,8 +417,8 @@ mod tests {
         let eqf = eq!(iv!("height").wrap(), 175.wrap());
         let or = or!(vec![eq.clone(), eq2.clone()]);
         let or2 = or!(vec![eq, eq2, eqf]);
-        assert!(or.eval(&s1));
-        assert!(or2.eval(&s1));
+        assert!(or.eval(&s1, "t"));
+        assert!(or2.eval(&s1, "t"));
     }
 
     fn make_robot_initial_state() -> State {

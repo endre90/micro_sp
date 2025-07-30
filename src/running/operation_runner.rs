@@ -64,14 +64,14 @@ pub async fn planned_operation_runner(
 fn process_plan_tick(sp_id: &str, model: &Model, state: &State, log_target: &str) -> State {
     let mut new_state = state.clone();
     let mut planner_state =
-        state.get_string_or_default_to_unknown(&format!("{}_planner_state", sp_id));
+        state.get_string_or_default_to_unknown(&format!("{}_planner_state", sp_id), &log_target);
 
     let mut plan_state_str =
-        state.get_string_or_default_to_unknown(&format!("{}_plan_state", sp_id));
+        state.get_string_or_default_to_unknown(&format!("{}_plan_state", sp_id), &log_target);
     let mut plan_current_step =
-        state.get_int_or_default_to_zero(&format!("{}_plan_current_step", sp_id));
+        state.get_int_or_default_to_zero(&format!("{}_plan_current_step", sp_id), &log_target);
     let plan_of_sp_values =
-        state.get_array_or_default_to_empty(&format!("{}_plan", sp_id));
+        state.get_array_or_default_to_empty(&format!("{}_plan", sp_id), &log_target);
 
     let plan: Vec<String> = plan_of_sp_values
         .iter()
@@ -142,29 +142,29 @@ fn process_operation(
     };
 
     let operation_state_str =
-        state.get_string_or_default_to_unknown(&format!("{}", operation.name));
+        state.get_string_or_default_to_unknown(&format!("{}", operation.name), &log_target);
 
     let old_operation_information = state
-        .get_string_or_default_to_unknown(&format!("{}_information", operation.name));
+        .get_string_or_default_to_unknown(&format!("{}_information", operation.name), &log_target);
 
     let mut operation_retry_counter =
-        state.get_int_or_default_to_zero(&format!("{}_retry_counter", operation.name));
+        state.get_int_or_default_to_zero(&format!("{}_retry_counter", operation.name), &log_target);
 
     let mut new_op_info = old_operation_information.clone();
 
     match OperationState::from_str(&operation_state_str) {
         OperationState::Initial => {
-            if operation.eval_running(state) {
-                *new_state = operation.start_running(new_state);
+            if operation.eval_running(state, &log_target) {
+                *new_state = operation.start_running(new_state, &log_target);
                 new_op_info = format!("Operation '{}' started.", operation.name);
             }
         }
         OperationState::Executing => {
-            if operation.can_be_completed(state) {
-                *new_state = operation.complete_running(new_state);
+            if operation.can_be_completed(state, &log_target) {
+                *new_state = operation.complete_running(new_state, &log_target);
                 new_op_info = format!("Operation '{}' completing.", operation.name);
-            } else if operation.can_be_failed(state) {
-                *new_state = operation.fail_running(new_state);
+            } else if operation.can_be_failed(state, &log_target) {
+                *new_state = operation.fail_running(new_state, &log_target);
                 new_op_info = format!("Operation '{}' failing.", operation.name);
             }
         }
@@ -177,7 +177,7 @@ fn process_operation(
         OperationState::Failed => {
             if operation_retry_counter < operation.retries {
                 operation_retry_counter += 1;
-                *new_state = operation.retry_running(new_state);
+                *new_state = operation.retry_running(new_state, &log_target);
                 *new_state = new_state.update(
                     &format!("{}_retry_counter", operation.name),
                     operation_retry_counter.to_spvalue(),
@@ -187,12 +187,12 @@ fn process_operation(
                     operation.name, operation_retry_counter, operation.retries
                 );
             } else {
-                *new_state = operation.unrecover_running(new_state);
+                *new_state = operation.unrecover_running(new_state, &log_target);
                 new_op_info = format!("Operation '{}' failed. No retries left.", operation.name);
             }
         }
         OperationState::Timedout => {
-            *new_state = operation.unrecover_running(new_state);
+            *new_state = operation.unrecover_running(new_state, &log_target);
             new_op_info = format!("Operation '{}' timed out.", operation.name);
         }
         OperationState::Unrecoverable => {

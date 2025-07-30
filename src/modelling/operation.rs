@@ -121,11 +121,11 @@ impl Operation {
     }
 
     /// Check the guard of the planning precondidion transition.
-    pub fn eval_planning(&self, state: &State) -> bool {
-        if let Some(value) = state.get_value(&self.name) {
+    pub fn eval_planning(&self, state: &State, log_target: &str) -> bool {
+        if let Some(value) = state.get_value(&self.name, &log_target) {
             if value == OperationState::Initial.to_spvalue() {
                 for precondition in &self.preconditions {
-                    if precondition.clone().eval_planning(state) {
+                    if precondition.clone().eval_planning(state, &log_target) {
                         return true;
                     }
                 }
@@ -137,17 +137,20 @@ impl Operation {
 
     /// Execute the planing actions of both the pre and post conditions.
     /// Inex 0 taken as to indicate that the firstly defined transition should be taken when planning.
-    pub fn take_planning(&self, state: &State) -> State {
-        self.postconditions[0]
-            .clone()
-            .take_planning(&self.preconditions[0].clone().take_planning(state))
+    pub fn take_planning(&self, state: &State, log_target: &str) -> State {
+        self.postconditions[0].clone().take_planning(
+            &self.preconditions[0]
+                .clone()
+                .take_planning(state, &log_target),
+            &log_target,
+        )
     }
 
-    pub fn eval_running(&self, state: &State) -> bool {
-        if let Some(value) = state.get_value(&self.name) {
+    pub fn eval_running(&self, state: &State, log_target: &str) -> bool {
+        if let Some(value) = state.get_value(&self.name, &log_target) {
             if value == OperationState::Initial.to_spvalue() {
                 for precondition in &self.preconditions {
-                    if precondition.clone().eval_running(state) {
+                    if precondition.clone().eval_running(state, &log_target) {
                         return true;
                     }
                 }
@@ -157,11 +160,15 @@ impl Operation {
     }
 
     /// Check the guard and return a tuple: (is_enabled, index_of_enabled_transition)
-    pub fn eval_running_with_transition_index(&self, state: &State) -> (bool, usize) {
-        if let Some(value) = state.get_value(&self.name) {
+    pub fn eval_running_with_transition_index(
+        &self,
+        state: &State,
+        log_target: &str,
+    ) -> (bool, usize) {
+        if let Some(value) = state.get_value(&self.name, &log_target) {
             if value == OperationState::Initial.to_spvalue() {
                 for (index, precondition) in self.preconditions.iter().enumerate() {
-                    if precondition.clone().eval_running(state) {
+                    if precondition.clone().eval_running(state, &log_target) {
                         return (true, index);
                     }
                 }
@@ -171,11 +178,15 @@ impl Operation {
     }
 
     /// Check the running postondition guard.
-    pub fn can_be_completed_with_transition_index(&self, state: &State) -> (bool, usize) {
-        if let Some(value) = state.get_value(&self.name) {
+    pub fn can_be_completed_with_transition_index(
+        &self,
+        state: &State,
+        log_target: &str,
+    ) -> (bool, usize) {
+        if let Some(value) = state.get_value(&self.name, &log_target) {
             if value == OperationState::Executing.to_spvalue() {
                 for (index, postcondition) in self.postconditions.iter().enumerate() {
-                    if postcondition.clone().eval_running(state) {
+                    if postcondition.clone().eval_running(state, &log_target) {
                         return (true, index);
                     }
                 }
@@ -185,11 +196,11 @@ impl Operation {
     }
 
     /// Check the running postondition guard.
-    pub fn can_be_completed(&self, state: &State) -> bool {
-        if let Some(value) = state.get_value(&self.name) {
+    pub fn can_be_completed(&self, state: &State, log_target: &str) -> bool {
+        if let Some(value) = state.get_value(&self.name, &log_target) {
             if value == OperationState::Executing.to_spvalue() {
                 for postcondition in &self.postconditions {
-                    if postcondition.clone().eval_running(&state) {
+                    if postcondition.clone().eval_running(&state, &log_target) {
                         return true;
                     }
                 }
@@ -199,11 +210,11 @@ impl Operation {
     }
 
     /// Check the running fail_transition guard.
-    pub fn can_be_failed(&self, state: &State) -> bool {
-        if let Some(value) = state.get_value(&self.name) {
+    pub fn can_be_failed(&self, state: &State, log_target: &str) -> bool {
+        if let Some(value) = state.get_value(&self.name, &log_target) {
             if value == OperationState::Executing.to_spvalue() {
                 for fail_transition in &self.fail_transitions {
-                    if fail_transition.clone().eval_running(&state) {
+                    if fail_transition.clone().eval_running(&state, &log_target) {
                         return true;
                     }
                 }
@@ -213,11 +224,11 @@ impl Operation {
     }
 
     /// Check the running reset_transition guard.
-    pub fn can_be_reset(&self, state: &State) -> bool {
-        if let Some(value) = state.get_value(&self.name) {
+    pub fn can_be_reset(&self, state: &State, log_target: &str) -> bool {
+        if let Some(value) = state.get_value(&self.name, &log_target) {
             if value == OperationState::Completed.to_spvalue() {
                 for reset_transition in &self.reset_transitions {
-                    if reset_transition.clone().eval_running(&state) {
+                    if reset_transition.clone().eval_running(&state, &log_target) {
                         return true;
                     }
                 }
@@ -239,16 +250,19 @@ impl Operation {
     // }
 
     /// Start executing the operation. Check for eval_running() first.
-    pub fn start_running(&self, state: &State) -> State {
-        let assignment = state.get_assignment(&self.name);
+    pub fn start_running(&self, state: &State, log_target: &str) -> State {
+        let assignment = state.get_assignment(&self.name, &log_target);
         if assignment.val == OperationState::Initial.to_spvalue() {
             for precondition in &self.preconditions {
-                if precondition.clone().eval_running(state) {
+                if precondition.clone().eval_running(state, &log_target) {
                     let action = Action::new(
                         assignment.var,
                         OperationState::Executing.to_spvalue().wrap(),
                     );
-                    return action.assign(&precondition.clone().take_running(state));
+                    return action.assign(
+                        &precondition.clone().take_running(state, &log_target),
+                        &log_target,
+                    );
                 }
             }
         }
@@ -256,16 +270,18 @@ impl Operation {
     }
 
     /// Complete executing the operation. Check for can_be_completed() first.
-    pub fn complete_running(&self, state: &State) -> State {
-        let assignment = state.get_assignment(&self.name);
+    pub fn complete_running(&self, state: &State, log_target: &str) -> State {
+        let assignment = state.get_assignment(&self.name, &log_target);
         if assignment.val == OperationState::Executing.to_spvalue() {
             for postcondition in &self.postconditions {
-                if postcondition.clone().eval_running(&state) {
+                if postcondition.clone().eval_running(&state, &log_target) {
                     let action = Action::new(
                         assignment.var,
                         OperationState::Completed.to_spvalue().wrap(),
                     );
-                    return postcondition.clone().take_running(&action.assign(&state));
+                    return postcondition
+                        .clone()
+                        .take_running(&action.assign(&state, &log_target), &log_target);
                 }
             }
         }
@@ -273,22 +289,24 @@ impl Operation {
     }
 
     /// Fail the executing operation. Check for can_be_failed() first.
-    pub fn fail_running(&self, state: &State) -> State {
-        let assignment = state.get_assignment(&self.name);
+    pub fn fail_running(&self, state: &State, log_target: &str) -> State {
+        let assignment = state.get_assignment(&self.name, &log_target);
         if assignment.val == OperationState::Executing.to_spvalue() {
             for fail_transition in &self.fail_transitions {
-                if fail_transition.clone().eval_running(&state) {
+                if fail_transition.clone().eval_running(&state, &log_target) {
                     let action =
                         Action::new(assignment.var, OperationState::Failed.to_spvalue().wrap());
-                    return fail_transition.clone().take_running(&action.assign(&state));
+                    return fail_transition
+                        .clone()
+                        .take_running(&action.assign(&state, &log_target), &log_target);
                 }
             }
         }
         state.clone()
     }
 
-    pub fn unrecover_running(&self, state: &State) -> State {
-        let assignment = state.get_assignment(&self.name);
+    pub fn unrecover_running(&self, state: &State, log_target: &str) -> State {
+        let assignment = state.get_assignment(&self.name, &log_target);
         if assignment.val == OperationState::Failed.to_spvalue()
             || assignment.val == OperationState::Timedout.to_spvalue()
         {
@@ -296,7 +314,7 @@ impl Operation {
                 assignment.var,
                 OperationState::Unrecoverable.to_spvalue().wrap(),
             );
-            action.assign(&state)
+            action.assign(&state, &log_target)
         } else {
             log::error!(target: &&format!("micro_sp"), "Can't unrecover an operation which hasn't failed or timedout.");
             state.clone()
@@ -304,25 +322,25 @@ impl Operation {
     }
 
     /// Timeout an executing the operation.
-    pub fn timeout_running(&self, state: &State) -> State {
-        let assignment = state.get_assignment(&self.name);
+    pub fn timeout_running(&self, state: &State, log_target: &str) -> State {
+        let assignment = state.get_assignment(&self.name, &log_target);
         if assignment.val == OperationState::Executing.to_spvalue() {
             if self.timeout_transitions.len() > 0 {
                 for timeout_transition in &self.timeout_transitions {
-                    if timeout_transition.clone().eval_running(&state) {
+                    if timeout_transition.clone().eval_running(&state, &log_target) {
                         let action = Action::new(
                             assignment.var,
                             OperationState::Timedout.to_spvalue().wrap(),
                         );
                         return timeout_transition
                             .clone()
-                            .take_running(&action.assign(&state));
+                            .take_running(&action.assign(&state, &log_target), &log_target);
                     }
                 }
             } else {
                 let action =
                     Action::new(assignment.var, OperationState::Timedout.to_spvalue().wrap());
-                return action.assign(&state);
+                return action.assign(&state, &log_target);
             }
         }
         state.clone()
@@ -331,23 +349,23 @@ impl Operation {
     /// Retry the execution of the operation, allows for retries without immediate replanning.
     /// However, do we have to reset the variables before we can go back the initial state?
     /// Otherwise we might end up in blocked.
-    pub fn retry_running(&self, state: &State) -> State {
-        let assignment = state.get_assignment(&self.name);
+    pub fn retry_running(&self, state: &State, log_target: &str) -> State {
+        let assignment = state.get_assignment(&self.name, &log_target);
         if assignment.val == OperationState::Failed.to_spvalue() {
             let action = Action::new(assignment.var, OperationState::Initial.to_spvalue().wrap());
-            action.assign(&state)
+            action.assign(&state, &log_target)
         } else {
             state.clone()
         }
     }
 
-    pub fn reinitialize_running(&self, state: &State) -> State {
-        let assignment = state.get_assignment(&self.name);
+    pub fn reinitialize_running(&self, state: &State, log_target: &str) -> State {
+        let assignment = state.get_assignment(&self.name, &log_target);
         if assignment.val == OperationState::Completed.to_spvalue()
             || assignment.val == OperationState::Unrecoverable.to_spvalue()
         {
             let action = Action::new(assignment.var, OperationState::Initial.to_spvalue().wrap());
-            action.assign(&state)
+            action.assign(&state, &log_target)
         } else {
             state.clone()
         }
