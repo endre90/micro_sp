@@ -55,9 +55,9 @@ pub async fn planned_operation_runner(
         };
 
         let new_state = process_plan_tick(sp_id, &model, &state, &log_target);
-        // let modified_state = state.get_diff_partial_state(&new_state);
+        let modified_state = state.get_diff_partial_state(&new_state);
         // StateManager::set_state(con, &modified_state).await;
-        StateManager::set_state(&mut con, &new_state).await;
+        StateManager::set_state(&mut con, &modified_state).await;
     }
 }
 

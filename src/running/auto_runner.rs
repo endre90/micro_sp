@@ -16,9 +16,9 @@ async fn process_single_transition(
     let new_state = transition.to_owned().take_running(state);
     log::info!(target: log_target, "Executed auto transition: '{}'.", transition.name);
 
-    // let modified_state = state.get_diff_partial_state(&new_state);
+    let modified_state = state.get_diff_partial_state(&new_state);
     // StateManager::set_state(con, &modified_state).await;
-    StateManager::set_state(con, &new_state).await;
+    StateManager::set_state(con, &modified_state).await;
 }
 
 pub async fn auto_transition_runner(
