@@ -31,8 +31,8 @@ pub async fn sop_runner(
 
         if old_sop_id != current_sop_id && !current_sop_id.is_empty() {
             if let Some(root_sop) = model.sops.iter().find(|s| s.id == current_sop_id) {
-                log::info!(target: log_target, "Now executing new SOP '{}':", current_sop_id);
-                log::info!(target: log_target, "{:?}", visualize_sop(&root_sop.sop));
+                log::info!(target: &log_target, "Now executing new SOP '{}':", current_sop_id);
+                log::info!(target: &log_target, "{:?}", visualize_sop(&root_sop.sop));
             }
             old_sop_id = current_sop_id;
         }
@@ -176,13 +176,13 @@ pub fn run_sop_tick(
     let mut new_state = state.clone();
 
     let mut stack: Vec<SOP> = serde_json::from_str(&stack_json).unwrap_or_else(|_| {
-        log::info!("SOP stack is empty or invalid, initializing with root SOP.");
+        log::info!(target: &log_target, "SOP stack is empty or invalid, initializing with root SOP.");
         vec![root_sop.clone()]
     });
 
     // If the stack is empty after initialization, the SOP is done.
     if stack.is_empty() {
-        log::info!("SOP execution is complete.");
+        log::info!(target: &log_target, "SOP execution is complete.");
         return (new_state, serde_json::to_string(&stack).unwrap());
     }
     let current_sop = stack.pop().unwrap();
@@ -206,7 +206,7 @@ pub fn run_sop_tick(
                 OperationState::Initial => {
                     if operation.eval_running(&new_state, &log_target) {
                         new_state = operation.start_running(&new_state, &log_target);
-                        log::info!("Operation '{}' started execution", operation.name);
+                        log::info!(target: &log_target, "Operation '{}' started execution", operation.name);
                         operation_information =
                             format!("Operation '{}' started execution", operation.name);
                     }
@@ -215,21 +215,21 @@ pub fn run_sop_tick(
                     if operation.can_be_completed(&state, &log_target) {
                         new_state = operation.clone().complete_running(&new_state, &log_target);
                         operation_information = "Completing operation".to_string();
-                        log::info!("Completing operation '{}'", operation.name);
+                        log::info!(target: &log_target, "Completing operation '{}'", operation.name);
                     } else if operation.can_be_failed(&state, &log_target) {
                         new_state = operation.clone().fail_running(&new_state, &log_target);
                         operation_information = "Failing operation".to_string();
-                        log::info!("Failing operation '{}'", operation.name);
+                        log::info!(target: &log_target, "Failing operation '{}'", operation.name);
                     } else {
                         operation_information = "Waiting to be completed".to_string();
-                        log::info!("Operation '{}' waiting to be completed", operation.name);
+                        log::info!(target: &log_target, "Operation '{}' waiting to be completed", operation.name);
                     }
                 }
                 OperationState::Completed => {
                     // new_state = operation.reinitialize_running(&new_state);
                     operation_information =
                         format!("Operation {} completed, reinitializing", operation.name);
-                    log::info!("Operation '{}' completed", operation.name);
+                    log::info!(target: &log_target, "Operation '{}' completed", operation.name);
                     new_state = new_state
                         .update(&format!("{}_retry_counter", operation.name), 0.to_spvalue());
                     new_state =
@@ -242,7 +242,7 @@ pub fn run_sop_tick(
                 OperationState::Failed => {
                     if operation_retry_counter < operation.retries {
                         operation_retry_counter = operation_retry_counter + 1;
-                        log::info!(
+                        log::info!(target: &log_target,
                             "Retrying '{}'. Retry nr. {} out of {}",
                             operation.name,
                             operation_retry_counter,
@@ -261,7 +261,7 @@ pub fn run_sop_tick(
                         new_state = operation.unrecover_running(&new_state, &log_target);
                         new_state = new_state
                             .update(&format!("{}_retry_counter", operation.name), 0.to_spvalue());
-                        log::info!("Operation failed, no more retries left. Unrecoverable");
+                        log::info!(target: &log_target, "Operation failed, no more retries left. Unrecoverable");
                         operation_information =
                             format!("Operation failed, no more retries left. Unrecoverable");
                     }
@@ -269,7 +269,7 @@ pub fn run_sop_tick(
                 OperationState::Unrecoverable => {
                     // new_state = operation.reinitialize_running(&new_state); // reinitialize globally when sop is done
                     operation_information = format!("Failing the sop: {:?}", root_sop);
-                    log::info!("Failing the sop: {:?}", visualize_sop(root_sop));
+                    log::info!(target: &log_target, "Failing the sop: {:?}", visualize_sop(root_sop));
                 }
                 OperationState::UNKNOWN => (),
             }
@@ -297,7 +297,7 @@ pub fn run_sop_tick(
                 // The sequence IS finished.
                 // By doing nothing here, we allow the Sequence to be "consumed" from the stack.
                 // If it was the last item, the SOP will correctly be flagged as completed on the next tick.
-                log::info!("Sequence is complete.");
+                log::info!(target: &log_target, "Sequence is complete.");
             }
         }
 
@@ -311,23 +311,23 @@ pub fn run_sop_tick(
         }
 
         SOP::Alternative(sops) => {
-            log::info!("Processing an Alternative node.");
+            log::info!(target: &log_target, "Processing an Alternative node.");
 
             let chosen_path = sops
                 .iter()
                 .find(|sop| !is_sop_in_initial_state(sp_id, sop, &new_state, &log_target));
 
             if let Some(path) = chosen_path {
-                log::info!(
+                log::info!(target: &log_target,
                     "Alternative path {:?} is already active. Pushing for continued execution.",
                     path
                 );
                 stack.push(path.clone());
             } else {
-                log::info!("No active path found. Evaluating new alternatives.");
+                log::info!(target: &log_target, "No active path found. Evaluating new alternatives.");
                 for sub_sop in sops {
                     if can_sop_start(sp_id, &sub_sop, &new_state, &log_target) {
-                        log::info!(
+                        log::info!(target: &log_target, 
                             "Found valid alternative {:?}. Pushing it to the stack.",
                             sub_sop
                         );
