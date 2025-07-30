@@ -130,7 +130,7 @@ fn handle_sop_executing(
     log_target: &str,
 ) {
     let sop_id = state.get_string_or_default_to_unknown(&format!("{}_sop_id", sp_id), &log_target);
-    let stack_json = state.get_string_or_value(sp_id, "[]".to_string(), &log_target);
+    let stack_json = state.get_string_or_value(&format!("{}_sop_stack", sp_id), "[]".to_string(), &log_target);
 
     let Some(root_sop) = model.sops.iter().find(|s| s.id == sop_id) else {
         log::error!(target: &log_target, "SOP with id '{}' not found in model. Failing.", sop_id);
