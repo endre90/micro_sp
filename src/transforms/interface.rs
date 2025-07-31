@@ -1,4 +1,4 @@
-use std::{collections::HashMap, sync::Arc};
+use std::sync::Arc;
 
 use crate::*;
 use tokio::time::{Duration, interval};
@@ -58,90 +58,59 @@ pub async fn tf_interface(
                     &log_target,
                 );
 
-                // let tf_insert_transform = state.get_transform_or_default_to_default(
-                //
-                //     &format!("{}_tf_insert_transform", sp_id),
-                // );
-
-                let tf_insert_transforms = state.get_array_or_default_to_empty(
+                let tf_insert_transforms_sp_values = state.get_array_or_default_to_empty(
                     &format!("{}_tf_insert_transforms", sp_id),
                     &log_target,
                 );
 
-                match command.as_str() {
-                    // "lookup" => {
-                    //     match TransformsManager::lookup_transform(&mut con, &parent, &child).await {
-                    //         Some(tf) => {
-                    //             tf_lookup_result = tf;
-                    //             request_state = ServiceRequestState::Succeeded.to_string();
-                    //         }
-                    //         None => {
-                    //             log::error!(target: &log_target,
-                    //                 "Failed to lookup {} to {}.", parent, child);
-                    //             request_state = ServiceRequestState::Failed.to_string();
-                    //         }
-                    //     }
-                    // }
-                    // "reparent" => {
-                    //     match TransformsManager::reparent_transform(&mut con, &parent, &child).await
-                    //     {
-                    //         true => {
-                    //             request_state = ServiceRequestState::Succeeded.to_string();
-                    //         }
-                    //         false => {
-                    //             log::error!(target:  &log_target,
-                    //                 "Failed to reparent {} to {}.", child, parent);
-                    //             request_state = ServiceRequestState::Failed.to_string();
-                    //         }
-                    //     }
-                    // }
+                let mut tf_insert_transforms = vec![];
+                tf_insert_transforms_sp_values.iter().for_each(|x| match x {
+                    SPValue::Transform(TransformOrUnknown::Transform(transform)) => {
+                        tf_insert_transforms.push(transform.to_owned())
+                    }
+                    _ => (),
+                });
 
-                    "insert" => {
-                        let mut frames = vec!();
-                        for transform in tf_insert_transforms {
-                            match transform {
-                                SPValue::Transform(tf_or_unknown) => match tf_or_unknown {
-                                    TransformOrUnknown::Transform(t) => {
-                                        frames.push(t);
-                                    }
-                                    TransformOrUnknown::UNKNOWN => (),
-                                },
-                                _ => (),
+                match command.as_str() {
+                    "lookup" => {
+                        match TransformsManager::lookup_transform(&mut con, &parent, &child).await {
+                            Ok(tf) => {
+                                tf_lookup_result = tf;
+                                request_state = ServiceRequestState::Succeeded.to_string();
+                            }
+                            Err(e) => {
+                                log::error!(target: &log_target,
+                                    "Failed to lookup {} to {}.", parent, child);
+                                log::error!(target: &log_target, "{e}");
+                                request_state = ServiceRequestState::Failed.to_string();
                             }
                         }
-                        TransformsManager::insert_transforms(&mut con, &frames).await;
-                        request_state = ServiceRequestState::Succeeded.to_string();
-                        // match response_rx.await? {
-                        //     // NICE WAY TO PROPAGATE SUCCESS/FAILURE
-                        //     true => {
-                        //         request_state = ServiceRequestState::Succeeded.to_string();
-                        //     }
-                        //     false => {
-                        //         log::error!(target:
-                        //             "Failed to reparent {} to {}.", child, parent);
-                        //         request_state = ServiceRequestState::Failed.to_string();
-                        //     }
-                        // }
                     }
-
-                    // BETTER, DO LIKE THIS IN THE FUTURE
-                    // "insert" => {
-                    //     let (response_tx, response_rx) = oneshot::channel();
-                    //     command_sender
-                    //         .send(StateManagement::InsertTransform((tf_insert_transform, response_rx)))
-                    //         .await?;
-                    //     match response_rx.await? {
-                    //         // NICE WAY TO PROPAGATE SUCCESS/FAILURE
-                    //         true => {
-                    //             request_state = ServiceRequestState::Succeeded.to_string();
-                    //         }
-                    //         false => {
-                    //             log::error!(target:
-                    //                 "Failed to reparent {} to {}.", child, parent);
-                    //             request_state = ServiceRequestState::Failed.to_string();
-                    //         }
-                    //     }
-                    // }
+                    "reparent" => {
+                        match TransformsManager::reparent_transform(&mut con, &parent, &child).await
+                        {
+                            Ok(()) => request_state = ServiceRequestState::Succeeded.to_string(),
+                            Err(e) => {
+                                log::error!(target:  &log_target,
+                                    "Failed to reparent {} to {}.", child, parent);
+                                log::error!(target:  &log_target, "{e}");
+                                request_state = ServiceRequestState::Failed.to_string();
+                            }
+                        }
+                    }
+                    "insert" => {
+                        match TransformsManager::insert_transforms(&mut con, &tf_insert_transforms)
+                            .await
+                        {
+                            Ok(()) => request_state = ServiceRequestState::Succeeded.to_string(),
+                            Err(e) => {
+                                log::error!(target:  &log_target,
+                                    "Failed to insert transforms {:?}.", tf_insert_transforms);
+                                log::error!(target:  &log_target, "{e}");
+                                request_state = ServiceRequestState::Failed.to_string();
+                            }
+                        }
+                    }                 
                     _ => {
                         log::error!(target:  &log_target,
                             "TF interface command {} is invalid.", command);
