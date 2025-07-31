@@ -1,6 +1,5 @@
-use crate::*;
+use crate::{transforms::interface::tf_interface, *};
 use std::sync::Arc;
-
 
 // Run everything and provide a model
 pub async fn main_runner(
@@ -65,10 +64,10 @@ pub async fn main_runner(
             .unwrap()
     });
 
-    // log::info!(target: &format!("{sp_id}_micro_sp"), "Spawning TF interface");
-    // // let tx_clone = tx.clone();
-    // let sp_id_clone = sp_id.clone();
-    // tokio::task::spawn(async move { tf_interface(&sp_id_clone, con).await.unwrap() });
+    log::info!(target: &format!("{sp_id}_micro_sp"), "Spawning TF interface");
+    let con_clone = connection_manager.clone();
+    let sp_id_clone = sp_id.clone();
+    tokio::task::spawn(async move { tf_interface(&sp_id_clone, &con_clone).await.unwrap() });
 
     // log::info!(target: &format!("{sp_id}_micro_sp"), "Spawning goal runner.");
     // let model_clone = model.clone();
