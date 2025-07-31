@@ -13,22 +13,6 @@ pub(super) async fn insert_transform(
     con.set::<_, _, ()>(&key, value_str).await?;
 
     Ok(())
-
-    // let value_str = match serde_json::to_string(&transform.to_spvalue()) {
-    //     Ok(s) => s,
-    //     Err(e) => {
-    //         // e.to_string()
-    //         log::error!("Failed to serialize transform for key '{key}': {e}");
-    //         return Error(e.to_string());
-    //     }
-    // };
-
-    // match con.set::<_, _, ()>(&key, value_str).await {
-    //     Ok(_) => {}
-    //     Err(e) => {
-    //         log::error!("Redis SET command for key '{key}' failed: {e}");
-    //     }
-    // }
 }
 
 #[cfg(test)]
@@ -65,7 +49,9 @@ mod tests_for_insert_transform {
         let mut con = ConnectionManager::new().await.get_connection().await;
         let transform_to_insert = create_dummy_transform("new_child");
 
-        insert_transform(&mut con, &transform_to_insert).await.expect("Failed to insert transform!");
+        insert_transform(&mut con, &transform_to_insert)
+            .await
+            .expect("Failed to insert transform!");
 
         let key = tf_key("new_child");
 
@@ -92,8 +78,12 @@ mod tests_for_insert_transform {
         let mut new_transform = create_dummy_transform("child_to_overwrite");
         new_transform.transform.translation.x = ordered_float::OrderedFloat(99.0);
 
-        insert_transform(&mut con, &initial_transform).await.expect("Failed to insert transform!");
-        insert_transform(&mut con, &new_transform).await.expect("Failed to insert transform!");
+        insert_transform(&mut con, &initial_transform)
+            .await
+            .expect("Failed to insert transform!");
+        insert_transform(&mut con, &new_transform)
+            .await
+            .expect("Failed to insert transform!");
 
         let key = tf_key("child_to_overwrite");
         let result_str: String = con.get(key).await.unwrap();

@@ -30,32 +30,9 @@ pub(super) async fn reparent_transform(
 
     updated_transform.transform = lookup_tf.transform;
     let updated_value_json = serde_json::to_string(&updated_transform.to_spvalue())?;
-    
-    //  {
-    //     Ok(s) => s,
-    //     Err(e) => {
-    //         log::error!(
-    //             "Failed to serialize reparented transform '{}': {e}",
-    //             child_frame_id
-    //         );
-    //         return false;
-    //     }
-    // };
-    con.set::<_, _, ()>(redis_key, updated_value_json).await?;
-    // if let Err(e) = con.set::<_, _, ()>(redis_key, updated_value_json).await {
-    //     log::error!(
-    //         "Failed to SET reparented transform '{}': {e}",
-    //         child_frame_id
-    //     );
-    //     return false;
-    // }
 
-    // log::info!(
-    //     "Successfully reparented transform '{}' to new parent '{}'.",
-    //     child_frame_id,
-    //     new_parent_frame_id
-    // );
-    // true
+    con.set::<_, _, ()>(redis_key, updated_value_json).await?;
+
     Ok(())
 }
 

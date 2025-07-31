@@ -47,59 +47,6 @@ pub(super) async fn get_all_transforms(
     Ok(transform_map)
 }
 
-// pub(super) async fn get_all_transforms(
-//     con: &mut MultiplexedConnection,
-// ) -> HashMap<String, SPTransformStamped> {
-//     let mut con_clone = con.clone();
-//     let mut iter: redis::AsyncIter<String> =
-//         match con_clone.scan_match(&format!("{}*", TF_PREFIX)).await {
-//             Ok(it) => it,
-//             Err(e) => {
-//                 log::error!("Redis SCAN command failed for transforms: {}", e);
-//                 return HashMap::new();
-//             }
-//         };
-
-//     let mut keys = Vec::new();
-//     while let Some(key) = iter.next_item().await {
-//         keys.push(key);
-//     }
-
-//     if keys.is_empty() {
-//         return HashMap::new();
-//     }
-
-//     let values: Vec<Option<String>> = match con.mget(&keys).await {
-//         Ok(v) => v,
-//         Err(e) => {
-//             log::error!("Redis MGET command failed for transforms: {}", e);
-//             return HashMap::new();
-//         }
-//     };
-
-//     keys.into_par_iter()
-//         .zip(values.into_par_iter())
-//         .filter_map(|(key, value_opt)| {
-//             let value_str = value_opt?;
-
-//             match serde_json::from_str::<SPValue>(&value_str) {
-//                 Ok(SPValue::Transform(TransformOrUnknown::Transform(transform))) => {
-//                     let child_id = key.strip_prefix(TF_PREFIX).unwrap_or(&key).to_string();
-//                     Some((child_id, transform))
-//                 }
-//                 Ok(_) => {
-//                     log::warn!("Key '{}' held an SPValue that was not a Transform.", key);
-//                     None
-//                 }
-//                 Err(e) => {
-//                     log::error!("Failed to deserialize SPValue for key '{}': {}", key, e);
-//                     None
-//                 }
-//             }
-//         })
-//         .collect()
-// }
-
 #[cfg(test)]
 mod tests {
     use super::{TF_PREFIX, get_all_transforms};

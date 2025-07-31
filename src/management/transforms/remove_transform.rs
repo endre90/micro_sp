@@ -10,12 +10,6 @@ pub(super) async fn remove_transform(
     let redis_key = tf_key(key);
     con.del::<_, ()>(&redis_key).await?;
     Ok(())
-    //  {
-    //     Ok(_) => {}
-    //     Err(e) => {
-    //         log::error!("Redis DEL command for key '{}' failed: {}", redis_key, e);
-    //     }
-    // }
 }
 
 #[cfg(test)]

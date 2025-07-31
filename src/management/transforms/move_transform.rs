@@ -13,7 +13,7 @@ pub(super) async fn move_transform(
         Ok(None) => {
             return Err("Transform '{name}' not found in Redis, cannot move.".into());
         }
-        Err(e) => e.to_string()
+        Err(e) => e.to_string(),
     };
 
     let mut sp_tf_stamped: SPTransformStamped = match serde_json::from_str::<SPValue>(&redis_value)
@@ -26,19 +26,8 @@ pub(super) async fn move_transform(
 
     sp_tf_stamped.transform = new_transform;
     let updated_value_json = serde_json::to_string(&sp_tf_stamped.to_spvalue())?;
-    // let updated_value_json = match serde_json::to_string(&sp_tf_stamped.to_spvalue()) {
-    //     Ok(s) => s,
-    //     Err(e) => {
-    //         log::error!("Failed to serialize updated transform '{name}': {e}");
-    //         return;
-    //     }
-    // };
     con.set::<_, _, ()>(&redis_key, updated_value_json).await?;
     Ok(())
-
-    // if let Err(e) = con.set::<_, _, ()>(&redis_key, updated_value_json).await {
-    //     log::error!("Failed to SET updated transform '{name}': {e}");
-    // }
 }
 
 #[cfg(test)]

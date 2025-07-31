@@ -10,24 +10,6 @@ pub(super) async fn insert_transforms(
         return Err("There are no transforms to insert, vector is empty.".into());
     }
 
-    // let key_value_pairs: Vec<(String, String)> = transforms
-    //     .into_iter()
-    //     .filter_map(|transform| {
-    //         let key = tf_key(&transform.child_frame_id);
-    //         match serde_json::to_string(&transform.to_spvalue()) {
-    //             Ok(value_str) => Some((key, value_str)),
-    //             Err(e) => {
-    //                 log::error!(
-    //                     "Failed to serialize transform for child '{}': {}",
-    //                     transform.child_frame_id,
-    //                     e
-    //                 );
-    //                 None
-    //             }
-    //         }
-    //     })
-    //     .collect();
-
     let key_value_pairs: Vec<(String, String)> = transforms
         .iter()
         .map(|transform| {
@@ -40,12 +22,6 @@ pub(super) async fn insert_transforms(
         return Err("No valid transforms to set after serialization.".into());
     }
 
-    // match con.mset::<_, String, Value>(&key_value_pairs).await {
-    //     Ok(_) => {}
-    //     Err(e) => {
-    //         log::error!("Redis MSET command for multiple transforms failed: {}", e);
-    //     }
-    // }
     con.mset::<_, String, Value>(&key_value_pairs).await?;
     Ok(())
 }
