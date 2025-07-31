@@ -35,7 +35,7 @@ impl Error for ErrorMsg {
     }
 }
 
-pub fn list_frames_in_dir(path: &str) -> Result<Vec<String>, Box<dyn std::error::Error + Send>> {
+pub fn list_frames_in_dir(path: &str) -> Result<Vec<String>, Box<dyn std::error::Error>> {
     let mut scenario = vec![];
     match fs::read_dir(path) {
         Ok(dir) => dir.for_each(|file| match file {

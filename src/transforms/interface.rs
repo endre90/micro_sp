@@ -69,32 +69,32 @@ pub async fn tf_interface(
                 );
 
                 match command.as_str() {
-                    "lookup" => {
-                        match TransformsManager::lookup_transform(&mut con, &parent, &child).await {
-                            Some(tf) => {
-                                tf_lookup_result = tf;
-                                request_state = ServiceRequestState::Succeeded.to_string();
-                            }
-                            None => {
-                                log::error!(target: &log_target,
-                                    "Failed to lookup {} to {}.", parent, child);
-                                request_state = ServiceRequestState::Failed.to_string();
-                            }
-                        }
-                    }
-                    "reparent" => {
-                        match TransformsManager::reparent_transform(&mut con, &parent, &child).await
-                        {
-                            true => {
-                                request_state = ServiceRequestState::Succeeded.to_string();
-                            }
-                            false => {
-                                log::error!(target:  &log_target,
-                                    "Failed to reparent {} to {}.", child, parent);
-                                request_state = ServiceRequestState::Failed.to_string();
-                            }
-                        }
-                    }
+                    // "lookup" => {
+                    //     match TransformsManager::lookup_transform(&mut con, &parent, &child).await {
+                    //         Some(tf) => {
+                    //             tf_lookup_result = tf;
+                    //             request_state = ServiceRequestState::Succeeded.to_string();
+                    //         }
+                    //         None => {
+                    //             log::error!(target: &log_target,
+                    //                 "Failed to lookup {} to {}.", parent, child);
+                    //             request_state = ServiceRequestState::Failed.to_string();
+                    //         }
+                    //     }
+                    // }
+                    // "reparent" => {
+                    //     match TransformsManager::reparent_transform(&mut con, &parent, &child).await
+                    //     {
+                    //         true => {
+                    //             request_state = ServiceRequestState::Succeeded.to_string();
+                    //         }
+                    //         false => {
+                    //             log::error!(target:  &log_target,
+                    //                 "Failed to reparent {} to {}.", child, parent);
+                    //             request_state = ServiceRequestState::Failed.to_string();
+                    //         }
+                    //     }
+                    // }
 
                     "insert" => {
                         let mut frames = vec!();
