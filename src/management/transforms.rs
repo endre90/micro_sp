@@ -1,132 +1,37 @@
 use crate::*;
-use rayon::prelude::*;
 use redis::AsyncCommands;
-use redis::{aio::MultiplexedConnection, pipe};
+use redis::aio::MultiplexedConnection;
 use std::collections::HashMap;
 
-const TRANSFORM_INDEX_KEY: &str = "transforms_index";
+mod insert;
+mod remove;
+mod get_all;
 
 pub struct TransformsManager {}
 
 impl TransformsManager {
         pub async fn insert_transform(
         con: &mut MultiplexedConnection,
-        key: &str,
-        transform: SPTransformStamped,
+        transform: &SPTransformStamped,
     ) {
-        let sp_value = SPValue::Transform(TransformOrUnknown::Transform(transform));
-        let value_str = match serde_json::to_string(&sp_value) {
-            Ok(s) => s,
-            Err(e) => {
-                log::error!("Failed to serialize transform for key '{key}': {e}");
-                return;
-            }
-        };
-
-        let result: redis::RedisResult<()> = pipe()
-            .atomic()
-            .set(key, value_str)
-            .sadd(TRANSFORM_INDEX_KEY, key)
-            .query_async(con)
-            .await;
-
-        if let Err(e) = result {
-            log::error!("Failed to add transform for key '{key}': {e}");
-        }
+        insert::insert_transform(con, &transform).await
     }
 
     pub async fn insert_transforms(
         con: &mut MultiplexedConnection,
-        transforms: HashMap<String, SPTransformStamped>,
+        transforms: &Vec<SPTransformStamped>,
     ) {
-        if transforms.is_empty() {
-            return;
-        }
-
-        let keys: Vec<String> = transforms.keys().cloned().collect();
-
-        let mset_values: Vec<(String, String)> = match transforms
-            .into_iter()
-            .map(|(key, transform)| {
-                let sp_value = SPValue::Transform(TransformOrUnknown::Transform(transform));
-                serde_json::to_string(&sp_value).map(|json_val| (key, json_val))
-            })
-            .collect()
-        {
-            Ok(vals) => vals,
-            Err(e) => {
-                log::error!("Failed to serialize one or more transforms: {e}");
-                return;
-            }
-        };
-
-        let result: redis::RedisResult<()> = pipe()
-            .atomic()
-            .mset(&mset_values)
-            .sadd(TRANSFORM_INDEX_KEY, &keys)
-            .query_async(con)
-            .await;
-
-        if let Err(e) = result {
-            log::error!("Failed to add multiple transforms: {e}");
-        }
+        insert::insert_transforms(con, &transforms).await
     }
 
     pub async fn remove_transform(con: &mut MultiplexedConnection, key: &str) {
-        let result: redis::RedisResult<()> = pipe()
-            .atomic()
-            .del(key)
-            .srem(TRANSFORM_INDEX_KEY, key)
-            .query_async(con)
-            .await;
-
-        if let Err(e) = result {
-            log::error!("Failed to remove transform for key '{key}': {e}");
-        }
+        remove::remove_transform(con, &key).await;
     }
 
     pub async fn get_all_transforms(
         con: &mut MultiplexedConnection,
     ) -> HashMap<String, SPTransformStamped> {
-        let keys: Vec<String> = match con.smembers(TRANSFORM_INDEX_KEY).await {
-            Ok(k) => k,
-            Err(e) => {
-                log::error!("Failed to get transform keys: {e}");
-                return HashMap::new();
-            }
-        };
-
-        if keys.is_empty() {
-            return HashMap::new();
-        }
-
-        let values: Vec<String> = match con.mget(keys.clone()).await {
-            Ok(v) => v,
-            Err(e) => {
-                log::error!("Failed to MGET transform values: {e}");
-                return HashMap::new();
-            }
-        };
-
-        let key_value_pairs: Vec<(String, String)> =
-            keys.into_iter().zip(values.into_iter()).collect();
-
-        // Use Rayon to process the data in parallel
-        key_value_pairs
-            .into_par_iter()
-            .filter_map(
-                |(key, value_str)| match serde_json::from_str::<SPValue>(&value_str) {
-                    Ok(SPValue::Transform(TransformOrUnknown::Transform(transf))) => {
-                        Some((key, transf))
-                    }
-                    Ok(_) => None,
-                    Err(e) => {
-                        log::error!("Deserialization failed for key '{key}': {e}");
-                        None
-                    }
-                },
-            )
-            .collect()
+        get_all::get_all_transforms(con).await
     }
 
     pub async fn move_transform(
@@ -261,14 +166,14 @@ impl TransformsManager {
         result
     }
 
-    pub async fn load_transform_scenario(con: &mut MultiplexedConnection, path: &str) {
-        match list_frames_in_dir(&path) {
-            Ok(list) => {
-                let frames = load_new_scenario(&list);
-                // if overlay { ??
-                TransformsManager::insert_transforms(con, frames).await;
-            }
-            Err(_e) => (),
-        }
-    }
+    // pub async fn load_transform_scenario(con: &mut MultiplexedConnection, path: &str) {
+    //     match list_frames_in_dir(&path) {
+    //         Ok(list) => {
+    //             let frames = load_new_scenario(&list);
+    //             // if overlay { ??
+    //             TransformsManager::insert_transforms(con, frames).await;
+    //         }
+    //         Err(_e) => (),
+    //     }
+    // }
 }

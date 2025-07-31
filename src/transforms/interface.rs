@@ -97,19 +97,19 @@ pub async fn tf_interface(
                     }
 
                     "insert" => {
-                        let mut map = HashMap::new();
+                        let mut frames = vec!();
                         for transform in tf_insert_transforms {
                             match transform {
                                 SPValue::Transform(tf_or_unknown) => match tf_or_unknown {
                                     TransformOrUnknown::Transform(t) => {
-                                        map.insert(t.clone().child_frame_id, t);
+                                        frames.push(t);
                                     }
                                     TransformOrUnknown::UNKNOWN => (),
                                 },
                                 _ => (),
                             }
                         }
-                        TransformsManager::insert_transforms(&mut con, map).await;
+                        TransformsManager::insert_transforms(&mut con, &frames).await;
                         request_state = ServiceRequestState::Succeeded.to_string();
                         // match response_rx.await? {
                         //     // NICE WAY TO PROPAGATE SUCCESS/FAILURE
