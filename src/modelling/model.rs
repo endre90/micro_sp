@@ -24,7 +24,7 @@ impl Model {
                 .iter()
                 .map(|sop| SOPStruct {
                     id: sop.id.clone(),
-                    sop: uniquify_sop_operations(sop.sop.clone()),
+                    sop: sop.sop.clone(), //uniquify_sop_operations(sop.sop.clone()),
                 })
                 .collect(),
             operations: operations
