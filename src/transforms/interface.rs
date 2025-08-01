@@ -136,7 +136,5 @@ pub async fn tf_interface(
                 StateManager::set_state(&mut con, &modified_state).await;
             }
         }
-
-        interval.tick().await;
     }
 }
