@@ -49,6 +49,9 @@ pub mod utils;
 pub use crate::utils::logger::*;
 pub use crate::utils::metadata::*;
 
+pub mod gui;
+pub use crate::gui::transforms_gui::*;
+
 pub mod macros;
 #[allow(unused_imports)]
 pub use crate::macros::action::*;
