@@ -11,6 +11,7 @@ mod lookup_transform;
 mod move_transform;
 mod remove_transform;
 mod reparent_transform;
+mod snap_to_parent_transform;
 
 pub const TF_PREFIX: &str = "tf:";
 
@@ -63,6 +64,14 @@ impl TransformsManager {
         child_frame_id: &str,
     ) -> Result<(), Box<dyn Error>> {
         reparent_transform::reparent_transform(con, new_parent_frame_id, child_frame_id).await
+    }
+
+    pub async fn snap_to_parent_transform(
+        con: &mut MultiplexedConnection,
+        new_parent_frame_id: &str,
+        child_frame_id: &str,
+    ) -> Result<(), Box<dyn Error>> {
+        snap_to_parent_transform::snap_to_parent_transform(con, new_parent_frame_id, child_frame_id).await
     }
 
     pub async fn lookup_transform(
