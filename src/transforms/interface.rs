@@ -98,6 +98,18 @@ pub async fn tf_interface(
                             }
                         }
                     }
+                    "snap_to_parent" => {
+                        match TransformsManager::snap_to_parent_transform(&mut con, &parent, &child).await
+                        {
+                            Ok(()) => request_state = ServiceRequestState::Succeeded.to_string(),
+                            Err(e) => {
+                                log::error!(target:  &log_target,
+                                    "Failed to snap {} to parent {}.", child, parent);
+                                log::error!(target:  &log_target, "{e}");
+                                request_state = ServiceRequestState::Failed.to_string();
+                            }
+                        }
+                    }
                     "insert" => {
                         match TransformsManager::insert_transforms(&mut con, &tf_insert_transforms)
                             .await

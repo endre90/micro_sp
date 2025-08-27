@@ -130,7 +130,11 @@ fn handle_sop_executing(
     log_target: &str,
 ) {
     let sop_id = state.get_string_or_default_to_unknown(&format!("{}_sop_id", sp_id), &log_target);
-    let stack_json = state.get_string_or_value(&format!("{}_sop_stack", sp_id), "[]".to_string(), &log_target);
+    let stack_json = state.get_string_or_value(
+        &format!("{}_sop_stack", sp_id),
+        "[]".to_string(),
+        &log_target,
+    );
 
     let Some(root_sop) = model.sops.iter().find(|s| s.id == sop_id) else {
         log::error!(target: &log_target, "SOP with id '{}' not found in model. Failing.", sop_id);
@@ -192,10 +196,12 @@ pub fn run_sop_tick(
             let operation_state =
                 state.get_string_or_default_to_unknown(&format!("{}", operation.name), &log_target);
 
-            let mut operation_information = state.get_string_or_default_to_unknown(
+            let old_operation_information = state.get_string_or_default_to_unknown(
                 &format!("{}_information", operation.name),
                 &log_target,
             );
+
+            let mut new_op_info = old_operation_information.clone();
 
             let mut operation_retry_counter = state.get_int_or_default_to_zero(
                 &format!("{}_retry_counter", operation.name),
@@ -206,30 +212,28 @@ pub fn run_sop_tick(
                 OperationState::Initial => {
                     if operation.eval_running(&new_state, &log_target) {
                         new_state = operation.start_running(&new_state, &log_target);
-                        log::info!(target: &log_target, "Operation '{}' started execution", operation.name);
-                        operation_information =
-                            format!("Operation '{}' started execution", operation.name);
+                        // log::info!(target: &log_target, "Operation '{}' started execution", operation.name);
+                        new_op_info = format!("Operation '{}' started execution", operation.name);
                     }
                 }
                 OperationState::Executing => {
                     if operation.can_be_completed(&state, &log_target) {
                         new_state = operation.clone().complete_running(&new_state, &log_target);
-                        operation_information = "Completing operation".to_string();
-                        log::info!(target: &log_target, "Completing operation '{}'", operation.name);
+                        new_op_info = "Completing operation".to_string();
+                        // log::info!(target: &log_target, "Completing operation '{}'", operation.name);
                     } else if operation.can_be_failed(&state, &log_target) {
                         new_state = operation.clone().fail_running(&new_state, &log_target);
-                        operation_information = "Failing operation".to_string();
-                        log::info!(target: &log_target, "Failing operation '{}'", operation.name);
+                        new_op_info = "Failing operation".to_string();
+                        // log::info!(target: &log_target, "Failing operation '{}'", operation.name);
                     } else {
-                        operation_information = "Waiting to be completed".to_string();
-                        log::info!(target: &log_target, "Operation '{}' waiting to be completed", operation.name);
+                        new_op_info = "Waiting to be completed".to_string();
+                        // log::info!(target: &log_target, "Operation '{}' waiting to be completed", operation.name);
                     }
                 }
                 OperationState::Completed => {
                     // new_state = operation.reinitialize_running(&new_state);
-                    operation_information =
-                        format!("Operation {} completed, reinitializing", operation.name);
-                    log::info!(target: &log_target, "Operation '{}' completed", operation.name);
+                    new_op_info = format!("Operation {} completed, reinitializing", operation.name);
+                    // log::info!(target: &log_target, "Operation '{}' completed", operation.name);
                     new_state = new_state
                         .update(&format!("{}_retry_counter", operation.name), 0.to_spvalue());
                     new_state =
@@ -237,18 +241,18 @@ pub fn run_sop_tick(
                 }
                 OperationState::Timedout => {
                     new_state = operation.unrecover_running(&new_state, &log_target);
-                    operation_information = format!("Timedout {}. Unrecoverable", operation.name);
+                    new_op_info = format!("Timedout {}. Unrecoverable", operation.name);
                 }
                 OperationState::Failed => {
                     if operation_retry_counter < operation.retries {
                         operation_retry_counter = operation_retry_counter + 1;
-                        log::info!(target: &log_target,
-                            "Retrying '{}'. Retry nr. {} out of {}",
-                            operation.name,
-                            operation_retry_counter,
-                            operation.retries
-                        );
-                        operation_information = format!(
+                        // log::info!(target: &log_target,
+                        //     "Retrying '{}'. Retry nr. {} out of {}",
+                        //     operation.name,
+                        //     operation_retry_counter,
+                        //     operation.retries
+                        // );
+                        new_op_info = format!(
                             "Retrying '{}'. Retry nr. {} out of {}",
                             operation.name, operation_retry_counter, operation.retries
                         );
@@ -261,22 +265,26 @@ pub fn run_sop_tick(
                         new_state = operation.unrecover_running(&new_state, &log_target);
                         new_state = new_state
                             .update(&format!("{}_retry_counter", operation.name), 0.to_spvalue());
-                        log::info!(target: &log_target, "Operation failed, no more retries left. Unrecoverable");
-                        operation_information =
+                        // log::info!(target: &log_target, "Operation failed, no more retries left. Unrecoverable");
+                        new_op_info =
                             format!("Operation failed, no more retries left. Unrecoverable");
                     }
                 }
                 OperationState::Unrecoverable => {
                     // new_state = operation.reinitialize_running(&new_state); // reinitialize globally when sop is done
-                    operation_information = format!("Failing the sop: {:?}", root_sop);
-                    log::info!(target: &log_target, "Failing the sop: {:?}", visualize_sop(root_sop));
+                    new_op_info = format!("Failing the sop: {:?}", root_sop);
+                    // log::info!(target: &log_target, "Failing the sop: {:?}", visualize_sop(root_sop));
                 }
                 OperationState::UNKNOWN => (),
             }
 
+            if new_op_info != old_operation_information {
+                log::info!(target: &log_target, "{}", new_op_info);
+            }
+
             new_state = new_state.update(
                 &format!("{}_information", operation.name),
-                operation_information.to_spvalue(),
+                new_op_info.to_spvalue(),
             );
         }
 

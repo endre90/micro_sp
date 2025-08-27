@@ -202,7 +202,7 @@ fn handle_replan_request(
     state: &State,
     log_target: &str
 ) {
-    *new_state = reset_all_operations(new_state);
+    *new_state = reset_all_operations(new_state); // Doesn't work now because we don't track operations with "operation_" prefix and "_state" suffix
     ctx.plan = vec![];
 
     let planner_state = PlannerState::from_str(&ctx.planner_state);
