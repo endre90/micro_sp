@@ -188,14 +188,38 @@ pub fn generate_operation_state_variables(model: &Model, coverability_tracking: 
     state
 }
 
-pub fn reset_all_operations(state: &State) -> State {
+// pub fn reset_all_operations(state: &State) -> State {
+//     let state = state.clone();
+//     let mut mut_state = state.clone();
+//     state.state.iter().for_each(|(k, _)| {
+//         if k.starts_with("operation_") && k.ends_with("_state") {
+//             mut_state = mut_state.update(&k, "initial".to_spvalue());
+//         }
+//     });
+//     mut_state
+// }
+
+pub fn reset_all_operations(state: &State, model: &Model) -> State {
     let state = state.clone();
     let mut mut_state = state.clone();
-    state.state.iter().for_each(|(k, _)| {
-        if k.starts_with("operation_") && k.ends_with("_state") {
-            mut_state = mut_state.update(&k, "initial".to_spvalue());
-        }
-    });
+    for op in &model.operations {
+        // for all op instances (for now, we will have to remove these from the state when exec finishes)
+        state.state.iter().for_each(|(k, _)| {
+            if k.starts_with(&op.name) && !k.ends_with("_information") && !k.ends_with("_retry_counter") && !k.ends_with("_start_time") {
+                mut_state = mut_state.update(&k, "initial".to_spvalue());
+            }
+        });
+    }
+
+        for op in &model.sops {
+        // for all op instances (for now, we will have to remove these from the state when exec finishes)
+        state.state.iter().for_each(|(k, _)| {
+            if k.starts_with(&op.id) && !k.ends_with("_information") && !k.ends_with("_retry_counter") && !k.ends_with("_start_time") {
+                mut_state = mut_state.update(&k, "initial".to_spvalue());
+            }
+        });
+    }
+    
     mut_state
 }
 

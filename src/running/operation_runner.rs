@@ -103,7 +103,7 @@ fn process_plan_tick(sp_id: &str, model: &Model, state: &State, log_target: &str
         }
         PlanState::Failed | PlanState::Completed | PlanState::UNKNOWN => {
             plan_current_step = 0;
-            new_state = reset_all_operations(&new_state);
+            new_state = reset_all_operations(&new_state, &model);
             plan_state_str = PlanState::Initial.to_string();
             planner_state = PlannerState::Ready.to_string();
         }
