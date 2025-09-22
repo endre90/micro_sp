@@ -1,5 +1,5 @@
-use std::sync::Arc;
 use nanoid::nanoid;
+use std::sync::Arc;
 
 use crate::*;
 use tokio::time::{Duration, interval};
@@ -92,12 +92,7 @@ fn process_sop_tick(
     Ok(new_state)
 }
 
-fn run_single_sop_tick(
-    sp_id: &str,
-    state: &State,
-    sop: &SOP,
-    log_target: &str,
-) -> State {
+fn run_single_sop_tick(sp_id: &str, state: &State, sop: &SOP, log_target: &str) -> State {
     let mut new_state = state.clone();
 
     match sop {
@@ -119,12 +114,18 @@ fn run_single_sop_tick(
 
             match OperationState::from_str(&operation_state) {
                 OperationState::Initial => {
+                    if let Some(sleep) = operation.pre_start_sleep_ms {
+                        std::thread::sleep(Duration::from_millis(sleep as u64));
+                    }
                     if operation.eval_running(&new_state, &log_target) {
                         new_state = operation.start_running(&new_state, &log_target);
                         new_op_info = format!("Operation '{}' started execution", operation.name);
                     }
                 }
                 OperationState::Executing => {
+                    if let Some(sleep) = operation.pre_complete_sleep_ms {
+                        std::thread::sleep(Duration::from_millis(sleep as u64));
+                    }
                     if operation.can_be_completed(&state, &log_target) {
                         new_state = operation.clone().complete_running(&new_state, &log_target);
                         new_op_info = "Completing operation".to_string();
@@ -206,7 +207,7 @@ fn run_single_sop_tick(
                 }
             }
             if all_children_completed {
-                 log::info!(target: &log_target, "All children of parallel SOP node {id} completed.");
+                log::info!(target: &log_target, "All children of parallel SOP node {id} completed.");
             }
         }
 
@@ -270,12 +271,10 @@ pub fn run_sop_tick(
     if !is_sop_completed(sp_id, &current_sop, &new_state, &log_target) {
         stack.push(current_sop);
     }
-    
+
     let new_stack_json = serde_json::to_string(&stack).unwrap();
     (new_state, new_stack_json)
 }
-
-
 
 fn handle_sop_initial(
     sp_id: &str,
@@ -659,7 +658,6 @@ fn can_sop_start(sp_id: &str, sop: &SOP, state: &State, log_target: &str) -> boo
 //     }
 // }
 
-
 pub fn uniquify_sop_operations(sop: SOP) -> SOP {
     match sop {
         SOP::Operation(_, op) => {
@@ -674,13 +672,10 @@ pub fn uniquify_sop_operations(sop: SOP) -> SOP {
 
         SOP::Sequence(_, sops) => {
             let unique_id = nanoid!(6);
-            let unique_children = sops
-                .into_iter()
-                .map(uniquify_sop_operations)
-                .collect();
+            let unique_children = sops.into_iter().map(uniquify_sop_operations).collect();
             SOP::Sequence(unique_id, unique_children)
         }
-        
+
         SOP::Parallel(_, sops) => {
             let unique_id = nanoid!(6);
             let unique_children = sops.into_iter().map(uniquify_sop_operations).collect();
