@@ -154,8 +154,8 @@ async fn process_operation(
 
     match OperationState::from_str(&operation_state_str) {
         OperationState::Initial => {
-            if operation.pre_complete_sleep_ms != 0 {
-                tokio::time::sleep(Duration::from_millis(operation.pre_start_sleep_ms as u64)).await;
+            if let Some(sleep) = operation.pre_start_sleep_ms {
+                tokio::time::sleep(Duration::from_millis(sleep as u64)).await;
             }
             if operation.eval_running(state, &log_target) {
                 *new_state = operation.start_running(new_state, &log_target);
@@ -164,8 +164,8 @@ async fn process_operation(
         }
         OperationState::Executing => {
             if operation.can_be_completed(state, &log_target) {
-                if operation.pre_complete_sleep_ms != 0 {
-                    tokio::time::sleep(Duration::from_millis(operation.pre_complete_sleep_ms as u64)).await;
+                if let Some(sleep) = operation.pre_complete_sleep_ms {
+                    tokio::time::sleep(Duration::from_millis(sleep as u64)).await;
                 }
                 *new_state = operation.complete_running(new_state, &log_target);
                 new_op_info = format!("Operation '{}' completing.", operation.name);
