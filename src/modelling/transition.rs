@@ -28,7 +28,7 @@ pub struct Transition {
     pub name: String,
     pub guard: Predicate,
     pub runner_guard: Predicate,
-    pub delay_ms: u64,
+    // pub sleep_ms: u64,
     pub actions: Vec<Action>,
     pub runner_actions: Vec<Action>,
 }
@@ -39,7 +39,7 @@ impl Transition {
         name: &str,
         guard: Predicate,
         runner_guard: Predicate,
-        delay_ms: u64,
+        // sleep_ms: u64,
         actions: Vec<Action>,
         runner_actions: Vec<Action>,
     ) -> Transition {
@@ -47,7 +47,7 @@ impl Transition {
             name: name.to_string(),
             guard,
             runner_guard,
-            delay_ms,
+            // sleep_ms,
             actions,
             runner_actions,
         }
@@ -58,7 +58,7 @@ impl Transition {
         name: &str,
         guard: &str,
         runner_guard: &str,
-        delay_ms: u64,
+        // sleep_ms: u64,
         actions: Vec<&str>,
         runner_actions: Vec<&str>,
         state: &State,
@@ -85,7 +85,7 @@ impl Transition {
                     Predicate::FALSE
                 }
             },
-            delay_ms,
+            // sleep_ms,
             actions
                 .iter()
                 .map(|action| match pred_parser::action(action, state) {
@@ -121,7 +121,7 @@ impl Transition {
             "empty",
             Predicate::FALSE,
             Predicate::FALSE,
-            0,
+            // 0,
             vec![],
             vec![],
         )
@@ -181,7 +181,7 @@ impl Transition {
                 Some(x) => x,
                 None => Predicate::TRUE,
             },
-            delay_ms: self.delay_ms,
+            // sleep_ms: self.sleep_ms,
             actions: r_actions,
             runner_actions: r_runner_actions,
         }
@@ -225,7 +225,7 @@ impl Default for Transition {
             name: "unknown".to_string(),
             guard: Predicate::TRUE,
             runner_guard: Predicate::TRUE,
-            delay_ms: 0,
+            // sleep_ms: 0,
             actions: vec![],
             runner_actions: vec![],
         }
@@ -293,7 +293,7 @@ mod tests {
             "gains_weight",
             Predicate::TRUE,
             Predicate::TRUE,
-            0,
+            // 0,
             vec![a1.clone()],
             vec![],
         );
@@ -301,7 +301,7 @@ mod tests {
             "gains_weight",
             Predicate::TRUE,
             Predicate::TRUE,
-            0,
+            // 0,
             vec![a1],
             vec![],
         );
@@ -335,7 +335,7 @@ mod tests {
             "gains_weight",
             "true",
             "true",
-            0,
+            // 0,
             vec!("var:weight <- 85.0", "var:height <- 190"),
             Vec::<&str>::new(),
             &s
@@ -344,7 +344,7 @@ mod tests {
             "gains_weight",
             "true",
             "false",
-            0,
+            // 0,
             vec!("var:weight <- 85.0"),
             Vec::<&str>::new(),
             &s
@@ -361,7 +361,7 @@ mod tests {
             "gains_weight",
             "true",
             "var:weight == 85.0",
-            0,
+            // 0,
             vec!("var:weight <- 85.0", "var:height <- 190"),
             Vec::<&str>::new(),
             &s

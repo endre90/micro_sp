@@ -5,7 +5,7 @@ macro_rules! t_plan {
             $a,
             $b.clone(),
             Predicate::TRUE,
-            0,
+            // 0,
             $c.iter().map(|x| x.to_owned()).collect::<Vec<Action>>(),
             Vec::<Action>::new(),
         )
@@ -14,12 +14,12 @@ macro_rules! t_plan {
 
 #[macro_export]
 macro_rules! t {
-    ($name:expr, $guard:expr, $runner_guard:expr, $delay_ms:expr, $actions:expr, $runner_actions:expr, $state:expr) => {
+    ($name:expr, $guard:expr, $runner_guard:expr, $actions:expr, $runner_actions:expr, $state:expr) => {
         Transition::new(
             $name,
             pred_parser::pred($guard.clone(), $state).unwrap(),
             pred_parser::pred($runner_guard.clone(), $state).unwrap(),
-            $delay_ms,
+            // $delay_ms,
             $actions
                 .iter()
                 .map(|action| pred_parser::action(action.to_owned(), $state).unwrap())

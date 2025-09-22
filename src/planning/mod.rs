@@ -149,7 +149,7 @@ mod tests {
                 "start_moving_to_b",
                 "var:ur_action_trigger == false && var:ur_action_state == initial && var:ur_current_pose != b",
                 "true",
-                0,
+                // 0,
                 vec!(
                     "var:ur_command <- movej",
                     "var:ur_action_trigger <- true",
@@ -163,7 +163,7 @@ mod tests {
                 "complete_moving_to_b",
                 "var:ur_action_state == done",
                 "true",
-                0,
+                // 0,
                 vec!("var:ur_action_trigger <- false", "var:ur_current_pose <- b"),
                 Vec::<&str>::new(),
                 &state
@@ -181,7 +181,7 @@ mod tests {
                 "start_moving_to_c",
                 "var:ur_action_trigger == false && var:ur_action_state == initial && var:ur_current_pose == b",
                 "true",
-                0,
+                // 0,
                 vec!(
                     "var:ur_command <- movej",
                     "var:ur_action_trigger <- true",
@@ -195,7 +195,7 @@ mod tests {
                 "complete_moving_to_c",
                 "var:ur_action_state == done",
                 "true",
-                0,
+                // 0,
                 vec!("var:ur_action_trigger <- false", "var:ur_current_pose <- c"),
                 Vec::<&str>::new(),
                 &state
@@ -213,7 +213,7 @@ mod tests {
                 "start_moving_to_d",
                 "var:ur_action_trigger == false && var:ur_action_state == initial && var:ur_current_pose == c",
                 "true",
-                0,
+                // 0,
                 vec!(
                     "var:ur_command <- movej",
                     "var:ur_action_trigger <- true",
@@ -227,7 +227,7 @@ mod tests {
                 "complete_moving_to_d",
                 "var:ur_action_state == done",
                 "true",
-                0,
+                // 0,
                 vec!("var:ur_action_trigger <- false", "var:ur_current_pose <- d"),
                 Vec::<&str>::new(),
                 &state
