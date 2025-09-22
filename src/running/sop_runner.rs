@@ -38,7 +38,7 @@ pub async fn sop_runner(
             old_sop_id = current_sop_id;
         }
 
-        let new_state = process_sop_tick(sp_id, model, &state, &log_target)?;
+        let new_state = process_sop_tick(sp_id, model, &state, &log_target).await?;
         let modified_state = state.get_diff_partial_state(&new_state);
 
         if !modified_state.state.is_empty() {
@@ -47,7 +47,7 @@ pub async fn sop_runner(
     }
 }
 
-fn process_sop_tick(
+async fn process_sop_tick(
     sp_id: &str,
     model: &Model,
     state: &State,
@@ -76,7 +76,7 @@ fn process_sop_tick(
                 &mut new_state,
                 &mut sop_overall_state,
                 &log_target,
-            );
+            ).await;
         }
         SOPState::Completed | SOPState::Failed => {}
         SOPState::UNKNOWN => {
@@ -92,7 +92,7 @@ fn process_sop_tick(
     Ok(new_state)
 }
 
-fn run_single_sop_tick(sp_id: &str, state: &State, sop: &SOP, log_target: &str) -> State {
+async fn run_single_sop_tick(sp_id: &str, state: &State, sop: &SOP, log_target: &str) -> State {
     let mut new_state = state.clone();
 
     match sop {
@@ -115,7 +115,7 @@ fn run_single_sop_tick(sp_id: &str, state: &State, sop: &SOP, log_target: &str) 
             match OperationState::from_str(&operation_state) {
                 OperationState::Initial => {
                     if let Some(sleep) = operation.pre_start_sleep_ms {
-                        std::thread::sleep(Duration::from_millis(sleep as u64));
+                        tokio::time::sleep(Duration::from_millis(sleep as u64)).await;
                     }
                     if operation.eval_running(&new_state, &log_target) {
                         new_state = operation.start_running(&new_state, &log_target);
@@ -124,7 +124,7 @@ fn run_single_sop_tick(sp_id: &str, state: &State, sop: &SOP, log_target: &str) 
                 }
                 OperationState::Executing => {
                     if let Some(sleep) = operation.pre_complete_sleep_ms {
-                        std::thread::sleep(Duration::from_millis(sleep as u64));
+                        tokio::time::sleep(Duration::from_millis(sleep as u64)).await;
                     }
                     if operation.can_be_completed(&state, &log_target) {
                         new_state = operation.clone().complete_running(&new_state, &log_target);
@@ -189,7 +189,7 @@ fn run_single_sop_tick(sp_id: &str, state: &State, sop: &SOP, log_target: &str) 
                 .find(|sub_sop| !is_sop_completed(sp_id, sub_sop, &new_state, &log_target));
 
             if let Some(sub_sop) = next_sop_to_run {
-                new_state = run_single_sop_tick(sp_id, &new_state, sub_sop, &log_target);
+                new_state = Box::pin(run_single_sop_tick(sp_id, &new_state, sub_sop, &log_target)).await;
             } else {
                 log::info!(target: &log_target, "Sequence SOP node {id} is complete.");
             }
@@ -200,7 +200,7 @@ fn run_single_sop_tick(sp_id: &str, state: &State, sop: &SOP, log_target: &str) 
             let mut all_children_completed = true;
             for sub_sop in sops.iter() {
                 if !is_sop_completed(sp_id, sub_sop, &new_state, &log_target) {
-                    new_state = run_single_sop_tick(sp_id, &new_state, sub_sop, &log_target);
+                    new_state = Box::pin(run_single_sop_tick(sp_id, &new_state, sub_sop, &log_target)).await;
                     if !is_sop_completed(sp_id, sub_sop, &new_state, &log_target) {
                         all_children_completed = false;
                     }
@@ -222,7 +222,7 @@ fn run_single_sop_tick(sp_id: &str, state: &State, sop: &SOP, log_target: &str) 
                     "Alternative path {:?} of SOP node {id} is already active. Processing it.",
                     path
                 );
-                new_state = run_single_sop_tick(sp_id, &new_state, path, &log_target);
+                new_state = Box::pin(run_single_sop_tick(sp_id, &new_state, path, &log_target)).await;
             } else {
                 log::info!(target: &log_target, "No active path found. Evaluating new alternatives.");
                 for sub_sop in sops {
@@ -231,7 +231,7 @@ fn run_single_sop_tick(sp_id: &str, state: &State, sop: &SOP, log_target: &str) 
                             "Found valid alternative {:?}. Processing it.",
                             sub_sop
                         );
-                        new_state = run_single_sop_tick(sp_id, &new_state, sub_sop, &log_target);
+                        new_state = Box::pin(run_single_sop_tick(sp_id, &new_state, sub_sop, &log_target)).await;
                         break;
                     }
                 }
@@ -242,7 +242,7 @@ fn run_single_sop_tick(sp_id: &str, state: &State, sop: &SOP, log_target: &str) 
     new_state
 }
 
-pub fn run_sop_tick(
+pub async fn run_sop_tick(
     sp_id: &str,
     state: &State,
     stack_json: String,
@@ -263,7 +263,7 @@ pub fn run_sop_tick(
 
     // Process the SOP at the top of the stack.
     let current_sop = stack.pop().unwrap();
-    new_state = run_single_sop_tick(sp_id, &new_state, &current_sop, &log_target);
+    new_state = run_single_sop_tick(sp_id, &new_state, &current_sop, &log_target).await;
 
     // If the SOP is a container, its children might be handled.
     // We now check if the `current_sop` itself is completed to decide whether to continue.
@@ -306,7 +306,7 @@ fn handle_sop_initial(
     Ok(())
 }
 
-fn handle_sop_executing(
+async fn handle_sop_executing(
     sp_id: &str,
     model: &Model,
     state: &State,
@@ -328,7 +328,7 @@ fn handle_sop_executing(
     };
 
     let (updated_state, new_stack_json) =
-        run_sop_tick(sp_id, state, stack_json, &root_sop.sop, &log_target);
+        run_sop_tick(sp_id, state, stack_json, &root_sop.sop, &log_target).await;
     *new_state = updated_state;
 
     *new_state = new_state.update(&format!("{}_sop_stack", sp_id), new_stack_json.to_spvalue());

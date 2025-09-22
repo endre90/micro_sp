@@ -54,14 +54,14 @@ pub async fn planned_operation_runner(
             None => continue,
         };
 
-        let new_state = process_plan_tick(sp_id, &model, &state, &log_target);
+        let new_state = process_plan_tick(sp_id, &model, &state, &log_target).await;
         let modified_state = state.get_diff_partial_state(&new_state);
         // StateManager::set_state(con, &modified_state).await;
         StateManager::set_state(&mut con, &modified_state).await;
     }
 }
 
-fn process_plan_tick(sp_id: &str, model: &Model, state: &State, log_target: &str) -> State {
+async fn process_plan_tick(sp_id: &str, model: &Model, state: &State, log_target: &str) -> State {
     let mut new_state = state.clone();
     let mut planner_state =
         state.get_string_or_default_to_unknown(&format!("{}_planner_state", sp_id), &log_target);
@@ -96,7 +96,7 @@ fn process_plan_tick(sp_id: &str, model: &Model, state: &State, log_target: &str
                     model,
                     state,
                     log_target,
-                );
+                ).await;
             } else {
                 plan_state_str = PlanState::Completed.to_string();
             }
@@ -126,7 +126,7 @@ fn process_plan_tick(sp_id: &str, model: &Model, state: &State, log_target: &str
     new_state
 }
 
-fn process_operation(
+async fn process_operation(
     new_state: &mut State,
     plan_state_str: &mut String,
     plan_current_step: &mut i64,
@@ -155,7 +155,7 @@ fn process_operation(
     match OperationState::from_str(&operation_state_str) {
         OperationState::Initial => {
             if let Some(sleep) = operation.pre_start_sleep_ms {
-                std::thread::sleep(Duration::from_millis(sleep as u64));
+                tokio::time::sleep(Duration::from_millis(sleep as u64)).await;
             }
             if operation.eval_running(state, &log_target) {
                 *new_state = operation.start_running(new_state, &log_target);
@@ -165,7 +165,7 @@ fn process_operation(
         OperationState::Executing => {
             if operation.can_be_completed(state, &log_target) {
                 if let Some(sleep) = operation.pre_complete_sleep_ms {
-                    std::thread::sleep(Duration::from_millis(sleep as u64));
+                    tokio::time::sleep(Duration::from_millis(sleep as u64)).await;
                 }
                 *new_state = operation.complete_running(new_state, &log_target);
                 new_op_info = format!("Operation '{}' completing.", operation.name);
