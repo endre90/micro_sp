@@ -177,6 +177,7 @@ async fn process_operation(
         OperationState::Completed => {
             *new_state =
                 new_state.update(&format!("{}_retry_counter", operation.name), 0.to_spvalue());
+            *new_state = operation.reinitialize_running(&new_state, &log_target);
             *plan_current_step += 1;
             new_op_info = format!("Operation '{}' completed.", operation.name);
         }

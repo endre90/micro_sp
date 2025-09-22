@@ -142,6 +142,7 @@ async fn run_single_sop_tick(sp_id: &str, state: &State, sop: &SOP, log_target: 
                         .update(&format!("{}_retry_counter", operation.name), 0.to_spvalue());
                     new_state =
                         new_state.update(&format!("{}_start_time", operation.name), 0.to_spvalue());
+                    new_state = operation.reinitialize_running(&new_state, &log_target);
                 }
                 OperationState::Timedout => {
                     new_state = operation.unrecover_running(&new_state, &log_target);
