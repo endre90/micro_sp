@@ -230,6 +230,7 @@ pub fn reset_all_operations(state: &State, model: &Model) -> State {
     let state = state.clone();
     let mut mut_state = state.clone();
     for op in &model.operations {
+        mut_state = mut_state.update(&op.name, "initial".to_spvalue());
         // for all op instances (for now, we will have to remove these from the state when exec finishes)
         state.state.iter().for_each(|(k, _)| {
             if k.starts_with(&op.name) && !k.ends_with("_information") && !k.ends_with("_retry_counter") && !k.ends_with("_elapsed_ms") {
