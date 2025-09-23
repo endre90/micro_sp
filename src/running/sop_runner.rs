@@ -626,67 +626,41 @@ fn can_sop_start(sp_id: &str, sop: &SOP, state: &State, log_target: &str) -> boo
     }
 }
 
-// pub fn uniquify_sop_operations(sop: SOP) -> SOP {
-//     match sop {
-//         // Base case: We found an Operation.
-//         SOP::Operation(op) => {
-//             // Generate a short, unique ID.
-//             let unique_id = nanoid::nanoid!(6);
-
-//             // Create the new, unique name.
-//             let new_name = format!("{}_{}", op.name, unique_id);
-
-//             // Return a new Operation SOP with the updated name.
-//             SOP::Operation(Box::new(Operation {
-//                 name: new_name,
-//                 state: op.state,
-//                 timeout_ms: op.timeout_ms,
-//                 retries: op.retries,
-//                 preconditions: op.preconditions,
-//                 postconditions: op.postconditions,
-//                 fail_transitions: op.fail_transitions,
-//                 timeout_transitions: op.timeout_transitions,
-//                 reset_transitions: op.reset_transitions,
-//             }))
-//         }
-
-//         // Recursive cases: We found a container.
-//         // We process the children and then rebuild the container.
-//         SOP::Sequence(sops) => {
-//             let unique_children = sops
-//                 .into_iter() // Consumes the vector
-//                 .map(uniquify_sop_operations) // Recursively call on each child
-//                 .collect(); // Collect into a new Vec<SOP>
-//             SOP::Sequence(unique_children)
-//         }
-//         SOP::Parallel(sops) => {
-//             let unique_children = sops.into_iter().map(uniquify_sop_operations).collect();
-//             SOP::Parallel(unique_children)
-//         }
-//         SOP::Alternative(sops) => {
-//             let unique_children = sops.into_iter().map(uniquify_sop_operations).collect();
-//             SOP::Alternative(unique_children)
-//         }
-//     }
-// }
-
 pub fn uniquify_sop_operations(sop: SOP) -> SOP {
     match sop {
+        // Base case: We found an Operation.
         SOP::Operation(op) => {
-            let unique_id = nanoid!(6);
+            // Generate a short, unique ID.
+            let unique_id = nanoid::nanoid!(6);
+
+            // Create the new, unique name.
             let new_name = format!("{}_{}", op.name, unique_id);
-            let new_op = Operation {
+
+            // Return a new Operation SOP with the updated name.
+            SOP::Operation(Box::new(Operation {
                 name: new_name,
-                ..*op
-            };
-            SOP::Operation(Box::new(new_op))
+                state: op.state,
+                timeout_ms: op.timeout_ms,
+                retries: op.retries,
+                pre_start_sleep_ms: None,
+                preconditions: op.preconditions,
+                pre_complete_sleep_ms: None,
+                postconditions: op.postconditions,
+                fail_transitions: op.fail_transitions,
+                timeout_transitions: op.timeout_transitions,
+                reset_transitions: op.reset_transitions,
+            }))
         }
 
+        // Recursive cases: We found a container.
+        // We process the children and then rebuild the container.
         SOP::Sequence(sops) => {
-            let unique_children = sops.into_iter().map(uniquify_sop_operations).collect();
+            let unique_children = sops
+                .into_iter() // Consumes the vector
+                .map(uniquify_sop_operations) // Recursively call on each child
+                .collect(); // Collect into a new Vec<SOP>
             SOP::Sequence(unique_children)
         }
-
         SOP::Parallel(sops) => {
             let unique_children = sops.into_iter().map(uniquify_sop_operations).collect();
             SOP::Parallel(unique_children)
@@ -697,3 +671,31 @@ pub fn uniquify_sop_operations(sop: SOP) -> SOP {
         }
     }
 }
+
+// pub fn uniquify_sop_operations(sop: SOP) -> SOP {
+//     match sop {
+//         SOP::Operation(op) => {
+//             let unique_id = nanoid!(6);
+//             let new_name = format!("{}_{}", op.name, unique_id);
+//             let new_op = Operation {
+//                 name: new_name,
+//                 ..*op
+//             };
+//             SOP::Operation(Box::new(new_op))
+//         }
+
+//         SOP::Sequence(sops) => {
+//             let unique_children = sops.into_iter().map(uniquify_sop_operations).collect();
+//             SOP::Sequence(unique_children)
+//         }
+
+//         SOP::Parallel(sops) => {
+//             let unique_children = sops.into_iter().map(uniquify_sop_operations).collect();
+//             SOP::Parallel(unique_children)
+//         }
+//         SOP::Alternative(sops) => {
+//             let unique_children = sops.into_iter().map(uniquify_sop_operations).collect();
+//             SOP::Alternative(unique_children)
+//         }
+//     }
+// }
