@@ -239,10 +239,14 @@ pub fn reset_all_operations(state: &State, model: &Model) -> State {
         });
     }
 
-        for op in &model.sops {
+    for sop_struct in &model.sops {
+        let operations = sop_struct.sop.get_all_operation_names();
+        for op in operations {
+            mut_state = mut_state.update(&op, "initial".to_spvalue());
+        }
         // for all op instances (for now, we will have to remove these from the state when exec finishes)
         state.state.iter().for_each(|(k, _)| {
-            if k.starts_with(&op.id) && !k.ends_with("_information") && !k.ends_with("_retry_counter") && !k.ends_with("_elapsed_ms") {
+            if k.starts_with(&sop_struct.id) && !k.ends_with("_information") && !k.ends_with("_retry_counter") && !k.ends_with("_elapsed_ms") {
                 mut_state = mut_state.update(&k, "initial".to_spvalue());
             }
         });
