@@ -93,7 +93,7 @@ pub fn generate_runner_state_variables(name: &str) -> State {
     state = state.add(assign!(tf_lookup_result, SPValue::Transform(TransformOrUnknown::UNKNOWN)));
     state = state.add(assign!(tf_insert_transforms, SPValue::Array(ArrayOrUnknown::UNKNOWN)));
     state = state.add(assign!(time_request_trigger, SPValue::Bool(BoolOrUnknown::UNKNOWN)));
-    state = state.add(assign!(time_request_state, SPValue::String(StringOrUnknown::UNKNOWN)));
+    state = state.add(assign!(time_request_state, SPValue::String(StringOrUnknown::String("initial".to_string()))));
     state = state.add(assign!(time_command, SPValue::String(StringOrUnknown::UNKNOWN)));
     state = state.add(assign!(time_duration_ms, SPValue::Int64(IntOrUnknown::UNKNOWN)));
     state = state.add(assign!(time_elapsed_ms, SPValue::Int64(IntOrUnknown::UNKNOWN)));
