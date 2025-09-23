@@ -1,4 +1,3 @@
-use nanoid::nanoid;
 use std::sync::Arc;
 
 use crate::*;
@@ -176,7 +175,9 @@ fn run_single_sop_tick(sp_id: &str, state: &State, sop: &SOP, log_target: &str) 
                 OperationState::Unrecoverable => {
                     new_op_info = format!("Failing the sop: {:?}", sop);
                 }
-                OperationState::UNKNOWN => (),
+                OperationState::UNKNOWN => {
+                     new_state = operation.initialize_running(&new_state, &log_target);
+                },
             }
 
             if new_op_info != old_operation_information {

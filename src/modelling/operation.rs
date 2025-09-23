@@ -367,6 +367,12 @@ impl Operation {
         }
     }
 
+    pub fn initialize_running(&self, state: &State, log_target: &str) -> State {
+        let assignment = state.get_assignment(&self.name, &log_target);
+        let action = Action::new(assignment.var, OperationState::Initial.to_spvalue().wrap());
+        action.assign(&state, &log_target)
+    }
+
     pub fn reinitialize_running(&self, state: &State, log_target: &str) -> State {
         let assignment = state.get_assignment(&self.name, &log_target);
         if assignment.val == OperationState::Completed.to_spvalue()

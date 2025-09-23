@@ -209,7 +209,9 @@ async fn process_operation(
                 operation.name
             );
         }
-        OperationState::UNKNOWN => (),
+        OperationState::UNKNOWN => {
+            *new_state = operation.initialize_running(&new_state, &log_target);
+        },
     }
 
     if new_op_info != old_operation_information {

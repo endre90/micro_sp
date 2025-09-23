@@ -113,6 +113,24 @@ pub fn generate_runner_state_variables(name: &str) -> State {
     state
 }
 
+pub fn all_values_to_unknown(state: &State) -> State {
+    let mut new_state = state.clone();
+    for (key, value) in &state.state {
+        let unknown_value = match value.val {
+            SPValue::Bool(_) => SPValue::Bool(BoolOrUnknown::UNKNOWN),
+            SPValue::Float64(_) => SPValue::Float64(FloatOrUnknown::UNKNOWN),
+            SPValue::Int64(_) => SPValue::Int64(IntOrUnknown::UNKNOWN),
+            SPValue::String(_) => SPValue::String(StringOrUnknown::UNKNOWN),
+            SPValue::Time(_) => SPValue::Time(TimeOrUnknown::UNKNOWN),
+            SPValue::Array(_) => SPValue::Array(ArrayOrUnknown::UNKNOWN),
+            SPValue::Map(_) => SPValue::Map(MapOrUnknown::UNKNOWN),
+            SPValue::Transform(_) => SPValue::Transform(TransformOrUnknown::UNKNOWN),
+        };
+        new_state = new_state.update(&key, unknown_value);
+    }
+    new_state
+}
+
 pub fn generate_operation_state_variables(model: &Model, coverability_tracking: bool) -> State {
     let mut state = State::new();
     // operations should be put in the initial state once they are part of the plan
