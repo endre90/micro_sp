@@ -47,6 +47,11 @@ pub fn generate_runner_state_variables(name: &str) -> State {
     let tf_child = v!(&&format!("{}_tf_child", name));
     let tf_lookup_result = tfv!(&&format!("{}_tf_lookup_result", name));
     let tf_insert_transforms = av!(&&format!("{}_tf_insert_transforms", name));
+    let time_request_trigger = bv!(&&format!("{}_time_request_trigger", name));
+    let time_request_state = v!(&&format!("{}_time_request_state", name));
+    let time_command = v!(&&format!("{}_time_command", name));
+    let time_duration_ms = iv!(&&format!("{}_time_duration_ms", name));
+    let time_elapsed_ms = iv!(&&format!("{}_time_elapsed_ms", name));
     
     // Initialize values
     state = state.add(assign!(runner_state, SPValue::String(StringOrUnknown::UNKNOWN)));
@@ -74,7 +79,6 @@ pub fn generate_runner_state_variables(name: &str) -> State {
     state = state.add(assign!(replan_trigger, SPValue::Bool(BoolOrUnknown::UNKNOWN)));
     state = state.add(assign!(incoming_goals, SPValue::Map(MapOrUnknown::UNKNOWN)));
     state = state.add(assign!(scheduled_goals, SPValue::Map(MapOrUnknown::UNKNOWN)));
-    // state = state.add(assign!(sop_request_state, SPValue::String(StringOrUnknown::UNKNOWN)));
     state = state.add(assign!(sop_id, SPValue::String(StringOrUnknown::UNKNOWN)));
     state = state.add(assign!(sop_state, SPValue::String(StringOrUnknown::UNKNOWN)));
     state = state.add(assign!(sop_stack, SPValue::String(StringOrUnknown::UNKNOWN)));
@@ -88,6 +92,11 @@ pub fn generate_runner_state_variables(name: &str) -> State {
     state = state.add(assign!(tf_child, SPValue::String(StringOrUnknown::UNKNOWN)));
     state = state.add(assign!(tf_lookup_result, SPValue::Transform(TransformOrUnknown::UNKNOWN)));
     state = state.add(assign!(tf_insert_transforms, SPValue::Array(ArrayOrUnknown::UNKNOWN)));
+    state = state.add(assign!(time_request_trigger, SPValue::Bool(BoolOrUnknown::UNKNOWN)));
+    state = state.add(assign!(time_request_state, SPValue::String(StringOrUnknown::UNKNOWN)));
+    state = state.add(assign!(time_command, SPValue::String(StringOrUnknown::UNKNOWN)));
+    state = state.add(assign!(time_duration_ms, SPValue::Int64(IntOrUnknown::UNKNOWN)));
+    state = state.add(assign!(time_elapsed_ms, SPValue::Int64(IntOrUnknown::UNKNOWN)));
 
     // Define variables to keep track of the processes
     let state_manager_online = bv!(&&format!("state_manager_online"));
@@ -135,11 +144,11 @@ pub fn generate_operation_state_variables(model: &Model, coverability_tracking: 
         for operation in ops_in_sop {
             let operation_state = v!(&&format!("{}", operation.name)); // Initial, Executing, Failed, Completed, Unknown
             let operation_information = v!(&&format!("{}_information", operation.name));
-            let operation_start_time = iv!(&&format!("{}_start_time", operation.name)); // to timeout if it takes too long
+            let operation_elapsed_ms = iv!(&&format!("{}_elapsed_ms", operation.name)); // to timeout if it takes too long
             let operation_retry_counter = iv!(&&format!("{}_retry_counter", operation.name)); // without scrapping the current plan, how many times has an operation retried
             state = state.add(assign!(operation_state, "initial".to_spvalue()));
             state = state.add(assign!(operation_information, SPValue::String(StringOrUnknown::UNKNOWN)));
-            state = state.add(assign!(operation_start_time, SPValue::Int64(IntOrUnknown::UNKNOWN)));
+            state = state.add(assign!(operation_elapsed_ms, SPValue::Int64(IntOrUnknown::UNKNOWN)));
             state = state.add(assign!(operation_retry_counter, SPValue::Int64(IntOrUnknown::UNKNOWN)));
         }
     }
@@ -147,11 +156,11 @@ pub fn generate_operation_state_variables(model: &Model, coverability_tracking: 
     for operation in &model.operations {
         let operation_state = v!(&&format!("{}", operation.name)); // Initial, Executing, Failed, Completed, Unknown
         let operation_information = v!(&&format!("{}_information", operation.name));
-        let operation_start_time = iv!(&&format!("{}_start_time", operation.name)); // to timeout if it takes too long
+        let operation_elapsed_ms = iv!(&&format!("{}_elapsed_ms", operation.name)); // to timeout if it takes too long
         let operation_retry_counter = iv!(&&format!("{}_retry_counter", operation.name)); // without scrapping the current plan, how many times has an operation retried
         state = state.add(assign!(operation_state, "initial".to_spvalue()));
         state = state.add(assign!(operation_information, SPValue::String(StringOrUnknown::UNKNOWN)));
-        state = state.add(assign!(operation_start_time, SPValue::Int64(IntOrUnknown::UNKNOWN)));
+        state = state.add(assign!(operation_elapsed_ms, SPValue::Int64(IntOrUnknown::UNKNOWN)));
         state = state.add(assign!(operation_retry_counter, SPValue::Int64(IntOrUnknown::UNKNOWN)));
 
         if coverability_tracking {
@@ -205,7 +214,7 @@ pub fn reset_all_operations(state: &State, model: &Model) -> State {
     for op in &model.operations {
         // for all op instances (for now, we will have to remove these from the state when exec finishes)
         state.state.iter().for_each(|(k, _)| {
-            if k.starts_with(&op.name) && !k.ends_with("_information") && !k.ends_with("_retry_counter") && !k.ends_with("_start_time") {
+            if k.starts_with(&op.name) && !k.ends_with("_information") && !k.ends_with("_retry_counter") && !k.ends_with("_elapsed_ms") {
                 mut_state = mut_state.update(&k, "initial".to_spvalue());
             }
         });
@@ -214,7 +223,7 @@ pub fn reset_all_operations(state: &State, model: &Model) -> State {
         for op in &model.sops {
         // for all op instances (for now, we will have to remove these from the state when exec finishes)
         state.state.iter().for_each(|(k, _)| {
-            if k.starts_with(&op.id) && !k.ends_with("_information") && !k.ends_with("_retry_counter") && !k.ends_with("_start_time") {
+            if k.starts_with(&op.id) && !k.ends_with("_information") && !k.ends_with("_retry_counter") && !k.ends_with("_elapsed_ms") {
                 mut_state = mut_state.update(&k, "initial".to_spvalue());
             }
         });
