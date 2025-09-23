@@ -266,8 +266,6 @@ pub async fn run_sop_tick(
         vec![root_sop.clone()]
     });
 
-    println!("{:?}", stack.iter().map(|x| x.get_all_operation_names()).collect::<Vec<Vec<String>>>());
-
     if stack.is_empty() {
         log::info!(target: &log_target, "SOP execution is complete.");
         return (new_state, serde_json::to_string(&stack).unwrap());
