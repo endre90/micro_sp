@@ -119,17 +119,12 @@ fn run_single_sop_tick(sp_id: &str, state: &State, sop: &SOP, log_target: &str) 
 
             match OperationState::from_str(&operation_state) {
                 OperationState::Initial => {
-                    // if let Some(sleep) = operation.pre_start_sleep_ms {
-                    //     tokio::time::sleep(Duration::from_millis(sleep as u64)).await;
-                    // }
                     if operation.eval_running(&new_state, &log_target) {
                         new_state = operation.start_running(&new_state, &log_target);
                         new_op_info = format!("Operation '{}' started execution", operation.name);
                     }
                 }
                 OperationState::Executing => {
-                    // operation_elapsed_ms = operation_elapsed_ms + TICK_INTERVAL as i64;
-
                     if operation.can_be_completed(&state, &log_target) {
                         new_state = operation.clone().complete_running(&new_state, &log_target);
                         new_op_info = "Completing operation".to_string();
@@ -641,9 +636,9 @@ pub fn uniquify_sop_operations(sop: SOP) -> SOP {
                 state: op.state,
                 timeout_ms: op.timeout_ms,
                 retries: op.retries,
-                pre_start_sleep_ms: None,
+                // pre_start_sleep_ms: None,
                 preconditions: op.preconditions,
-                pre_complete_sleep_ms: None,
+                // pre_complete_sleep_ms: None,
                 postconditions: op.postconditions,
                 fail_transitions: op.fail_transitions,
                 timeout_transitions: op.timeout_transitions,

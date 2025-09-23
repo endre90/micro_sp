@@ -145,7 +145,7 @@ mod tests {
             "move_to_b",
             None,
             None,
-            None,
+            // None,
             vec![t!(
                 "start_moving_to_b",
                 "var:ur_action_trigger == false && var:ur_action_state == initial && var:ur_current_pose != b",
@@ -160,7 +160,7 @@ mod tests {
                 Vec::<&str>::new(),
                 &state
             )],
-            None,
+            // None,
             vec![t!(
                 "complete_moving_to_b",
                 "var:ur_action_state == done",
@@ -179,7 +179,7 @@ mod tests {
             "move_to_c",
             None,
             None,
-            None,
+            // None,
             vec![t!(
                 "start_moving_to_c",
                 "var:ur_action_trigger == false && var:ur_action_state == initial && var:ur_current_pose == b",
@@ -194,7 +194,7 @@ mod tests {
                 Vec::<&str>::new(),
                 &state
             )],
-            None,
+            // None,
             vec![t!(
                 "complete_moving_to_c",
                 "var:ur_action_state == done",
@@ -213,7 +213,7 @@ mod tests {
             "move_to_d",
             None,
             None,
-            None,
+            // None,
             vec![t!(
                 "start_moving_to_d",
                 "var:ur_action_trigger == false && var:ur_action_state == initial && var:ur_current_pose == c",
@@ -228,7 +228,7 @@ mod tests {
                 Vec::<&str>::new(),
                 &state
             )],
-            None,
+            // None,
             vec![t!(
                 "complete_moving_to_d",
                 "var:ur_action_state == done",
