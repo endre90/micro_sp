@@ -85,11 +85,11 @@ pub async fn time_interface_runner(
 
         let new_state = state
             .update(
-                &format!("{}_tf_request_trigger", sp_id),
+                &format!("{}_time_request_trigger", sp_id),
                 request_trigger.to_spvalue(),
             )
             .update(
-                &format!("{}_tf_request_state", sp_id),
+                &format!("{}_time_request_state", sp_id),
                 request_state.to_spvalue(),
             )
             .update(
