@@ -126,12 +126,12 @@ pub fn generate_operation_state_variables(model: &Model, coverability_tracking: 
     fn get_all_operations_recursive(sop: &SOP, operations: &mut Vec<Operation>) {
         match sop {
             // Base case: We found an operation. Clone it and add it to our list.
-            SOP::Operation(_, op) => {
+            SOP::Operation(op) => {
                 operations.push(*op.clone());
             }
             // Recursive step: This is a container. Iterate through its children
             // and call this function on each of them.
-            SOP::Sequence(_, sops) | SOP::Parallel(_, sops) | SOP::Alternative(_, sops) => {
+            SOP::Sequence(sops) | SOP::Parallel(sops) | SOP::Alternative(sops) => {
                 for child_sop in sops {
                     get_all_operations_recursive(child_sop, operations);
                 }

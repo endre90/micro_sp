@@ -99,7 +99,7 @@ fn run_single_sop_tick(sp_id: &str, state: &State, sop: &SOP, log_target: &str) 
     let mut new_state = state.clone();
 
     match sop {
-        SOP::Operation(_, operation) => {
+        SOP::Operation(operation) => {
             let operation_state =
                 state.get_string_or_default_to_unknown(&format!("{}", operation.name), &log_target);
 
@@ -189,7 +189,7 @@ fn run_single_sop_tick(sp_id: &str, state: &State, sop: &SOP, log_target: &str) 
             );
         }
 
-        SOP::Sequence(id, sops) => {
+        SOP::Sequence(sops) => {
             let next_sop_to_run = sops
                 .iter()
                 .find(|sub_sop| !is_sop_completed(sp_id, sub_sop, &new_state, &log_target));
@@ -198,12 +198,12 @@ fn run_single_sop_tick(sp_id: &str, state: &State, sop: &SOP, log_target: &str) 
                 new_state =
                     run_single_sop_tick(sp_id, &new_state, sub_sop, &log_target);
             } else {
-                log::info!(target: &log_target, "Sequence SOP node {id} is complete.");
+                log::info!(target: &log_target, "Sequence SOP node is complete.");
             }
         }
 
-        SOP::Parallel(id, sops) => {
-            log::info!(target: &log_target, "Processing all unfinished children of the Parallel SOP node {id}.");
+        SOP::Parallel(sops) => {
+            log::info!(target: &log_target, "Processing all unfinished children of the Parallel SOP node.");
             let mut all_children_completed = true;
             for sub_sop in sops.iter() {
                 if !is_sop_completed(sp_id, sub_sop, &new_state, &log_target) {
@@ -215,19 +215,19 @@ fn run_single_sop_tick(sp_id: &str, state: &State, sop: &SOP, log_target: &str) 
                 }
             }
             if all_children_completed {
-                log::info!(target: &log_target, "All children of parallel SOP node {id} completed.");
+                log::info!(target: &log_target, "All children of parallel SOP node completed.");
             }
         }
 
-        SOP::Alternative(id, sops) => {
-            log::info!(target: &log_target, "Processing an Alternative SOP node {id}.");
+        SOP::Alternative(sops) => {
+            log::info!(target: &log_target, "Processing an Alternative SOP node.");
             let active_path = sops
                 .iter()
                 .find(|sop| !is_sop_in_initial_state(sp_id, sop, &new_state, &log_target));
 
             if let Some(path) = active_path {
                 log::info!(target: &log_target,
-                    "Alternative path {:?} of SOP node {id} is already active. Processing it.",
+                    "Alternative path {:?} of SOP node is already active. Processing it.",
                     path
                 );
                 new_state =
@@ -357,11 +357,11 @@ async fn handle_sop_executing(
 
 fn is_sop_failed(sp_id: &str, sop: &SOP, state: &State, log_target: &str) -> bool {
     match sop {
-        SOP::Operation(_, operation) => {
+        SOP::Operation(operation) => {
             let op_state_str = state.get_string_or_default_to_unknown(&operation.name, &log_target);
             OperationState::from_str(&op_state_str) == OperationState::Unrecoverable
         }
-        SOP::Sequence(_, sops) | SOP::Parallel(_, sops) | SOP::Alternative(_, sops) => sops
+        SOP::Sequence(sops) | SOP::Parallel(sops) | SOP::Alternative(sops) => sops
             .iter()
             .any(|child_sop| is_sop_failed(sp_id, child_sop, state, &log_target)),
     }
@@ -556,17 +556,17 @@ fn is_sop_failed(sp_id: &str, sop: &SOP, state: &State, log_target: &str) -> boo
 /// - For an `Alternative`, it checks if **any** child is completed.
 fn is_sop_completed(sp_id: &str, sop: &SOP, state: &State, log_target: &str) -> bool {
     match sop {
-        SOP::Operation(_, operation) => {
+        SOP::Operation(operation) => {
             let operation_state =
                 state.get_string_or_default_to_unknown(&format!("{}", operation.name), &log_target);
             OperationState::from_str(&operation_state) == OperationState::Completed
         }
-        SOP::Sequence(_, sops) | SOP::Parallel(_, sops) => {
+        SOP::Sequence(sops) | SOP::Parallel(sops) => {
             // A Sequence or Parallel SOP is completed only when all of its children are completed.
             sops.iter()
                 .all(|child_sop| is_sop_completed(sp_id, child_sop, state, &log_target))
         }
-        SOP::Alternative(_, sops) => {
+        SOP::Alternative(sops) => {
             // An Alternative is considered completed as soon as one of its branches completes.
             sops.iter()
                 .any(|child_sop| is_sop_completed(sp_id, child_sop, state, &log_target))
@@ -579,13 +579,13 @@ fn is_sop_completed(sp_id: &str, sop: &SOP, state: &State, log_target: &str) -> 
 /// This is used to determine if an `Alternative` path has been chosen yet.
 fn is_sop_in_initial_state(sp_id: &str, sop: &SOP, state: &State, log_target: &str) -> bool {
     match sop {
-        SOP::Operation(_, operation) => {
+        SOP::Operation(operation) => {
             let operation_state =
                 state.get_string_or_default_to_unknown(&format!("{}", operation.name), &log_target);
             OperationState::from_str(&operation_state) == OperationState::Initial
                 || OperationState::from_str(&operation_state) == OperationState::UNKNOWN
         }
-        SOP::Sequence(_, sops) | SOP::Parallel(_, sops) | SOP::Alternative(_, sops) => {
+        SOP::Sequence(sops) | SOP::Parallel(sops) | SOP::Alternative(sops) => {
             // Any container SOP is in its initial state only if all children are also in their initial state.
             sops.iter()
                 .all(|child_sop| is_sop_in_initial_state(sp_id, child_sop, state, &log_target))
@@ -601,24 +601,24 @@ fn is_sop_in_initial_state(sp_id: &str, sop: &SOP, state: &State, log_target: &s
 /// - For an `Alternative`, it checks if **any** child can start.
 fn can_sop_start(sp_id: &str, sop: &SOP, state: &State, log_target: &str) -> bool {
     match sop {
-        SOP::Operation(_, operation) => {
+        SOP::Operation(operation) => {
             let operation_state =
                 state.get_string_or_default_to_unknown(&format!("{}", operation.name), &log_target);
             (OperationState::from_str(&operation_state) == OperationState::Initial)
                 && operation.eval_running(state, &log_target)
         }
-        SOP::Sequence(_, sops) => {
+        SOP::Sequence(sops) => {
             // A sequence can start if its very first element can start.
             sops.first().map_or(false, |first_sop| {
                 can_sop_start(sp_id, first_sop, state, &log_target)
             })
         }
-        SOP::Parallel(_, sops) => {
+        SOP::Parallel(sops) => {
             // A Parallel or Alternative block can start if any of its children can start.
             sops.iter()
                 .all(|child_sop| can_sop_start(sp_id, child_sop, state, &log_target))
         }
-        SOP::Alternative(_, sops) => {
+        SOP::Alternative(sops) => {
             // A Parallel or Alternative block can start if any of its children can start.
             sops.iter()
                 .any(|child_sop| can_sop_start(sp_id, child_sop, state, &log_target))
@@ -672,31 +672,28 @@ fn can_sop_start(sp_id: &str, sop: &SOP, state: &State, log_target: &str) -> boo
 
 pub fn uniquify_sop_operations(sop: SOP) -> SOP {
     match sop {
-        SOP::Operation(_, op) => {
+        SOP::Operation(op) => {
             let unique_id = nanoid!(6);
-            // let new_name = format!("{}_{}", op.name, unique_id);
+            let new_name = format!("{}_{}", op.name, unique_id);
             let new_op = Operation {
-                name: op.name,
+                name: new_name,
                 ..*op
             };
-            SOP::Operation(unique_id, Box::new(new_op))
+            SOP::Operation(Box::new(new_op))
         }
 
-        SOP::Sequence(_, sops) => {
-            let unique_id = nanoid!(6);
+        SOP::Sequence(sops) => {
             let unique_children = sops.into_iter().map(uniquify_sop_operations).collect();
-            SOP::Sequence(unique_id, unique_children)
+            SOP::Sequence(unique_children)
         }
 
-        SOP::Parallel(_, sops) => {
-            let unique_id = nanoid!(6);
+        SOP::Parallel(sops) => {
             let unique_children = sops.into_iter().map(uniquify_sop_operations).collect();
-            SOP::Parallel(unique_id, unique_children)
+            SOP::Parallel(unique_children)
         }
-        SOP::Alternative(_, sops) => {
-            let unique_id = nanoid!(6);
+        SOP::Alternative(sops) => {
             let unique_children = sops.into_iter().map(uniquify_sop_operations).collect();
-            SOP::Alternative(unique_id, unique_children)
+            SOP::Alternative(unique_children)
         }
     }
 }
