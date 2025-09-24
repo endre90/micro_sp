@@ -241,7 +241,7 @@ async fn run_operation_tick(
         }
         OperationState::Completed => {
             new_op_info = format!("Operation {} completed", operation.name);
-            StateManager::remove_sp_value(&mut con, &operation.name).await; // Once completed we don't need it anymroe
+            // StateManager::remove_sp_value(&mut con, &operation.name).await; // Once completed we don't need it anymroe
         }
         OperationState::Timedout => {
             new_state = operation.unrecover_running(&new_state, &log_target);
