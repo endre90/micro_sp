@@ -8,6 +8,7 @@ mod get_state_for_keys;
 mod set_sp_value;
 mod set_state;
 mod remove_sp_value;
+mod flush_state;
 
 pub struct StateManager {}
 
@@ -41,5 +42,9 @@ impl StateManager {
 
     pub fn build_state(keys: Vec<String>, values: Vec<Option<String>>) -> State {
         build_state::build_state(keys, values)
+    }
+
+    pub async fn flush_state(con: &mut MultiplexedConnection) {
+        flush_state::flush_state(con).await
     }
 }
