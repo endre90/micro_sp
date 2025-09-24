@@ -251,6 +251,15 @@ pub fn reset_all_operations(state: &State, model: &Model) -> State {
             }
         });
     }
+
+    for (key, _) in state.state {
+        if key.ends_with("_request_state") {
+            mut_state = mut_state.update(&key, "initial".to_spvalue());
+        }
+        if key.ends_with("_request_trigger") {
+            mut_state = mut_state.update(&key, false.to_spvalue());
+        }
+    }
     
     mut_state
 }

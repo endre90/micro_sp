@@ -104,7 +104,6 @@ fn handle_sop_initial(
 ) -> Result<(), Box<dyn std::error::Error>> {
     if state.get_bool_or_default_to_false(&format!("{}_sop_enabled", sp_id), &log_target) {
         log::info!(target: &log_target, "SOP enabled. Transitioning to Executing.");
-        // No stack to initialize anymore. The traversal will start from the root.
         *new_state = new_state.update(&format!("{}_sop_enabled", sp_id), false.to_spvalue());
         *sop_overall_state = SOPState::Executing.to_string();
     }
@@ -128,11 +127,9 @@ async fn handle_sop_executing(
         return;
     };
 
-    // This is the new core logic: a single call to the traversal function.
     let updated_state = process_sop_node_tick(sp_id, state.clone(), &root_sop_container.sop, con, &log_target).await;
     *new_state = updated_state;
 
-    // Check for terminal conditions by inspecting the root SOP's status.
     if is_sop_completed(sp_id, &root_sop_container.sop, new_state, &log_target) {
         log::info!(target: &log_target, "SOP root is complete. SOP Completed.");
         *sop_overall_state = SOPState::Completed.to_string();
@@ -142,19 +139,13 @@ async fn handle_sop_executing(
     }
 }
 
-// ===================================================================================
-// NEW RECURSIVE TRAVERSAL LOGIC
-// ===================================================================================
-
-/// Recursively processes a SOP node and its children for a single tick.
 async fn process_sop_node_tick(
     sp_id: &str,
-    mut state: State, // Takes ownership and returns the modified version
+    mut state: State,
     sop: &SOP,
     con: redis::aio::MultiplexedConnection,
     log_target: &str,
 ) -> State {
-    // If the entire SOP node is already completed or failed, we can skip processing it.
     if is_sop_completed(sp_id, sop, &state, log_target) || is_sop_failed(sp_id, sop, &state, log_target) {
         return state;
     }
@@ -165,7 +156,7 @@ async fn process_sop_node_tick(
         }
 
         SOP::Sequence(sops) => {
-            // Find the first child that is not yet completed and process it.
+            // Find the first child that is not yet completed and process it
             if let Some(active_child) = sops
                 .iter()
                 .find(|child| !is_sop_completed(sp_id, child, &state, log_target))
@@ -175,26 +166,26 @@ async fn process_sop_node_tick(
         }
 
         SOP::Parallel(sops) => {
-            // Process ALL children that are not yet completed. This is the key for parallelism.
+            // Process ALL children that are not yet completed
             for child in sops {
                 // The state is threaded through each call, so updates from one branch
-                // are visible to the next within the same tick.
+                // are visible to the next within the same tick
                 state = Box::pin(process_sop_node_tick(sp_id, state, child, con.clone(), log_target)).await;
             }
         }
 
         SOP::Alternative(sops) => {
-            // Check if a path is already active (i.e., not initial and not completed).
+            // Check if a path is already active (i.e., not initial and not completed)
             let active_path = sops.iter().find(|child| {
                 !is_sop_in_initial_state(sp_id, child, &state, log_target)
                     && !is_sop_completed(sp_id, child, &state, log_target)
             });
 
             if let Some(path) = active_path {
-                // If a path is active, keep processing it.
+                // If a path is active, keep processing it
                 state = Box::pin(process_sop_node_tick(sp_id, state, path, con, log_target)).await;
             } else {
-                // If no path is active, find the first one that can start.
+                // If no path is active, find the first one that can start
                 if let Some(path_to_start) = sops
                     .iter()
                     .find(|child| can_sop_start(sp_id, child, &state, log_target))
@@ -209,8 +200,6 @@ async fn process_sop_node_tick(
     state
 }
 
-
-/// Handles the state transitions for a single Operation SOP for one tick.
 async fn run_operation_tick(
     mut new_state: State,
     operation: &Operation,
@@ -293,10 +282,6 @@ async fn run_operation_tick(
         new_op_info.to_spvalue(),
     )
 }
-
-// ===================================================================================
-// HELPER FUNCTIONS (UNCHANGED)
-// ===================================================================================
 
 fn is_sop_failed(sp_id: &str, sop: &SOP, state: &State, log_target: &str) -> bool {
     match sop {
