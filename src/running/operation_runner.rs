@@ -43,7 +43,8 @@ pub async fn planned_operation_runner(
 
     // let last_known_state: Arc<RwLock<Option<State>>> = Arc::new(RwLock::new(None));
 
-    let mut con = connection_manager.get_connection().await;
+    let mut con: redis::aio::MultiplexedConnection = connection_manager.get_connection().await;
+    
     loop {
         interval.tick().await;
         if let Err(_) = connection_manager.check_redis_health(&log_target).await {
@@ -53,15 +54,15 @@ pub async fn planned_operation_runner(
             Some(s) => s,
             None => continue,
         };
-
-        let new_state = process_plan_tick(sp_id, &model, &state, &log_target).await;
+        let con_clone = con.clone();
+        let new_state = process_plan_tick(sp_id, con_clone, &model, &state, &log_target).await;
         let modified_state = state.get_diff_partial_state(&new_state);
         // StateManager::set_state(con, &modified_state).await;
         StateManager::set_state(&mut con, &modified_state).await;
     }
 }
 
-async fn process_plan_tick(sp_id: &str, model: &Model, state: &State, log_target: &str) -> State {
+async fn process_plan_tick(sp_id: &str, con: redis::aio::MultiplexedConnection, model: &Model, state: &State, log_target: &str) -> State {
     let mut new_state = state.clone();
     let mut planner_state =
         state.get_string_or_default_to_unknown(&format!("{}_planner_state", sp_id), &log_target);
@@ -95,6 +96,7 @@ async fn process_plan_tick(sp_id: &str, model: &Model, state: &State, log_target
                     op_name,
                     model,
                     state,
+                    con,
                     log_target,
                 ).await;
             } else {
@@ -133,6 +135,7 @@ async fn process_operation(
     op_name: &str,
     model: &Model,
     state: &State,
+    mut con: redis::aio::MultiplexedConnection,
     log_target: &str,
 ) {
     let Some(operation) = model.operations.iter().find(|op| op.name == op_name) else {
@@ -171,7 +174,8 @@ async fn process_operation(
         OperationState::Completed => {
             *new_state =
                 new_state.update(&format!("{}_retry_counter", operation.name), 0.to_spvalue());
-            *new_state = operation.reinitialize_running(&new_state, &log_target);
+            StateManager::remove_sp_value(&mut con, &operation.name).await;
+            // *new_state = operation.reinitialize_running(&new_state, &log_target);
             *plan_current_step += 1;
             new_op_info = format!("Operation '{}' completed.", operation.name);
         }

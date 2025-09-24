@@ -38,7 +38,8 @@ pub async fn sop_runner(
             old_sop_id = current_sop_id;
         }
 
-        let new_state = process_sop_tick(sp_id, model, &state, &log_target).await?;
+        let con_clone = con.clone();
+        let new_state = process_sop_tick(sp_id, model, &state, con_clone, &log_target).await?;
         let modified_state = state.get_diff_partial_state(&new_state);
 
         if !modified_state.state.is_empty() {
@@ -51,6 +52,7 @@ async fn process_sop_tick(
     sp_id: &str,
     model: &Model,
     state: &State,
+    con: redis::aio::MultiplexedConnection,
     log_target: &str,
 ) -> Result<State, Box<dyn std::error::Error>> {
     let mut new_state = state.clone();
@@ -74,6 +76,7 @@ async fn process_sop_tick(
                 state,
                 &mut new_state,
                 &mut sop_overall_state,
+                con,
                 &log_target,
             )
             .await;
@@ -114,6 +117,7 @@ async fn handle_sop_executing(
     state: &State,
     new_state: &mut State,
     sop_overall_state: &mut String,
+    con: redis::aio::MultiplexedConnection,
     log_target: &str,
 ) {
     let sop_id = state.get_string_or_default_to_unknown(&format!("{}_sop_id", sp_id), &log_target);
@@ -125,7 +129,7 @@ async fn handle_sop_executing(
     };
 
     // This is the new core logic: a single call to the traversal function.
-    let updated_state = process_sop_node_tick(sp_id, state.clone(), &root_sop_container.sop, &log_target);
+    let updated_state = process_sop_node_tick(sp_id, state.clone(), &root_sop_container.sop, con, &log_target).await;
     *new_state = updated_state;
 
     // Check for terminal conditions by inspecting the root SOP's status.
@@ -143,10 +147,11 @@ async fn handle_sop_executing(
 // ===================================================================================
 
 /// Recursively processes a SOP node and its children for a single tick.
-fn process_sop_node_tick(
+async fn process_sop_node_tick(
     sp_id: &str,
     mut state: State, // Takes ownership and returns the modified version
     sop: &SOP,
+    con: redis::aio::MultiplexedConnection,
     log_target: &str,
 ) -> State {
     // If the entire SOP node is already completed or failed, we can skip processing it.
@@ -156,7 +161,7 @@ fn process_sop_node_tick(
 
     match sop {
         SOP::Operation(operation) => {
-            state = run_operation_tick(state, operation, log_target);
+            state = run_operation_tick(state, operation, con, log_target).await;
         }
 
         SOP::Sequence(sops) => {
@@ -165,7 +170,7 @@ fn process_sop_node_tick(
                 .iter()
                 .find(|child| !is_sop_completed(sp_id, child, &state, log_target))
             {
-                state = process_sop_node_tick(sp_id, state, active_child, log_target);
+                state = Box::pin(process_sop_node_tick(sp_id, state, active_child, con, log_target)).await;
             }
         }
 
@@ -174,7 +179,7 @@ fn process_sop_node_tick(
             for child in sops {
                 // The state is threaded through each call, so updates from one branch
                 // are visible to the next within the same tick.
-                state = process_sop_node_tick(sp_id, state, child, log_target);
+                state = Box::pin(process_sop_node_tick(sp_id, state, child, con.clone(), log_target)).await;
             }
         }
 
@@ -187,7 +192,7 @@ fn process_sop_node_tick(
 
             if let Some(path) = active_path {
                 // If a path is active, keep processing it.
-                state = process_sop_node_tick(sp_id, state, path, log_target);
+                state = Box::pin(process_sop_node_tick(sp_id, state, path, con, log_target)).await;
             } else {
                 // If no path is active, find the first one that can start.
                 if let Some(path_to_start) = sops
@@ -195,7 +200,7 @@ fn process_sop_node_tick(
                     .find(|child| can_sop_start(sp_id, child, &state, log_target))
                 {
                     log::info!(target: log_target, "Found valid alternative path to start.");
-                    state = process_sop_node_tick(sp_id, state, path_to_start, log_target);
+                    state = Box::pin(process_sop_node_tick(sp_id, state, path_to_start, con, log_target)).await;
                 }
             }
         }
@@ -206,9 +211,10 @@ fn process_sop_node_tick(
 
 
 /// Handles the state transitions for a single Operation SOP for one tick.
-fn run_operation_tick(
+async fn run_operation_tick(
     mut new_state: State,
     operation: &Operation,
+    mut con: redis::aio::MultiplexedConnection,
     log_target: &str,
 ) -> State {
     let operation_state =
@@ -246,7 +252,7 @@ fn run_operation_tick(
         }
         OperationState::Completed => {
             new_op_info = format!("Operation {} completed", operation.name);
-            // No longer re-initializing here. Let the completed state persist.
+            StateManager::remove_sp_value(&mut con, &operation.name).await; // Once completed we don't need it anymroe
         }
         OperationState::Timedout => {
             new_state = operation.unrecover_running(&new_state, &log_target);
