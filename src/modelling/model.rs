@@ -30,7 +30,7 @@ impl Model {
             operations: operations
                 .iter()
                 .map(|o| Operation {
-                    name: format!("operation_{}", o.name),
+                    name: format!("{}", o.name),
                     timeout_ms: o.timeout_ms,
                     retries: o.retries,
                     // pre_start_sleep_ms: o.pre_start_sleep_ms,
