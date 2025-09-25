@@ -67,11 +67,11 @@ pub struct Operation {
     pub state: OperationState,
     pub timeout_ms: Option<i64>, // Option<u128>,
     pub retries: i64,
-    // pub pre_start_sleep_ms: Option<i64>,
+    pub continue_if_unrecoverable: bool,
     pub preconditions: Vec<Transition>,
-    // pub pre_complete_sleep_ms: Option<i64>,
     pub postconditions: Vec<Transition>,
     pub fail_transitions: Vec<Transition>,
+    pub continue_transitions: Vec<Transition>,
     pub timeout_transitions: Vec<Transition>,
     pub reset_transitions: Vec<Transition>,
 }
@@ -83,12 +83,12 @@ impl Default for Operation {
             state: OperationState::UNKNOWN,
             timeout_ms: None,
             retries: 0,
-            // pre_start_sleep_ms: None,
+            continue_if_unrecoverable: false,
             preconditions: Vec::new(),
-            // pre_complete_sleep_ms: None,
             postconditions: Vec::new(),
             fail_transitions: Vec::new(),
             timeout_transitions: Vec::new(),
+            continue_transitions: Vec::new(),
             reset_transitions: Vec::new(),
         }
     }
@@ -99,12 +99,12 @@ impl Operation {
         name: &str,
         timeout_ms: Option<i64>,
         retries: Option<i64>,
-        // pre_start_sleep_ms: Option<i64>,
+        continue_if_unrecoverable: bool,
         preconditions: Vec<Transition>,
-        // pre_complete_sleep_ms: Option<i64>,
         postconditions: Vec<Transition>,
         fail_transitions: Vec<Transition>,
         timeout_transitions: Vec<Transition>,
+        continue_transitions: Vec<Transition>,
         reset_transitions: Vec<Transition>,
     ) -> Operation {
         Operation {
@@ -119,11 +119,11 @@ impl Operation {
                 Some(x) => x,
                 None => 0,
             },
-            // pre_start_sleep_ms,
+            continue_if_unrecoverable,
             preconditions,
-            // pre_complete_sleep_ms,
             postconditions,
             fail_transitions,
+            continue_transitions,
             reset_transitions,
         }
     }
@@ -383,6 +383,25 @@ impl Operation {
         } else {
             state.clone()
         }
+    }
+
+    /// Continue executing the next operation if this one has failed
+    pub fn continue_running_next(&self, state: &State, log_target: &str) -> State {
+        let assignment = state.get_assignment(&self.name, &log_target);
+        if assignment.val == OperationState::Unrecoverable.to_spvalue() {
+            for postcondition in &self.continue_transitions {
+                if postcondition.clone().eval_running(&state, &log_target) {
+                    let action = Action::new(
+                        assignment.var,
+                        OperationState::Completed.to_spvalue().wrap(),
+                    );
+                    return postcondition
+                        .clone()
+                        .take_running(&action.assign(&state, &log_target), &log_target);
+                }
+            }
+        }
+        state.clone()
     }
 
     pub fn get_all_var_keys(&self) -> Vec<String> {

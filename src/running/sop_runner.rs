@@ -203,7 +203,7 @@ async fn process_sop_node_tick(
 async fn run_operation_tick(
     mut new_state: State,
     operation: &Operation,
-    mut con: redis::aio::MultiplexedConnection,
+    mut _con: redis::aio::MultiplexedConnection,
     log_target: &str,
 ) -> State {
     let operation_state =
@@ -266,7 +266,12 @@ async fn run_operation_tick(
             }
         }
         OperationState::Unrecoverable => {
-            new_op_info = format!("Operation {} is in an unrecoverable state.", operation.name);
+            if operation.continue_if_unrecoverable {
+                new_op_info = format!("Operation {} unrecoverable but flow continued.", operation.name);
+                new_state = operation.continue_running_next(&new_state, &log_target);
+            } else {
+                new_op_info = format!("Operation {} is in an unrecoverable state.", operation.name);
+            }
         }
         OperationState::UNKNOWN => {
              new_state = operation.initialize_running(&new_state, &log_target);

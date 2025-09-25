@@ -1,6 +1,6 @@
 use crate::*;
 use std::sync::Arc;
-use tokio::time::{interval, Duration};
+use tokio::time::{Duration, interval};
 
 pub async fn planned_operation_runner(
     model: &Model,
@@ -44,7 +44,7 @@ pub async fn planned_operation_runner(
     // let last_known_state: Arc<RwLock<Option<State>>> = Arc::new(RwLock::new(None));
 
     let mut con: redis::aio::MultiplexedConnection = connection_manager.get_connection().await;
-    
+
     loop {
         interval.tick().await;
         if let Err(_) = connection_manager.check_redis_health(&log_target).await {
@@ -62,7 +62,13 @@ pub async fn planned_operation_runner(
     }
 }
 
-async fn process_plan_tick(sp_id: &str, con: redis::aio::MultiplexedConnection, model: &Model, state: &State, log_target: &str) -> State {
+async fn process_plan_tick(
+    sp_id: &str,
+    con: redis::aio::MultiplexedConnection,
+    model: &Model,
+    state: &State,
+    log_target: &str,
+) -> State {
     let mut new_state = state.clone();
     let mut planner_state =
         state.get_string_or_default_to_unknown(&format!("{}_planner_state", sp_id), &log_target);
@@ -98,7 +104,8 @@ async fn process_plan_tick(sp_id: &str, con: redis::aio::MultiplexedConnection, 
                     state,
                     con,
                     log_target,
-                ).await;
+                )
+                .await;
             } else {
                 plan_state_str = PlanState::Completed.to_string();
             }
@@ -135,7 +142,7 @@ async fn process_operation(
     op_name: &str,
     model: &Model,
     state: &State,
-    mut con: redis::aio::MultiplexedConnection,
+    mut _con: redis::aio::MultiplexedConnection,
     log_target: &str,
 ) {
     let Some(operation) = model.operations.iter().find(|op| op.name == op_name) else {
@@ -174,7 +181,7 @@ async fn process_operation(
         OperationState::Completed => {
             *new_state =
                 new_state.update(&format!("{}_retry_counter", operation.name), 0.to_spvalue());
-            // StateManager::remove_sp_value(&mut con, &operation.name).await;
+            // StateManager::remove_sp_value(&mut con, &operation.name).await; //
             // *new_state = operation.reinitialize_running(&new_state, &log_target);
             *plan_current_step += 1;
             new_op_info = format!("Operation '{}' completed.", operation.name);
@@ -201,15 +208,23 @@ async fn process_operation(
             new_op_info = format!("Operation '{}' timed out.", operation.name);
         }
         OperationState::Unrecoverable => {
-            *plan_state_str = PlanState::Failed.to_string();
-            new_op_info = format!(
-                "Operation '{}' is unrecoverable. Failing plan.",
-                operation.name
-            );
+            if operation.continue_if_unrecoverable {
+                new_op_info = format!(
+                    "Operation {} unrecoverable but flow continued.",
+                    operation.name
+                );
+                *new_state = operation.continue_running_next(new_state, &log_target);
+            } else {
+                *plan_state_str = PlanState::Failed.to_string();
+                new_op_info = format!(
+                    "Operation '{}' is unrecoverable. Failing plan.",
+                    operation.name
+                )
+            }
         }
         OperationState::UNKNOWN => {
             *new_state = operation.initialize_running(&new_state, &log_target);
-        },
+        }
     }
 
     if new_op_info != old_operation_information {
