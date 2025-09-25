@@ -292,7 +292,7 @@ fn is_sop_failed(sp_id: &str, sop: &SOP, state: &State, log_target: &str) -> boo
     match sop {
         SOP::Operation(operation) => {
             let op_state_str = state.get_string_or_default_to_unknown(&operation.name, &log_target);
-            OperationState::from_str(&op_state_str) == OperationState::Unrecoverable
+            OperationState::from_str(&op_state_str) == OperationState::Unrecoverable && operation.continue_if_unrecoverable == false
         }
         SOP::Sequence(sops) | SOP::Parallel(sops) | SOP::Alternative(sops) => sops
             .iter()
