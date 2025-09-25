@@ -226,6 +226,8 @@ async fn run_operation_tick(
             if operation.eval_running(&new_state, &log_target) {
                 new_state = operation.start_running(&new_state, &log_target);
                 new_op_info = format!("Operation '{}' started execution", operation.name);
+            } else {
+                new_op_info = format!("Operation '{}' disabled. Please satisfy the guard: {:?}.", operation.name, operation.preconditions);
             }
         }
         OperationState::Executing => {

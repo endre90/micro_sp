@@ -167,6 +167,8 @@ async fn process_operation(
             if operation.eval_running(state, &log_target) {
                 *new_state = operation.start_running(new_state, &log_target);
                 new_op_info = format!("Operation '{}' started.", operation.name);
+            } else {
+                new_op_info = format!("Operation '{}' disabled. Please satisfy the guard: {:?}.", operation.name, operation.preconditions);
             }
         }
         OperationState::Executing => {
