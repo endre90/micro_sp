@@ -3,6 +3,9 @@ use redis::aio::MultiplexedConnection;
 use std::{sync::Arc, time::Duration};
 use tokio::time::interval;
 
+// Add automatic operations here as well that finish immediatelly, god for setting some values, triggering robot moves etc.
+
+
 async fn process_single_transition(
     con: &mut MultiplexedConnection,
     transition: &Transition,
@@ -17,7 +20,6 @@ async fn process_single_transition(
     log::info!(target: &log_target, "Executed auto transition: '{}'.", transition.name);
 
     let modified_state = state.get_diff_partial_state(&new_state);
-    // StateManager::set_state(con, &modified_state).await;
     StateManager::set_state(con, &modified_state).await;
 }
 
@@ -42,7 +44,7 @@ pub async fn auto_transition_runner(
     let mut con = connection_manager.get_connection().await;
     loop {
         interval.tick().await;
-        if let Err(_) = connection_manager.check_redis_health(&log_target).await {
+        if let Err(_) = connection_manager.check_redis_health(&log_target, &State::new()).await {
             continue;
         }
         let state = match StateManager::get_state_for_keys(&mut con, &keys).await {

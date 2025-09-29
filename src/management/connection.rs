@@ -46,14 +46,14 @@ impl ConnectionManager {
         self.connection.read().await.clone()
     }
 
-    pub async fn check_redis_health(&self, log_target: &str) -> redis::RedisResult<()> {
+    pub async fn check_redis_health(&self, log_target: &str, reconnect_state: &State) -> redis::RedisResult<()> {
         let mut con = self.get_connection().await;
         match redis::cmd("PING").query_async::<()>(&mut con).await {
             Ok(()) => Ok::<(), RedisError>(()),
             Err(e) => {
                 if e.is_io_error() {
                     log::error!(target: log_target, "Pinging Redis failed, triggering reconnect.");
-                    self.reconnect().await;
+                    self.reconnect(&reconnect_state).await;
                     return Err(e);
                 } else {
                     log::error!(target: log_target, "An unexpected Redis error occurred: {}", e);
@@ -63,7 +63,8 @@ impl ConnectionManager {
         }
     }
 
-    pub async fn reconnect(&self) {
+    // Use the reconnect state so that the resource can get the values when reconnecting
+    pub async fn reconnect(&self, reconnect_state: &State) {
         log::warn!(target: "redis_manager", "Redis connection lost. Attempting to reconnect...");
 
         // Get a write lock to replace the connection.
@@ -72,14 +73,15 @@ impl ConnectionManager {
 
         loop {
             match Self::try_connect(&self.redis_addr).await {
-                Ok(new_connection) => {
-                    *connection_guard = new_connection;
+                Ok(mut new_connection) => {
+                    *connection_guard = new_connection.clone();
+                    StateManager::set_state(&mut new_connection, &reconnect_state).await;
                     log::info!(target: "redis_manager", "Redis re-connection successful.");
                     return;
                 }
                 Err(e) => {
                     log::error!(target: "redis_manager", "Reconnect failed: {}. Retrying in 3s...", e);
-                    tokio::time::sleep(Duration::from_secs(5)).await;
+                    tokio::time::sleep(Duration::from_secs(3)).await;
                 }
             }
         }
@@ -88,11 +90,12 @@ impl ConnectionManager {
     pub async fn handle_redis_error(
         &self,
         e: &redis::RedisError,
+        reconnect_state: &State,
         log_target: &str,
     ) {
         if e.is_io_error() {
             log::error!(target: log_target, "Redis command failed, triggering reconnect.");
-            self.reconnect().await;
+            self.reconnect(&reconnect_state).await;
         } else {
             log::error!(target: log_target, "An unexpected Redis error occurred: {}", e);
         }
