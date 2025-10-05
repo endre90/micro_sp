@@ -6,6 +6,7 @@ use serde::{Deserialize, Serialize};
 pub struct Model {
     pub name: String,
     pub auto_transitions: Vec<Transition>,
+    pub auto_operations: Vec<Operation>,
     pub sops: Vec<SOPStruct>,
     pub operations: Vec<Operation>,
 }
@@ -14,12 +15,14 @@ impl Model {
     pub fn new(
         name: &str,
         auto_transitions: Vec<Transition>,
+        auto_operations: Vec<Operation>,
         sops: Vec<SOPStruct>,
         operations: Vec<Operation>,
     ) -> Model {
         Model {
             name: name.to_string(),
             auto_transitions,
+            auto_operations,
             sops: sops
                 .iter()
                 .map(|sop| SOPStruct {
@@ -33,7 +36,7 @@ impl Model {
                     name: format!("{}", o.name),
                     timeout_ms: o.timeout_ms,
                     retries: o.retries,
-                    continue_if_unrecoverable: o.continue_if_unrecoverable,
+                    can_be_bypassed: o.can_be_bypassed,
                     preconditions: o.preconditions.clone(),
                     postconditions: o.postconditions.clone(),
                     fail_transitions: o.fail_transitions.clone(),

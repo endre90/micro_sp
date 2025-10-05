@@ -1,5 +1,8 @@
+use crate::{
+    running::process_operation::OperationProcessingType,
+    *,
+};
 use std::sync::Arc;
-use crate::*;
 use tokio::time::{Duration, interval};
 
 static TICK_INTERVAL: u64 = 100; // millis
@@ -19,7 +22,7 @@ pub async fn sop_runner(
     let mut con = connection_manager.get_connection().await;
     loop {
         interval.tick().await;
-        if let Err(_) = connection_manager.check_redis_health(&log_target, &State::new()).await {
+        if let Err(_) = connection_manager.check_redis_health(&log_target).await {
             continue;
         }
         let state = match StateManager::get_full_state(&mut con).await {
@@ -127,7 +130,14 @@ async fn handle_sop_executing(
         return;
     };
 
-    let updated_state = process_sop_node_tick(sp_id, state.clone(), &root_sop_container.sop, con, &log_target).await;
+    let updated_state = process_sop_node_tick(
+        sp_id,
+        state.clone(),
+        &root_sop_container.sop,
+        con,
+        &log_target,
+    )
+    .await;
     *new_state = updated_state;
 
     if is_sop_completed(sp_id, &root_sop_container.sop, new_state, &log_target) {
@@ -146,13 +156,24 @@ async fn process_sop_node_tick(
     con: redis::aio::MultiplexedConnection,
     log_target: &str,
 ) -> State {
-    if is_sop_completed(sp_id, sop, &state, log_target) || is_sop_failed(sp_id, sop, &state, log_target) {
+    if is_sop_completed(sp_id, sop, &state, log_target)
+        || is_sop_failed(sp_id, sop, &state, log_target)
+    {
         return state;
     }
 
     match sop {
         SOP::Operation(operation) => {
-            state = run_operation_tick(state, operation, con, log_target).await;
+            state = running::process_operation::process_operation(
+                state,
+                operation,
+                OperationProcessingType::SOP,
+                None,
+                None,
+                con,
+                log_target,
+            )
+            .await;
         }
 
         SOP::Sequence(sops) => {
@@ -161,7 +182,14 @@ async fn process_sop_node_tick(
                 .iter()
                 .find(|child| !is_sop_completed(sp_id, child, &state, log_target))
             {
-                state = Box::pin(process_sop_node_tick(sp_id, state, active_child, con, log_target)).await;
+                state = Box::pin(process_sop_node_tick(
+                    sp_id,
+                    state,
+                    active_child,
+                    con,
+                    log_target,
+                ))
+                .await;
             }
         }
 
@@ -170,7 +198,14 @@ async fn process_sop_node_tick(
             for child in sops {
                 // The state is threaded through each call, so updates from one branch
                 // are visible to the next within the same tick
-                state = Box::pin(process_sop_node_tick(sp_id, state, child, con.clone(), log_target)).await;
+                state = Box::pin(process_sop_node_tick(
+                    sp_id,
+                    state,
+                    child,
+                    con.clone(),
+                    log_target,
+                ))
+                .await;
             }
         }
 
@@ -191,7 +226,14 @@ async fn process_sop_node_tick(
                     .find(|child| can_sop_start(sp_id, child, &state, log_target))
                 {
                     log::info!(target: log_target, "Found valid alternative path to start.");
-                    state = Box::pin(process_sop_node_tick(sp_id, state, path_to_start, con, log_target)).await;
+                    state = Box::pin(process_sop_node_tick(
+                        sp_id,
+                        state,
+                        path_to_start,
+                        con,
+                        log_target,
+                    ))
+                    .await;
                 }
             }
         }
@@ -200,101 +242,104 @@ async fn process_sop_node_tick(
     state
 }
 
-async fn run_operation_tick(
-    mut new_state: State,
-    operation: &Operation,
-    mut _con: redis::aio::MultiplexedConnection,
-    log_target: &str,
-) -> State {
-    let operation_state =
-        new_state.get_string_or_default_to_unknown(&format!("{}", operation.name), &log_target);
+// async fn run_operation_tick(
+//     mut new_state: State,
+//     operation: &Operation,
+//     mut _con: redis::aio::MultiplexedConnection,
+//     log_target: &str,
+// ) -> State {
+//     let operation_state =
+//         new_state.get_string_or_default_to_unknown(&format!("{}", operation.name), &log_target);
 
-    let old_operation_information = new_state.get_string_or_default_to_unknown(
-        &format!("{}_information", operation.name),
-        &log_target,
-    );
+//     let old_operation_information = new_state
+//         .get_string_or_default_to_unknown(&format!("{}_information", operation.name), &log_target);
 
-    let mut new_op_info = old_operation_information.clone();
+//     let mut new_op_info = old_operation_information.clone();
 
-    let mut operation_retry_counter = new_state.get_int_or_default_to_zero(
-        &format!("{}_retry_counter", operation.name),
-        &log_target,
-    );
+//     let mut operation_retry_counter = new_state
+//         .get_int_or_default_to_zero(&format!("{}_retry_counter", operation.name), &log_target);
 
-    match OperationState::from_str(&operation_state) {
-        OperationState::Initial => {
-            if operation.eval_running(&new_state, &log_target) {
-                new_state = operation.start_running(&new_state, &log_target);
-                new_op_info = format!("Operation '{}' started execution", operation.name);
-            } else {
-                new_op_info = format!("Operation '{}' disabled. Please satisfy the guard: {:?}.", operation.name, operation.preconditions[0].runner_guard);
-            }
-        }
-        OperationState::Executing => {
-            if operation.can_be_completed(&new_state, &log_target) {
-                new_state = operation.clone().complete_running(&new_state, &log_target);
-                new_op_info = "Completing operation".to_string();
-            } else if operation.can_be_failed(&new_state, &log_target) {
-                new_state = operation.clone().fail_running(&new_state, &log_target);
-                new_op_info = "Failing operation".to_string();
-            } else {
-                new_op_info = "Waiting to be completed".to_string();
-            }
-        }
-        OperationState::Completed => {
-            new_op_info = format!("Operation {} completed", operation.name);
-            // StateManager::remove_sp_value(&mut con, &operation.name).await; // Once completed we don't need it anymroe
-        }
-        OperationState::Timedout => {
-            new_state = operation.unrecover_running(&new_state, &log_target);
-            new_op_info = format!("Timedout {}. Unrecoverable", operation.name);
-        }
-        OperationState::Failed => {
-            if operation_retry_counter < operation.retries {
-                operation_retry_counter += 1;
-                new_op_info = format!(
-                    "Retrying '{}'. Retry nr. {} out of {}",
-                    operation.name, operation_retry_counter, operation.retries
-                );
-                new_state = operation.clone().retry_running(&new_state, &log_target);
-                new_state = new_state.update(
-                    &format!("{}_retry_counter", operation.name),
-                    operation_retry_counter.to_spvalue(),
-                );
-            } else {
-                new_state = operation.unrecover_running(&new_state, &log_target);
-                new_state = new_state.update(&format!("{}_retry_counter", operation.name), 0.to_spvalue());
-                new_op_info = format!("Operation failed, no more retries left. Unrecoverable");
-            }
-        }
-        OperationState::Unrecoverable => {
-            if operation.continue_if_unrecoverable {
-                new_op_info = format!("Operation {} unrecoverable but flow continued.", operation.name);
-                new_state = operation.continue_running_next(&new_state, &log_target);
-            } else {
-                new_op_info = format!("Operation {} is in an unrecoverable state.", operation.name);
-            }
-        }
-        OperationState::UNKNOWN => {
-             new_state = operation.initialize_running(&new_state, &log_target);
-        },
-    }
+//     match OperationState::from_str(&operation_state) {
+//         OperationState::Initial => {
+//             if operation.eval_running(&new_state, &log_target) {
+//                 new_state = operation.start_running(&new_state, &log_target);
+//                 new_op_info = format!("Operation '{}' started execution", operation.name);
+//             } else {
+//                 new_op_info = format!(
+//                     "Operation '{}' disabled. Please satisfy the guard: {:?}.",
+//                     operation.name, operation.preconditions[0].runner_guard
+//                 );
+//             }
+//         }
+//         OperationState::Executing => {
+//             if operation.can_be_completed(&new_state, &log_target) {
+//                 new_state = operation.clone().complete_running(&new_state, &log_target);
+//                 new_op_info = "Completing operation".to_string();
+//             } else if operation.can_be_failed(&new_state, &log_target) {
+//                 new_state = operation.clone().fail_running(&new_state, &log_target);
+//                 new_op_info = "Failing operation".to_string();
+//             } else {
+//                 new_op_info = "Waiting to be completed".to_string();
+//             }
+//         }
+//         OperationState::Completed => {
+//             new_op_info = format!("Operation {} completed", operation.name);
+//             // StateManager::remove_sp_value(&mut con, &operation.name).await; // Once completed we don't need it anymroe
+//         }
+//         OperationState::Timedout => {
+//             new_state = operation.unrecover_running(&new_state, &log_target);
+//             new_op_info = format!("Timedout {}. Unrecoverable", operation.name);
+//         }
+//         OperationState::Failed => {
+//             if operation_retry_counter < operation.retries {
+//                 operation_retry_counter += 1;
+//                 new_op_info = format!(
+//                     "Retrying '{}'. Retry nr. {} out of {}",
+//                     operation.name, operation_retry_counter, operation.retries
+//                 );
+//                 new_state = operation.clone().retry_running(&new_state, &log_target);
+//                 new_state = new_state.update(
+//                     &format!("{}_retry_counter", operation.name),
+//                     operation_retry_counter.to_spvalue(),
+//                 );
+//             } else {
+//                 new_state = operation.unrecover_running(&new_state, &log_target);
+//                 new_state =
+//                     new_state.update(&format!("{}_retry_counter", operation.name), 0.to_spvalue());
+//                 new_op_info = format!("Operation failed, no more retries left. Unrecoverable");
+//             }
+//         }
+//         OperationState::Unrecoverable => {
+//             if operation.continue_if_unrecoverable {
+//                 new_op_info = format!(
+//                     "Operation {} unrecoverable but flow continued.",
+//                     operation.name
+//                 );
+//                 new_state = operation.continue_running_next(&new_state, &log_target);
+//             } else {
+//                 new_op_info = format!("Operation {} is in an unrecoverable state.", operation.name);
+//             }
+//         }
+//         OperationState::UNKNOWN => {
+//             new_state = operation.initialize_running(&new_state, &log_target);
+//         }
+//     }
 
-    if new_op_info != old_operation_information {
-        log::info!(target: &log_target, "{}", new_op_info);
-    }
+//     if new_op_info != old_operation_information {
+//         log::info!(target: &log_target, "{}", new_op_info);
+//     }
 
-    new_state.update(
-        &format!("{}_information", operation.name),
-        new_op_info.to_spvalue(),
-    )
-}
+//     new_state.update(
+//         &format!("{}_information", operation.name),
+//         new_op_info.to_spvalue(),
+//     )
+// }
 
 fn is_sop_failed(sp_id: &str, sop: &SOP, state: &State, log_target: &str) -> bool {
     match sop {
         SOP::Operation(operation) => {
             let op_state_str = state.get_string_or_default_to_unknown(&operation.name, &log_target);
-            OperationState::from_str(&op_state_str) == OperationState::Unrecoverable && operation.continue_if_unrecoverable == false
+            OperationState::from_str(&op_state_str) == OperationState::Unrecoverable
         }
         SOP::Sequence(sops) | SOP::Parallel(sops) | SOP::Alternative(sops) => sops
             .iter()
@@ -309,14 +354,12 @@ fn is_sop_completed(sp_id: &str, sop: &SOP, state: &State, log_target: &str) -> 
                 state.get_string_or_default_to_unknown(&format!("{}", operation.name), &log_target);
             OperationState::from_str(&operation_state) == OperationState::Completed
         }
-        SOP::Sequence(sops) | SOP::Parallel(sops) => {
-            sops.iter()
-                .all(|child_sop| is_sop_completed(sp_id, child_sop, state, &log_target))
-        }
-        SOP::Alternative(sops) => {
-            sops.iter()
-                .any(|child_sop| is_sop_completed(sp_id, child_sop, state, &log_target))
-        }
+        SOP::Sequence(sops) | SOP::Parallel(sops) => sops
+            .iter()
+            .all(|child_sop| is_sop_completed(sp_id, child_sop, state, &log_target)),
+        SOP::Alternative(sops) => sops
+            .iter()
+            .any(|child_sop| is_sop_completed(sp_id, child_sop, state, &log_target)),
     }
 }
 
@@ -328,10 +371,9 @@ fn is_sop_in_initial_state(sp_id: &str, sop: &SOP, state: &State, log_target: &s
             let op_state = OperationState::from_str(&operation_state);
             op_state == OperationState::Initial || op_state == OperationState::UNKNOWN
         }
-        SOP::Sequence(sops) | SOP::Parallel(sops) | SOP::Alternative(sops) => {
-            sops.iter()
-                .all(|child_sop| is_sop_in_initial_state(sp_id, child_sop, state, &log_target))
-        }
+        SOP::Sequence(sops) | SOP::Parallel(sops) | SOP::Alternative(sops) => sops
+            .iter()
+            .all(|child_sop| is_sop_in_initial_state(sp_id, child_sop, state, &log_target)),
     }
 }
 
@@ -343,19 +385,15 @@ fn can_sop_start(sp_id: &str, sop: &SOP, state: &State, log_target: &str) -> boo
             (OperationState::from_str(&operation_state) == OperationState::Initial)
                 && operation.eval_running(state, &log_target)
         }
-        SOP::Sequence(sops) => {
-            sops.first().map_or(false, |first_sop| {
-                can_sop_start(sp_id, first_sop, state, &log_target)
-            })
-        }
-        SOP::Parallel(sops) => {
-            sops.iter()
-                .all(|child_sop| can_sop_start(sp_id, child_sop, state, &log_target))
-        }
-        SOP::Alternative(sops) => {
-            sops.iter()
-                .any(|child_sop| can_sop_start(sp_id, child_sop, state, &log_target))
-        }
+        SOP::Sequence(sops) => sops.first().map_or(false, |first_sop| {
+            can_sop_start(sp_id, first_sop, state, &log_target)
+        }),
+        SOP::Parallel(sops) => sops
+            .iter()
+            .all(|child_sop| can_sop_start(sp_id, child_sop, state, &log_target)),
+        SOP::Alternative(sops) => sops
+            .iter()
+            .any(|child_sop| can_sop_start(sp_id, child_sop, state, &log_target)),
     }
 }
 

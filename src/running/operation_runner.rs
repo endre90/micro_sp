@@ -1,4 +1,4 @@
-use crate::*;
+use crate::{running::process_operation::OperationProcessingType, *};
 use std::sync::Arc;
 use tokio::time::{Duration, interval};
 
@@ -47,7 +47,7 @@ pub async fn planned_operation_runner(
 
     loop {
         interval.tick().await;
-        if let Err(_) = connection_manager.check_redis_health(&log_target, &State::new()).await {
+        if let Err(_) = connection_manager.check_redis_health(&log_target).await {
             continue;
         }
         let state = match StateManager::get_state_for_keys(&mut con, &keys).await {
@@ -93,19 +93,27 @@ async fn process_plan_tick(
                 plan_current_step = 0;
             }
         }
+
         PlanState::Executing => {
             if let Some(op_name) = plan.get(plan_current_step as usize) {
-                process_operation(
-                    &mut new_state,
-                    &mut plan_state_str,
-                    &mut plan_current_step,
-                    op_name,
-                    model,
-                    state,
-                    con,
-                    log_target,
-                )
-                .await;
+                match model.operations.iter().find(|op| op.name == *op_name) {
+                    Some(operation) => {
+                        new_state = running::process_operation::process_operation(
+                            new_state,
+                            operation,
+                            OperationProcessingType::Planned,
+                            Some(&mut plan_current_step),
+                            Some(&mut plan_state_str),
+                            con,
+                            log_target,
+                        )
+                        .await;
+                    }
+                    None => {
+                        log::error!("Operation '{}' not found in model!", op_name);
+                        plan_state_str = PlanState::Failed.to_string();
+                    }
+                }
             } else {
                 plan_state_str = PlanState::Completed.to_string();
             }
@@ -133,108 +141,4 @@ async fn process_plan_tick(
         );
 
     new_state
-}
-
-async fn process_operation(
-    new_state: &mut State,
-    plan_state_str: &mut String,
-    plan_current_step: &mut i64,
-    op_name: &str,
-    model: &Model,
-    state: &State,
-    mut _con: redis::aio::MultiplexedConnection,
-    log_target: &str,
-) {
-    let Some(operation) = model.operations.iter().find(|op| op.name == op_name) else {
-        log::error!("Operation '{}' not found in model!", op_name);
-        *plan_state_str = PlanState::Failed.to_string();
-        return;
-    };
-
-    let operation_state_str =
-        state.get_string_or_default_to_unknown(&format!("{}", operation.name), &log_target);
-
-    let old_operation_information = state
-        .get_string_or_default_to_unknown(&format!("{}_information", operation.name), &log_target);
-
-    let mut operation_retry_counter =
-        state.get_int_or_default_to_zero(&format!("{}_retry_counter", operation.name), &log_target);
-
-    let mut new_op_info = old_operation_information.clone();
-
-    match OperationState::from_str(&operation_state_str) {
-        OperationState::Initial => {
-            if operation.eval_running(state, &log_target) {
-                *new_state = operation.start_running(new_state, &log_target);
-                new_op_info = format!("Operation '{}' started.", operation.name);
-            } else {
-                new_op_info = format!("Operation '{}' disabled. Please satisfy the guard: {:?}.", operation.name, operation.preconditions[0].runner_guard);
-            }
-        }
-        OperationState::Executing => {
-            if operation.can_be_completed(state, &log_target) {
-                *new_state = operation.complete_running(new_state, &log_target);
-                new_op_info = format!("Operation '{}' completing.", operation.name);
-            } else if operation.can_be_failed(state, &log_target) {
-                *new_state = operation.fail_running(new_state, &log_target);
-                new_op_info = format!("Operation '{}' failing.", operation.name);
-            }
-        }
-        OperationState::Completed => {
-            *new_state =
-                new_state.update(&format!("{}_retry_counter", operation.name), 0.to_spvalue());
-            // StateManager::remove_sp_value(&mut con, &operation.name).await; //
-            // *new_state = operation.reinitialize_running(&new_state, &log_target);
-            *plan_current_step += 1;
-            new_op_info = format!("Operation '{}' completed.", operation.name);
-        }
-        OperationState::Failed => {
-            if operation_retry_counter < operation.retries {
-                operation_retry_counter += 1;
-                *new_state = operation.retry_running(new_state, &log_target);
-                *new_state = new_state.update(
-                    &format!("{}_retry_counter", operation.name),
-                    operation_retry_counter.to_spvalue(),
-                );
-                new_op_info = format!(
-                    "Operation '{}' retrying ({}/{}).",
-                    operation.name, operation_retry_counter, operation.retries
-                );
-            } else {
-                *new_state = operation.unrecover_running(new_state, &log_target);
-                new_op_info = format!("Operation '{}' failed. No retries left.", operation.name);
-            }
-        }
-        OperationState::Timedout => {
-            *new_state = operation.unrecover_running(new_state, &log_target);
-            new_op_info = format!("Operation '{}' timed out.", operation.name);
-        }
-        OperationState::Unrecoverable => {
-            if operation.continue_if_unrecoverable {
-                new_op_info = format!(
-                    "Operation {} unrecoverable but flow continued.",
-                    operation.name
-                );
-                *new_state = operation.continue_running_next(new_state, &log_target);
-            } else {
-                *plan_state_str = PlanState::Failed.to_string();
-                new_op_info = format!(
-                    "Operation '{}' is unrecoverable. Failing plan.",
-                    operation.name
-                )
-            }
-        }
-        OperationState::UNKNOWN => {
-            *new_state = operation.initialize_running(&new_state, &log_target);
-        }
-    }
-
-    if new_op_info != old_operation_information {
-        log::info!(target: &log_target, "{}", new_op_info);
-    }
-
-    *new_state = new_state.update(
-        &format!("{}_information", operation.name),
-        new_op_info.to_spvalue(),
-    );
 }

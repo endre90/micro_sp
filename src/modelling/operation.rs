@@ -13,9 +13,10 @@ use crate::*;
 #[derive(Debug, PartialEq, Clone, Eq, Hash, Serialize, Deserialize)]
 pub enum OperationState {
     Initial,
-    // Blocked,
+    // Disabled,
     Executing,
     Completed,
+    Bypassed,
     Timedout,
     Failed,
     Unrecoverable,
@@ -38,6 +39,7 @@ impl OperationState {
             "failed" => OperationState::Failed,
             "unrecoverable" => OperationState::Unrecoverable,
             "completed" => OperationState::Completed,
+            "bypassed" => OperationState::Bypassed,
             _ => OperationState::UNKNOWN,
         }
     }
@@ -56,6 +58,7 @@ impl fmt::Display for OperationState {
             OperationState::Failed => write!(f, "failed"),
             OperationState::Unrecoverable => write!(f, "unrecoverable"),
             OperationState::Completed => write!(f, "completed"),
+            OperationState::Bypassed => write!(f, "bypassed"),
             OperationState::UNKNOWN => write!(f, "UNKNOWN"),
         }
     }
@@ -67,7 +70,7 @@ pub struct Operation {
     pub state: OperationState,
     pub timeout_ms: Option<i64>, // Option<u128>,
     pub retries: i64,
-    pub continue_if_unrecoverable: bool,
+    pub can_be_bypassed: bool,
     pub preconditions: Vec<Transition>,
     pub postconditions: Vec<Transition>,
     pub fail_transitions: Vec<Transition>,
@@ -83,7 +86,7 @@ impl Default for Operation {
             state: OperationState::UNKNOWN,
             timeout_ms: None,
             retries: 0,
-            continue_if_unrecoverable: false,
+            can_be_bypassed: false,
             preconditions: Vec::new(),
             postconditions: Vec::new(),
             fail_transitions: Vec::new(),
@@ -99,7 +102,7 @@ impl Operation {
         name: &str,
         timeout_ms: Option<i64>,
         retries: Option<i64>,
-        continue_if_unrecoverable: bool,
+        can_be_bypassed: bool,
         preconditions: Vec<Transition>,
         postconditions: Vec<Transition>,
         fail_transitions: Vec<Transition>,
@@ -119,7 +122,7 @@ impl Operation {
                 Some(x) => x,
                 None => 0,
             },
-            continue_if_unrecoverable,
+            can_be_bypassed,
             preconditions,
             postconditions,
             fail_transitions,
@@ -325,6 +328,22 @@ impl Operation {
             action.assign(&state, &log_target)
         } else {
             log::error!(target: &&format!("micro_sp"), "Can't unrecover an operation which hasn't failed or timedout.");
+            state.clone()
+        }
+    }
+
+    pub fn bypass_running(&self, state: &State, log_target: &str) -> State {
+        let assignment = state.get_assignment(&self.name, &log_target);
+        if assignment.val == OperationState::Failed.to_spvalue()
+            || assignment.val == OperationState::Timedout.to_spvalue() // || maybe even Disabled?
+        {
+            let action = Action::new(
+                assignment.var,
+                OperationState::Bypassed.to_spvalue().wrap(),
+            );
+            action.assign(&state, &log_target)
+        } else {
+            log::error!(target: &&format!("micro_sp"), "Can't bypass an operation which hasn't failed or timedout.");
             state.clone()
         }
     }

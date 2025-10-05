@@ -49,7 +49,7 @@ impl TransformsManager {
         get_all_transforms::get_all_transforms(con).await
     }
 
-    // TODO: return something
+    // TODO: return success or fail
     pub async fn move_transform(
         con: &mut MultiplexedConnection,
         name: &str,
@@ -58,6 +58,7 @@ impl TransformsManager {
         move_transform::move_transform(con, name, new_transform).await
     }
 
+    // TODO: return success or fail
     pub async fn reparent_transform(
         con: &mut MultiplexedConnection,
         new_parent_frame_id: &str,

@@ -8,7 +8,7 @@ pub(super) async fn insert_transforms(
 ) -> Result<(), Box<dyn Error>> {
     if transforms.is_empty() {
         // return Err("There are no transforms to insert, vector is empty.".into());
-        log::error!(target:  "insert_transforms", "There are no transforms to insert, vector is empty.");
+        log::error!(target:  "insert_transforms", "There are no transforms to insert. Skipping, vector is empty.");
         return Ok(())
     }
 
@@ -87,7 +87,7 @@ mod tests_for_insert_transform {
         let transforms_to_insert = vec![];
         let result = insert_transforms(&mut con, &transforms_to_insert).await;
 
-        assert!(result.is_err());
+        assert!(result.is_ok());
 
         let all_keys: Vec<String> = con.keys("*").await.unwrap();
         assert!(all_keys.is_empty());

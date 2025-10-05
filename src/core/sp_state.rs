@@ -123,6 +123,19 @@ impl State {
         }
     }
 
+    pub fn remove(&self, var: &str, log_target: &str) -> State {
+        let mut new_state_map = self.state.clone();
+        match new_state_map.remove(var) {
+            Some(_) => {
+                State { state: new_state_map }
+            }
+            None => {
+                log::error!(target: &log_target, "Variable '{}' not in state, can't be removed.", var);
+                self.clone()
+            }
+        }
+    }
+
     // Panics if the variable is not in the state. Should remain panicking.
     pub fn get_value(&self, name: &str, log_target: &str) -> Option<SPValue> {
         match self.state.clone().get(name) {
