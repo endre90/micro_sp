@@ -33,7 +33,7 @@ impl Model {
             operations: operations
                 .iter()
                 .map(|o| Operation {
-                    name: format!("{}", o.name),
+                    name: format!("op_{}", o.name),
                     timeout_ms: o.timeout_ms,
                     fail_retries: o.fail_retries,
                     timeout_retries: o.timeout_retries,
