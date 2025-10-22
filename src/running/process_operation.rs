@@ -92,8 +92,8 @@ pub(super) async fn process_operation(
             }
             new_op_info = format!("Operation '{}' completed.", operation.name);
             op_info_level = OperationInfoLevel::Info;
-            new_state = new_state.remove(&operation.name, log_target);
-            StateManager::remove_sp_value(&mut con, &operation.name).await;
+            // new_state = new_state.remove(&operation.name, log_target);
+            // StateManager::remove_sp_value(&mut con, &operation.name).await;
             // new_state = operation.terminate(&new_state, &log_target);
         }
 
@@ -108,8 +108,8 @@ pub(super) async fn process_operation(
                 }
             }
             op_info_level = OperationInfoLevel::Warn;
-            new_state = new_state.remove(&operation.name, log_target);
-            StateManager::remove_sp_value(&mut con, &operation.name).await;
+            // new_state = new_state.remove(&operation.name, log_target);
+            // StateManager::remove_sp_value(&mut con, &operation.name).await;
             // new_state = operation.terminate(&new_state, &log_target);
         }
 
@@ -169,8 +169,8 @@ pub(super) async fn process_operation(
                 }
                 _ => (),
             }
-            new_state = new_state.remove(&operation.name, log_target);
-            StateManager::remove_sp_value(&mut con, &operation.name).await;
+            // new_state = new_state.remove(&operation.name, log_target);
+            // StateManager::remove_sp_value(&mut con, &operation.name).await;
             // new_state = operation.terminate(&new_state, &log_target);
         }
         OperationState::Terminated => {
