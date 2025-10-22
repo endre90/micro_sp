@@ -38,7 +38,7 @@ pub(super) async fn process_operation(
             if operation.eval(&new_state, &log_target) {
                 new_state = operation.start(&new_state, &log_target);
                 new_op_info = format!("Starting operation '{}'.", operation.name);
-                op_info_level = OperationInfoLevel::Warn;
+                op_info_level = OperationInfoLevel::Info;
             } else {
                 new_op_info = format!("Disabling operation '{}'.", operation.name).to_string();
                 op_info_level = OperationInfoLevel::Warn;
@@ -92,7 +92,9 @@ pub(super) async fn process_operation(
             }
             new_op_info = format!("Operation '{}' completed.", operation.name);
             op_info_level = OperationInfoLevel::Info;
-            new_state = operation.terminate(&new_state, &log_target);
+            new_state = new_state.remove(&operation.name, log_target);
+            StateManager::remove_sp_value(&mut con, &operation.name).await;
+            // new_state = operation.terminate(&new_state, &log_target);
         }
 
         OperationState::Bypassed => {
@@ -106,7 +108,9 @@ pub(super) async fn process_operation(
                 }
             }
             op_info_level = OperationInfoLevel::Warn;
-            new_state = operation.terminate(&new_state, &log_target);
+            new_state = new_state.remove(&operation.name, log_target);
+            StateManager::remove_sp_value(&mut con, &operation.name).await;
+            // new_state = operation.terminate(&new_state, &log_target);
         }
 
         OperationState::Timedout => {
@@ -165,7 +169,9 @@ pub(super) async fn process_operation(
                 }
                 _ => (),
             }
-            new_state = operation.terminate(&new_state, &log_target);
+            new_state = new_state.remove(&operation.name, log_target);
+            StateManager::remove_sp_value(&mut con, &operation.name).await;
+            // new_state = operation.terminate(&new_state, &log_target);
         }
         OperationState::Terminated => {
             new_op_info = format!("Operation '{}' terminated.", operation.name);
