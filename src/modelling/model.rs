@@ -35,13 +35,14 @@ impl Model {
                 .map(|o| Operation {
                     name: format!("{}", o.name),
                     timeout_ms: o.timeout_ms,
-                    retries: o.retries,
+                    fail_retries: o.fail_retries,
+                    timeout_retries: o.timeout_retries,
                     can_be_bypassed: o.can_be_bypassed,
                     preconditions: o.preconditions.clone(),
                     postconditions: o.postconditions.clone(),
                     fail_transitions: o.fail_transitions.clone(),
                     timeout_transitions: o.timeout_transitions.clone(),
-                    continue_transitions: o.continue_transitions.clone(),
+                    bypass_transitions: o.bypass_transitions.clone(),
                     reset_transitions: o.reset_transitions.clone(),
                     state: o.state.clone(),
                 })

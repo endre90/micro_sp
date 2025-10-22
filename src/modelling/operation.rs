@@ -13,13 +13,14 @@ use crate::*;
 #[derive(Debug, PartialEq, Clone, Eq, Hash, Serialize, Deserialize)]
 pub enum OperationState {
     Initial,
-    // Disabled,
+    Disabled,
     Executing,
     Completed,
     Bypassed,
     Timedout,
     Failed,
     Unrecoverable,
+    Terminated,
     UNKNOWN,
 }
 
@@ -33,13 +34,14 @@ impl OperationState {
     pub fn from_str(x: &str) -> OperationState {
         match x {
             "initial" => OperationState::Initial,
-            // "blocked" => OperationState::Blocked,
+            "disabled" => OperationState::Disabled,
             "executing" => OperationState::Executing,
             "timedout" => OperationState::Timedout,
             "failed" => OperationState::Failed,
             "unrecoverable" => OperationState::Unrecoverable,
             "completed" => OperationState::Completed,
             "bypassed" => OperationState::Bypassed,
+            "terminated" => OperationState::Terminated,
             _ => OperationState::UNKNOWN,
         }
     }
@@ -52,13 +54,14 @@ impl fmt::Display for OperationState {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             OperationState::Initial => write!(f, "initial"),
-            // OperationState::Blocked => write!(f, "blocked"),
+            OperationState::Disabled => write!(f, "disabled"),
             OperationState::Executing => write!(f, "executing"),
             OperationState::Timedout => write!(f, "timedout"),
             OperationState::Failed => write!(f, "failed"),
             OperationState::Unrecoverable => write!(f, "unrecoverable"),
             OperationState::Completed => write!(f, "completed"),
             OperationState::Bypassed => write!(f, "bypassed"),
+            OperationState::Terminated => write!(f, "terminated"),
             OperationState::UNKNOWN => write!(f, "UNKNOWN"),
         }
     }
@@ -69,12 +72,13 @@ pub struct Operation {
     pub name: String,
     pub state: OperationState,
     pub timeout_ms: Option<i64>, // Option<u128>,
-    pub retries: i64,
+    pub fail_retries: i64,
+    pub timeout_retries: i64,
     pub can_be_bypassed: bool,
     pub preconditions: Vec<Transition>,
     pub postconditions: Vec<Transition>,
     pub fail_transitions: Vec<Transition>,
-    pub continue_transitions: Vec<Transition>,
+    pub bypass_transitions: Vec<Transition>,
     pub timeout_transitions: Vec<Transition>,
     pub reset_transitions: Vec<Transition>,
 }
@@ -85,13 +89,14 @@ impl Default for Operation {
             name: "unknown".to_string(),
             state: OperationState::UNKNOWN,
             timeout_ms: None,
-            retries: 0,
+            fail_retries: 0,
+            timeout_retries: 0,
             can_be_bypassed: false,
             preconditions: Vec::new(),
             postconditions: Vec::new(),
             fail_transitions: Vec::new(),
             timeout_transitions: Vec::new(),
-            continue_transitions: Vec::new(),
+            bypass_transitions: Vec::new(),
             reset_transitions: Vec::new(),
         }
     }
@@ -101,13 +106,14 @@ impl Operation {
     pub fn new(
         name: &str,
         timeout_ms: Option<i64>,
-        retries: Option<i64>,
+        fail_retries: Option<i64>,
+        timeout_retries: Option<i64>,
         can_be_bypassed: bool,
         preconditions: Vec<Transition>,
         postconditions: Vec<Transition>,
         fail_transitions: Vec<Transition>,
         timeout_transitions: Vec<Transition>,
-        continue_transitions: Vec<Transition>,
+        bypass_transitions: Vec<Transition>,
         reset_transitions: Vec<Transition>,
     ) -> Operation {
         Operation {
@@ -118,7 +124,11 @@ impl Operation {
                 Some(x) => Some(x),
             },
             timeout_transitions,
-            retries: match retries {
+            fail_retries: match fail_retries {
+                Some(x) => x,
+                None => 0,
+            },
+            timeout_retries: match timeout_retries {
                 Some(x) => x,
                 None => 0,
             },
@@ -126,7 +136,7 @@ impl Operation {
             preconditions,
             postconditions,
             fail_transitions,
-            continue_transitions,
+            bypass_transitions,
             reset_transitions,
         }
     }
@@ -157,11 +167,11 @@ impl Operation {
         )
     }
 
-    pub fn eval_running(&self, state: &State, log_target: &str) -> bool {
+    pub fn eval(&self, state: &State, log_target: &str) -> bool {
         if let Some(value) = state.get_value(&self.name, &log_target) {
             if value == OperationState::Initial.to_spvalue() {
                 for precondition in &self.preconditions {
-                    if precondition.clone().eval_running(state, &log_target) {
+                    if precondition.clone().eval(state, &log_target) {
                         return true;
                     }
                 }
@@ -171,15 +181,11 @@ impl Operation {
     }
 
     /// Check the guard and return a tuple: (is_enabled, index_of_enabled_transition)
-    pub fn eval_running_with_transition_index(
-        &self,
-        state: &State,
-        log_target: &str,
-    ) -> (bool, usize) {
+    pub fn evaluate_with_transition_index(&self, state: &State, log_target: &str) -> (bool, usize) {
         if let Some(value) = state.get_value(&self.name, &log_target) {
             if value == OperationState::Initial.to_spvalue() {
                 for (index, precondition) in self.preconditions.iter().enumerate() {
-                    if precondition.clone().eval_running(state, &log_target) {
+                    if precondition.clone().eval(state, &log_target) {
                         return (true, index);
                     }
                 }
@@ -197,7 +203,7 @@ impl Operation {
         if let Some(value) = state.get_value(&self.name, &log_target) {
             if value == OperationState::Executing.to_spvalue() {
                 for (index, postcondition) in self.postconditions.iter().enumerate() {
-                    if postcondition.clone().eval_running(state, &log_target) {
+                    if postcondition.clone().eval(state, &log_target) {
                         return (true, index);
                     }
                 }
@@ -211,7 +217,7 @@ impl Operation {
         if let Some(value) = state.get_value(&self.name, &log_target) {
             if value == OperationState::Executing.to_spvalue() {
                 for postcondition in &self.postconditions {
-                    if postcondition.clone().eval_running(&state, &log_target) {
+                    if postcondition.clone().eval(&state, &log_target) {
                         return true;
                     }
                 }
@@ -225,7 +231,24 @@ impl Operation {
         if let Some(value) = state.get_value(&self.name, &log_target) {
             if value == OperationState::Executing.to_spvalue() {
                 for fail_transition in &self.fail_transitions {
-                    if fail_transition.clone().eval_running(&state, &log_target) {
+                    if fail_transition.clone().eval(&state, &log_target) {
+                        return true;
+                    }
+                }
+            }
+        }
+        false
+    }
+
+    pub fn can_be_timedout(&self, state: &State, log_target: &str) -> bool {
+        if let Some(value) = state.get_value(&self.name, &log_target) {
+            if value == OperationState::Executing.to_spvalue() {
+                if let Some(timeout_ms) = self.timeout_ms {
+                    let elapased_ms = state.get_int_or_default_to_zero(
+                        &format!("{}_elapsed_ms", &self.name),
+                        &log_target,
+                    );
+                    if elapased_ms > timeout_ms {
                         return true;
                     }
                 }
@@ -239,7 +262,7 @@ impl Operation {
         if let Some(value) = state.get_value(&self.name, &log_target) {
             if value == OperationState::Completed.to_spvalue() {
                 for reset_transition in &self.reset_transitions {
-                    if reset_transition.clone().eval_running(&state, &log_target) {
+                    if reset_transition.clone().eval(&state, &log_target) {
                         return true;
                     }
                 }
@@ -248,32 +271,30 @@ impl Operation {
         false
     }
 
-    // /// Start executing the operation. Check for eval_running() first.
-    // pub fn block_running(&self, state: &State) -> State {
-    //     let assignment = state.get_assignment(&self.name);
-    //     if assignment.val == OperationState::Initial.to_spvalue() {
-    //         let action = Action::new(assignment.var, OperationState::Blocked.to_spvalue().wrap());
-    //         action.assign(&state)
-    //     } else {
-    //         log::error!(target: &&format!("micro_sp"), "Can't block an operation which is not in its initial state.");
-    //         state.clone()
-    //     }
-    // }
+    /// Start executing the operation. Check for eval_running() first.
+    pub fn disable(&self, state: &State, log_target: &str) -> State {
+        let assignment = state.get_assignment(&self.name, &log_target);
+        if assignment.val == OperationState::Initial.to_spvalue() {
+            let action = Action::new(assignment.var, OperationState::Disabled.to_spvalue().wrap());
+            action.assign(&state, &log_target)
+        } else {
+            log::error!(target: &log_target, "Can't block an operation which is not in its initial state.");
+            state.clone()
+        }
+    }
 
     /// Start executing the operation. Check for eval_running() first.
-    pub fn start_running(&self, state: &State, log_target: &str) -> State {
+    pub fn start(&self, state: &State, log_target: &str) -> State {
         let assignment = state.get_assignment(&self.name, &log_target);
         if assignment.val == OperationState::Initial.to_spvalue() {
             for precondition in &self.preconditions {
-                if precondition.clone().eval_running(state, &log_target) {
+                if precondition.clone().eval(state, &log_target) {
                     let action = Action::new(
                         assignment.var,
                         OperationState::Executing.to_spvalue().wrap(),
                     );
-                    return action.assign(
-                        &precondition.clone().take_running(state, &log_target),
-                        &log_target,
-                    );
+                    return action
+                        .assign(&precondition.clone().take(state, &log_target), &log_target);
                 }
             }
         }
@@ -281,18 +302,18 @@ impl Operation {
     }
 
     /// Complete executing the operation. Check for can_be_completed() first.
-    pub fn complete_running(&self, state: &State, log_target: &str) -> State {
+    pub fn complete(&self, state: &State, log_target: &str) -> State {
         let assignment = state.get_assignment(&self.name, &log_target);
         if assignment.val == OperationState::Executing.to_spvalue() {
             for postcondition in &self.postconditions {
-                if postcondition.clone().eval_running(&state, &log_target) {
+                if postcondition.clone().eval(&state, &log_target) {
                     let action = Action::new(
                         assignment.var,
                         OperationState::Completed.to_spvalue().wrap(),
                     );
                     return postcondition
                         .clone()
-                        .take_running(&action.assign(&state, &log_target), &log_target);
+                        .take(&action.assign(&state, &log_target), &log_target);
                 }
             }
         }
@@ -300,23 +321,23 @@ impl Operation {
     }
 
     /// Fail the executing operation. Check for can_be_failed() first.
-    pub fn fail_running(&self, state: &State, log_target: &str) -> State {
+    pub fn fail(&self, state: &State, log_target: &str) -> State {
         let assignment = state.get_assignment(&self.name, &log_target);
         if assignment.val == OperationState::Executing.to_spvalue() {
             for fail_transition in &self.fail_transitions {
-                if fail_transition.clone().eval_running(&state, &log_target) {
+                if fail_transition.clone().eval(&state, &log_target) {
                     let action =
                         Action::new(assignment.var, OperationState::Failed.to_spvalue().wrap());
                     return fail_transition
                         .clone()
-                        .take_running(&action.assign(&state, &log_target), &log_target);
+                        .take(&action.assign(&state, &log_target), &log_target);
                 }
             }
         }
         state.clone()
     }
 
-    pub fn unrecover_running(&self, state: &State, log_target: &str) -> State {
+    pub fn unrecover(&self, state: &State, log_target: &str) -> State {
         let assignment = state.get_assignment(&self.name, &log_target);
         if assignment.val == OperationState::Failed.to_spvalue()
             || assignment.val == OperationState::Timedout.to_spvalue()
@@ -327,41 +348,39 @@ impl Operation {
             );
             action.assign(&state, &log_target)
         } else {
-            log::error!(target: &&format!("micro_sp"), "Can't unrecover an operation which hasn't failed or timedout.");
+            log::error!(target: &log_target, "Can't unrecover an operation which hasn't failed or timedout.");
             state.clone()
         }
     }
 
-    pub fn bypass_running(&self, state: &State, log_target: &str) -> State {
+    pub fn bypass(&self, state: &State, log_target: &str) -> State {
         let assignment = state.get_assignment(&self.name, &log_target);
         if assignment.val == OperationState::Failed.to_spvalue()
-            || assignment.val == OperationState::Timedout.to_spvalue() // || maybe even Disabled?
+            || assignment.val == OperationState::Timedout.to_spvalue()
+        // || eventually add Disabled + some timeout?
         {
-            let action = Action::new(
-                assignment.var,
-                OperationState::Bypassed.to_spvalue().wrap(),
-            );
+            let action = Action::new(assignment.var, OperationState::Bypassed.to_spvalue().wrap());
             action.assign(&state, &log_target)
         } else {
-            log::error!(target: &&format!("micro_sp"), "Can't bypass an operation which hasn't failed or timedout.");
+            log::error!(target: &log_target, "Can't bypass an operation which hasn't failed or timedout.");
             state.clone()
         }
     }
 
     /// Timeout an executing the operation.
-    pub fn timeout_running(&self, state: &State, log_target: &str) -> State {
+    pub fn timeout(&self, state: &State, log_target: &str) -> State {
         let assignment = state.get_assignment(&self.name, &log_target);
         if assignment.val == OperationState::Executing.to_spvalue() {
             if self.timeout_transitions.len() > 0 {
                 for timeout_transition in &self.timeout_transitions {
-                    if timeout_transition.clone().eval_running(&state, &log_target) {
+                    if timeout_transition.clone().eval(&state, &log_target) {
                         let action = Action::new(
                             assignment.var,
                             OperationState::Timedout.to_spvalue().wrap(),
                         );
                         return timeout_transition
                             .clone()
-                            .take_running(&action.assign(&state, &log_target), &log_target);
+                            .take(&action.assign(&state, &log_target), &log_target);
                     }
                 }
             } else {
@@ -375,10 +394,10 @@ impl Operation {
 
     /// Retry the execution of the operation, allows for retries without immediate replanning.
     /// However, do we have to reset the variables before we can go back the initial state?
-    /// Otherwise we might end up in blocked.
-    pub fn retry_running(&self, state: &State, log_target: &str) -> State {
+    /// Otherwise we might end up in disabled? Let's try withthe emulation.
+    pub fn retry(&self, state: &State, log_target: &str) -> State {
         let assignment = state.get_assignment(&self.name, &log_target);
-        if assignment.val == OperationState::Failed.to_spvalue() {
+        if assignment.val == OperationState::Failed.to_spvalue() || assignment.val == OperationState::Timedout.to_spvalue() {
             let action = Action::new(assignment.var, OperationState::Initial.to_spvalue().wrap());
             action.assign(&state, &log_target)
         } else {
@@ -386,13 +405,13 @@ impl Operation {
         }
     }
 
-    pub fn initialize_running(&self, state: &State, log_target: &str) -> State {
+    pub fn initialize(&self, state: &State, log_target: &str) -> State {
         let assignment = state.get_assignment(&self.name, &log_target);
         let action = Action::new(assignment.var, OperationState::Initial.to_spvalue().wrap());
         action.assign(&state, &log_target)
     }
 
-    pub fn reinitialize_running(&self, state: &State, log_target: &str) -> State {
+    pub fn reinitialize(&self, state: &State, log_target: &str) -> State {
         let assignment = state.get_assignment(&self.name, &log_target);
         if assignment.val == OperationState::Completed.to_spvalue()
             || assignment.val == OperationState::Unrecoverable.to_spvalue()
@@ -405,22 +424,40 @@ impl Operation {
     }
 
     /// Continue executing the next operation if this one has failed
-    pub fn continue_running_next(&self, state: &State, log_target: &str) -> State {
+    // pub fn continue_running_next(&self, state: &State, log_target: &str) -> State {
+    //     let assignment = state.get_assignment(&self.name, &log_target);
+    //     if assignment.val == OperationState::Bypassed.to_spvalue()
+    //     {
+    //         for postcondition in &self.bypass_transitions {
+    //             if postcondition.clone().eval(&state, &log_target) {
+    //                 let action = Action::new(
+    //                     assignment.var,
+    //                     OperationState::Completed.to_spvalue().wrap(),
+    //                 );
+    //                 return postcondition
+    //                     .clone()
+    //                     .take(&action.assign(&state, &log_target), &log_target);
+    //             }
+    //         }
+    //     }
+    //     state.clone()
+    // }
+
+    pub fn terminate(&self, state: &State, log_target: &str) -> State {
         let assignment = state.get_assignment(&self.name, &log_target);
-        if assignment.val == OperationState::Unrecoverable.to_spvalue() {
-            for postcondition in &self.continue_transitions {
-                if postcondition.clone().eval_running(&state, &log_target) {
-                    let action = Action::new(
-                        assignment.var,
-                        OperationState::Completed.to_spvalue().wrap(),
-                    );
-                    return postcondition
-                        .clone()
-                        .take_running(&action.assign(&state, &log_target), &log_target);
-                }
-            }
+        if assignment.val == OperationState::Unrecoverable.to_spvalue()
+            || assignment.val == OperationState::Bypassed.to_spvalue()
+            || assignment.val == OperationState::Completed.to_spvalue()
+        {
+            let action = Action::new(
+                assignment.var,
+                OperationState::Terminated.to_spvalue().wrap(),
+            );
+            action.assign(&state, &log_target)
+        } else {
+            log::error!(target: &log_target, "Can't terminate an operation which is not unrecoverable, bypassed, or completed.");
+            state.clone()
         }
-        state.clone()
     }
 
     pub fn get_all_var_keys(&self) -> Vec<String> {

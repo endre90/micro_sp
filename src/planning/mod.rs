@@ -145,6 +145,7 @@ mod tests {
             "move_to_b",
             None,
             None,
+            None,
             false,
             vec![t!(
                 "start_moving_to_b",
@@ -177,6 +178,7 @@ mod tests {
 
         let op_move_to_c = Operation::new(
             "move_to_c",
+            None,
             None,
             None,
             false,
@@ -212,6 +214,7 @@ mod tests {
 
         let op_move_to_d = Operation::new(
             "move_to_d",
+            None,
             None,
             None,
             false,

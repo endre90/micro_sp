@@ -14,11 +14,11 @@ async fn process_transition(
     state: &State,
     log_target: &str,
 ) {
-    if !transition.to_owned().eval_running(state, &log_target) {
+    if !transition.to_owned().eval(state, &log_target) {
         return;
     }
 
-    let new_state = transition.to_owned().take_running(state, &log_target);
+    let new_state = transition.to_owned().take(state, &log_target);
     log::info!(target: &log_target, "Executed auto transition: '{}'.", transition.name);
 
     let modified_state = state.get_diff_partial_state(&new_state);

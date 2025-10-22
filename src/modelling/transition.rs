@@ -131,7 +131,7 @@ impl Transition {
         self.guard.eval(state, &log_target)
     }
 
-    pub fn eval_running(self, state: &State, log_target: &str) -> bool {
+    pub fn eval(self, state: &State, log_target: &str) -> bool {
         self.guard.eval(state, &log_target) && self.runner_guard.eval(state, &log_target)
     }
 
@@ -143,7 +143,7 @@ impl Transition {
         new_state
     }
 
-    pub fn take_running(self, state: &State, log_target: &str) -> State {
+    pub fn take(self, state: &State, log_target: &str) -> State {
         let mut new_state = state.clone();
         for a in self.actions {
             new_state = a.assign(&new_state, &log_target)
@@ -349,8 +349,8 @@ mod tests {
             Vec::<&str>::new(),
             &s
         );
-        assert!(t1.eval_running(&s, "t"));
-        assert!(!t2.eval_running(&s, "t"));
+        assert!(t1.eval(&s, "t"));
+        assert!(!t2.eval(&s, "t"));
     }
 
     #[test]
@@ -366,7 +366,7 @@ mod tests {
             Vec::<&str>::new(),
             &s
         );
-        assert!(t1.eval_running(&s, "t"));
+        assert!(t1.eval(&s, "t"));
     }
 
     // #[test]

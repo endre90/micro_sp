@@ -383,7 +383,7 @@ fn can_sop_start(sp_id: &str, sop: &SOP, state: &State, log_target: &str) -> boo
             let operation_state =
                 state.get_string_or_default_to_unknown(&format!("{}", operation.name), &log_target);
             (OperationState::from_str(&operation_state) == OperationState::Initial)
-                && operation.eval_running(state, &log_target)
+                && operation.eval(state, &log_target)
         }
         SOP::Sequence(sops) => sops.first().map_or(false, |first_sop| {
             can_sop_start(sp_id, first_sop, state, &log_target)
