@@ -5,8 +5,9 @@ peg::parser!(pub grammar pred_parser() for str {
 
     rule _() =  quiet!{[' ' | '\t']*}
 
+
     pub rule variable(state: &State) -> SPVariable =
-    "var:" _ n:$(['a'..='z' | 'A'..='Z' | '0'..='9' | '_' | '/']+) {
+        "var:" _ n:$(['a'..='z' | 'A'..='Z' | '0'..='9' | '_' | '/']+) !(['a'..='z' | 'A'..='Z' | '0'..='9' | '_']) {
         state.get_assignment(n, "parser").var
     }
 
