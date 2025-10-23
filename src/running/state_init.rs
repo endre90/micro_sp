@@ -198,6 +198,33 @@ pub fn generate_operation_state_variables(model: &Model, coverability_tracking: 
         }
     }
 
+    for operation in &model.auto_operations {
+        let operation_state = v!(&&format!("{}", operation.name)); // Initial, Executing, Failed, Completed, Unknown
+        let operation_information = v!(&&format!("{}_information", operation.name));
+        let operation_elapsed_ms = iv!(&&format!("{}_elapsed_ms", operation.name)); // to timeout if it takes too long
+        let operation_failure_retry_counter = iv!(&&format!("{}_failure_retry_counter", operation.name)); // without scrapping the current plan, how many times has an operation retried
+        let operation_timeout_retry_counter = iv!(&&format!("{}_timeout_retry_counter", operation.name));
+        state = state.add(assign!(operation_state, "initial".to_spvalue()));
+        state = state.add(assign!(operation_information, SPValue::String(StringOrUnknown::UNKNOWN)));
+        state = state.add(assign!(operation_elapsed_ms, SPValue::Int64(IntOrUnknown::UNKNOWN)));
+        state = state.add(assign!(operation_failure_retry_counter, SPValue::Int64(IntOrUnknown::UNKNOWN)));
+        state = state.add(assign!(operation_timeout_retry_counter, SPValue::Int64(IntOrUnknown::UNKNOWN)));
+
+        if coverability_tracking {
+            // coverability tracking does nothing for now
+            let initial = iv!(&&format!("{}_visited_initial", operation.name));
+            let executing = iv!(&&format!("{}_visited_executing", operation.name));
+            let timedout = iv!(&&format!("{}_visited_timedout", operation.name)); // Operation should have optional deadline field
+            let disabled = iv!(&&format!("{}_visited_disabled", operation.name));
+            let failed = iv!(&&format!("{}_visited_failed", operation.name));
+            let completed = iv!(&&format!("{}_visited_completed", operation.name));
+
+            for cov in vec![initial, executing, timedout, disabled, failed, completed] {
+                state = state.add(assign!(cov, 0.to_spvalue()));
+            }
+        }
+    }
+
     for transition in &model.auto_transitions {
         if coverability_tracking {
             let taken = iv!(&&format!("transition_{}_taken", transition.name));

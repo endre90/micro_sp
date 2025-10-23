@@ -22,7 +22,23 @@ impl Model {
         Model {
             name: name.to_string(),
             auto_transitions,
-            auto_operations,
+            auto_operations: auto_operations
+                .iter()
+                .map(|o| Operation {
+                    name: format!("op_{}", o.name),
+                    timeout_ms: o.timeout_ms,
+                    failure_retries: o.failure_retries,
+                    timeout_retries: o.timeout_retries,
+                    can_be_bypassed: o.can_be_bypassed,
+                    preconditions: o.preconditions.clone(),
+                    postconditions: o.postconditions.clone(),
+                    failure_transitions: o.failure_transitions.clone(),
+                    timeout_transitions: o.timeout_transitions.clone(),
+                    bypass_transitions: o.bypass_transitions.clone(),
+                    reset_transitions: o.reset_transitions.clone(),
+                    state: o.state.clone(),
+                })
+                .collect(),
             sops: sops
                 .iter()
                 .map(|sop| SOPStruct {
