@@ -369,16 +369,13 @@ impl Operation {
 
     /// Timeout an executing the operation.
     pub fn timeout(&self, state: &State, log_target: &str) -> State {
-        println!("test1");
         let assignment = state.get_assignment(&self.name, &log_target);
         if assignment.val == OperationState::Executing.to_spvalue() {
-            println!("test2");
             if self.timeout_transitions.len() > 0 {
-                println!("test3x");
                 for timeout_transition in &self.timeout_transitions {
-                    println!("test4x");
                     if timeout_transition.clone().eval(&state, &log_target) {
-                        println!("test5x");
+                        // Carefull: this can forbid the operation to timeout!
+                        // Useful when you want to have different options to timeout and add some alternative conditions here
                         let action = Action::new(
                             assignment.var,
                             OperationState::Timedout.to_spvalue().wrap(),
