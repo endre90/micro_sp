@@ -72,8 +72,7 @@ pub(super) async fn process_operation(
                     )));
                 }
                 new_op_info = format!(
-                    "Operation '{}' disabled. Please satisfy the runner guard: \n       {} //
-                    \nDebug full guard: \n       {}",
+                    "Operation '{}' disabled. Please satisfy the runner guard: \n       {}\n       Debug full guard: \n       {}",
                     operation.name, Predicate::OR(or_clause), Predicate::OR(or_clause_full)
                 );
                 // new_op_info = format!(
