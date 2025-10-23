@@ -156,7 +156,7 @@ fn process_planner_tick(sp_id: &str, model: &Model, state: &State, log_target: &
     let mut new_state = state.clone();
 
     if !ctx.replan_trigger {
-        ctx.planner_information = "Planner is not triggered".to_string();
+        // ctx.planner_information = "Planner is not triggered".to_string();
         ctx.replanned = false;
     } else if ctx.replanned {
         ctx.replan_trigger = false;

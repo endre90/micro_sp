@@ -241,19 +241,13 @@ impl Operation {
     }
 
     pub fn can_be_timedout(&self, state: &State, log_target: &str) -> bool {
-        println!("test");
         if let Some(value) = state.get_value(&self.name, &log_target) {
-             println!("test2");
             if value == OperationState::Executing.to_spvalue() {
-                 println!("test3");
                 if let Some(timeout_ms) = self.timeout_ms {
-                     println!("test4");
                     let elapased_ms = state.get_int_or_default_to_zero(
                         &format!("{}_elapsed_ms", &self.name),
                         &log_target,
                     );
-                    println!("elapsed: {}", elapased_ms);
-                    println!("timeout: {}", timeout_ms);
                     if elapased_ms > timeout_ms {
                         return true;
                     }
@@ -375,11 +369,16 @@ impl Operation {
 
     /// Timeout an executing the operation.
     pub fn timeout(&self, state: &State, log_target: &str) -> State {
+        println!("test1");
         let assignment = state.get_assignment(&self.name, &log_target);
         if assignment.val == OperationState::Executing.to_spvalue() {
+            println!("test2");
             if self.timeout_transitions.len() > 0 {
+                println!("test3x");
                 for timeout_transition in &self.timeout_transitions {
+                    println!("test4x");
                     if timeout_transition.clone().eval(&state, &log_target) {
+                        println!("test5x");
                         let action = Action::new(
                             assignment.var,
                             OperationState::Timedout.to_spvalue().wrap(),
@@ -390,6 +389,7 @@ impl Operation {
                     }
                 }
             } else {
+                println!("test3");
                 let action =
                     Action::new(assignment.var, OperationState::Timedout.to_spvalue().wrap());
                 return action.assign(&state, &log_target);
