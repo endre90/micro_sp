@@ -95,7 +95,9 @@ pub(super) async fn process_operation(
 
         OperationState::Completed => {
             new_state =
-                new_state.update(&format!("{}_retry_counter", operation.name), 0.to_spvalue());
+                new_state.update(&format!("{}_failure_retry_counter", operation.name), 0.to_spvalue());
+            new_state =
+                new_state.update(&format!("{}_timeout_retry_counter", operation.name), 0.to_spvalue());
             if let OperationProcessingType::Planned = operation_processing_type {
                 if let Some(plan_current_step) = plan_current_step {
                     *plan_current_step += 1;
