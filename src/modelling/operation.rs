@@ -241,9 +241,13 @@ impl Operation {
     }
 
     pub fn can_be_timedout(&self, state: &State, log_target: &str) -> bool {
+        println!("test");
         if let Some(value) = state.get_value(&self.name, &log_target) {
+             println!("test2");
             if value == OperationState::Executing.to_spvalue() {
+                 println!("test3");
                 if let Some(timeout_ms) = self.timeout_ms {
+                     println!("test4");
                     let elapased_ms = state.get_int_or_default_to_zero(
                         &format!("{}_elapsed_ms", &self.name),
                         &log_target,
