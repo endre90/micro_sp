@@ -177,7 +177,9 @@ pub(super) async fn process_operation(
                     op_info_level = OperationInfoLevel::Error;
                 }
                 new_state =
-                    new_state.update(&format!("{}_retry_counter", operation.name), 0.to_spvalue());
+                    new_state.update(&format!("{}_failure_retry_counter", operation.name), 0.to_spvalue());
+                new_state =
+                    new_state.update(&format!("{}_timeout_retry_counter", operation.name), 0.to_spvalue());
             }
         }
         OperationState::Unrecoverable => {
