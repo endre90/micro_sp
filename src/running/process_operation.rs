@@ -29,8 +29,15 @@ pub(super) async fn process_operation(
 
     let mut new_op_info = old_operation_information.clone();
 
-    let mut operation_retry_counter = new_state
-        .get_int_or_default_to_zero(&format!("{}_retry_counter", operation.name), &log_target);
+    let mut operation_failure_retry_counter = new_state.get_int_or_default_to_zero(
+        &format!("{}_failure_retry_counter", operation.name),
+        &log_target,
+    );
+
+    let mut operation_timeout_retry_counter = new_state.get_int_or_default_to_zero(
+        &format!("{}_timeout_retry_counter", operation.name),
+        &log_target,
+    );
 
     let mut elapased_ms = new_state
         .get_int_or_default_to_zero(&format!("{}_elapsed_ms", operation.name), &log_target);
@@ -56,7 +63,7 @@ pub(super) async fn process_operation(
                 op_info_level = OperationInfoLevel::Info;
             } else {
                 new_op_info = format!(
-                    "Operation '{}' disabled. Please satisfy the guard: \n{}.",
+                    "Operation '{}' disabled. Please satisfy the guard: \n       {}",
                     operation.name, operation.preconditions[0].runner_guard
                 );
                 op_info_level = OperationInfoLevel::Warn;
@@ -118,7 +125,19 @@ pub(super) async fn process_operation(
         }
 
         OperationState::Timedout => {
-            if operation.can_be_bypassed {
+            if operation_timeout_retry_counter < operation.timeout_retries {
+                operation_timeout_retry_counter += 1;
+                new_op_info = format!(
+                    "Retrying operation (timeout) '{}'. Retry {} out of {}.",
+                    operation.name, operation_timeout_retry_counter, operation.timeout_retries
+                );
+                op_info_level = OperationInfoLevel::Warn;
+                new_state = operation.clone().retry(&new_state, &log_target);
+                new_state = new_state.update(
+                    &format!("{}_timeout_retry_counter", operation.name),
+                    operation_timeout_retry_counter.to_spvalue(),
+                );
+            } else if operation.can_be_bypassed {
                 new_state = operation.bypass(&new_state, &log_target);
                 new_op_info = format!("Operation '{}' timedout. Bypassing.", operation.name);
                 op_info_level = OperationInfoLevel::Warn;
@@ -129,17 +148,17 @@ pub(super) async fn process_operation(
             }
         }
         OperationState::Failed => {
-            if operation_retry_counter < operation.fail_retries {
-                operation_retry_counter += 1;
+            if operation_failure_retry_counter < operation.failure_retries {
+                operation_failure_retry_counter += 1;
                 new_op_info = format!(
-                    "Retrying operation '{}'. Retry {} out of {}.",
-                    operation.name, operation_retry_counter, operation.fail_retries
+                    "Retrying operation (failure) '{}'. Retry {} out of {}.",
+                    operation.name, operation_failure_retry_counter, operation.failure_retries
                 );
                 op_info_level = OperationInfoLevel::Warn;
                 new_state = operation.clone().retry(&new_state, &log_target);
                 new_state = new_state.update(
-                    &format!("{}_retry_counter", operation.name),
-                    operation_retry_counter.to_spvalue(),
+                    &format!("{}_failure_retry_counter", operation.name),
+                    operation_failure_retry_counter.to_spvalue(),
                 );
             } else {
                 if operation.can_be_bypassed {

@@ -72,7 +72,7 @@ pub struct Operation {
     pub name: String,
     pub state: OperationState,
     pub timeout_ms: Option<i64>, // Option<u128>,
-    pub fail_retries: i64,
+    pub failure_retries: i64,
     pub timeout_retries: i64,
     pub can_be_bypassed: bool,
     pub preconditions: Vec<Transition>,
@@ -89,7 +89,7 @@ impl Default for Operation {
             name: "unknown".to_string(),
             state: OperationState::UNKNOWN,
             timeout_ms: None,
-            fail_retries: 0,
+            failure_retries: 0,
             timeout_retries: 0,
             can_be_bypassed: false,
             preconditions: Vec::new(),
@@ -124,7 +124,7 @@ impl Operation {
                 Some(x) => Some(x),
             },
             timeout_transitions,
-            fail_retries: match fail_retries {
+            failure_retries: match fail_retries {
                 Some(x) => x,
                 None => 0,
             },

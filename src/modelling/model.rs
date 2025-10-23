@@ -35,7 +35,7 @@ impl Model {
                 .map(|o| Operation {
                     name: format!("op_{}", o.name),
                     timeout_ms: o.timeout_ms,
-                    fail_retries: o.fail_retries,
+                    failure_retries: o.failure_retries,
                     timeout_retries: o.timeout_retries,
                     can_be_bypassed: o.can_be_bypassed,
                     preconditions: o.preconditions.clone(),

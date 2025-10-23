@@ -9,7 +9,7 @@ pub async fn planned_operation_runner(
     connection_manager: &Arc<ConnectionManager>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let sp_id = &model.name;
-    let log_target = format!("{}_operation_runner", sp_id);
+    let log_target = format!("{}_op_runner", sp_id);
     let mut interval = interval(Duration::from_millis(OPERAION_RUNNER_TICK_INTERVAL_MS));
 
     // Get only the relevant keys from the state
@@ -37,7 +37,8 @@ pub async fn planned_operation_runner(
                 vec![
                     format!("{}", op.name),
                     format!("{}_information", op.name),
-                    format!("{}_retry_counter", op.name),
+                    format!("{}_fail_retry_counter", op.name),
+                    format!("{}_timeout_retry_counter", op.name),
                     format!("{}_elapsed_ms", op.name),
                 ]
             })
