@@ -56,7 +56,7 @@ pub(super) async fn process_operation(
                 op_info_level = OperationInfoLevel::Info;
             } else {
                 new_op_info = format!(
-                    "Operation '{}' disabled. Please satisfy the guard: {}.",
+                    "Operation '{}' disabled. Please satisfy the guard: \n{}.",
                     operation.name, operation.preconditions[0].runner_guard
                 );
                 op_info_level = OperationInfoLevel::Warn;
