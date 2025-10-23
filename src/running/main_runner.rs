@@ -64,6 +64,15 @@ pub async fn main_runner(
             .unwrap()
     });
 
+    log::info!(target: &format!("{sp_id}_micro_sp"), "Spawning auto operation runner");
+    let model_clone = model.clone();
+    let con_clone = connection_manager.clone();
+    tokio::task::spawn(async move {
+        auto_operation_runner(&model_clone.name, &model_clone, &con_clone)
+            .await
+            .unwrap()
+    });
+
     log::info!(target: &format!("{sp_id}_micro_sp"), "Spawning time runner");
     let con_clone = connection_manager.clone();
     let sp_id_clone = sp_id.clone();
