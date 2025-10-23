@@ -20,8 +20,9 @@ impl StateManager {
     pub async fn get_state_for_keys(
         con: &mut MultiplexedConnection,
         keys: &Vec<String>,
+        log_target: &str
     ) -> Option<State> {
-        get_state_for_keys::get_state_for_keys(con, keys).await
+        get_state_for_keys::get_state_for_keys(con, keys, &log_target).await
     }
 
     pub async fn get_sp_value(con: &mut MultiplexedConnection, var: &str) -> Option<SPValue> {

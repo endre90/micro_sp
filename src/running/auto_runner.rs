@@ -32,7 +32,7 @@ pub async fn auto_transition_runner(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let mut interval = interval(Duration::from_millis(TRANSITION_RUNNER_TICK_INTERVAL_MS));
     let model = model.clone();
-    let log_target = format!("{}_auto_trans_runner", name);
+    let log_target = format!("{}_auto_tr_runner", name);
     let keys: Vec<String> = model
         .auto_transitions
         .iter()
@@ -47,7 +47,7 @@ pub async fn auto_transition_runner(
             continue;
         }
         let mut con = connection_manager.get_connection().await;
-        let state = match StateManager::get_state_for_keys(&mut con, &keys).await {
+        let state = match StateManager::get_state_for_keys(&mut con, &keys, &log_target).await {
             Some(s) => s,
             None => continue,
         };
@@ -79,7 +79,7 @@ pub async fn auto_operation_runner(
             continue;
         }
         let con = connection_manager.get_connection().await;
-        let state = match StateManager::get_state_for_keys(&mut con.clone(), &keys).await {
+        let state = match StateManager::get_state_for_keys(&mut con.clone(), &keys, &log_target).await {
             Some(s) => s,
             None => continue,
         };

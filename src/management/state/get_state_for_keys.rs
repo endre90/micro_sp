@@ -5,6 +5,7 @@ use crate::{State, StateManager};
 pub(super) async fn get_state_for_keys(
     con: &mut MultiplexedConnection,
     keys: &Vec<String>,
+    log_target: &str
 ) -> Option<State> {
     if keys.is_empty() {
         return Some(State::new());
@@ -13,7 +14,7 @@ pub(super) async fn get_state_for_keys(
     let values: Vec<Option<String>> = match con.mget(keys).await {
         Ok(v) => v,
         Err(e) => {
-            log::error!("Failed to get values from Redis: {e}");
+            log::error!(target: &log_target, "Failed to get values from Redis: {e}");
             return None;
         }
     };
@@ -65,7 +66,7 @@ mod tests_for_get_state_for_keys {
             .unwrap();
 
         let keys_to_get = vec!["x".to_string(), "y".to_string()];
-        let result_state = get_state_for_keys(&mut con, &keys_to_get).await.unwrap();
+        let result_state = get_state_for_keys(&mut con, &keys_to_get, "test").await.unwrap();
 
         let mut expected_state_map = HashMap::new();
         expected_state_map.insert("x".to_string(), assignment1);
@@ -98,7 +99,7 @@ mod tests_for_get_state_for_keys {
             .unwrap();
 
         let keys_to_get = vec!["x".to_string(), "z".to_string()];
-        let result_state = get_state_for_keys(&mut con, &keys_to_get).await.unwrap();
+        let result_state = get_state_for_keys(&mut con, &keys_to_get, "test").await.unwrap();
 
         let mut expected_state_map = HashMap::new();
         expected_state_map.insert("x".to_string(), assignment1);
@@ -118,7 +119,7 @@ mod tests_for_get_state_for_keys {
         let mut con = ConnectionManager::new().await.get_connection().await;
 
         let keys_to_get = vec!["a".to_string(), "b".to_string()];
-        let result_state = get_state_for_keys(&mut con, &keys_to_get).await.unwrap();
+        let result_state = get_state_for_keys(&mut con, &keys_to_get, "test").await.unwrap();
 
         assert!(result_state.state.is_empty());
     }
@@ -135,7 +136,7 @@ mod tests_for_get_state_for_keys {
         let mut con = ConnectionManager::new().await.get_connection().await;
 
         let keys_to_get = vec![];
-        let result_state = get_state_for_keys(&mut con, &keys_to_get).await.unwrap();
+        let result_state = get_state_for_keys(&mut con, &keys_to_get, "test").await.unwrap();
 
         assert_eq!(result_state, State::new());
     }
@@ -167,7 +168,7 @@ mod tests_for_get_state_for_keys {
             .unwrap();
 
         let keys_to_get = vec!["good_key".to_string(), "bad_key".to_string()];
-        let result_state = get_state_for_keys(&mut con, &keys_to_get).await.unwrap();
+        let result_state = get_state_for_keys(&mut con, &keys_to_get, "test").await.unwrap();
 
         let mut expected_state_map = HashMap::new();
         expected_state_map.insert("good_key".to_string(), assignment_good);

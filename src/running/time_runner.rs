@@ -29,7 +29,7 @@ pub async fn time_interface_runner(
             continue;
         }
         let mut con = connection_manager.get_connection().await;
-        let state = match StateManager::get_state_for_keys(&mut con, &keys).await {
+        let state = match StateManager::get_state_for_keys(&mut con, &keys, &log_target).await {
             Some(s) => s,
             None => continue,
         };

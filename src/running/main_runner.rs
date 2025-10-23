@@ -46,7 +46,7 @@ pub async fn main_runner(
             .unwrap()
     });
 
-    log::info!(target:  &format!("{sp_id}_micro_sp"), "Spawning combined operation runner.");
+    log::info!(target:  &format!("{sp_id}_micro_sp"), "Spawning operation runner.");
     let model_clone = model.clone();
     let con_clone = connection_manager.clone();
     tokio::task::spawn(async move {

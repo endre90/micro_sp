@@ -22,13 +22,13 @@ pub async fn tf_interface(
         format!("{}_tf_insert_transforms", sp_id),
     ];
 
-    let mut con = connection_manager.get_connection().await;
     loop {
         interval.tick().await;
         if let Err(_) = connection_manager.check_redis_health(&log_target).await {
             continue;
         }
-        let state = match StateManager::get_state_for_keys(&mut con, &keys).await {
+        let mut con = connection_manager.get_connection().await;
+        let state = match StateManager::get_state_for_keys(&mut con, &keys, &log_target).await {
             Some(s) => s,
             None => continue,
         };
@@ -99,7 +99,8 @@ pub async fn tf_interface(
                         }
                     }
                     "snap_to_parent" => {
-                        match TransformsManager::snap_to_parent_transform(&mut con, &parent, &child).await
+                        match TransformsManager::snap_to_parent_transform(&mut con, &parent, &child)
+                            .await
                         {
                             Ok(()) => request_state = ServiceRequestState::Succeeded.to_string(),
                             Err(e) => {
@@ -122,7 +123,7 @@ pub async fn tf_interface(
                                 request_state = ServiceRequestState::Failed.to_string();
                             }
                         }
-                    }                 
+                    }
                     _ => {
                         log::error!(target:  &log_target,
                             "TF interface command {} is invalid.", command);
