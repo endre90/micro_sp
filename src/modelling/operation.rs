@@ -252,6 +252,8 @@ impl Operation {
                         &format!("{}_elapsed_ms", &self.name),
                         &log_target,
                     );
+                    println!("elapsed: {}", elapased_ms);
+                    println!("timeout: {}", timeout_ms);
                     if elapased_ms > timeout_ms {
                         return true;
                     }
