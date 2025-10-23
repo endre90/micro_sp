@@ -1,12 +1,12 @@
 use crate::{
-    ConnectionManager, Model, State, StateManager, Transition,
-    running::process_operation::{OperationProcessingType, process_operation},
+    running::process_operation::{process_operation, OperationProcessingType}, ConnectionManager, Model, State, StateManager, Transition, OPERAION_RUNNER_TICK_INTERVAL_MS
 };
 use redis::aio::MultiplexedConnection;
 use std::{sync::Arc, time::Duration};
 use tokio::time::interval;
 
 // Add automatic operations here as well that finish immediatelly, god for setting some values, triggering robot moves etc.
+pub static TRANSITION_RUNNER_TICK_INTERVAL_MS: u64 = 100;
 
 async fn process_transition(
     con: &mut MultiplexedConnection,
@@ -30,7 +30,7 @@ pub async fn auto_transition_runner(
     model: &Model,
     connection_manager: &Arc<ConnectionManager>,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let mut interval = interval(Duration::from_millis(100));
+    let mut interval = interval(Duration::from_millis(TRANSITION_RUNNER_TICK_INTERVAL_MS));
     let model = model.clone();
     let log_target = format!("{}_auto_trans_runner", name);
     let keys: Vec<String> = model
@@ -41,14 +41,12 @@ pub async fn auto_transition_runner(
 
     log::info!(target: &log_target, "Online.");
 
-    // let last_known_state: Arc<RwLock<Option<State>>> = Arc::new(RwLock::new(None));
-
-    let mut con = connection_manager.get_connection().await;
     loop {
         interval.tick().await;
         if let Err(_) = connection_manager.check_redis_health(&log_target).await {
             continue;
         }
+        let mut con = connection_manager.get_connection().await;
         let state = match StateManager::get_state_for_keys(&mut con, &keys).await {
             Some(s) => s,
             None => continue,
@@ -65,10 +63,9 @@ pub async fn auto_operation_runner(
     model: &Model,
     connection_manager: &Arc<ConnectionManager>,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let mut interval = interval(Duration::from_millis(100));
+    let mut interval = interval(Duration::from_millis(OPERAION_RUNNER_TICK_INTERVAL_MS));
     let model = model.clone();
     let log_target = format!("{}_auto_op_runner", name);
-    let con = connection_manager.get_connection().await;
 
     let keys: Vec<String> = model
         .auto_transitions
@@ -81,6 +78,7 @@ pub async fn auto_operation_runner(
         if let Err(_) = connection_manager.check_redis_health(&log_target).await {
             continue;
         }
+        let con = connection_manager.get_connection().await;
         let state = match StateManager::get_state_for_keys(&mut con.clone(), &keys).await {
             Some(s) => s,
             None => continue,
