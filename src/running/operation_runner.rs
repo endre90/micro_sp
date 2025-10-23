@@ -2,13 +2,15 @@ use crate::{running::process_operation::OperationProcessingType, *};
 use std::sync::Arc;
 use tokio::time::{Duration, interval};
 
+pub static OPERAION_RUNNER_TICK_INTERVAL_MS: u64 = 200;
+
 pub async fn planned_operation_runner(
     model: &Model,
     connection_manager: &Arc<ConnectionManager>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let sp_id = &model.name;
     let log_target = format!("{}_operation_runner", sp_id);
-    let mut interval = interval(Duration::from_millis(250));
+    let mut interval = interval(Duration::from_millis(OPERAION_RUNNER_TICK_INTERVAL_MS));
 
     // Get only the relevant keys from the state
     log::info!(target: &log_target, "Online.");

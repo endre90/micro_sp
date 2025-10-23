@@ -32,6 +32,9 @@ pub(super) async fn process_operation(
     let mut operation_retry_counter = new_state
         .get_int_or_default_to_zero(&format!("{}_retry_counter", operation.name), &log_target);
 
+    let mut elapased_ms = new_state
+        .get_int_or_default_to_zero(&format!("{}_elapsed_ms", operation.name), &log_target);
+
     let mut op_info_level = OperationInfoLevel::Info;
     match OperationState::from_str(&operation_state) {
         OperationState::Initial => {
@@ -60,6 +63,7 @@ pub(super) async fn process_operation(
             }
         }
         OperationState::Executing => {
+            elapased_ms += OPERAION_RUNNER_TICK_INTERVAL_MS as i64;
             if operation.can_be_completed(&new_state, &log_target) {
                 new_state = operation.clone().complete(&new_state, &log_target);
                 new_op_info = format!("Completing operation '{}'.", operation.name).to_string();
@@ -192,8 +196,13 @@ pub(super) async fn process_operation(
         }
     }
 
-    new_state.update(
-        &format!("{}_information", operation.name),
-        new_op_info.to_spvalue(),
-    )
+    new_state
+        .update(
+            &format!("{}_information", operation.name),
+            new_op_info.to_spvalue(),
+        )
+        .update(
+            &format!("{}_elapsed_ms", operation.name),
+            elapased_ms.to_spvalue(),
+        )
 }
