@@ -62,23 +62,22 @@ pub(super) async fn process_operation(
                 new_op_info = format!("Starting operation '{}'.", operation.name);
                 op_info_level = OperationInfoLevel::Info;
             } else {
-                let mut or_clause = vec!();
-                let mut or_clause_full = vec!();
+                let mut or_clause = vec![];
+                let mut or_clause_full = vec![];
                 for precondition in &operation.preconditions {
                     or_clause.push(precondition.runner_guard.clone());
-                    or_clause_full.push(Predicate::AND(vec!(
+                    or_clause_full.push(Predicate::AND(vec![
                         precondition.guard.clone(),
-                        precondition.runner_guard.clone()
-                    )));
+                        precondition.runner_guard.clone(),
+                    ]));
                 }
                 new_op_info = format!(
                     "Operation '{}' disabled. Please satisfy the runner guard: \n       {}\n       Debug full guard: \n       {}",
-                    operation.name, Predicate::OR(or_clause), Predicate::OR(or_clause_full)
+                    operation.name,
+                    Predicate::OR(or_clause),
+                    Predicate::OR(or_clause_full)
                 );
-                // new_op_info = format!(
-                //     "Operation '{}' disabled. Debug full guard: \n       {}",
-                //     operation.name, Predicate::OR(or_clause_full)
-                // );
+
                 op_info_level = OperationInfoLevel::Warn;
             }
         }
@@ -107,10 +106,14 @@ pub(super) async fn process_operation(
         }
 
         OperationState::Completed => {
-            new_state =
-                new_state.update(&format!("{}_failure_retry_counter", operation.name), 0.to_spvalue());
-            new_state =
-                new_state.update(&format!("{}_timeout_retry_counter", operation.name), 0.to_spvalue());
+            new_state = new_state.update(
+                &format!("{}_failure_retry_counter", operation.name),
+                0.to_spvalue(),
+            );
+            new_state = new_state.update(
+                &format!("{}_timeout_retry_counter", operation.name),
+                0.to_spvalue(),
+            );
             if let OperationProcessingType::Planned = operation_processing_type {
                 if let Some(plan_current_step) = plan_current_step {
                     *plan_current_step += 1;
@@ -189,10 +192,14 @@ pub(super) async fn process_operation(
                         format!("Operation '{}' has no more retries left.", operation.name);
                     op_info_level = OperationInfoLevel::Error;
                 }
-                new_state =
-                    new_state.update(&format!("{}_failure_retry_counter", operation.name), 0.to_spvalue());
-                new_state =
-                    new_state.update(&format!("{}_timeout_retry_counter", operation.name), 0.to_spvalue());
+                new_state = new_state.update(
+                    &format!("{}_failure_retry_counter", operation.name),
+                    0.to_spvalue(),
+                );
+                new_state = new_state.update(
+                    &format!("{}_timeout_retry_counter", operation.name),
+                    0.to_spvalue(),
+                );
             }
         }
         OperationState::Unrecoverable => {

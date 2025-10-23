@@ -77,7 +77,7 @@ pub struct Operation {
     pub can_be_bypassed: bool,
     pub preconditions: Vec<Transition>,
     pub postconditions: Vec<Transition>,
-    pub fail_transitions: Vec<Transition>,
+    pub failure_transitions: Vec<Transition>,
     pub bypass_transitions: Vec<Transition>,
     pub timeout_transitions: Vec<Transition>,
     pub reset_transitions: Vec<Transition>,
@@ -94,7 +94,7 @@ impl Default for Operation {
             can_be_bypassed: false,
             preconditions: Vec::new(),
             postconditions: Vec::new(),
-            fail_transitions: Vec::new(),
+            failure_transitions: Vec::new(),
             timeout_transitions: Vec::new(),
             bypass_transitions: Vec::new(),
             reset_transitions: Vec::new(),
@@ -111,7 +111,7 @@ impl Operation {
         can_be_bypassed: bool,
         preconditions: Vec<Transition>,
         postconditions: Vec<Transition>,
-        fail_transitions: Vec<Transition>,
+        failure_transitions: Vec<Transition>,
         timeout_transitions: Vec<Transition>,
         bypass_transitions: Vec<Transition>,
         reset_transitions: Vec<Transition>,
@@ -135,7 +135,7 @@ impl Operation {
             can_be_bypassed,
             preconditions,
             postconditions,
-            fail_transitions,
+            failure_transitions,
             bypass_transitions,
             reset_transitions,
         }
@@ -169,7 +169,9 @@ impl Operation {
 
     pub fn eval(&self, state: &State, log_target: &str) -> bool {
         if let Some(value) = state.get_value(&self.name, &log_target) {
-            if value == OperationState::Initial.to_spvalue() || value == OperationState::Disabled.to_spvalue() {
+            if value == OperationState::Initial.to_spvalue()
+                || value == OperationState::Disabled.to_spvalue()
+            {
                 for precondition in &self.preconditions {
                     if precondition.clone().eval(state, &log_target) {
                         return true;
@@ -230,7 +232,7 @@ impl Operation {
     pub fn can_be_failed(&self, state: &State, log_target: &str) -> bool {
         if let Some(value) = state.get_value(&self.name, &log_target) {
             if value == OperationState::Executing.to_spvalue() {
-                for fail_transition in &self.fail_transitions {
+                for fail_transition in &self.failure_transitions {
                     if fail_transition.clone().eval(&state, &log_target) {
                         return true;
                     }
@@ -286,7 +288,9 @@ impl Operation {
     /// Start executing the operation. Check for eval_running() first.
     pub fn start(&self, state: &State, log_target: &str) -> State {
         let assignment = state.get_assignment(&self.name, &log_target);
-        if assignment.val == OperationState::Initial.to_spvalue() || assignment.val == OperationState::Disabled.to_spvalue() {
+        if assignment.val == OperationState::Initial.to_spvalue()
+            || assignment.val == OperationState::Disabled.to_spvalue()
+        {
             for precondition in &self.preconditions {
                 if precondition.clone().eval(state, &log_target) {
                     let action = Action::new(
@@ -324,7 +328,7 @@ impl Operation {
     pub fn fail(&self, state: &State, log_target: &str) -> State {
         let assignment = state.get_assignment(&self.name, &log_target);
         if assignment.val == OperationState::Executing.to_spvalue() {
-            for fail_transition in &self.fail_transitions {
+            for fail_transition in &self.failure_transitions {
                 if fail_transition.clone().eval(&state, &log_target) {
                     let action =
                         Action::new(assignment.var, OperationState::Failed.to_spvalue().wrap());
@@ -357,14 +361,28 @@ impl Operation {
         let assignment = state.get_assignment(&self.name, &log_target);
         if assignment.val == OperationState::Failed.to_spvalue()
             || assignment.val == OperationState::Timedout.to_spvalue()
-        // || eventually add Disabled + some timeout?
         {
-            let action = Action::new(assignment.var, OperationState::Bypassed.to_spvalue().wrap());
-            action.assign(&state, &log_target)
-        } else {
-            log::error!(target: &log_target, "Can't bypass an operation which hasn't failed or timedout.");
-            state.clone()
+            if self.bypass_transitions.len() > 0 {
+                for bypass_transition in &self.bypass_transitions {
+                    if bypass_transition.clone().eval(&state, &log_target) {
+                        // Carefull: this can forbid the operation to bypass!
+                        // Useful when you want to have different options to bypass and add some alternative conditions here
+                        let action = Action::new(
+                            assignment.var,
+                            OperationState::Bypassed.to_spvalue().wrap(),
+                        );
+                        return bypass_transition
+                            .clone()
+                            .take(&action.assign(&state, &log_target), &log_target);
+                    }
+                }
+            } else {
+                let action =
+                    Action::new(assignment.var, OperationState::Bypassed.to_spvalue().wrap());
+                return action.assign(&state, &log_target);
+            }
         }
+        state.clone()
     }
 
     /// Timeout an executing the operation.
@@ -399,7 +417,9 @@ impl Operation {
     /// Otherwise we might end up in disabled? Let's try withthe emulation.
     pub fn retry(&self, state: &State, log_target: &str) -> State {
         let assignment = state.get_assignment(&self.name, &log_target);
-        if assignment.val == OperationState::Failed.to_spvalue() || assignment.val == OperationState::Timedout.to_spvalue() {
+        if assignment.val == OperationState::Failed.to_spvalue()
+            || assignment.val == OperationState::Timedout.to_spvalue()
+        {
             let action = Action::new(assignment.var, OperationState::Initial.to_spvalue().wrap());
             action.assign(&state, &log_target)
         } else {
@@ -473,7 +493,7 @@ impl Operation {
                     .flat_map(|t| t.get_all_var_keys()),
             )
             .chain(
-                self.fail_transitions
+                self.failure_transitions
                     .iter()
                     .flat_map(|t| t.get_all_var_keys()),
             )
