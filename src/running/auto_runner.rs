@@ -73,13 +73,15 @@ pub async fn auto_operation_runner(
         .flat_map(|t| t.get_all_var_keys())
         .collect();
 
+    let op_names: Vec<String> = model.auto_operations.iter().map(|o| o.name.to_string()).collect();
+
     loop {
         interval.tick().await;
         if let Err(_) = connection_manager.check_redis_health(&log_target).await {
             continue;
         }
         let con = connection_manager.get_connection().await;
-        let state = match StateManager::get_state_for_keys(&mut con.clone(), &keys, &log_target).await {
+        let state = match StateManager::get_state_for_keys(&mut con.clone(), &op_names, &log_target).await {
             Some(s) => s,
             None => continue,
         };
