@@ -62,10 +62,24 @@ pub(super) async fn process_operation(
                 new_op_info = format!("Starting operation '{}'.", operation.name);
                 op_info_level = OperationInfoLevel::Info;
             } else {
+                let mut or_clause = vec!();
+                let mut or_clause_full = vec!();
+                for precondition in &operation.preconditions {
+                    or_clause.push(precondition.runner_guard.clone());
+                    or_clause_full.push(Predicate::AND(vec!(
+                        precondition.guard.clone(),
+                        precondition.runner_guard.clone()
+                    )));
+                }
                 new_op_info = format!(
-                    "Operation '{}' disabled. Please satisfy the guard: \n       {}",
-                    operation.name, operation.preconditions[0].runner_guard
+                    "Operation '{}' disabled. Please satisfy the runner guard: \n       {} //
+                    \nDebug full guard: \n       {}",
+                    operation.name, Predicate::OR(or_clause), Predicate::OR(or_clause_full)
                 );
+                // new_op_info = format!(
+                //     "Operation '{}' disabled. Debug full guard: \n       {}",
+                //     operation.name, Predicate::OR(or_clause_full)
+                // );
                 op_info_level = OperationInfoLevel::Warn;
             }
         }
