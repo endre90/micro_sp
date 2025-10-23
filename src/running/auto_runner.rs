@@ -1,5 +1,6 @@
 use crate::{
-    running::process_operation::{process_operation, OperationProcessingType}, ConnectionManager, Model, State, StateManager, Transition, OPERAION_RUNNER_TICK_INTERVAL_MS
+    ConnectionManager, Model, OPERAION_RUNNER_TICK_INTERVAL_MS, State, StateManager, Transition,
+    running::process_operation::{OperationProcessingType, process_operation},
 };
 use redis::aio::MultiplexedConnection;
 use std::{sync::Arc, time::Duration};
@@ -67,13 +68,28 @@ pub async fn auto_operation_runner(
     let model = model.clone();
     let log_target = format!("{}_auto_op_runner", name);
 
-    let keys: Vec<String> = model
+    let mut keys: Vec<String> = model
         .auto_operations
         .iter()
         .flat_map(|t| t.get_all_var_keys())
         .collect();
 
-    let op_names: Vec<String> = model.auto_operations.iter().map(|o| o.name.to_string()).collect();
+    // And the vars to keep trask of operation states
+    keys.extend(
+        model
+            .operations
+            .iter()
+            .flat_map(|op| {
+                vec![
+                    format!("{}", op.name),
+                    format!("{}_information", op.name),
+                    format!("{}_failure_retry_counter", op.name),
+                    format!("{}_timeout_retry_counter", op.name),
+                    format!("{}_elapsed_ms", op.name),
+                ]
+            })
+            .collect::<Vec<String>>(),
+    );
 
     loop {
         interval.tick().await;
@@ -81,10 +97,11 @@ pub async fn auto_operation_runner(
             continue;
         }
         let con = connection_manager.get_connection().await;
-        let state = match StateManager::get_state_for_keys(&mut con.clone(), &op_names, &log_target).await {
-            Some(s) => s,
-            None => continue,
-        };
+        let state =
+            match StateManager::get_state_for_keys(&mut con.clone(), &keys, &log_target).await {
+                Some(s) => s,
+                None => continue,
+            };
 
         for o in &model.auto_operations {
             process_operation(
