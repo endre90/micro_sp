@@ -169,7 +169,7 @@ impl Operation {
 
     pub fn eval(&self, state: &State, log_target: &str) -> bool {
         if let Some(value) = state.get_value(&self.name, &log_target) {
-            if value == OperationState::Initial.to_spvalue() {
+            if value == OperationState::Initial.to_spvalue() || value == OperationState::Disabled.to_spvalue() {
                 for precondition in &self.preconditions {
                     if precondition.clone().eval(state, &log_target) {
                         return true;
