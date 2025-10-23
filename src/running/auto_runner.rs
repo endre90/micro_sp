@@ -68,7 +68,7 @@ pub async fn auto_operation_runner(
     let log_target = format!("{}_auto_op_runner", name);
 
     let keys: Vec<String> = model
-        .auto_transitions
+        .auto_operations
         .iter()
         .flat_map(|t| t.get_all_var_keys())
         .collect();
