@@ -82,12 +82,13 @@ pub async fn planner_ticker(
     //     }
     // }
 
-    let mut con = connection_manager.get_connection().await;
+    // let mut con = connection_manager.get_connection().await;
     loop {
         interval.tick().await;
         if let Err(_) = connection_manager.check_redis_health(&log_target).await {
             continue;
         }
+        let mut con = connection_manager.get_connection().await;
         let state = match StateManager::get_state_for_keys(&mut con, &keys).await {
             Some(s) => s,
             None => continue,

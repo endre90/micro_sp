@@ -42,6 +42,7 @@ impl ConnectionManager {
         client.get_multiplexed_async_connection().await
     }
 
+    // add log target
     pub async fn get_connection(&self) -> MultiplexedConnection {
         self.connection.read().await.clone()
     }
@@ -53,7 +54,7 @@ impl ConnectionManager {
             Err(e) => {
                 if e.is_io_error() {
                     log::error!(target: log_target, "Pinging Redis failed, triggering reconnect.");
-                    self.reconnect().await;
+                    self.reconnect(&log_target).await;
                     return Err(e);
                 } else {
                     log::error!(target: log_target, "An unexpected Redis error occurred: {}", e);
@@ -63,7 +64,7 @@ impl ConnectionManager {
         }
     }
 
-    pub async fn reconnect(&self) {
+    pub async fn reconnect(&self, log_target: &str) {
         log::warn!(target: "redis_manager", "Redis connection lost. Attempting to reconnect...");
 
         // Get a write lock to replace the connection.
@@ -74,11 +75,11 @@ impl ConnectionManager {
             match Self::try_connect(&self.redis_addr).await {
                 Ok(new_connection) => {
                     *connection_guard = new_connection;
-                    log::info!(target: "redis_manager", "Redis re-connection successful.");
+                    log::info!(target: &log_target, "Redis re-connection successful.");
                     return;
                 }
                 Err(e) => {
-                    log::error!(target: "redis_manager", "Reconnect failed: {}. Retrying in 3s...", e);
+                    log::error!(target: &log_target, "Reconnect failed: {}. Retrying in 3s...", e);
                     // drop(connection_guard);
                     tokio::time::sleep(Duration::from_secs(3)).await;
                     // connection_guard = self.connection.write().await;
@@ -94,7 +95,7 @@ impl ConnectionManager {
     ) {
         if e.is_io_error() {
             log::error!(target: log_target, "Redis command failed, triggering reconnect.");
-            self.reconnect().await;
+            self.reconnect(&log_target).await;
         } else {
             log::error!(target: log_target, "An unexpected Redis error occurred: {}", e);
         }
