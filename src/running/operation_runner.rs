@@ -37,7 +37,7 @@ pub async fn planned_operation_runner(
                 vec![
                     format!("{}", op.name),
                     format!("{}_information", op.name),
-                    format!("{}_fail_retry_counter", op.name),
+                    format!("{}_failure_retry_counter", op.name),
                     format!("{}_timeout_retry_counter", op.name),
                     format!("{}_elapsed_ms", op.name),
                 ]
