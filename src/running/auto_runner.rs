@@ -77,7 +77,7 @@ pub async fn auto_operation_runner(
     // And the vars to keep trask of operation states
     keys.extend(
         model
-            .operations
+            .auto_operations
             .iter()
             .flat_map(|op| {
                 vec![
