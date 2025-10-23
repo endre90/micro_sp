@@ -36,20 +36,18 @@ pub async fn planned_operation_runner(
                     format!("{}", op.name),
                     format!("{}_information", op.name),
                     format!("{}_retry_counter", op.name),
+                    format!("{}_elapsed_ms", op.name),
                 ]
             })
             .collect::<Vec<String>>(),
     );
-
-    // let last_known_state: Arc<RwLock<Option<State>>> = Arc::new(RwLock::new(None));
-
-    let mut con: redis::aio::MultiplexedConnection = connection_manager.get_connection().await;
 
     loop {
         interval.tick().await;
         if let Err(_) = connection_manager.check_redis_health(&log_target).await {
             continue;
         }
+        let mut con = connection_manager.get_connection().await;
         let state = match StateManager::get_state_for_keys(&mut con, &keys).await {
             Some(s) => s,
             None => continue,
