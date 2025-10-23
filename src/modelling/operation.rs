@@ -386,7 +386,6 @@ impl Operation {
                     }
                 }
             } else {
-                println!("test3");
                 let action =
                     Action::new(assignment.var, OperationState::Timedout.to_spvalue().wrap());
                 return action.assign(&state, &log_target);
