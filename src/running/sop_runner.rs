@@ -15,7 +15,7 @@ pub async fn sop_runner(
     let mut interval = interval(Duration::from_millis(TICK_INTERVAL));
     let log_target = &format!("{}_sop_runner", sp_id);
 
-    log::info!(target: log_target, "Online and managing SOP.");
+    log::info!(target: log_target, "Online.");
 
     let mut old_sop_id = String::new();
 
@@ -86,7 +86,7 @@ async fn process_sop_tick(
         }
         SOPState::Completed | SOPState::Failed => {}
         SOPState::UNKNOWN => {
-            log::warn!(target: &log_target, "SOP in UNKNOWN state. Resetting.");
+            // log::warn!(target: &log_target, "SOP in UNKNOWN state. Resetting.");
             sop_overall_state = SOPState::Initial.to_string();
         }
     }

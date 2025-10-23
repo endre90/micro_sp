@@ -286,7 +286,7 @@ impl Operation {
     /// Start executing the operation. Check for eval_running() first.
     pub fn start(&self, state: &State, log_target: &str) -> State {
         let assignment = state.get_assignment(&self.name, &log_target);
-        if assignment.val == OperationState::Initial.to_spvalue() {
+        if assignment.val == OperationState::Initial.to_spvalue() || assignment.val == OperationState::Disabled.to_spvalue() {
             for precondition in &self.preconditions {
                 if precondition.clone().eval(state, &log_target) {
                     let action = Action::new(
