@@ -103,17 +103,34 @@ pub async fn auto_operation_runner(
                 None => continue,
             };
 
-        for o in &model.auto_operations {
-            process_operation(
-                state.clone(),
-                o,
-                OperationProcessingType::Automatic,
-                None,
-                None,
-                con.clone(),
-                &log_target,
-            )
-            .await;
-        }
+        // TODO: Initially only run one operation at a time to avoid the chaos.
+        // Later maybe: Run noninterfeering operations simultaneously, but unnecessary probably.
+
+        // for o in &model.auto_operations {
+        //     process_operation(
+        //         state.clone(),
+        //         o,
+        //         OperationProcessingType::Automatic,
+        //         None,
+        //         None,
+        //         con.clone(),
+        //         &log_target,
+        //     )
+        //     .await;
+        // }
+
+        if let Some(o) = model.auto_operations.iter().next() {
+    process_operation(
+        state.clone(),
+        o,
+        OperationProcessingType::Automatic,
+        None,
+        None,
+        con.clone(),
+        &log_target,
+    )
+    .await;
+}
+
     }
 }
