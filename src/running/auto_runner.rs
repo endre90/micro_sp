@@ -74,7 +74,6 @@ pub async fn auto_operation_runner(
         .flat_map(|t| t.get_all_var_keys())
         .collect();
 
-    // And the vars to keep trask of operation states
     keys.extend(
         model
             .auto_operations
@@ -103,34 +102,19 @@ pub async fn auto_operation_runner(
                 None => continue,
             };
 
-        // TODO: Initially only run one operation at a time to avoid the chaos.
-        // Later maybe: Run noninterfeering operations simultaneously, but unnecessary probably.
-
-        // for o in &model.auto_operations {
-        //     process_operation(
-        //         state.clone(),
-        //         o,
-        //         OperationProcessingType::Automatic,
-        //         None,
-        //         None,
-        //         con.clone(),
-        //         &log_target,
-        //     )
-        //     .await;
-        // }
-
-        if let Some(o) = model.auto_operations.iter().next() {
-    process_operation(
-        state.clone(),
-        o,
-        OperationProcessingType::Automatic,
-        None,
-        None,
-        con.clone(),
-        &log_target,
-    )
-    .await;
-}
-
+        for o in &model.auto_operations {
+            if o.eval(&state, &log_target) {
+                process_operation(
+                state.clone(),
+                o,
+                OperationProcessingType::Automatic,
+                None,
+                None,
+                con.clone(),
+                &log_target,
+            )
+            .await;
+            }
+        }
     }
 }
