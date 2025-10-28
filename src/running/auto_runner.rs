@@ -95,7 +95,7 @@ pub async fn auto_operation_runner(
         if let Err(_) = connection_manager.check_redis_health(&log_target).await {
             continue;
         }
-        let con = connection_manager.get_connection().await;
+        let mut con = connection_manager.get_connection().await;
         let state =
             match StateManager::get_state_for_keys(&mut con.clone(), &keys, &log_target).await {
                 Some(s) => s,
@@ -103,8 +103,7 @@ pub async fn auto_operation_runner(
             };
 
         for o in &model.auto_operations {
-            if o.eval(&state, &log_target) {
-                process_operation(
+            let new_state = process_operation(
                 state.clone(),
                 o,
                 OperationProcessingType::Automatic,
@@ -114,7 +113,9 @@ pub async fn auto_operation_runner(
                 &log_target,
             )
             .await;
-            }
+
+            let modified_state = state.get_diff_partial_state(&new_state);
+            StateManager::set_state(&mut con, &modified_state).await;
         }
     }
 }
