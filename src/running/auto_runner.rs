@@ -1,5 +1,5 @@
 use crate::{
-    ConnectionManager, Model, OPERAION_RUNNER_TICK_INTERVAL_MS, OperationState, State,
+    ConnectionManager, Model, OPERAION_RUNNER_TICK_INTERVAL_MS, Operation, OperationState, State,
     StateManager, Transition,
     running::process_operation::{OperationProcessingType, process_operation},
 };
@@ -135,10 +135,15 @@ pub async fn auto_operation_runner(
             None => {}
         }
 
+        let mut default_op = Operation::default();
+        default_op.name = "asdf".to_string();
+
         //process all operations that are not in the initial state
         for o in &model.auto_operations {
-            println!("o.state.to_string()");
-            if o.state != OperationState::Initial {
+            println!("{}, {}", o.name, o.state.to_string());
+            if o.state != OperationState::Initial
+                && o.name != maybe_random_op.unwrap_or_else(|| &default_op).name
+            {
                 new_state = process_operation(
                     state.clone(),
                     o,
