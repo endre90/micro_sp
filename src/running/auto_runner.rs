@@ -1,6 +1,5 @@
 use crate::{
-    ConnectionManager, Model, OPERAION_RUNNER_TICK_INTERVAL_MS, State, StateManager, Transition,
-    running::process_operation::{OperationProcessingType, process_operation},
+    ConnectionManager, Model, OPERAION_RUNNER_TICK_INTERVAL_MS, OperationState, State, StateManager, Transition, running::process_operation::{OperationProcessingType, process_operation}
 };
 use rand::prelude::*;
 use redis::aio::MultiplexedConnection;
@@ -115,6 +114,7 @@ pub async fn auto_operation_runner(
             enabled_operations.choose(&mut rng).cloned()
         };
 
+        // process newly enabled operation
         match maybe_random_op {
             Some(random_operation) => {
                 let new_state = process_operation(
@@ -133,5 +133,25 @@ pub async fn auto_operation_runner(
             }
             None => {}
         }
+        
+        //process all operations that are not in the initial state
+        for o in &model.auto_operations {
+            if o.state != OperationState::Initial {
+                let new_state = process_operation(
+                    state.clone(),
+                    o,
+                    OperationProcessingType::Automatic,
+                    None,
+                    None,
+                    con.clone(),
+                    &log_target,
+                )
+                .await;
+
+                let modified_state = state.get_diff_partial_state(&new_state);
+                StateManager::set_state(&mut con, &modified_state).await;
+            }
+        }
+
     }
 }
