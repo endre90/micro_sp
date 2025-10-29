@@ -1,5 +1,7 @@
 use crate::{
-    ConnectionManager, Model, OPERAION_RUNNER_TICK_INTERVAL_MS, OperationState, State, StateManager, Transition, running::process_operation::{OperationProcessingType, process_operation}
+    ConnectionManager, Model, OPERAION_RUNNER_TICK_INTERVAL_MS, OperationState, State,
+    StateManager, Transition,
+    running::process_operation::{OperationProcessingType, process_operation},
 };
 use rand::prelude::*;
 use redis::aio::MultiplexedConnection;
@@ -114,10 +116,12 @@ pub async fn auto_operation_runner(
             enabled_operations.choose(&mut rng).cloned()
         };
 
+        let mut new_state = state.clone();
+
         // process newly enabled operation
         match maybe_random_op {
             Some(random_operation) => {
-                let new_state = process_operation(
+                new_state = process_operation(
                     state.clone(),
                     random_operation,
                     OperationProcessingType::Automatic,
@@ -127,17 +131,15 @@ pub async fn auto_operation_runner(
                     &log_target,
                 )
                 .await;
-
-                let modified_state = state.get_diff_partial_state(&new_state);
-                StateManager::set_state(&mut con, &modified_state).await;
             }
             None => {}
         }
-        
+
         //process all operations that are not in the initial state
         for o in &model.auto_operations {
+            println!("o.state.to_string()");
             if o.state != OperationState::Initial {
-                let new_state = process_operation(
+                new_state = process_operation(
                     state.clone(),
                     o,
                     OperationProcessingType::Automatic,
@@ -148,10 +150,12 @@ pub async fn auto_operation_runner(
                 )
                 .await;
 
-                let modified_state = state.get_diff_partial_state(&new_state);
-                StateManager::set_state(&mut con, &modified_state).await;
+                // let modified_state = state.get_diff_partial_state(&new_state);
+                // StateManager::set_state(&mut con, &modified_state).await;
             }
         }
 
+        let modified_state = state.get_diff_partial_state(&new_state);
+        StateManager::set_state(&mut con, &modified_state).await;
     }
 }
