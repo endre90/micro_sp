@@ -121,10 +121,14 @@ pub async fn auto_operation_runner(
             let operation_state_str = new_state
                 .get_string_or_default_to_unknown(&format!("{}", operation.name), &log_target);
             match OperationState::from_str(&operation_state_str) {
-                OperationState::Initial | OperationState::Disabled | OperationState::UNKNOWN => {
+                OperationState::Initial | OperationState::UNKNOWN => {
                     pending_operations.push(operation);
                 }
-                OperationState::Executing | OperationState::Failed | OperationState::Timedout => {
+                OperationState::Executing
+                | OperationState::Failed
+                | OperationState::Timedout
+                | OperationState::Disabled
+                | OperationState::Completed => {
                     active_operations.push(operation);
                 }
                 _ => {
