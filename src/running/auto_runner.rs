@@ -141,8 +141,12 @@ pub async fn auto_operation_runner(
         //process all operations that are not in the initial state
         for o in &model.auto_operations {
             println!("{}, {}", o.name, o.state.to_string());
-            if o.state != OperationState::Initial
-                && o.name != maybe_random_op.unwrap_or_else(|| &default_op).name
+            if o.state == OperationState::Disabled
+                || o.state == OperationState::Executing
+                || o.state == OperationState::Bypassed
+                || o.state == OperationState::Timedout
+                || o.state == OperationState::Failed
+                    && o.name != maybe_random_op.unwrap_or_else(|| &default_op).name
             {
                 new_state = process_operation(
                     state.clone(),
