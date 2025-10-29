@@ -2,6 +2,7 @@ use crate::{
     ConnectionManager, Model, OPERAION_RUNNER_TICK_INTERVAL_MS, State, StateManager, Transition,
     running::process_operation::{OperationProcessingType, process_operation},
 };
+use rand::prelude::*;
 use redis::aio::MultiplexedConnection;
 use std::{sync::Arc, time::Duration};
 use tokio::time::interval;
@@ -102,20 +103,35 @@ pub async fn auto_operation_runner(
                 None => continue,
             };
 
+        let mut enabled_operations = vec![];
         for o in &model.auto_operations {
-            let new_state = process_operation(
-                state.clone(),
-                o,
-                OperationProcessingType::Automatic,
-                None,
-                None,
-                con.clone(),
-                &log_target,
-            )
-            .await;
+            if o.eval(&state, &log_target) {
+                enabled_operations.push(o);
+            }
+        }
 
-            let modified_state = state.get_diff_partial_state(&new_state);
-            StateManager::set_state(&mut con, &modified_state).await;
+        let maybe_random_op = {
+            let mut rng = rand::rng();
+            enabled_operations.choose(&mut rng).cloned()
+        };
+
+        match maybe_random_op {
+            Some(random_operation) => {
+                let new_state = process_operation(
+                    state.clone(),
+                    random_operation,
+                    OperationProcessingType::Automatic,
+                    None,
+                    None,
+                    con.clone(),
+                    &log_target,
+                )
+                .await;
+
+                let modified_state = state.get_diff_partial_state(&new_state);
+                StateManager::set_state(&mut con, &modified_state).await;
+            }
+            None => {}
         }
     }
 }
