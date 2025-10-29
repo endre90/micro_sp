@@ -119,6 +119,9 @@ pub(super) async fn process_operation(
                     *plan_current_step += 1;
                 }
             }
+            if let OperationProcessingType::Automatic = operation_processing_type {
+                new_state = operation.reinitialize(&new_state, &log_target);
+            }
             new_op_info = format!("Operation '{}' completed.", operation.name);
             op_info_level = OperationInfoLevel::Info;
             // new_state = new_state.remove(&operation.name, log_target);
