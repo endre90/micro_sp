@@ -1,5 +1,5 @@
 use crate::{
-    ConnectionManager, Model, OPERAION_RUNNER_TICK_INTERVAL_MS, Operation, OperationState, State,
+    ConnectionManager, Model, OPERAION_RUNNER_TICK_INTERVAL_MS, OperationState, State,
     StateManager, Transition,
     running::process_operation::{OperationProcessingType, process_operation},
 };
@@ -111,47 +111,76 @@ pub async fn auto_operation_runner(
             }
         }
 
-        let maybe_random_op = {
-            let mut rng = rand::rng();
-            enabled_operations.choose(&mut rng).cloned()
-        };
-
         let mut new_state = state.clone();
 
-        let mut default_op = Operation::default();
-        default_op.name = "asdf".to_string();
+        let mut active_operations = Vec::new();
+        let mut pending_operations = Vec::new();
+        let mut terminated_operations = Vec::new();
 
-        //process all operations that are not in the initial state
-        for o in &model.auto_operations {
-            println!("{}, {}", o.name, o.state.to_string());
-            if o.state == OperationState::Disabled
-                || o.state == OperationState::Executing
-                || o.state == OperationState::Bypassed
-                || o.state == OperationState::Timedout
-                || o.state == OperationState::Failed
-                    && o.name != maybe_random_op.unwrap_or_else(|| &default_op).name
-            {
-                new_state = process_operation(
-                    state.clone(),
-                    o,
-                    OperationProcessingType::Automatic,
-                    None,
-                    None,
-                    con.clone(),
-                    &log_target,
-                )
-                .await;
-
-                // let modified_state = state.get_diff_partial_state(&new_state);
-                // StateManager::set_state(&mut con, &modified_state).await;
+        for operation in &model.auto_operations {
+            let operation_state_str = new_state
+                .get_string_or_default_to_unknown(&format!("{}", operation.name), &log_target);
+            match OperationState::from_str(&operation_state_str) {
+                OperationState::Initial | OperationState::Disabled | OperationState::UNKNOWN => {
+                    pending_operations.push(operation);
+                }
+                OperationState::Executing | OperationState::Failed | OperationState::Timedout => {
+                    active_operations.push(operation);
+                }
+                _ => {
+                    terminated_operations.push(operation);
+                }
             }
         }
 
-        // process newly enabled operation
-        match maybe_random_op {
-            Some(random_operation) => {
+        // 1. Tick all active operations first
+        // This handles completions, failures, retries, etc.
+        for operation in active_operations {
+            new_state = process_operation(
+                new_state, // Pass the progressively updated state
+                operation,
+                OperationProcessingType::Automatic,
+                None,
+                None,
+                con.clone(),
+                &log_target,
+            )
+            .await;
+        }
+
+        // 2. Check if any operation is in the Executing state *after* ticking.
+        // If an op was Executing and just moved to Completed, this will be false.
+        let mut is_any_op_executing = false;
+        for operation in &model.auto_operations {
+            let op_state_str = new_state
+                .get_string_or_default_to_unknown(&format!("{}", operation.name), &log_target);
+            if let OperationState::Executing = OperationState::from_str(&op_state_str) {
+                is_any_op_executing = true;
+                break;
+            }
+        }
+
+        // 3. If no operation is actively executing, try to start *one* new pending operation.
+        if !is_any_op_executing {
+            // Find all pending operations that are now enabled
+            let mut enabled_pending_ops = Vec::new();
+            for op in pending_operations {
+                // Use eval to check preconditions on the *latest* state
+                if op.eval(&new_state, &log_target) {
+                    enabled_pending_ops.push(op);
+                }
+            }
+
+            // Randomly pick one of the newly enabled operations to start
+            let maybe_random_op = {
+                let mut rng = rand::rng();
+                enabled_pending_ops.choose(&mut rng).cloned()
+            };
+
+            if let Some(random_operation) = maybe_random_op {
+                // Process *only* this new operation to start it
                 new_state = process_operation(
-                    state.clone(),
+                    new_state,
                     random_operation,
                     OperationProcessingType::Automatic,
                     None,
@@ -161,10 +190,26 @@ pub async fn auto_operation_runner(
                 )
                 .await;
             }
-            None => {}
         }
 
-        
+        // let mut default_op = Operation::default();
+
+        // // process newly enabled operation
+        // match maybe_random_op {
+        //     Some(random_operation) => {
+        //         new_state = process_operation(
+        //             state.clone(),
+        //             random_operation,
+        //             OperationProcessingType::Automatic,
+        //             None,
+        //             None,
+        //             con.clone(),
+        //             &log_target,
+        //         )
+        //         .await;
+        //     }
+        //     None => {}
+        // }
 
         let modified_state = state.get_diff_partial_state(&new_state);
         StateManager::set_state(&mut con, &modified_state).await;
