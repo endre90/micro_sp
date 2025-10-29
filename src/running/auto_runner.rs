@@ -118,23 +118,6 @@ pub async fn auto_operation_runner(
 
         let mut new_state = state.clone();
 
-        // process newly enabled operation
-        match maybe_random_op {
-            Some(random_operation) => {
-                new_state = process_operation(
-                    state.clone(),
-                    random_operation,
-                    OperationProcessingType::Automatic,
-                    None,
-                    None,
-                    con.clone(),
-                    &log_target,
-                )
-                .await;
-            }
-            None => {}
-        }
-
         let mut default_op = Operation::default();
         default_op.name = "asdf".to_string();
 
@@ -163,6 +146,25 @@ pub async fn auto_operation_runner(
                 // StateManager::set_state(&mut con, &modified_state).await;
             }
         }
+
+        // process newly enabled operation
+        match maybe_random_op {
+            Some(random_operation) => {
+                new_state = process_operation(
+                    state.clone(),
+                    random_operation,
+                    OperationProcessingType::Automatic,
+                    None,
+                    None,
+                    con.clone(),
+                    &log_target,
+                )
+                .await;
+            }
+            None => {}
+        }
+
+        
 
         let modified_state = state.get_diff_partial_state(&new_state);
         StateManager::set_state(&mut con, &modified_state).await;
