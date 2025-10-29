@@ -137,7 +137,7 @@ pub async fn auto_operation_runner(
             }
         }
 
-        for operation in active_operations {
+        for operation in &active_operations {
             new_state = process_operation(
                 new_state,
                 operation,
@@ -150,17 +150,18 @@ pub async fn auto_operation_runner(
             .await;
         }
 
-        let mut is_any_op_executing = false;
-        for operation in &model.auto_operations {
-            let op_state_str = new_state
-                .get_string_or_default_to_unknown(&format!("{}", operation.name), &log_target);
-            if let OperationState::Executing = OperationState::from_str(&op_state_str) {
-                is_any_op_executing = true;
-                break;
-            }
-        }
+        // let mut is_any_op_executing = false;
+        // for operation in &model.auto_operations {
+        //     let op_state_str = new_state
+        //         .get_string_or_default_to_unknown(&format!("{}", operation.name), &log_target);
+        //     if let OperationState::Executing = OperationState::from_str(&op_state_str) {
+        //         is_any_op_executing = true;
+        //         break;
+        //     }
+        // }
 
-        if !is_any_op_executing {
+        // if !is_any_op_executing {
+        if active_operations.len() == 0 {
             let mut enabled_pending_ops = Vec::new();
             for op in pending_operations {
                 if op.eval(&new_state, &log_target) {
