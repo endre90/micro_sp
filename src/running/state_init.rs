@@ -53,6 +53,14 @@ pub fn generate_runner_state_variables(name: &str) -> State {
     let time_duration_ms = iv!(&&format!("{}_time_duration_ms", name));
     let time_elapsed_ms = iv!(&&format!("{}_time_elapsed_ms", name));
 
+
+    // Diagnostics:
+    let diagnostics_operations = v!(&&format!("{}_diagnostics_operations", name));
+    state = state.add(assign!(
+        diagnostics_operations,
+        SPValue::String(StringOrUnknown::UNKNOWN)
+    ));
+
     // Initialize values
     state = state.add(assign!(
         runner_state,

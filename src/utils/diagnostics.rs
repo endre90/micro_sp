@@ -33,7 +33,7 @@ pub async fn operation_diagnostics_receiver_task(
         }
         let mut con = connection_manager.get_connection().await;
         if let Some(log_spvalue) =
-            StateManager::get_sp_value(&mut con, "diagnostics_operations").await
+            StateManager::get_sp_value(&mut con, &format!("{}_diagnostics_operations", sp_id)).await
         {
             if let SPValue::String(StringOrUnknown::String(string_log)) = log_spvalue {
                 if let Ok(mut log) = serde_json::from_str::<Vec<Vec<OperationLog>>>(&string_log) {
