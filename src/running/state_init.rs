@@ -55,10 +55,11 @@ pub fn generate_runner_state_variables(name: &str) -> State {
 
 
     // Diagnostics:
+    let empty_diag_log: Vec<Vec<OperationLog>> = vec![];
     let diagnostics_operations = v!(&&format!("{}_diagnostics_operations", name));
     state = state.add(assign!(
         diagnostics_operations,
-        SPValue::String(StringOrUnknown::UNKNOWN)
+        SPValue::String(StringOrUnknown::String(serde_json::to_string(&empty_diag_log).unwrap()))
     ));
 
     // Initialize values
