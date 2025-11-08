@@ -44,6 +44,7 @@ pub async fn planned_operation_runner(
                     format!("{}_failure_retry_counter", op.name),
                     format!("{}_timeout_retry_counter", op.name),
                     format!("{}_elapsed_executing_ms", op.name),
+                    format!("{}_elapsed_disabled_ms", op.name),
                 ]
             })
             .collect::<Vec<String>>(),
@@ -60,7 +61,8 @@ pub async fn planned_operation_runner(
             None => continue,
         };
         // let con_clone = con.clone();
-        let new_state = process_plan_tick(sp_id, &model, &state, diagnostics_tx.clone(), &log_target).await;
+        let new_state =
+            process_plan_tick(sp_id, &model, &state, diagnostics_tx.clone(), &log_target).await;
         let modified_state = state.get_diff_partial_state(&new_state);
         // StateManager::set_state(con, &modified_state).await;
         StateManager::set_state(&mut con, &modified_state).await;
