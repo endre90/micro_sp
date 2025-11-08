@@ -58,7 +58,7 @@ pub(super) async fn process_operation(
         OperationState::Initial => {
             if operation.eval(&new_state, &log_target) {
                 new_state = operation.start(&new_state, &log_target);
-                new_op_info = format!("Starting operation '{}'.", operation.name);
+                new_op_info = format!("Starting initialized operation '{}'.", operation.name);
                 op_info_level = log::Level::Info;
             } else {
                 new_op_info = format!("Disabling operation '{}'.", operation.name).to_string();
@@ -71,11 +71,11 @@ pub(super) async fn process_operation(
             elapased_disabled_ms += OPERAION_RUNNER_TICK_INTERVAL_MS as i64;
             if operation.eval(&new_state, &log_target) {
                 new_state = operation.start(&new_state, &log_target);
-                new_op_info = format!("Starting operation '{}'.", operation.name);
+                new_op_info = format!("Starting disabled operation '{}'.", operation.name);
                 op_info_level = log::Level::Info;
             } else if operation.can_be_timedout(&new_state, &log_target) {
                 new_state = operation.clone().timeout(&new_state, &log_target);
-                new_op_info = format!("Timeout for operation '{}'.", operation.name).to_string();
+                new_op_info = format!("Timeout for disabled operation '{}'.", operation.name).to_string();
                 op_info_level = log::Level::Warn;
             } else {
                 let mut or_clause = vec![];
@@ -109,7 +109,7 @@ pub(super) async fn process_operation(
                 op_info_level = log::Level::Warn;
             } else if operation.can_be_timedout(&new_state, &log_target) {
                 new_state = operation.clone().timeout(&new_state, &log_target);
-                new_op_info = format!("Timeout for operation '{}'.", operation.name).to_string();
+                new_op_info = format!("Timeout for executing operation '{}'.", operation.name).to_string();
                 op_info_level = log::Level::Warn;
             } else {
                 new_op_info = format!(
