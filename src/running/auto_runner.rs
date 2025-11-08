@@ -1,12 +1,10 @@
 use crate::{
-    ConnectionManager, Model, OPERAION_RUNNER_TICK_INTERVAL_MS, OperationState, State,
-    StateManager, Transition,
-    running::process_operation::{OperationProcessingType, process_operation},
+    ConnectionManager, Model, OPERAION_RUNNER_TICK_INTERVAL_MS, OperationMsg, OperationState, State, StateManager, Transition, running::process_operation::{OperationProcessingType, process_operation}
 };
 use rand::prelude::*;
 use redis::aio::MultiplexedConnection;
 use std::{sync::Arc, time::Duration};
-use tokio::time::interval;
+use tokio::{sync::mpsc, time::interval};
 
 // Add automatic operations here as well that finish immediatelly, god for setting some values, triggering robot moves etc.
 pub static TRANSITION_RUNNER_TICK_INTERVAL_MS: u64 = 100;
@@ -64,6 +62,7 @@ pub async fn auto_transition_runner(
 pub async fn auto_operation_runner(
     name: &str,
     model: &Model,
+    diagnostics_tx: mpsc::Sender<OperationMsg>,
     connection_manager: &Arc<ConnectionManager>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let mut interval = interval(Duration::from_millis(OPERAION_RUNNER_TICK_INTERVAL_MS));
@@ -144,7 +143,7 @@ pub async fn auto_operation_runner(
                 OperationProcessingType::Automatic,
                 None,
                 None,
-                // con.clone(),
+                diagnostics_tx.clone(),
                 &log_target,
             )
             .await;
@@ -181,7 +180,7 @@ pub async fn auto_operation_runner(
                     OperationProcessingType::Automatic,
                     None,
                     None,
-                    // con.clone(),
+                    diagnostics_tx.clone(),
                     &log_target,
                 )
                 .await;
