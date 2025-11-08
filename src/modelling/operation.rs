@@ -19,7 +19,7 @@ pub enum OperationState {
     Bypassed,
     Timedout,
     Failed,
-    Unrecoverable,
+    Fatal,
     // Terminated,
     UNKNOWN,
 }
@@ -38,7 +38,7 @@ impl OperationState {
             "executing" => OperationState::Executing,
             "timedout" => OperationState::Timedout,
             "failed" => OperationState::Failed,
-            "unrecoverable" => OperationState::Unrecoverable,
+            "fatal" => OperationState::Fatal,
             "completed" => OperationState::Completed,
             "bypassed" => OperationState::Bypassed,
             // "terminated" => OperationState::Terminated,
@@ -58,7 +58,7 @@ impl fmt::Display for OperationState {
             OperationState::Executing => write!(f, "executing"),
             OperationState::Timedout => write!(f, "timedout"),
             OperationState::Failed => write!(f, "failed"),
-            OperationState::Unrecoverable => write!(f, "unrecoverable"),
+            OperationState::Fatal => write!(f, "fatal"),
             OperationState::Completed => write!(f, "completed"),
             OperationState::Bypassed => write!(f, "bypassed"),
             // OperationState::Terminated => write!(f, "terminated"),
@@ -366,7 +366,7 @@ impl Operation {
         {
             let action = Action::new(
                 assignment.var,
-                OperationState::Unrecoverable.to_spvalue().wrap(),
+                OperationState::Fatal.to_spvalue().wrap(),
             );
             action.assign(&state, &log_target)
         } else {
@@ -454,7 +454,7 @@ impl Operation {
     pub fn reinitialize(&self, state: &State, log_target: &str) -> State {
         let assignment = state.get_assignment(&self.name, &log_target);
         if assignment.val == OperationState::Completed.to_spvalue()
-            || assignment.val == OperationState::Unrecoverable.to_spvalue()
+            || assignment.val == OperationState::Fatal.to_spvalue()
         {
             let action = Action::new(assignment.var, OperationState::Initial.to_spvalue().wrap());
             action.assign(&state, &log_target)

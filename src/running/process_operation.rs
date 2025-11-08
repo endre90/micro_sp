@@ -239,9 +239,9 @@ pub(super) async fn process_operation(
                 );
             }
         }
-        OperationState::Unrecoverable => {
+        OperationState::Fatal => {
             new_op_info = format!(
-                "Operation '{}' is unrecoverable. Stopping execution.",
+                "Operation '{}' unrecoverable. Stopping execution.",
                 operation.name
             );
             diagnostics_log = "Operation unrecoverable.";

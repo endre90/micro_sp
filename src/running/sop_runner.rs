@@ -157,7 +157,7 @@ async fn handle_sop_executing(
         log::info!(target: &log_target, "SOP root is complete. SOP Completed.");
         *sop_overall_state = SOPState::Completed.to_string();
     } else if is_sop_failed(sp_id, &root_sop_container.sop, new_state, &log_target) {
-        log::error!(target: &log_target, "Unrecoverable error detected in SOP. SOP Failed.");
+        log::error!(target: &log_target, "Fatal error detected in SOP. SOP Failed.");
         *sop_overall_state = SOPState::Failed.to_string();
     }
 }
@@ -271,7 +271,7 @@ fn is_sop_failed(sp_id: &str, sop: &SOP, state: &State, log_target: &str) -> boo
     match sop {
         SOP::Operation(operation) => {
             let op_state_str = state.get_string_or_default_to_unknown(&operation.name, &log_target);
-            OperationState::from_str(&op_state_str) == OperationState::Unrecoverable
+            OperationState::from_str(&op_state_str) == OperationState::Fatal
         }
         SOP::Sequence(sops) | SOP::Parallel(sops) | SOP::Alternative(sops) => sops
             .iter()
