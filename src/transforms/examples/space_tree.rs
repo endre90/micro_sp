@@ -7,12 +7,12 @@ pub static VISUALIZE_TREE_REFRESH_RATE: u64 = 100; // milliseconds
 
 #[tokio::main]
 async fn main() -> () {
-    fn initialize_logging() {
-        std::env::set_var("RUST_LOG", "warn");
-        let _ = env_logger::builder().is_test(true).try_init();
-    }
+    // fn initialize_logging() {
+    //     std::env::set_var("RUST_LOG", "warn");
+    //     let _ = env_logger::builder().is_test(true).try_init();
+    // }
 
-    initialize_logging();
+    // initialize_logging();
 
     log::info!("Starting the r2r_transforms example...");
 

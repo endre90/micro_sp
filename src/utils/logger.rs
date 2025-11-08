@@ -2,7 +2,7 @@ use log::Level;
 
 pub fn initialize_env_logger() {
     let env = env_logger::Env::default().filter_or("RUST_LOG", "info");
-    env_logger::Builder::from_env(env)
+    let _ = env_logger::Builder::from_env(env)
         .format(|buf, record| {
             use chrono::Local;
             // use env_logger::fmt::style::{AnsiColor, Style};
@@ -55,5 +55,5 @@ pub fn initialize_env_logger() {
                 }
             }
         })
-        .init();
+        .try_init();
 }

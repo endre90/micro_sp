@@ -85,7 +85,8 @@ pub async fn auto_operation_runner(
                     format!("{}_information", op.name),
                     format!("{}_failure_retry_counter", op.name),
                     format!("{}_timeout_retry_counter", op.name),
-                    format!("{}_elapsed_ms", op.name),
+                    format!("{}_elapsed_executing_ms", op.name),
+                    format!("{}_elapsed_disabled_ms", op.name),
                 ]
             })
             .collect::<Vec<String>>(),
