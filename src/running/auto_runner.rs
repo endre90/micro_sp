@@ -144,7 +144,7 @@ pub async fn auto_operation_runner(
                 OperationProcessingType::Automatic,
                 None,
                 None,
-                con.clone(),
+                // con.clone(),
                 &log_target,
             )
             .await;
@@ -181,7 +181,7 @@ pub async fn auto_operation_runner(
                     OperationProcessingType::Automatic,
                     None,
                     None,
-                    con.clone(),
+                    // con.clone(),
                     &log_target,
                 )
                 .await;

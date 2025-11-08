@@ -18,7 +18,7 @@ pub(super) async fn process_operation(
     operation_processing_type: OperationProcessingType,
     plan_current_step: Option<&mut i64>,
     plan_state: Option<&mut String>,
-    mut con: redis::aio::MultiplexedConnection,
+    // mut con: redis::aio::MultiplexedConnection,
     log_target: &str,
 ) -> State {
     let operation_state =
@@ -39,8 +39,11 @@ pub(super) async fn process_operation(
         &log_target,
     );
 
-    let mut elapased_ms = new_state
-        .get_int_or_default_to_zero(&format!("{}_elapsed_ms", operation.name), &log_target);
+    let mut elapased_executing_ms = new_state
+        .get_int_or_default_to_zero(&format!("{}_elapsed_executing_ms", operation.name), &log_target);
+
+    let mut elapased_disabled_ms = new_state
+        .get_int_or_default_to_zero(&format!("{}_elapsed_disabled_ms", operation.name), &log_target);
 
     let mut op_info_level = OperationInfoLevel::Info;
     match OperationState::from_str(&operation_state) {
@@ -57,10 +60,15 @@ pub(super) async fn process_operation(
         }
         // TODO: Later, we can also add a timeout on how long the operation can be disabled
         OperationState::Disabled => {
+            elapased_disabled_ms += OPERAION_RUNNER_TICK_INTERVAL_MS as i64;
             if operation.eval(&new_state, &log_target) {
                 new_state = operation.start(&new_state, &log_target);
                 new_op_info = format!("Starting operation '{}'.", operation.name);
                 op_info_level = OperationInfoLevel::Info;
+            } else if operation.can_be_timedout(&new_state, &log_target) {
+                new_state = operation.clone().timeout(&new_state, &log_target);
+                new_op_info = format!("Timeout for operation '{}'.", operation.name).to_string();
+                op_info_level = OperationInfoLevel::Warn;
             } else {
                 let mut or_clause = vec![];
                 let mut or_clause_full = vec![];
@@ -82,7 +90,7 @@ pub(super) async fn process_operation(
             }
         }
         OperationState::Executing => {
-            elapased_ms += OPERAION_RUNNER_TICK_INTERVAL_MS as i64;
+            elapased_executing_ms += OPERAION_RUNNER_TICK_INTERVAL_MS as i64;
             if operation.can_be_completed(&new_state, &log_target) {
                 new_state = operation.clone().complete(&new_state, &log_target);
                 new_op_info = format!("Completing operation '{}'.", operation.name).to_string();
@@ -223,12 +231,12 @@ pub(super) async fn process_operation(
             // StateManager::remove_sp_value(&mut con, &operation.name).await;
             // new_state = operation.terminate(&new_state, &log_target);
         }
-        OperationState::Terminated => {
-            new_op_info = format!("Operation '{}' terminated.", operation.name);
-            op_info_level = OperationInfoLevel::Info;
-            new_state = new_state.remove(&operation.name, log_target);
-            StateManager::remove_sp_value(&mut con, &operation.name).await;
-        }
+        // OperationState::Terminated => {
+        //     new_op_info = format!("Operation '{}' terminated.", operation.name);
+        //     op_info_level = OperationInfoLevel::Info;
+        //     new_state = new_state.remove(&operation.name, log_target);
+        //     StateManager::remove_sp_value(&mut con, &operation.name).await;
+        // }
         OperationState::UNKNOWN => {
             new_state = operation.initialize(&new_state, &log_target);
         }
@@ -248,7 +256,11 @@ pub(super) async fn process_operation(
             new_op_info.to_spvalue(),
         )
         .update(
-            &format!("{}_elapsed_ms", operation.name),
-            elapased_ms.to_spvalue(),
+            &format!("{}_elapsed_executing_ms", operation.name),
+            elapased_executing_ms.to_spvalue(),
+        )
+                .update(
+            &format!("{}_elapsed_disabled_ms", operation.name),
+            elapased_disabled_ms.to_spvalue(),
         )
 }

@@ -20,7 +20,7 @@ pub enum OperationState {
     Timedout,
     Failed,
     Unrecoverable,
-    Terminated,
+    // Terminated,
     UNKNOWN,
 }
 
@@ -41,7 +41,7 @@ impl OperationState {
             "unrecoverable" => OperationState::Unrecoverable,
             "completed" => OperationState::Completed,
             "bypassed" => OperationState::Bypassed,
-            "terminated" => OperationState::Terminated,
+            // "terminated" => OperationState::Terminated,
             _ => OperationState::UNKNOWN,
         }
     }
@@ -61,7 +61,7 @@ impl fmt::Display for OperationState {
             OperationState::Unrecoverable => write!(f, "unrecoverable"),
             OperationState::Completed => write!(f, "completed"),
             OperationState::Bypassed => write!(f, "bypassed"),
-            OperationState::Terminated => write!(f, "terminated"),
+            // OperationState::Terminated => write!(f, "terminated"),
             OperationState::UNKNOWN => write!(f, "UNKNOWN"),
         }
     }
@@ -71,7 +71,8 @@ impl fmt::Display for OperationState {
 pub struct Operation {
     pub name: String,
     pub state: OperationState,
-    pub timeout_ms: Option<i64>, // Option<u128>,
+    pub timeout_executing_ms: Option<i64>,
+    pub timeout_disabled_ms: Option<i64>,
     pub failure_retries: i64,
     pub timeout_retries: i64,
     pub can_be_bypassed: bool,
@@ -88,7 +89,8 @@ impl Default for Operation {
         Operation {
             name: "unknown".to_string(),
             state: OperationState::UNKNOWN,
-            timeout_ms: None,
+            timeout_executing_ms: None,
+            timeout_disabled_ms: None,
             failure_retries: 0,
             timeout_retries: 0,
             can_be_bypassed: false,
@@ -105,7 +107,8 @@ impl Default for Operation {
 impl Operation {
     pub fn new(
         name: &str,
-        timeout_ms: Option<i64>,
+        timeout_executing_ms: Option<i64>,
+        timeout_disabled_ms: Option<i64>,
         fail_retries: Option<i64>,
         timeout_retries: Option<i64>,
         can_be_bypassed: bool,
@@ -119,7 +122,11 @@ impl Operation {
         Operation {
             name: name.to_string(),
             state: OperationState::UNKNOWN,
-            timeout_ms: match timeout_ms {
+            timeout_executing_ms: match timeout_executing_ms {
+                None => Some(MAX_ALLOWED_OPERATION_DURATION_MS),
+                Some(x) => Some(x),
+            },
+            timeout_disabled_ms: match timeout_disabled_ms {
                 None => Some(MAX_ALLOWED_OPERATION_DURATION_MS),
                 Some(x) => Some(x),
             },
@@ -245,12 +252,23 @@ impl Operation {
     pub fn can_be_timedout(&self, state: &State, log_target: &str) -> bool {
         if let Some(value) = state.get_value(&self.name, &log_target) {
             if value == OperationState::Executing.to_spvalue() {
-                if let Some(timeout_ms) = self.timeout_ms {
+                if let Some(timeout_executing_ms) = self.timeout_executing_ms {
                     let elapased_ms = state.get_int_or_default_to_zero(
-                        &format!("{}_elapsed_ms", &self.name),
+                        &format!("{}_elapsed_executing_ms", &self.name),
                         &log_target,
                     );
-                    if elapased_ms > timeout_ms {
+                    if elapased_ms > timeout_executing_ms {
+                        return true;
+                    }
+                }
+            }
+            if value == OperationState::Disabled.to_spvalue() {
+                if let Some(timeout_disabled_ms) = self.timeout_disabled_ms {
+                    let elapased_ms = state.get_int_or_default_to_zero(
+                        &format!("{}_elapsed_disabled_ms", &self.name),
+                        &log_target,
+                    );
+                    if elapased_ms > timeout_disabled_ms {
                         return true;
                     }
                 }
@@ -465,22 +483,22 @@ impl Operation {
     //     state.clone()
     // }
 
-    pub fn terminate(&self, state: &State, log_target: &str) -> State {
-        let assignment = state.get_assignment(&self.name, &log_target);
-        if assignment.val == OperationState::Unrecoverable.to_spvalue()
-            || assignment.val == OperationState::Bypassed.to_spvalue()
-            || assignment.val == OperationState::Completed.to_spvalue()
-        {
-            let action = Action::new(
-                assignment.var,
-                OperationState::Terminated.to_spvalue().wrap(),
-            );
-            action.assign(&state, &log_target)
-        } else {
-            log::error!(target: &log_target, "Can't terminate an operation which is not unrecoverable, bypassed, or completed.");
-            state.clone()
-        }
-    }
+    // pub fn terminate(&self, state: &State, log_target: &str) -> State {
+    //     let assignment = state.get_assignment(&self.name, &log_target);
+    //     if assignment.val == OperationState::Unrecoverable.to_spvalue()
+    //         || assignment.val == OperationState::Bypassed.to_spvalue()
+    //         || assignment.val == OperationState::Completed.to_spvalue()
+    //     {
+    //         let action = Action::new(
+    //             assignment.var,
+    //             OperationState::Terminated.to_spvalue().wrap(),
+    //         );
+    //         action.assign(&state, &log_target)
+    //     } else {
+    //         log::error!(target: &log_target, "Can't terminate an operation which is not unrecoverable, bypassed, or completed.");
+    //         state.clone()
+    //     }
+    // }
 
     pub fn get_all_var_keys(&self) -> Vec<String> {
         let mut all_keys: Vec<String> = self

@@ -26,7 +26,8 @@ impl Model {
                 .iter()
                 .map(|o| Operation {
                     name: format!("op_{}", o.name),
-                    timeout_ms: o.timeout_ms,
+                    timeout_executing_ms: o.timeout_executing_ms,
+                    timeout_disabled_ms: o.timeout_disabled_ms,
                     failure_retries: o.failure_retries,
                     timeout_retries: o.timeout_retries,
                     can_be_bypassed: o.can_be_bypassed,
@@ -50,7 +51,8 @@ impl Model {
                 .iter()
                 .map(|o| Operation {
                     name: format!("op_{}", o.name),
-                    timeout_ms: o.timeout_ms,
+                    timeout_executing_ms: o.timeout_executing_ms,
+                    timeout_disabled_ms: o.timeout_disabled_ms,
                     failure_retries: o.failure_retries,
                     timeout_retries: o.timeout_retries,
                     can_be_bypassed: o.can_be_bypassed,

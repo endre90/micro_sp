@@ -39,7 +39,7 @@ pub async fn planned_operation_runner(
                     format!("{}_information", op.name),
                     format!("{}_failure_retry_counter", op.name),
                     format!("{}_timeout_retry_counter", op.name),
-                    format!("{}_elapsed_ms", op.name),
+                    format!("{}_elapsed_executing_ms", op.name),
                 ]
             })
             .collect::<Vec<String>>(),
@@ -55,8 +55,8 @@ pub async fn planned_operation_runner(
             Some(s) => s,
             None => continue,
         };
-        let con_clone = con.clone();
-        let new_state = process_plan_tick(sp_id, con_clone, &model, &state, &log_target).await;
+        // let con_clone = con.clone();
+        let new_state = process_plan_tick(sp_id, &model, &state, &log_target).await;
         let modified_state = state.get_diff_partial_state(&new_state);
         // StateManager::set_state(con, &modified_state).await;
         StateManager::set_state(&mut con, &modified_state).await;
@@ -65,7 +65,7 @@ pub async fn planned_operation_runner(
 
 async fn process_plan_tick(
     sp_id: &str,
-    con: redis::aio::MultiplexedConnection,
+    // con: redis::aio::MultiplexedConnection,
     model: &Model,
     state: &State,
     log_target: &str,
@@ -105,7 +105,7 @@ async fn process_plan_tick(
                             OperationProcessingType::Planned,
                             Some(&mut plan_current_step),
                             Some(&mut plan_state_str),
-                            con,
+                            // con,
                             log_target,
                         )
                         .await;
