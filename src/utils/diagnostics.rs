@@ -1,4 +1,4 @@
-use chrono::{DateTime, TimeZone, Timelike, Utc};
+use chrono::{DateTime, Utc};
 use colored::Colorize;
 use console::measure_text_width;
 use serde::{Deserialize, Serialize};
@@ -86,7 +86,7 @@ fn format_timestamp(utc_ts: &DateTime<Utc>) -> String {
     cet_ts.format("%H:%M:%S%.3f").to_string()
 }
 
-fn format_log_rows(log_rows: &Vec<Vec<OperationLog>>) -> String {
+pub fn format_log_rows(log_rows: &Vec<Vec<OperationLog>>) -> String {
     let mut output = String::new();
     let column_separator = " ".to_string();
     let total_rows = log_rows.len();
@@ -203,12 +203,10 @@ fn format_log_rows(log_rows: &Vec<Vec<OperationLog>>) -> String {
 
 #[test]
 fn test_log_formatter_with_colors() {
-    let base_time = Utc.with_ymd_and_hms(2025, 11, 8, 15, 36, 0).unwrap();
+    let base_time = chrono::TimeZone::with_ymd_and_hms(&Utc, 2025, 11, 8, 15, 36, 0).unwrap();
     let ts = |sec, nano| {
-        base_time
-            .with_second(sec)
-            .unwrap()
-            .with_nanosecond(nano)
+        chrono::Timelike::with_nanosecond(&chrono::Timelike::with_second(&base_time, sec)
+            .unwrap(), nano)
             .unwrap()
     };
 
