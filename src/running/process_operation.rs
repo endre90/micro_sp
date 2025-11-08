@@ -261,7 +261,7 @@ pub(super) async fn process_operation(
             operation_name: operation.name.clone(),
             timestamp: Utc::now(),
             severity: op_info_level,
-            state: operation.state.clone(),
+            state: OperationState::from_str(&operation_state),
             log: new_op_info.clone(),
         };
         match diagnostics_tx.send(operation_msg).await {
