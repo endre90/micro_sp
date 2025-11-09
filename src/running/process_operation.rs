@@ -69,7 +69,6 @@ pub(super) async fn process_operation(
                 new_state = operation.disable(&new_state, &log_target);
             }
         }
-        // TODO: Later, we can also add a timeout on how long the operation can be disabled
         OperationState::Disabled => {
             elapased_disabled_ms += OPERAION_RUNNER_TICK_INTERVAL_MS as i64;
             if operation.eval(&new_state, &log_target) {

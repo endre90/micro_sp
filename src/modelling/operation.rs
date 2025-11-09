@@ -364,10 +364,7 @@ impl Operation {
         if assignment.val == OperationState::Failed.to_spvalue()
             || assignment.val == OperationState::Timedout.to_spvalue()
         {
-            let action = Action::new(
-                assignment.var,
-                OperationState::Fatal.to_spvalue().wrap(),
-            );
+            let action = Action::new(assignment.var, OperationState::Fatal.to_spvalue().wrap());
             action.assign(&state, &log_target)
         } else {
             log::error!(target: &log_target, "Can't unrecover an operation which hasn't failed or timedout.");
@@ -406,7 +403,9 @@ impl Operation {
     /// Timeout an executing the operation.
     pub fn timeout(&self, state: &State, log_target: &str) -> State {
         let assignment = state.get_assignment(&self.name, &log_target);
-        if assignment.val == OperationState::Executing.to_spvalue() {
+        if assignment.val == OperationState::Executing.to_spvalue()
+            || assignment.val == OperationState::Disabled.to_spvalue()
+        {
             if self.timeout_transitions.len() > 0 {
                 for timeout_transition in &self.timeout_transitions {
                     if timeout_transition.clone().eval(&state, &log_target) {

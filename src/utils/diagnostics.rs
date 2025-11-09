@@ -38,43 +38,6 @@ pub async fn operation_diagnostics_receiver_task(
         {
             if let SPValue::String(StringOrUnknown::String(string_log)) = log_spvalue {
                 if let Ok(mut log) = serde_json::from_str::<Vec<Vec<OperationLog>>>(&string_log) {
-                    // if let Some(last_vector) = log.last_mut() {
-                    //     if last_vector.is_empty() {
-                    //         last_vector.push(OperationLog {
-                    //             operation_name: msg.operation_name.clone(),
-                    //             log: vec![msg],
-                    //         });
-                    //     } else {
-                    //         match last_vector
-                    //             .iter_mut()
-                    //             .find(|log| log.operation_name == msg.operation_name)
-                    //         {
-                    //             Some(exists) => {
-                    //                 exists.log.push(msg);
-                    //             }
-                    //             None => {
-                    //                 last_vector.push(OperationLog {
-                    //                     operation_name: msg.operation_name.clone(),
-                    //                     log: vec![msg],
-                    //                 });
-                    //             }
-                    //         }
-                    //     }
-                    //     match serde_json::to_string(&log) {
-                    //         Ok(serialized) => {
-                    //             StateManager::set_sp_value(
-                    //                 &mut con,
-                    //                 &format!("{}_diagnostics_operations", sp_id),
-                    //                 &serialized.to_spvalue(),
-                    //             )
-                    //             .await
-                    //         }
-                    //         Err(e) => {
-                    //             log::error!(target: &log_target, "Serialization failed with {e}.")
-                    //         }
-                    //     }
-                    // }
-                  
                     let is_last_empty = log.last().map_or(true, |v| v.is_empty());
 
                     if is_last_empty {
