@@ -38,40 +38,120 @@ pub async fn operation_diagnostics_receiver_task(
         {
             if let SPValue::String(StringOrUnknown::String(string_log)) = log_spvalue {
                 if let Ok(mut log) = serde_json::from_str::<Vec<Vec<OperationLog>>>(&string_log) {
-                    if let Some(last_vector) = log.last_mut() {
-                        if last_vector.is_empty() {
-                            last_vector.push(OperationLog {
-                                operation_name: msg.operation_name.clone(),
-                                log: vec![msg],
-                            });
-                        } else {
-                            match last_vector
-                                .iter_mut()
-                                .find(|log| log.operation_name == msg.operation_name)
-                            {
-                                Some(exists) => {
-                                    exists.log.push(msg);
-                                }
-                                None => {
-                                    last_vector.push(OperationLog {
-                                        operation_name: msg.operation_name.clone(),
-                                        log: vec![msg],
-                                    });
+                    // if let Some(last_vector) = log.last_mut() {
+                    //     if last_vector.is_empty() {
+                    //         last_vector.push(OperationLog {
+                    //             operation_name: msg.operation_name.clone(),
+                    //             log: vec![msg],
+                    //         });
+                    //     } else {
+                    //         match last_vector
+                    //             .iter_mut()
+                    //             .find(|log| log.operation_name == msg.operation_name)
+                    //         {
+                    //             Some(exists) => {
+                    //                 exists.log.push(msg);
+                    //             }
+                    //             None => {
+                    //                 last_vector.push(OperationLog {
+                    //                     operation_name: msg.operation_name.clone(),
+                    //                     log: vec![msg],
+                    //                 });
+                    //             }
+                    //         }
+                    //     }
+                    //     match serde_json::to_string(&log) {
+                    //         Ok(serialized) => {
+                    //             StateManager::set_sp_value(
+                    //                 &mut con,
+                    //                 &format!("{}_diagnostics_operations", sp_id),
+                    //                 &serialized.to_spvalue(),
+                    //             )
+                    //             .await
+                    //         }
+                    //         Err(e) => {
+                    //             log::error!(target: &log_target, "Serialization failed with {e}.")
+                    //         }
+                    //     }
+                    // }
+                  
+                    let is_last_empty = log.last().map_or(true, |v| v.is_empty());
+
+                    if is_last_empty {
+                        if log.is_empty() {
+                            log.push(Vec::new());
+                        }
+                        log.last_mut().unwrap().push(OperationLog {
+                            operation_name: msg.operation_name.clone(),
+                            log: vec![msg],
+                        });
+                    } else {
+                        let needs_partition = log.last().unwrap().iter().any(|op| {
+                            matches!(
+                                op.log.last().map(|s| &s.state),
+                                Some(
+                                    OperationState::Completed
+                                        | OperationState::Bypassed
+                                        | OperationState::Fatal
+                                )
+                            )
+                        });
+
+                        if needs_partition {
+                            log.push(Vec::new());
+                            let log_len = log.len();
+                            let (prefix, suffix) = log.split_at_mut(log_len - 1);
+
+                            let old_last_vec = &mut prefix[prefix.len() - 1];
+                            let new_last_vec = &mut suffix[0];
+
+                            let ops_to_partition = std::mem::take(old_last_vec);
+
+                            for op in ops_to_partition {
+                                match op.log.last().map(|s| &s.state) {
+                                    Some(
+                                        OperationState::Completed
+                                        | OperationState::Bypassed
+                                        | OperationState::Fatal,
+                                    ) => {
+                                        old_last_vec.push(op);
+                                    }
+                                    _ => {
+                                        new_last_vec.push(op);
+                                    }
                                 }
                             }
                         }
-                        match serde_json::to_string(&log) {
-                            Ok(serialized) => {
-                                StateManager::set_sp_value(
-                                    &mut con,
-                                    &format!("{}_diagnostics_operations", sp_id),
-                                    &serialized.to_spvalue(),
-                                )
-                                .await
+
+                        let last_vector = log.last_mut().unwrap();
+
+                        match last_vector
+                            .iter_mut()
+                            .find(|log| log.operation_name == msg.operation_name)
+                        {
+                            Some(exists) => {
+                                exists.log.push(msg);
                             }
-                            Err(e) => {
-                                log::error!(target: &log_target, "Serialization failed with {e}.")
+                            None => {
+                                last_vector.push(OperationLog {
+                                    operation_name: msg.operation_name.clone(),
+                                    log: vec![msg],
+                                });
                             }
+                        }
+                    }
+
+                    match serde_json::to_string(&log) {
+                        Ok(serialized) => {
+                            StateManager::set_sp_value(
+                                &mut con,
+                                &format!("{}_diagnostics_operations", sp_id),
+                                &serialized.to_spvalue(),
+                            )
+                            .await
+                        }
+                        Err(e) => {
+                            log::error!(target: &log_target, "Serialization failed with {e}.")
                         }
                     }
                 }
@@ -113,7 +193,7 @@ pub fn format_log_rows(log_rows: &Vec<Vec<OperationLog>>) -> String {
 
             let title = format!("{}: {}", header, op_log.operation_name)
                 .bold()
-                .cyan();
+                .blue();
             let underline = format!("{:-<width$}", "", width = op_log.operation_name.len() + 1);
 
             let title_width = measure_text_width(&title.to_string());
@@ -205,9 +285,11 @@ pub fn format_log_rows(log_rows: &Vec<Vec<OperationLog>>) -> String {
 fn test_log_formatter_with_colors() {
     let base_time = chrono::TimeZone::with_ymd_and_hms(&Utc, 2025, 11, 8, 15, 36, 0).unwrap();
     let ts = |sec, nano| {
-        chrono::Timelike::with_nanosecond(&chrono::Timelike::with_second(&base_time, sec)
-            .unwrap(), nano)
-            .unwrap()
+        chrono::Timelike::with_nanosecond(
+            &chrono::Timelike::with_second(&base_time, sec).unwrap(),
+            nano,
+        )
+        .unwrap()
     };
 
     let op_name_1 = "op_emulate_timeout".to_string();
