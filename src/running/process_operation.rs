@@ -183,7 +183,7 @@ pub(super) async fn process_operation(
                     operation.name, operation_timeout_retry_counter, operation.timeout_retries
                 );
                 diagnostics_log = format!(
-                    "Retrying operation (t) {} / {}.",
+                    "Retrying operation {} / {}.",
                     operation_timeout_retry_counter, operation.timeout_retries
                 );
                 op_info_level = log::Level::Warn;
