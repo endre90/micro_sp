@@ -234,7 +234,7 @@ pub(super) async fn process_operation(
                     new_op_info =
                         format!("Operation '{}' has no more retries left.", operation.name);
                     diagnostics_log = format!("Operation has no more retries left.");
-                    op_info_level = log::Level::Error;
+                    op_info_level = log::Level::Warn;
                 }
                 new_state = new_state.update(
                     &format!("{}_failure_retry_counter", operation.name),
