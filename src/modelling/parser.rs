@@ -175,6 +175,7 @@ peg::parser!(pub grammar pred_parser() for str {
         //     Action::new(p1, new_val.wrap())
         // }
         = p1:variable(&state) _ "+=" _ p2:value(&state) { Action::inc(p1, p2) }
+        / p1:variable(&state) _ "-=" _ p2:value(&state) { Action::dec(p1, p2) }
         / p1:variable(&state) _ "<-" _ p2:variable(&state) { Action::new(p1, p2.wrap()) }
         / p1:variable(&state) _ "<-" _ p2:value(&state) { Action::new(p1, p2) }
     }
@@ -397,14 +398,15 @@ mod tests {
                 var_or_val: SPVariable {
                     name: "weight_2".to_string(),
                     value_type: SPValueType::Float64,
-                }.wrap(),
+                }
+                .wrap(),
                 action_type: ActionType::Assign
             })
         );
     }
 
     #[test]
-    fn parse_increment_actions() {
+    fn parse_increment_integer_actions() {
         let s = State::from_vec(&john_doe());
         let inc1 = pred_parser::action("var:height += 5", &s).unwrap();
         let inc2 = pred_parser::action("var:height += 7", &s).unwrap();
@@ -414,4 +416,36 @@ mod tests {
         assert_eq!(s_next_2.get_value("height", "t"), Some(197.to_spvalue()));
     }
 
+    #[test]
+    fn parse_decrement_integer_actions() {
+        let s = State::from_vec(&john_doe());
+        let inc1 = pred_parser::action("var:height -= 5", &s).unwrap();
+        let inc2 = pred_parser::action("var:height -= 7", &s).unwrap();
+        let s_next_1 = inc1.assign(&s, "t");
+        let s_next_2 = inc2.assign(&s_next_1, "t");
+        assert_eq!(s_next_1.get_value("height", "t"), Some(180.to_spvalue()));
+        assert_eq!(s_next_2.get_value("height", "t"), Some(173.to_spvalue()));
+    }
+
+    #[test]
+    fn parse_increment_float_actions() {
+        let s = State::from_vec(&john_doe());
+        let inc1 = pred_parser::action("var:weight += 5.5", &s).unwrap();
+        let inc2 = pred_parser::action("var:weight += 7.7", &s).unwrap();
+        let s_next_1 = inc1.assign(&s, "t");
+        let s_next_2 = inc2.assign(&s_next_1, "t");
+        assert_eq!(s_next_1.get_value("weight", "t"), Some(85.5.to_spvalue()));
+        assert_eq!(s_next_2.get_value("weight", "t"), Some(93.2.to_spvalue()));
+    }
+
+    #[test]
+    fn parse_decrement_float_actions() {
+        let s = State::from_vec(&john_doe());
+        let inc1 = pred_parser::action("var:weight -= 5.5", &s).unwrap();
+        let inc2 = pred_parser::action("var:weight -= 7.7", &s).unwrap();
+        let s_next_1 = inc1.assign(&s, "t");
+        let s_next_2 = inc2.assign(&s_next_1, "t");
+        assert_eq!(s_next_1.get_value("weight", "t"), Some(74.5.to_spvalue()));
+        assert_eq!(s_next_2.get_value("weight", "t"), Some(66.8.to_spvalue()));
+    }
 }

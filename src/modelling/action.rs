@@ -8,7 +8,7 @@ use std::fmt;
 pub enum ActionType {
     Assign,
     Increment,
-    // Decrement,
+    Decrement,
 }
 
 /// Actions update the assignments of the state variables.
@@ -18,22 +18,6 @@ pub struct Action {
     pub var_or_val: SPWrapped,
     pub action_type: ActionType,
 }
-
-// #[derive(Debug, PartialEq, Eq, Clone, Hash, Serialize, Deserialize)]
-// pub enum Action {
-//     Assign {
-//         var: SPVariable,
-//         var_or_val: SPWrapped,
-//     },
-//     Inc {
-//         var: SPVariable,
-//         amount: i64,
-//     },
-//     Dec {
-//         var: SPVariable,
-//         amount: i64,
-//     },
-// }
 
 impl Action {
     pub fn empty() -> Action {
@@ -64,7 +48,7 @@ impl Action {
         Action {
             var,
             var_or_val,
-            action_type: ActionType::Increment,
+            action_type: ActionType::Decrement,
         }
     }
 
@@ -129,32 +113,60 @@ impl Action {
                     }
                 };
 
-                // 3. Update state
                 state.update(&self.var.name, new_val)
-            } // // Logic for Decrement
-              // Action::Dec { var, amount } => {
-              //     // 1. Get current value
-              //     let current_val = state
-              //         .get_value(&var.name, log_target)
-              //         .unwrap_or_else(|| panic!("Variable '{}' not in state.", var.name));
+            }
 
-              //     // 2. Perform decrement, panicking on type error
-              //     let new_val = match current_val {
-              //         SPValue::Int64(IntOrUnknown::Int64(i)) => {
-              //             SPValue::Int64(IntOrUnknown::Int64(i - amount))
-              //         }
-              //         // SPValue::Float(f) => SPValue::Float(f - amount as f64),
-              //         other => {
-              //             panic!(
-              //                 "Variable '{}' holds non-numeric value '{:?}' and cannot be decremented.",
-              //                 var.name, other
-              //             );
-              //         }
-              //     };
+            ActionType::Decrement => {
+                let current_val = state
+                    .get_value(&self.var.name, log_target)
+                    .unwrap_or_else(|| panic!("Variable '{}' not in state.", self.var.name));
 
-              //     // 3. Update state
-              //     state.update(&var.name, new_val)
-              // }
+                let increment_val = match self.var_or_val {
+                    SPWrapped::SPVariable(x) => state
+                        .get_value(&x.name, log_target)
+                        .unwrap_or_else(|| panic!("Source variable '{}' not in state.", x.name)),
+                    SPWrapped::SPValue(x) => x,
+                };
+
+                let new_val = match (current_val, increment_val) {
+                    (
+                        SPValue::Int64(IntOrUnknown::Int64(x)),
+                        SPValue::Int64(IntOrUnknown::Int64(y)),
+                    ) => SPValue::Int64(IntOrUnknown::Int64(x - y)),
+                    (
+                        SPValue::Float64(FloatOrUnknown::Float64(ordered_float::OrderedFloat(x))),
+                        SPValue::Float64(FloatOrUnknown::Float64(ordered_float::OrderedFloat(y))),
+                    ) => SPValue::Float64(FloatOrUnknown::Float64(ordered_float::OrderedFloat(
+                        x - y,
+                    ))),
+                    (
+                        SPValue::Int64(IntOrUnknown::Int64(_)),
+                        SPValue::Float64(FloatOrUnknown::Float64(ordered_float::OrderedFloat(y))),
+                    ) => {
+                        panic!(
+                            "Cannot increment integer variable {} with a float value {}.",
+                            self.var.name, y
+                        );
+                    }
+                    (
+                        SPValue::Float64(FloatOrUnknown::Float64(ordered_float::OrderedFloat(_))),
+                        SPValue::Int64(IntOrUnknown::Int64(y)),
+                    ) => {
+                        panic!(
+                            "Cannot increment float variable {} with an integer value {}.",
+                            self.var.name, y
+                        );
+                    }
+                    other => {
+                        panic!(
+                            "Variable '{}' holds non-numeric value '{:?}' and cannot be incremented.",
+                            self.var.name, other
+                        );
+                    }
+                };
+
+                state.update(&self.var.name, new_val)
+            }
         }
     }
 }
@@ -167,41 +179,13 @@ impl fmt::Display for Action {
             }
             ActionType::Increment => {
                 write!(fmtr, "{} += {}", self.var, self.var_or_val)
-            } // Action::Dec { var, amount } => {
-              //     write!(fmtr, "{} -= {}", var, amount)
-              // }
+            }
+            ActionType::Decrement => {
+                write!(fmtr, "{} -= {}", self.var, self.var_or_val)
+            }
         }
     }
 }
-
-// impl Action {
-//     pub fn empty() -> Action {
-//         Action {
-//             var: SPVariable::new("empty", SPValueType::Bool),
-//             var_or_val: false.wrap(),
-//         }
-//     }
-
-//     pub fn new(var: SPVariable, var_or_val: SPWrapped) -> Action {
-//         Action { var, var_or_val }
-//     }
-
-//     pub fn assign(self, state: &State, log_target: &str) -> State {
-//         let value_to_assign = match self.var_or_val {
-//             SPWrapped::SPVariable(x) => state
-//                 .get_value(&x.name, &log_target)
-//                 .unwrap_or_else(|| panic!("Source variable '{}' not in state.", x.name)),
-//             SPWrapped::SPValue(x) => x,
-//         };
-//         state.update(&self.var.name, value_to_assign)
-//     }
-// }
-
-// impl fmt::Display for Action {
-//     fn fmt(&self, fmtr: &mut fmt::Formatter<'_>) -> fmt::Result {
-//         write!(fmtr, "{} <= {}", self.var, self.var_or_val)
-//     }
-// }
 
 #[cfg(test)]
 mod tests {
