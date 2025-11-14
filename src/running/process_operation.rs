@@ -211,7 +211,7 @@ pub(super) async fn process_operation(
                     operation.name, operation_failure_retry_counter, operation.failure_retries
                 );
                 diagnostics_log = format!(
-                    "Retrying operation (f) {} / {}.",
+                    "Retrying operation {} / {}.",
                     operation_failure_retry_counter, operation.failure_retries
                 );
                 op_info_level = log::Level::Warn;
