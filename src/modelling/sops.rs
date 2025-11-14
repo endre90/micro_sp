@@ -4,7 +4,7 @@ use termtree::Tree;
 
 // I look at SOPS as function blocks with a rigid structure, sort of as a high level operation
 // Maybe, just maybe, we can also have a "Planned" variant that should use a planner within a certain domain to get a sequence???
-#[derive(Debug, PartialEq, Clone, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
 pub enum SOP {
     Operation(Box<Operation>),
     Sequence(Vec<SOP>),
@@ -52,7 +52,7 @@ pub enum SOP {
 //     }
 // }
 
-#[derive(Debug, PartialEq, Clone, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
 pub struct SOPStruct {
     pub id: String,
     pub sop: SOP,

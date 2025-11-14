@@ -411,7 +411,7 @@ impl fmt::Display for CurrentGoalState {
     }
 }
 
-#[derive(Debug, PartialEq, Clone, Hash, Eq, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
 pub struct GoalLog {
     pub time: SystemTime,
     pub state: State,

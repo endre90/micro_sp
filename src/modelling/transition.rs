@@ -154,46 +154,46 @@ impl Transition {
         new_state
     }
 
-    pub fn relax(self, vars: &Vec<String>) -> Transition {
-        let r_guard = self.guard.remove(vars);
-        let r_runner_guard = self.runner_guard.remove(vars);
-        let mut r_actions = vec![];
-        let mut r_runner_actions = vec![];
-        self.actions
-            .iter()
-            .for_each(|x| match vars.contains(&x.var.name) {
-                false => r_actions.push(x.clone()),
-                true => (),
-            });
-        self.runner_actions
-            .iter()
-            .for_each(|x| match vars.contains(&x.var.name) {
-                false => r_runner_actions.push(x.clone()),
-                true => (),
-            });
-        Transition {
-            name: self.name,
-            guard: match r_guard {
-                Some(x) => x,
-                None => Predicate::TRUE,
-            },
-            runner_guard: match r_runner_guard {
-                Some(x) => x,
-                None => Predicate::TRUE,
-            },
-            // sleep_ms: self.sleep_ms,
-            actions: r_actions,
-            runner_actions: r_runner_actions,
-        }
-    }
+    // pub fn relax(self, vars: &Vec<String>) -> Transition {
+    //     let r_guard = self.guard.remove(vars);
+    //     let r_runner_guard = self.runner_guard.remove(vars);
+    //     let mut r_actions = vec![];
+    //     let mut r_runner_actions = vec![];
+    //     self.actions
+    //         .iter()
+    //         .for_each(|x| match vars.contains(&x.var.name) {
+    //             false => r_actions.push(x.clone()),
+    //             true => (),
+    //         });
+    //     self.runner_actions
+    //         .iter()
+    //         .for_each(|x| match vars.contains(&x.var.name) {
+    //             false => r_runner_actions.push(x.clone()),
+    //             true => (),
+    //         });
+    //     Transition {
+    //         name: self.name,
+    //         guard: match r_guard {
+    //             Some(x) => x,
+    //             None => Predicate::TRUE,
+    //         },
+    //         runner_guard: match r_runner_guard {
+    //             Some(x) => x,
+    //             None => Predicate::TRUE,
+    //         },
+    //         // sleep_ms: self.sleep_ms,
+    //         actions: r_actions,
+    //         runner_actions: r_runner_actions,
+    //     }
+    // }
 
     // TODO: test...
-    pub fn contains_planning(self, var: &String) -> bool {
-        let guard_vars: Vec<String> = self.guard.get_predicate_var_keys();
-        let actions_vars: Vec<String> =
-            self.actions.iter().map(|a| a.var.name.to_owned()).collect();
-        guard_vars.contains(var) || actions_vars.contains(var)
-    }
+    // pub fn contains_planning(self, var: &String) -> bool {
+    //     let guard_vars: Vec<String> = self.guard.get_predicate_var_keys();
+    //     let actions_vars: Vec<String> =
+    //         self.actions.iter().map(|a| a.var.name.to_owned()).collect();
+    //     guard_vars.contains(var) || actions_vars.contains(var)
+    // }
 
         // TODO: test...
     pub fn get_all_var_keys(&self) -> Vec<String> {

@@ -97,83 +97,84 @@ peg::parser!(pub grammar pred_parser() for str {
     }
 
     pub rule action(state: &State) -> Action
-        = p1:variable(&state) _ "<-" _ p2:variable(&state) _ "+" _ p3:value(&state) {
-            let p2_val = state.get_value(&p2.name, "parser");
+        // = p1:variable(&state) _ "<-" _ p1:variable(&state) _ "+" _ p3:value(&state) {
+        //     let p2_val = state.get_value(&p2.name, "parser");
 
-            let p3_val = match p3 {
-                SPWrapped::SPValue(val) => val,
-                SPWrapped::SPVariable(var) => {
-                    state.get_value(&var.name, "parser").expect("variable not found")
-                }
-            };
+        //     let p3_val = match p3 {
+        //         SPWrapped::SPValue(val) => val,
+        //         SPWrapped::SPVariable(var) => {
+        //             state.get_value(&var.name, "parser").expect("variable not found")
+        //         }
+        //     };
 
-            let new_val = match (p2_val, p3_val) {
-                (Some(SPValue::Int64(v2)), SPValue::Int64(v3)) => {
-                    let i2 = match v2 {
-                        IntOrUnknown::Int64(i) => i,
-                        IntOrUnknown::UNKNOWN => 0,
-                    };
-                    let i3 = match v3 {
-                        IntOrUnknown::Int64(i) => i,
-                        IntOrUnknown::UNKNOWN => 0,
-                    };
-                    (i2 + i3).to_spvalue()
-                },
-                (Some(SPValue::Float64(v2)), SPValue::Float64(v3)) => {
-                    let f2 = match v2 {
-                        FloatOrUnknown::Float64(ordered_float::OrderedFloat(f)) => f,
-                        FloatOrUnknown::UNKNOWN => 0.0,
-                    };
-                    let f3 = match v3 {
-                        FloatOrUnknown::Float64(ordered_float::OrderedFloat(f)) => f,
-                        FloatOrUnknown::UNKNOWN => 0.0,
-                    };
-                    (f2 + f3).to_spvalue()
-                },
-                _ => panic!("Can only add int to int or float to float")
-            };
+        //     let new_val = match (p2_val, p3_val) {
+        //         (Some(SPValue::Int64(v2)), SPValue::Int64(v3)) => {
+        //             let i2 = match v2 {
+        //                 IntOrUnknown::Int64(i) => i,
+        //                 IntOrUnknown::UNKNOWN => 0,
+        //             };
+        //             let i3 = match v3 {
+        //                 IntOrUnknown::Int64(i) => i,
+        //                 IntOrUnknown::UNKNOWN => 0,
+        //             };
+        //             (i2 + i3).to_spvalue()
+        //         },
+        //         (Some(SPValue::Float64(v2)), SPValue::Float64(v3)) => {
+        //             let f2 = match v2 {
+        //                 FloatOrUnknown::Float64(ordered_float::OrderedFloat(f)) => f,
+        //                 FloatOrUnknown::UNKNOWN => 0.0,
+        //             };
+        //             let f3 = match v3 {
+        //                 FloatOrUnknown::Float64(ordered_float::OrderedFloat(f)) => f,
+        //                 FloatOrUnknown::UNKNOWN => 0.0,
+        //             };
+        //             (f2 + f3).to_spvalue()
+        //         },
+        //         _ => panic!("Can only add int to int or float to float")
+        //     };
 
-            Action::new(p1, SPWrapped::SPValue(new_val))
-        }
+        //     Action::new(p1, new_val.wrap())
+        // }
 
-        / p1:variable(&state) _ "<-" _ p2:variable(&state) _ "-" _ p3:value(&state) {
-            let p2_val = state.get_value(&p2.name, "parser");
+        // / p1:variable(&state) _ "<-" _ p2:variable(&state) _ "-" _ p3:value(&state) {
+        //     let p2_val = state.get_value(&p2.name, "parser");
 
-            let p3_val = match p3 {
-                SPWrapped::SPValue(val) => val,
-                SPWrapped::SPVariable(var) => {
-                    state.get_value(&var.name, "parser").expect("variable not found")
-                }
-            };
+        //     let p3_val = match p3 {
+        //         SPWrapped::SPValue(val) => val,
+        //         SPWrapped::SPVariable(var) => {
+        //             state.get_value(&var.name, "parser").expect("variable not found")
+        //         }
+        //     };
 
-            let new_val = match (p2_val, p3_val) {
-                (Some(SPValue::Int64(v2)), SPValue::Int64(v3)) => {
-                    let i2 = match v2 {
-                        IntOrUnknown::Int64(i) => i,
-                        IntOrUnknown::UNKNOWN => 0,
-                    };
-                    let i3 = match v3 {
-                        IntOrUnknown::Int64(i) => i,
-                        IntOrUnknown::UNKNOWN => 0,
-                    };
-                    (i2 - i3).to_spvalue()
-                },
-                (Some(SPValue::Float64(v2)), SPValue::Float64(v3)) => {
-                    let f2 = match v2 {
-                        FloatOrUnknown::Float64(ordered_float::OrderedFloat(f)) => f,
-                        FloatOrUnknown::UNKNOWN => 0.0,
-                    };
-                    let f3 = match v3 {
-                        FloatOrUnknown::Float64(ordered_float::OrderedFloat(f)) => f,
-                        FloatOrUnknown::UNKNOWN => 0.0,
-                    };
-                    (f2 - f3).to_spvalue()
-                },
-                _ => panic!("Can only add int to int or float to float")
-            };
+        //     let new_val = match (p2_val, p3_val) {
+        //         (Some(SPValue::Int64(v2)), SPValue::Int64(v3)) => {
+        //             let i2 = match v2 {
+        //                 IntOrUnknown::Int64(i) => i,
+        //                 IntOrUnknown::UNKNOWN => 0,
+        //             };
+        //             let i3 = match v3 {
+        //                 IntOrUnknown::Int64(i) => i,
+        //                 IntOrUnknown::UNKNOWN => 0,
+        //             };
+        //             (i2 - i3).to_spvalue()
+        //         },
+        //         (Some(SPValue::Float64(v2)), SPValue::Float64(v3)) => {
+        //             let f2 = match v2 {
+        //                 FloatOrUnknown::Float64(ordered_float::OrderedFloat(f)) => f,
+        //                 FloatOrUnknown::UNKNOWN => 0.0,
+        //             };
+        //             let f3 = match v3 {
+        //                 FloatOrUnknown::Float64(ordered_float::OrderedFloat(f)) => f,
+        //                 FloatOrUnknown::UNKNOWN => 0.0,
+        //             };
+        //             (f2 - f3).to_spvalue()
+        //         },
+        //         _ => panic!("Can only add int to int or float to float")
+        //     };
 
-            Action::new(p1, SPWrapped::SPValue(new_val))
-        }
+        //     Action::new(p1, new_val.wrap())
+        // }
+        = p1:variable(&state) _ "+=" _ p2:value(&state) { Action::inc(p1, p2) }
         / p1:variable(&state) _ "<-" _ p2:variable(&state) { Action::new(p1, p2.wrap()) }
         / p1:variable(&state) _ "<-" _ p2:value(&state) { Action::new(p1, p2) }
     }
@@ -377,103 +378,6 @@ mod tests {
         assert_eq!(pred_parser::pred(impl1, &s), Ok(impl2));
     }
 
-    // #[test]
-    // fn parse_actions() {
-    //     let s = State::from_vec(&john_doe());
-    //     let weight = fv!("weight");
-    //     let weight_2 = fv!("weight_2");
-    //     let s_new = s.add(SPAssignment::new(weight_2, 85.0.to_spvalue()));
-    //     let a1 = a!(weight.clone(), 82.5.wrap());
-    //     let _a2 = a!(weight.clone(), 85.0.wrap());
-    //     assert_eq!(pred_parser::action("var:weight <- 82.5", &s), Ok(a1));
-    //     assert_eq!(
-    //         pred_parser::action("var:weight <- var:weight_2", &s_new),
-    //         Ok(Action {
-    //             var: SPVariable {
-    //                 name: "weight".to_string(),
-    //                 value_type: SPValueType::Float64,
-    //             },
-    //             var_or_val: SPVariable {
-    //                 name: "weight_2".to_string(),
-    //                 value_type: SPValueType::Float64,
-    //             }
-    //             .wrap()
-    //         })
-    //     );
-
-    //     let counter_var = SPVariable {
-    //         name: "counter".to_string(),
-    //         value_type: SPValueType::Int64,
-    //     };
-
-    //     let counter_var_2 = SPVariable {
-    //         name: "counter_2".to_string(),
-    //         value_type: SPValueType::Int64,
-    //     };
-
-    //     let counter_var_f = SPVariable {
-    //         name: "counter_f".to_string(),
-    //         value_type: SPValueType::Float64,
-    //     };
-
-    //     let counter_var_2_f = SPVariable {
-    //         name: "counter_2_f".to_string(),
-    //         value_type: SPValueType::Float64,
-    //     };
-
-    //     let s_counter = s.add(SPAssignment::new(counter_var.clone(), (10i64).to_spvalue()));
-    //     let s_counter = s_counter.add(SPAssignment::new(counter_var_2.clone(), (3i64).to_spvalue()));
-
-    //     let s_counter_f = s.add(SPAssignment::new(counter_var_f.clone(), (10f64).to_spvalue()));
-    //     let s_counter_f = s_counter_f.add(SPAssignment::new(counter_var_2_f.clone(), (9f64).to_spvalue()));
-
-    //     let expected_action_1 = Action::new(
-    //         counter_var.clone(),
-    //         SPWrapped::SPValue((11i64).to_spvalue()),
-    //     );
-    //     assert_eq!(
-    //         pred_parser::action("var:counter <- var:counter + 1", &s_counter),
-    //         Ok(expected_action_1)
-    //     );
-
-    //     let expected_action_5 = Action::new(
-    //         counter_var.clone(),
-    //         SPWrapped::SPValue((15i64).to_spvalue()),
-    //     );
-    //     assert_eq!(
-    //         pred_parser::action("var:counter <- var:counter + 5", &s_counter),
-    //         Ok(expected_action_5)
-    //     );
-
-    //     let expected_action_5f = Action::new(
-    //         counter_var_f.clone(),
-    //         SPWrapped::SPValue((15f64).to_spvalue()),
-    //     );
-    //     assert_eq!(
-    //         pred_parser::action("var:counter_f <- var:counter_f + 5.0", &s_counter_f),
-    //         Ok(expected_action_5f)
-    //     );
-
-    //     let a3 = pred_parser::action("var:counter <- var:counter + 5", &s_counter).unwrap();
-    //     let a4 = pred_parser::action("var:counter_f <- var:counter_f + 7.0", &s_counter_f).unwrap();
-
-    //     let a5 = pred_parser::action("var:counter <- var:counter + var:counter_2", &s_counter).unwrap();
-    //     let a6 = pred_parser::action("var:counter_f <- var:counter_f + var:counter_2_f", &s_counter_f).unwrap();
-
-    //     let s_next_1 = a3.assign(&s_counter, "t");
-    //     assert_eq!(s_next_1.get_value("counter", "t"), Some(15.to_spvalue()));
-
-    //     let s_next_2 = a4.assign(&s_counter_f, "t");
-    //     assert_eq!(s_next_2.get_value("counter_f", "t"), Some(17.0.to_spvalue()));
-
-    //     let s_next_3 = a5.assign(&s_counter, "t");
-    //     assert_eq!(s_next_3.get_value("counter", "t"), Some(13.to_spvalue()));
-
-    //     let s_next_4 = a6.assign(&s_counter_f, "t");
-    //     assert_eq!(s_next_4.get_value("counter_f", "t"), Some(19.0.to_spvalue()));
-
-    // }
-
     #[test]
     fn parse_basic_actions() {
         let s = State::from_vec(&john_doe());
@@ -493,8 +397,8 @@ mod tests {
                 var_or_val: SPVariable {
                     name: "weight_2".to_string(),
                     value_type: SPValueType::Float64,
-                }
-                .wrap()
+                }.wrap(),
+                action_type: ActionType::Assign
             })
         );
     }
@@ -502,235 +406,12 @@ mod tests {
     #[test]
     fn parse_increment_actions() {
         let s = State::from_vec(&john_doe());
-        let counter_var = SPVariable {
-            name: "counter".to_string(),
-            value_type: SPValueType::Int64,
-        };
-        let counter_var_2 = SPVariable {
-            name: "counter_2".to_string(),
-            value_type: SPValueType::Int64,
-        };
-        let counter_var_f = SPVariable {
-            name: "counter_f".to_string(),
-            value_type: SPValueType::Float64,
-        };
-        let counter_var_2_f = SPVariable {
-            name: "counter_2_f".to_string(),
-            value_type: SPValueType::Float64,
-        };
-        let i_unknown_var = SPVariable {
-            name: "i_unknown".to_string(),
-            value_type: SPValueType::Int64,
-        };
-
-        let s_counter = s
-            .add(SPAssignment::new(counter_var.clone(), (10i64).to_spvalue()))
-            .add(SPAssignment::new(
-                counter_var_2.clone(),
-                (3i64).to_spvalue(),
-            ))
-            .add(SPAssignment::new(
-                i_unknown_var.clone(),
-                SPValue::Int64(IntOrUnknown::UNKNOWN),
-            ));
-
-        let s_counter_f = s
-            .add(SPAssignment::new(
-                counter_var_f.clone(),
-                (10.0f64).to_spvalue(),
-            ))
-            .add(SPAssignment::new(
-                counter_var_2_f.clone(),
-                (9.0f64).to_spvalue(),
-            ));
-
-        // --- Test Parsing (Resulting Action object) ---
-        let expected_action_1 = Action::new(
-            counter_var.clone(),
-            SPWrapped::SPValue((11i64).to_spvalue()),
-        );
-        assert_eq!(
-            pred_parser::action("var:counter <- var:counter + 1", &s_counter),
-            Ok(expected_action_1)
-        );
-
-        let expected_action_5f = Action::new(
-            counter_var_f.clone(),
-            SPWrapped::SPValue((15.0f64).to_spvalue()),
-        );
-        assert_eq!(
-            pred_parser::action("var:counter_f <- var:counter_f + 5.0", &s_counter_f),
-            Ok(expected_action_5f)
-        );
-
-        let expected_action_var_i = Action::new(
-            counter_var.clone(),
-            SPWrapped::SPValue((13i64).to_spvalue()),
-        );
-        assert_eq!(
-            pred_parser::action("var:counter <- var:counter + var:counter_2", &s_counter),
-            Ok(expected_action_var_i)
-        );
-
-        let expected_action_var_f = Action::new(
-            counter_var_f.clone(),
-            SPWrapped::SPValue((19.0f64).to_spvalue()),
-        );
-        assert_eq!(
-            pred_parser::action(
-                "var:counter_f <- var:counter_f + var:counter_2_f",
-                &s_counter_f
-            ),
-            Ok(expected_action_var_f)
-        );
-
-        // --- Test Execution (Resulting State value) ---
-        let a3 = pred_parser::action("var:counter <- var:counter + 5", &s_counter).unwrap();
-        let s_next_1 = a3.assign(&s_counter, "t");
-        assert_eq!(s_next_1.get_value("counter", "t"), Some(15.to_spvalue()));
-
-        let a4 = pred_parser::action("var:counter_f <- var:counter_f + 7.0", &s_counter_f).unwrap();
-        let s_next_2 = a4.assign(&s_counter_f, "t");
-        assert_eq!(
-            s_next_2.get_value("counter_f", "t"),
-            Some(17.0.to_spvalue())
-        );
-
-        // --- Test UNKNOWN (as 0) ---
-        // UNKNOWN_var (0) + Int (10) = 10
-        let expected_unknown_1 = Action::new(
-            i_unknown_var.clone(),
-            SPWrapped::SPValue((10i64).to_spvalue()),
-        );
-        assert_eq!(
-            pred_parser::action("var:i_unknown <- var:i_unknown + var:counter", &s_counter),
-            Ok(expected_unknown_1)
-        );
-
-        // Int (10) + UNKNOWN_literal (0) = 10
-        let expected_unknown_2 = Action::new(
-            counter_var.clone(),
-            SPWrapped::SPValue((10i64).to_spvalue()),
-        );
-        assert_eq!(
-            pred_parser::action("var:counter <- var:counter + UNKNOWN_int", &s_counter),
-            Ok(expected_unknown_2)
-        );
+        let inc1 = pred_parser::action("var:height += 5", &s).unwrap();
+        let inc2 = pred_parser::action("var:height += 7", &s).unwrap();
+        let s_next_1 = inc1.assign(&s, "t");
+        let s_next_2 = inc2.assign(&s_next_1, "t");
+        assert_eq!(s_next_1.get_value("height", "t"), Some(190.to_spvalue()));
+        assert_eq!(s_next_2.get_value("height", "t"), Some(197.to_spvalue()));
     }
 
-    #[test]
-    fn parse_decrement_actions() {
-        let s = State::from_vec(&john_doe());
-        let counter_var = SPVariable {
-            name: "counter".to_string(),
-            value_type: SPValueType::Int64,
-        };
-        let counter_var_2 = SPVariable {
-            name: "counter_2".to_string(),
-            value_type: SPValueType::Int64,
-        };
-        let counter_var_f = SPVariable {
-            name: "counter_f".to_string(),
-            value_type: SPValueType::Float64,
-        };
-        let counter_var_2_f = SPVariable {
-            name: "counter_2_f".to_string(),
-            value_type: SPValueType::Float64,
-        };
-        let i_unknown_var = SPVariable {
-            name: "i_unknown".to_string(),
-            value_type: SPValueType::Int64,
-        };
-
-        let s_counter = s
-            .add(SPAssignment::new(counter_var.clone(), (10i64).to_spvalue()))
-            .add(SPAssignment::new(
-                counter_var_2.clone(),
-                (3i64).to_spvalue(),
-            ))
-            .add(SPAssignment::new(
-                i_unknown_var.clone(),
-                SPValue::Int64(IntOrUnknown::UNKNOWN),
-            ));
-
-        let s_counter_f = s
-            .add(SPAssignment::new(
-                counter_var_f.clone(),
-                (10.0f64).to_spvalue(),
-            ))
-            .add(SPAssignment::new(
-                counter_var_2_f.clone(),
-                (9.0f64).to_spvalue(),
-            ));
-
-        // --- Test Parsing (Resulting Action object) ---
-        // Int - literal (10 - 1 = 9)
-        let expected_action_1 =
-            Action::new(counter_var.clone(), SPWrapped::SPValue((9i64).to_spvalue()));
-        assert_eq!(
-            pred_parser::action("var:counter <- var:counter - 1", &s_counter),
-            Ok(expected_action_1)
-        );
-
-        // Float - literal (10.0 - 1.5 = 8.5)
-        let expected_action_f = Action::new(
-            counter_var_f.clone(),
-            SPWrapped::SPValue((8.5f64).to_spvalue()),
-        );
-        assert_eq!(
-            pred_parser::action("var:counter_f <- var:counter_f - 1.5", &s_counter_f),
-            Ok(expected_action_f)
-        );
-
-        // Int - variable (10 - 3 = 7)
-        let expected_action_var_i =
-            Action::new(counter_var.clone(), SPWrapped::SPValue((7i64).to_spvalue()));
-        assert_eq!(
-            pred_parser::action("var:counter <- var:counter - var:counter_2", &s_counter),
-            Ok(expected_action_var_i)
-        );
-
-        // Float - variable (10.0 - 9.0 = 1.0)
-        let expected_action_var_f = Action::new(
-            counter_var_f.clone(),
-            SPWrapped::SPValue((1.0f64).to_spvalue()),
-        );
-        assert_eq!(
-            pred_parser::action(
-                "var:counter_f <- var:counter_f - var:counter_2_f",
-                &s_counter_f
-            ),
-            Ok(expected_action_var_f)
-        );
-
-        // --- Test Execution (Resulting State value) ---
-        let a1 = pred_parser::action("var:counter <- var:counter - 5", &s_counter).unwrap(); // 10 - 5 = 5
-        let s_next_1 = a1.assign(&s_counter, "t");
-        assert_eq!(s_next_1.get_value("counter", "t"), Some(5.to_spvalue()));
-
-        let a2 = pred_parser::action("var:counter_f <- var:counter_f - 2.5", &s_counter_f).unwrap(); // 10.0 - 2.5 = 7.5
-        let s_next_2 = a2.assign(&s_counter_f, "t");
-        assert_eq!(s_next_2.get_value("counter_f", "t"), Some(7.5.to_spvalue()));
-
-        // --- Test UNKNOWN (as 0) ---
-        // UNKNOWN_var (0) - Int (10) = -10
-        let expected_unknown_1 = Action::new(
-            i_unknown_var.clone(),
-            SPWrapped::SPValue((-10i64).to_spvalue()),
-        );
-        assert_eq!(
-            pred_parser::action("var:i_unknown <- var:i_unknown - var:counter", &s_counter),
-            Ok(expected_unknown_1)
-        );
-
-        // Int (10) - UNKNOWN_var (0) = 10
-        let expected_unknown_2 = Action::new(
-            counter_var.clone(),
-            SPWrapped::SPValue((10i64).to_spvalue()),
-        );
-        assert_eq!(
-            pred_parser::action("var:counter <- var:counter - var:i_unknown", &s_counter),
-            Ok(expected_unknown_2)
-        );
-    }
 }
