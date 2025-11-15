@@ -301,6 +301,70 @@ pub fn format_log_rows(log_rows: &Vec<Vec<OperationLog>>) -> String {
     output
 }
 
+pub fn format_transition_log(log: &Vec<TransitionMsg>) -> String {
+    let mut output = String::new();
+
+    if log.is_empty() {
+        writeln!(&mut output, "(No transitions logged)").unwrap();
+        return output;
+    }
+
+    let mut max_line_width;
+    let mut rendered_lines: Vec<String> = Vec::new();
+
+    let title = "Transitions".bold().blue();
+    let underline = format!("{:-<width$}", "", width = "Transitions".len());
+
+    max_line_width = std::cmp::max(
+        measure_text_width(&title.to_string()),
+        measure_text_width(&underline),
+    );
+
+    rendered_lines.push(title.to_string());
+    rendered_lines.push(underline.to_string());
+
+    for msg in log {
+        let ts = format_timestamp(&msg.timestamp);
+
+        let log_colored = match msg.severity {
+            log::Level::Error => msg.log.red().bold(),
+            log::Level::Warn => msg.log.yellow(),
+            _ => msg.log.normal(),
+        };
+
+        let colored_line = format!(
+            "[{ts}] {name}: {log}",
+            ts = ts.dimmed(),
+            name = msg.transition_name.blue(),
+            log = log_colored
+        );
+
+        let line_width = measure_text_width(&colored_line);
+        max_line_width = std::cmp::max(max_line_width, line_width);
+        rendered_lines.push(colored_line);
+    }
+
+    let mut padded_box_lines = Vec::new();
+    let border_top = format!("+{:-<width$}+", "", width = max_line_width + 2);
+
+    padded_box_lines.push(border_top.clone());
+
+    for mut line in rendered_lines {
+        let current_width = measure_text_width(&line);
+        let padding = " ".repeat(max_line_width.saturating_sub(current_width));
+        line.push_str(&padding);
+        padded_box_lines.push(format!("| {} |", line));
+    }
+
+    padded_box_lines.push(border_top);
+
+    for line in padded_box_lines {
+        writeln!(&mut output, "{}", line).unwrap();
+    }
+
+    output
+}
+
 #[test]
 fn test_log_formatter_with_colors() {
     let base_time = chrono::TimeZone::with_ymd_and_hms(&Utc, 2025, 11, 8, 15, 36, 0).unwrap();
