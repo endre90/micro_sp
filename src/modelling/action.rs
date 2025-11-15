@@ -9,6 +9,8 @@ pub enum ActionType {
     Assign,
     Increment,
     Decrement,
+    // Addition,
+    // Subtraction
 }
 
 /// Actions update the assignments of the state variables.
@@ -51,6 +53,15 @@ impl Action {
             action_type: ActionType::Decrement,
         }
     }
+
+    // could provide a vector and then add all in the vectro...
+    // pub fn addition(var: SPVariable, var_or_val: SPWrapped, var_or_val_2: SPWrapped) -> Action {
+    //     Action {
+    //         var,
+    //         var_or_val,
+    //         action_type: ActionType::Addition,
+    //     }
+    // }
 
     pub fn assign(self, state: &State, log_target: &str) -> State {
         match self.action_type {

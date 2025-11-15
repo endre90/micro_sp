@@ -18,6 +18,10 @@ pub enum Predicate {
     OR(Vec<Predicate>),
     EQ(SPWrapped, SPWrapped),
     NEQ(SPWrapped, SPWrapped),
+    LTEQ(SPWrapped, SPWrapped),
+    GTEQ(SPWrapped, SPWrapped),
+    LT(SPWrapped, SPWrapped),
+    GT(SPWrapped, SPWrapped),
 }
 
 impl Predicate {
@@ -69,6 +73,86 @@ impl Predicate {
                 }
                 (SPWrapped::SPValue(vx), SPWrapped::SPValue(vy)) => vx != vy,
             },
+            Predicate::LTEQ(x, y) => match (x, y) {
+                (SPWrapped::SPVariable(vx), SPWrapped::SPVariable(vy)) => {
+                    state.get_value(&vx.name, &log_target) <= state.get_value(&vy.name, &log_target)
+                }
+                (SPWrapped::SPVariable(vx), SPWrapped::SPValue(vy)) => {
+                    if let Some(value) = state.get_value(&vx.name, &log_target) {
+                        value <= vy
+                    } else {
+                        false
+                    }
+                }
+                (SPWrapped::SPValue(vx), SPWrapped::SPVariable(vy)) => {
+                    if let Some(value) = state.get_value(&vy.name, &log_target) {
+                        vx <= value
+                    } else {
+                        false
+                    }
+                }
+                (SPWrapped::SPValue(vx), SPWrapped::SPValue(vy)) => vx <= vy,
+            },
+            Predicate::GTEQ(x, y) => match (x, y) {
+                (SPWrapped::SPVariable(vx), SPWrapped::SPVariable(vy)) => {
+                    state.get_value(&vx.name, &log_target) >= state.get_value(&vy.name, &log_target)
+                }
+                (SPWrapped::SPVariable(vx), SPWrapped::SPValue(vy)) => {
+                    if let Some(value) = state.get_value(&vx.name, &log_target) {
+                        value >= vy
+                    } else {
+                        false
+                    }
+                }
+                (SPWrapped::SPValue(vx), SPWrapped::SPVariable(vy)) => {
+                    if let Some(value) = state.get_value(&vy.name, &log_target) {
+                        vx >= value
+                    } else {
+                        false
+                    }
+                }
+                (SPWrapped::SPValue(vx), SPWrapped::SPValue(vy)) => vx >= vy,
+            },
+            Predicate::LT(x, y) => match (x, y) {
+                (SPWrapped::SPVariable(vx), SPWrapped::SPVariable(vy)) => {
+                    state.get_value(&vx.name, &log_target) < state.get_value(&vy.name, &log_target)
+                }
+                (SPWrapped::SPVariable(vx), SPWrapped::SPValue(vy)) => {
+                    if let Some(value) = state.get_value(&vx.name, &log_target) {
+                        value < vy
+                    } else {
+                        false
+                    }
+                }
+                (SPWrapped::SPValue(vx), SPWrapped::SPVariable(vy)) => {
+                    if let Some(value) = state.get_value(&vy.name, &log_target) {
+                        vx < value
+                    } else {
+                        false
+                    }
+                }
+                (SPWrapped::SPValue(vx), SPWrapped::SPValue(vy)) => vx < vy,
+            },
+            Predicate::GT(x, y) => match (x, y) {
+                (SPWrapped::SPVariable(vx), SPWrapped::SPVariable(vy)) => {
+                    state.get_value(&vx.name, &log_target) > state.get_value(&vy.name, &log_target)
+                }
+                (SPWrapped::SPVariable(vx), SPWrapped::SPValue(vy)) => {
+                    if let Some(value) = state.get_value(&vx.name, &log_target) {
+                        value > vy
+                    } else {
+                        false
+                    }
+                }
+                (SPWrapped::SPValue(vx), SPWrapped::SPVariable(vy)) => {
+                    if let Some(value) = state.get_value(&vy.name, &log_target) {
+                        vx > value
+                    } else {
+                        false
+                    }
+                }
+                (SPWrapped::SPValue(vx), SPWrapped::SPValue(vy)) => vx > vy,
+            },
         }
     }
 
@@ -103,7 +187,12 @@ impl Predicate {
                     Some(Predicate::OR(new))
                 }
             }
-            Predicate::EQ(x, y) | Predicate::NEQ(x, y) => {
+            Predicate::EQ(x, y)
+            | Predicate::NEQ(x, y)
+            | Predicate::LTEQ(x, y)
+            | Predicate::GTEQ(x, y)
+            | Predicate::LT(x, y)
+            | Predicate::GT(x, y) => {
                 let remove_x = match x {
                     SPWrapped::SPValue(_) => false,
                     SPWrapped::SPVariable(vx) => !only.contains(&vx.name),
@@ -153,7 +242,12 @@ impl Predicate {
                     Some(Predicate::OR(new))
                 }
             }
-            Predicate::EQ(x, y) | Predicate::NEQ(x, y) => {
+            Predicate::EQ(x, y)
+            | Predicate::NEQ(x, y)
+            | Predicate::LTEQ(x, y)
+            | Predicate::GTEQ(x, y)
+            | Predicate::LT(x, y)
+            | Predicate::GT(x, y) => {
                 let remove_x = match x {
                     SPWrapped::SPValue(_) => false,
                     SPWrapped::SPVariable(vx) => remove.contains(&vx.name),
@@ -178,7 +272,12 @@ impl Predicate {
                 preds.iter().flat_map(|p| p.get_predicate_vars()).collect()
             }
             Predicate::NOT(p) => p.get_predicate_vars(),
-            Predicate::EQ(lhs, rhs) | Predicate::NEQ(lhs, rhs) => {
+            Predicate::EQ(lhs, rhs)
+            | Predicate::NEQ(lhs, rhs)
+            | Predicate::LTEQ(lhs, rhs)
+            | Predicate::GTEQ(lhs, rhs)
+            | Predicate::LT(lhs, rhs)
+            | Predicate::GT(lhs, rhs) => {
                 let mut found = Vec::new();
                 if let SPWrapped::SPVariable(v) = lhs {
                     found.push(v.clone());
@@ -197,7 +296,10 @@ impl Predicate {
     }
 
     pub fn get_predicate_var_keys(&self) -> Vec<String> {
-        self.get_predicate_vars().iter().map(|var| var.name.to_owned()).collect()
+        self.get_predicate_vars()
+            .iter()
+            .map(|var| var.name.to_owned())
+            .collect()
     }
 
     // let mut s = Vec::new();
@@ -250,6 +352,10 @@ impl fmt::Display for Predicate {
             Predicate::FALSE => "FALSE".into(),
             Predicate::EQ(x, y) => format!("{} = {}", x, y),
             Predicate::NEQ(x, y) => format!("{} != {}", x, y),
+            Predicate::LTEQ(x, y) => format!("{} <= {}", x, y),
+            Predicate::GTEQ(x, y) => format!("{} >= {}", x, y),
+            Predicate::LT(x, y) => format!("{} < {}", x, y),
+            Predicate::GT(x, y) => format!("{} > {}", x, y),
         };
 
         write!(fmtr, "{}", &s)
@@ -284,6 +390,126 @@ mod tests {
         let eq2 = Predicate::EQ(v!("name").wrap(), "Jack".wrap());
         assert!(eq1.eval(&state, "t"));
         assert_ne!(true, eq2.eval(&state, "t"));
+    }
+
+    #[test]
+    fn test_predicate_lteq() {
+        let state = State::from_vec(&john_doe());
+        let eq1 = Predicate::LTEQ(
+            state.get_int_or_default_to_zero("height", "t").wrap(),
+            185.wrap(),
+        );
+        let eq2 = Predicate::LTEQ(
+            state.get_int_or_default_to_zero("height", "t").wrap(),
+            186.wrap(),
+        );
+        let eq3 = Predicate::LTEQ(
+            state.get_int_or_default_to_zero("height", "t").wrap(),
+            184.wrap(),
+        );
+        let eq4 = Predicate::LTEQ(
+            state.get_float_or_default_to_zero("weight", "t").wrap(),
+            state.get_int_or_default_to_zero("height", "t").wrap(),
+        );
+        let eq5 = Predicate::LTEQ(
+            state.get_int_or_default_to_zero("height", "t").wrap(),
+            state.get_float_or_default_to_zero("weight", "t").wrap(),
+        );
+        assert!(eq1.eval(&state, "t"));
+        assert!(eq2.eval(&state, "t"));
+        assert!(!eq3.eval(&state, "t"));
+        assert!(eq4.eval(&state, "t"));
+        assert!(!eq5.eval(&state, "t"));
+    }
+
+    #[test]
+    fn test_predicate_lt() {
+        let state = State::from_vec(&john_doe());
+        let eq1 = Predicate::LT(
+            state.get_int_or_default_to_zero("height", "t").wrap(),
+            185.wrap(),
+        );
+        let eq2 = Predicate::LT(
+            state.get_int_or_default_to_zero("height", "t").wrap(),
+            186.wrap(),
+        );
+        let eq3 = Predicate::LT(
+            state.get_int_or_default_to_zero("height", "t").wrap(),
+            184.wrap(),
+        );
+        let eq4 = Predicate::LT(
+            state.get_float_or_default_to_zero("weight", "t").wrap(),
+            state.get_int_or_default_to_zero("height", "t").wrap(),
+        );
+        let eq5 = Predicate::LT(
+            state.get_int_or_default_to_zero("height", "t").wrap(),
+            state.get_float_or_default_to_zero("weight", "t").wrap(),
+        );
+        assert!(!eq1.eval(&state, "t"));
+        assert!(eq2.eval(&state, "t"));
+        assert!(!eq3.eval(&state, "t"));
+        assert!(eq4.eval(&state, "t"));
+        assert!(!eq5.eval(&state, "t"));
+    }
+
+    #[test]
+    fn test_predicate_gteq() {
+        let state = State::from_vec(&john_doe());
+        let eq1 = Predicate::GTEQ(
+            state.get_int_or_default_to_zero("height", "t").wrap(),
+            185.wrap(),
+        );
+        let eq2 = Predicate::GTEQ(
+            state.get_int_or_default_to_zero("height", "t").wrap(),
+            184.wrap(),
+        );
+        let eq3 = Predicate::GTEQ(
+            state.get_int_or_default_to_zero("height", "t").wrap(),
+            186.wrap(),
+        );
+        let eq4 = Predicate::GTEQ(
+            state.get_float_or_default_to_zero("weight", "t").wrap(),
+            state.get_int_or_default_to_zero("height", "t").wrap(),
+        );
+        let eq5 = Predicate::GTEQ(
+            state.get_int_or_default_to_zero("height", "t").wrap(),
+            state.get_float_or_default_to_zero("weight", "t").wrap(),
+        );
+        assert!(eq1.eval(&state, "t"));
+        assert!(eq2.eval(&state, "t"));
+        assert!(!eq3.eval(&state, "t"));
+        assert!(!eq4.eval(&state, "t"));
+        assert!(eq5.eval(&state, "t"));
+    }
+
+    #[test]
+    fn test_predicate_gt() {
+        let state = State::from_vec(&john_doe());
+        let eq1 = Predicate::GT(
+            state.get_int_or_default_to_zero("height", "t").wrap(),
+            185.wrap(),
+        );
+        let eq2 = Predicate::GT(
+            state.get_int_or_default_to_zero("height", "t").wrap(),
+            184.wrap(),
+        );
+        let eq3 = Predicate::GT(
+            state.get_int_or_default_to_zero("height", "t").wrap(),
+            186.wrap(),
+        );
+        let eq4 = Predicate::GT(
+            state.get_float_or_default_to_zero("weight", "t").wrap(),
+            state.get_int_or_default_to_zero("height", "t").wrap(),
+        );
+        let eq5 = Predicate::GT(
+            state.get_int_or_default_to_zero("height", "t").wrap(),
+            state.get_float_or_default_to_zero("weight", "t").wrap(),
+        );
+        assert!(!eq1.eval(&state, "t"));
+        assert!(eq2.eval(&state, "t"));
+        assert!(!eq3.eval(&state, "t"));
+        assert!(!eq4.eval(&state, "t"));
+        assert!(eq5.eval(&state, "t"));
     }
 
     #[test]

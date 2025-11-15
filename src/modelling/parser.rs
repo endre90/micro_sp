@@ -58,6 +58,10 @@ peg::parser!(pub grammar pred_parser() for str {
     pub rule eq(state: &State) -> Predicate
         = p1:value(&state) _ "==" _ p2:value(&state) { Predicate::EQ(p1,p2) }
         / p1:value(&state) _ "!=" _ p2:value(&state) { Predicate::NEQ(p1,p2) }
+        / p1:value(&state) _ "<=" _ p2:value(&state) { Predicate::LTEQ(p1,p2) }
+        / p1:value(&state) _ "<" _ p2:value(&state) { Predicate::LT(p1,p2) }
+        / p1:value(&state) _ ">=" _ p2:value(&state) { Predicate::GTEQ(p1,p2) }
+        / p1:value(&state) _ ">" _ p2:value(&state) { Predicate::GT(p1,p2) }
 
     pub rule pred(state: &State) -> Predicate = precedence!{
         _ p:eq(&state) { p }
@@ -97,85 +101,9 @@ peg::parser!(pub grammar pred_parser() for str {
     }
 
     pub rule action(state: &State) -> Action
-        // = p1:variable(&state) _ "<-" _ p1:variable(&state) _ "+" _ p3:value(&state) {
-        //     let p2_val = state.get_value(&p2.name, "parser");
-
-        //     let p3_val = match p3 {
-        //         SPWrapped::SPValue(val) => val,
-        //         SPWrapped::SPVariable(var) => {
-        //             state.get_value(&var.name, "parser").expect("variable not found")
-        //         }
-        //     };
-
-        //     let new_val = match (p2_val, p3_val) {
-        //         (Some(SPValue::Int64(v2)), SPValue::Int64(v3)) => {
-        //             let i2 = match v2 {
-        //                 IntOrUnknown::Int64(i) => i,
-        //                 IntOrUnknown::UNKNOWN => 0,
-        //             };
-        //             let i3 = match v3 {
-        //                 IntOrUnknown::Int64(i) => i,
-        //                 IntOrUnknown::UNKNOWN => 0,
-        //             };
-        //             (i2 + i3).to_spvalue()
-        //         },
-        //         (Some(SPValue::Float64(v2)), SPValue::Float64(v3)) => {
-        //             let f2 = match v2 {
-        //                 FloatOrUnknown::Float64(ordered_float::OrderedFloat(f)) => f,
-        //                 FloatOrUnknown::UNKNOWN => 0.0,
-        //             };
-        //             let f3 = match v3 {
-        //                 FloatOrUnknown::Float64(ordered_float::OrderedFloat(f)) => f,
-        //                 FloatOrUnknown::UNKNOWN => 0.0,
-        //             };
-        //             (f2 + f3).to_spvalue()
-        //         },
-        //         _ => panic!("Can only add int to int or float to float")
-        //     };
-
-        //     Action::new(p1, new_val.wrap())
-        // }
-
-        // / p1:variable(&state) _ "<-" _ p2:variable(&state) _ "-" _ p3:value(&state) {
-        //     let p2_val = state.get_value(&p2.name, "parser");
-
-        //     let p3_val = match p3 {
-        //         SPWrapped::SPValue(val) => val,
-        //         SPWrapped::SPVariable(var) => {
-        //             state.get_value(&var.name, "parser").expect("variable not found")
-        //         }
-        //     };
-
-        //     let new_val = match (p2_val, p3_val) {
-        //         (Some(SPValue::Int64(v2)), SPValue::Int64(v3)) => {
-        //             let i2 = match v2 {
-        //                 IntOrUnknown::Int64(i) => i,
-        //                 IntOrUnknown::UNKNOWN => 0,
-        //             };
-        //             let i3 = match v3 {
-        //                 IntOrUnknown::Int64(i) => i,
-        //                 IntOrUnknown::UNKNOWN => 0,
-        //             };
-        //             (i2 - i3).to_spvalue()
-        //         },
-        //         (Some(SPValue::Float64(v2)), SPValue::Float64(v3)) => {
-        //             let f2 = match v2 {
-        //                 FloatOrUnknown::Float64(ordered_float::OrderedFloat(f)) => f,
-        //                 FloatOrUnknown::UNKNOWN => 0.0,
-        //             };
-        //             let f3 = match v3 {
-        //                 FloatOrUnknown::Float64(ordered_float::OrderedFloat(f)) => f,
-        //                 FloatOrUnknown::UNKNOWN => 0.0,
-        //             };
-        //             (f2 - f3).to_spvalue()
-        //         },
-        //         _ => panic!("Can only add int to int or float to float")
-        //     };
-
-        //     Action::new(p1, new_val.wrap())
-        // }
         = p1:variable(&state) _ "+=" _ p2:value(&state) { Action::inc(p1, p2) }
         / p1:variable(&state) _ "-=" _ p2:value(&state) { Action::dec(p1, p2) }
+        // / p1:variable(&state) _ "<-" _ p2:value(&state) _ "+" _ p3:value(&state) { Action::new(p1, p2) }
         / p1:variable(&state) _ "<-" _ p2:variable(&state) { Action::new(p1, p2.wrap()) }
         / p1:variable(&state) _ "<-" _ p2:value(&state) { Action::new(p1, p2) }
     }
@@ -447,5 +375,77 @@ mod tests {
         let s_next_2 = inc2.assign(&s_next_1, "t");
         assert_eq!(s_next_1.get_value("weight", "t"), Some(74.5.to_spvalue()));
         assert_eq!(s_next_2.get_value("weight", "t"), Some(66.8.to_spvalue()));
+    }
+
+    #[test]
+    fn test_parse_predicate_lteq() {
+        let s = State::from_vec(&john_doe());
+        let eq1 = pred_parser::pred("var:height <= 185", &s).unwrap();
+        let eq2 = pred_parser::pred("var:height <= 186", &s).unwrap();
+        let eq3 = pred_parser::pred("var:height <= 184", &s).unwrap();
+        let eq4 = pred_parser::pred("var:height <= var:weight", &s).unwrap();
+        let eq5 = pred_parser::pred("var:weight <= var:height", &s).unwrap();
+        let eq6 = pred_parser::pred("var:weight <= var:weight", &s).unwrap();
+
+        assert!(eq1.eval(&s, "t"));
+        assert!(eq2.eval(&s, "t"));
+        assert!(!eq3.eval(&s, "t"));
+        assert!(!eq4.eval(&s, "t"));
+        assert!(eq5.eval(&s, "t"));
+        assert!(eq6.eval(&s, "t"));
+    }
+
+    #[test]
+    fn test_parse_predicate_lt() {
+        let s = State::from_vec(&john_doe());
+        let eq1 = pred_parser::pred("var:height < 185", &s).unwrap();
+        let eq2 = pred_parser::pred("var:height < 186", &s).unwrap();
+        let eq3 = pred_parser::pred("var:height < 184", &s).unwrap();
+        let eq4 = pred_parser::pred("var:height < var:weight", &s).unwrap();
+        let eq5 = pred_parser::pred("var:weight < var:height", &s).unwrap();
+        let eq6 = pred_parser::pred("var:weight < var:weight", &s).unwrap();
+
+        assert!(!eq1.eval(&s, "t"));
+        assert!(eq2.eval(&s, "t"));
+        assert!(!eq3.eval(&s, "t"));
+        assert!(!eq4.eval(&s, "t"));
+        assert!(eq5.eval(&s, "t"));
+        assert!(!eq6.eval(&s, "t"));
+    }
+
+    #[test]
+    fn test_parse_predicate_gteq() {
+        let s = State::from_vec(&john_doe());
+        let eq1 = pred_parser::pred("var:height >= 185", &s).unwrap();
+        let eq2 = pred_parser::pred("var:height >= 186", &s).unwrap();
+        let eq3 = pred_parser::pred("var:height >= 184", &s).unwrap();
+        let eq4 = pred_parser::pred("var:height >= var:weight", &s).unwrap();
+        let eq5 = pred_parser::pred("var:weight >= var:height", &s).unwrap();
+        let eq6 = pred_parser::pred("var:weight >= var:weight", &s).unwrap();
+
+        assert!(eq1.eval(&s, "t"));
+        assert!(!eq2.eval(&s, "t"));
+        assert!(eq3.eval(&s, "t"));
+        assert!(eq4.eval(&s, "t"));
+        assert!(!eq5.eval(&s, "t"));
+        assert!(eq6.eval(&s, "t"));
+    }
+
+    #[test]
+    fn test_parse_predicate_gt() {
+        let s = State::from_vec(&john_doe());
+        let eq1 = pred_parser::pred("var:height > 185", &s).unwrap();
+        let eq2 = pred_parser::pred("var:height > 186", &s).unwrap();
+        let eq3 = pred_parser::pred("var:height > 184", &s).unwrap();
+        let eq4 = pred_parser::pred("var:height > var:weight", &s).unwrap();
+        let eq5 = pred_parser::pred("var:weight > var:height", &s).unwrap();
+        let eq6 = pred_parser::pred("var:weight > var:weight", &s).unwrap();
+
+        assert!(!eq1.eval(&s, "t"));
+        assert!(!eq2.eval(&s, "t"));
+        assert!(eq3.eval(&s, "t"));
+        assert!(eq4.eval(&s, "t"));
+        assert!(!eq5.eval(&s, "t"));
+        assert!(!eq6.eval(&s, "t"));
     }
 }
