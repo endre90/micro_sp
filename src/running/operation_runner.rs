@@ -103,6 +103,16 @@ async fn process_plan_tick(
         }
 
         PlanState::Executing => {
+            if let Some(dashboard_command) =
+                    state.get_value(&format!("{}_dashboard_command", sp_id), &log_target)
+                {
+                    if let SPValue::String(StringOrUnknown::String(db)) = dashboard_command {
+                        match db.as_str() {
+                            "stop" => plan_state_str = PlanState::Cancelled.to_string(),
+                            _ => (),
+                        }
+                    }
+                }
             if let Some(op_name) = plan.get(plan_current_step as usize) {
                 match model.operations.iter().find(|op| op.name == *op_name) {
                     Some(operation) => {
@@ -126,7 +136,7 @@ async fn process_plan_tick(
                 plan_state_str = PlanState::Completed.to_string();
             }
         }
-        PlanState::Failed | PlanState::Completed | PlanState::UNKNOWN => {
+        PlanState::Failed | PlanState::Completed | PlanState::Cancelled | PlanState::UNKNOWN => {
             plan_current_step = 0;
             new_state = reset_all_operations(&new_state, &model);
             plan_state_str = PlanState::Initial.to_string();

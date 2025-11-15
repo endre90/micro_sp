@@ -20,7 +20,8 @@ pub enum OperationState {
     Timedout,
     Failed,
     Fatal,
-    // Terminated,
+    Cancelled,
+    // Paused,
     UNKNOWN,
 }
 
@@ -61,7 +62,7 @@ impl fmt::Display for OperationState {
             OperationState::Fatal => write!(f, "fatal"),
             OperationState::Completed => write!(f, "completed"),
             OperationState::Bypassed => write!(f, "bypassed"),
-            // OperationState::Terminated => write!(f, "terminated"),
+            OperationState::Cancelled => write!(f, "cancelled"),
             OperationState::UNKNOWN => write!(f, "UNKNOWN"),
         }
     }
@@ -284,6 +285,27 @@ impl Operation {
                 for reset_transition in &self.reset_transitions {
                     if reset_transition.clone().eval(&state, &log_target) {
                         return true;
+                    }
+                }
+            }
+        }
+        false
+    }
+
+    /// Check if we can stop the execution and cancel the operations
+    pub fn can_be_cancelled(&self, sp_id: &str, state: &State, log_target: &str) -> bool {
+        if let Some(value) = state.get_value(&self.name, &log_target) {
+            if value == OperationState::Executing.to_spvalue()
+                || value == OperationState::Disabled.to_spvalue()
+            {
+                if let Some(dashboard_command) =
+                    state.get_value(&format!("{}_dashboard_command", sp_id), &log_target)
+                {
+                    if let SPValue::String(StringOrUnknown::String(db)) = dashboard_command {
+                        match db.as_str() {
+                            "stop" => return true,
+                            _ => (),
+                        }
                     }
                 }
             }

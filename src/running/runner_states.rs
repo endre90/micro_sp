@@ -23,7 +23,7 @@ pub enum PlanState {
     Failed,
     // NotFound,
     Completed,
-    // Cancelled,
+    Cancelled,
     UNKNOWN,
 }
 
@@ -89,7 +89,7 @@ impl PlanState {
             PlanState::Failed => "failed".to_spvalue(),
             // PlanState::NotFound => "not_found".to_spvalue(),
             PlanState::Completed => "completed".to_spvalue(),
-            // PlanState::Cancelled => "cancelled".to_spvalue(),
+            PlanState::Cancelled => "cancelled".to_spvalue(),
             PlanState::UNKNOWN => "UNKNOWN".to_spvalue(),
         }
     }
@@ -154,7 +154,7 @@ impl fmt::Display for PlanState {
             PlanState::Failed => write!(f, "failed"),
             // PlanState::NotFound => write!(f, "not_found"),
             PlanState::Completed => write!(f, "completed"),
-            // PlanState::Cancelled => write!(f, "cancelled"),
+            PlanState::Cancelled => write!(f, "cancelled"),
         }
     }
 }

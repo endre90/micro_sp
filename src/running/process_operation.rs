@@ -9,12 +9,6 @@ pub enum OperationProcessingType {
     Automatic,
 }
 
-// pub enum OperationInfoLevel {
-//     Info,
-//     Warn,
-//     Error,
-// }
-
 pub(super) async fn process_operation(
     mut new_state: State,
     operation: &Operation,
@@ -265,6 +259,9 @@ pub(super) async fn process_operation(
             // StateManager::remove_sp_value(&mut con, &operation.name).await;
             // new_state = operation.terminate(&new_state, &log_target);
         }
+
+        OperationState::Cancelled => {}
+
         // OperationState::Terminated => {
         //     new_op_info = format!("Operation '{}' terminated.", operation.name);
         //     op_info_level = OperationInfoLevel::Info;
