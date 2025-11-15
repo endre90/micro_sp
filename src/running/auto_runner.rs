@@ -1,7 +1,5 @@
 use crate::{
-    ConnectionManager, LogMsg, Model, OPERAION_RUNNER_TICK_INTERVAL_MS, OperationState, State,
-    StateManager, Transition, TransitionMsg,
-    running::process_operation::{OperationProcessingType, process_operation},
+    ConnectionManager, LogMsg, Model, OPERAION_RUNNER_TICK_INTERVAL_MS, OperationState, State, StateManager, Transition, TransitionMsg, initialize_env_logger, running::process_operation::{OperationProcessingType, process_operation}
 };
 use chrono::Utc;
 use rand::prelude::*;
@@ -46,8 +44,9 @@ pub async fn auto_transition_runner(
     name: &str,
     model: &Model,
     connection_manager: &Arc<ConnectionManager>,
-    diagnostics_tx: mpsc::Sender<LogMsg>,
+        diagnostics_tx: mpsc::Sender<LogMsg>,
 ) -> Result<(), Box<dyn std::error::Error>> {
+    initialize_env_logger();
     let mut interval = interval(Duration::from_millis(TRANSITION_RUNNER_TICK_INTERVAL_MS));
     let model = model.clone();
     let log_target = format!("{}_auto_tr_runner", name);
@@ -82,6 +81,7 @@ pub async fn auto_operation_runner(
     diagnostics_tx: mpsc::Sender<LogMsg>,
     connection_manager: &Arc<ConnectionManager>,
 ) -> Result<(), Box<dyn std::error::Error>> {
+    initialize_env_logger();
     let mut interval = interval(Duration::from_millis(OPERAION_RUNNER_TICK_INTERVAL_MS));
     let model = model.clone();
     let log_target = format!("{}_auto_op_runner", name);
