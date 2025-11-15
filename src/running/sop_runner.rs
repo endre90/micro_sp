@@ -10,7 +10,7 @@ static TICK_INTERVAL: u64 = 100; // millis
 pub async fn sop_runner(
     sp_id: &str,
     model: &Model,
-    diagnostics_tx: mpsc::Sender<OperationMsg>,
+    diagnostics_tx: mpsc::Sender<LogMsg>,
     connection_manager: &Arc<ConnectionManager>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let mut interval = interval(Duration::from_millis(TICK_INTERVAL));
@@ -65,7 +65,7 @@ async fn process_sop_tick(
     model: &Model,
     state: &State,
     con: redis::aio::MultiplexedConnection,
-    diagnostics_tx: mpsc::Sender<OperationMsg>,
+    diagnostics_tx: mpsc::Sender<LogMsg>,
     log_target: &str,
 ) -> Result<State, Box<dyn std::error::Error>> {
     let mut new_state = state.clone();
@@ -131,7 +131,7 @@ async fn handle_sop_executing(
     new_state: &mut State,
     sop_overall_state: &mut String,
     con: redis::aio::MultiplexedConnection,
-    diagnostics_tx: mpsc::Sender<OperationMsg>,
+    diagnostics_tx: mpsc::Sender<LogMsg>,
     log_target: &str,
 ) {
     let sop_id = state.get_string_or_default_to_unknown(&format!("{}_sop_id", sp_id), &log_target);
@@ -167,7 +167,7 @@ async fn process_sop_node_tick(
     mut state: State,
     sop: &SOP,
     con: redis::aio::MultiplexedConnection,
-    diagnostics_tx: mpsc::Sender<OperationMsg>,
+    diagnostics_tx: mpsc::Sender<LogMsg>,
     log_target: &str,
 ) -> State {
     if is_sop_completed(sp_id, sop, &state, log_target)

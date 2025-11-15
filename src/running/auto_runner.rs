@@ -1,18 +1,22 @@
 use crate::{
-    ConnectionManager, Model, OPERAION_RUNNER_TICK_INTERVAL_MS, OperationMsg, OperationState, State, StateManager, Transition, running::process_operation::{OperationProcessingType, process_operation}
+    ConnectionManager, LogMsg, Model, OPERAION_RUNNER_TICK_INTERVAL_MS, OperationState, State,
+    StateManager, Transition, TransitionMsg,
+    running::process_operation::{OperationProcessingType, process_operation},
 };
+use chrono::Utc;
 use rand::prelude::*;
 use redis::aio::MultiplexedConnection;
 use std::{sync::Arc, time::Duration};
 use tokio::{sync::mpsc, time::interval};
 
 // Add automatic operations here as well that finish immediatelly, god for setting some values, triggering robot moves etc.
-pub static TRANSITION_RUNNER_TICK_INTERVAL_MS: u64 = 100;
+pub static TRANSITION_RUNNER_TICK_INTERVAL_MS: u64 = 50;
 
 async fn process_transition(
     con: &mut MultiplexedConnection,
     transition: &Transition,
     state: &State,
+    diagnostics_tx: mpsc::Sender<LogMsg>,
     log_target: &str,
 ) {
     if !transition.to_owned().eval(state, &log_target) {
@@ -22,6 +26,18 @@ async fn process_transition(
     let new_state = transition.to_owned().take(state, &log_target);
     log::info!(target: &log_target, "Executed auto transition: '{}'.", transition.name);
 
+    let transition_msg = TransitionMsg {
+        transition_name: transition.name.clone(),
+        timestamp: Utc::now(),
+        severity: log::Level::Info,
+        log: format!("Executed auto transition."),
+    };
+    let log_msg = LogMsg::TransitionMsg(transition_msg);
+    match diagnostics_tx.send(log_msg).await {
+        Ok(()) => (),
+        Err(e) => log::error!(target: &log_target, "Failed to send diagnostics with: {e}."),
+    }
+
     let modified_state = state.get_diff_partial_state(&new_state);
     StateManager::set_state(con, &modified_state).await;
 }
@@ -30,6 +46,7 @@ pub async fn auto_transition_runner(
     name: &str,
     model: &Model,
     connection_manager: &Arc<ConnectionManager>,
+    diagnostics_tx: mpsc::Sender<LogMsg>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let mut interval = interval(Duration::from_millis(TRANSITION_RUNNER_TICK_INTERVAL_MS));
     let model = model.clone();
@@ -54,7 +71,7 @@ pub async fn auto_transition_runner(
         };
 
         for t in &model.auto_transitions {
-            process_transition(&mut con, t, &state, &log_target).await;
+            process_transition(&mut con, t, &state, diagnostics_tx.clone(), &log_target).await;
         }
     }
 }
@@ -62,7 +79,7 @@ pub async fn auto_transition_runner(
 pub async fn auto_operation_runner(
     name: &str,
     model: &Model,
-    diagnostics_tx: mpsc::Sender<OperationMsg>,
+    diagnostics_tx: mpsc::Sender<LogMsg>,
     connection_manager: &Arc<ConnectionManager>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let mut interval = interval(Duration::from_millis(OPERAION_RUNNER_TICK_INTERVAL_MS));

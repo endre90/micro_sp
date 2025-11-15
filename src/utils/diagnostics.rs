@@ -8,9 +8,23 @@ use tokio::sync::mpsc;
 use crate::{ConnectionManager, OperationState, SPValue, StateManager, StringOrUnknown, ToSPValue};
 
 #[derive(Debug, Serialize, Deserialize)]
+pub enum LogMsg {
+    OperationMsg(OperationMsg),
+    TransitionMsg(TransitionMsg),
+}
+
+#[derive(Debug, Serialize, Deserialize)]
 pub struct OperationMsg {
     pub operation_name: String,
     pub state: OperationState,
+    pub timestamp: DateTime<Utc>,
+    pub severity: log::Level,
+    pub log: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct TransitionMsg {
+    pub transition_name: String,
     pub timestamp: DateTime<Utc>,
     pub severity: log::Level,
     pub log: String,
@@ -23,102 +37,145 @@ pub struct OperationLog {
 }
 
 pub async fn operation_diagnostics_receiver_task(
-    mut rx: mpsc::Receiver<OperationMsg>,
+    mut rx: mpsc::Receiver<LogMsg>,
     connection_manager: &Arc<ConnectionManager>,
     sp_id: &str,
 ) {
-    let log_target = format!("{}_diagnostics_operations_receiver", sp_id);
-    while let Some(msg) = rx.recv().await {
-        if let Err(_) = connection_manager.check_redis_health(&log_target).await {
-            continue;
-        }
-        let mut con = connection_manager.get_connection().await;
-        if let Some(log_spvalue) =
-            StateManager::get_sp_value(&mut con, &format!("{}_diagnostics_operations", sp_id)).await
-        {
-            if let SPValue::String(StringOrUnknown::String(string_log)) = log_spvalue {
-                if let Ok(mut log) = serde_json::from_str::<Vec<Vec<OperationLog>>>(&string_log) {
-                    let is_last_empty = log.last().map_or(true, |v| v.is_empty());
-
-                    if is_last_empty {
-                        if log.is_empty() {
-                            log.push(Vec::new());
-                        }
-                        log.last_mut().unwrap().push(OperationLog {
-                            operation_name: msg.operation_name.clone(),
-                            log: vec![msg],
-                        });
-                    } else {
-                        let needs_partition = log.last().unwrap().iter().any(|op| {
-                            matches!(
-                                op.log.last().map(|s| &s.state),
-                                Some(
-                                    OperationState::Completed
-                                        | OperationState::Bypassed
-                                        | OperationState::Fatal
-                                )
-                            )
-                        });
-
-                        if needs_partition {
-                            log.push(Vec::new());
-                            let log_len = log.len();
-                            let (prefix, suffix) = log.split_at_mut(log_len - 1);
-
-                            let old_last_vec = &mut prefix[prefix.len() - 1];
-                            let new_last_vec = &mut suffix[0];
-
-                            let ops_to_partition = std::mem::take(old_last_vec);
-
-                            for op in ops_to_partition {
-                                match op.log.last().map(|s| &s.state) {
-                                    Some(
-                                        OperationState::Completed
-                                        | OperationState::Bypassed
-                                        | OperationState::Fatal,
-                                    ) => {
-                                        old_last_vec.push(op);
-                                    }
-                                    _ => {
-                                        new_last_vec.push(op);
-                                    }
-                                }
-                            }
-                        }
-
-                        let last_vector = log.last_mut().unwrap();
-
-                        match last_vector
-                            .iter_mut()
-                            .find(|log| log.operation_name == msg.operation_name)
+    let log_target = format!("{}_diagnostics_receiver", sp_id);
+    while let Some(log_msg) = rx.recv().await {
+        match log_msg {
+            LogMsg::OperationMsg(msg) => {
+                if let Err(_) = connection_manager.check_redis_health(&log_target).await {
+                    continue;
+                }
+                let mut con = connection_manager.get_connection().await;
+                if let Some(log_spvalue) = StateManager::get_sp_value(
+                    &mut con,
+                    &format!("{}_diagnostics_operations", sp_id),
+                )
+                .await
+                {
+                    if let SPValue::String(StringOrUnknown::String(string_log)) = log_spvalue {
+                        if let Ok(mut log) =
+                            serde_json::from_str::<Vec<Vec<OperationLog>>>(&string_log)
                         {
-                            Some(exists) => {
-                                exists.log.push(msg);
-                            }
-                            None => {
-                                last_vector.push(OperationLog {
+                            let is_last_empty = log.last().map_or(true, |v| v.is_empty());
+
+                            if is_last_empty {
+                                if log.is_empty() {
+                                    log.push(Vec::new());
+                                }
+                                log.last_mut().unwrap().push(OperationLog {
                                     operation_name: msg.operation_name.clone(),
                                     log: vec![msg],
                                 });
+                            } else {
+                                let needs_partition = log.last().unwrap().iter().any(|op| {
+                                    matches!(
+                                        op.log.last().map(|s| &s.state),
+                                        Some(
+                                            OperationState::Completed
+                                                | OperationState::Bypassed
+                                                | OperationState::Fatal
+                                        )
+                                    )
+                                });
+
+                                if needs_partition {
+                                    log.push(Vec::new());
+                                    let log_len = log.len();
+                                    let (prefix, suffix) = log.split_at_mut(log_len - 1);
+
+                                    let old_last_vec = &mut prefix[prefix.len() - 1];
+                                    let new_last_vec = &mut suffix[0];
+
+                                    let ops_to_partition = std::mem::take(old_last_vec);
+
+                                    for op in ops_to_partition {
+                                        match op.log.last().map(|s| &s.state) {
+                                            Some(
+                                                OperationState::Completed
+                                                | OperationState::Bypassed
+                                                | OperationState::Fatal,
+                                            ) => {
+                                                old_last_vec.push(op);
+                                            }
+                                            _ => {
+                                                new_last_vec.push(op);
+                                            }
+                                        }
+                                    }
+                                }
+
+                                let last_vector = log.last_mut().unwrap();
+
+                                match last_vector
+                                    .iter_mut()
+                                    .find(|log| log.operation_name == msg.operation_name)
+                                {
+                                    Some(exists) => {
+                                        exists.log.push(msg);
+                                    }
+                                    None => {
+                                        last_vector.push(OperationLog {
+                                            operation_name: msg.operation_name.clone(),
+                                            log: vec![msg],
+                                        });
+                                    }
+                                }
+                            }
+
+                            match serde_json::to_string(&log) {
+                                Ok(serialized) => {
+                                    StateManager::set_sp_value(
+                                        &mut con,
+                                        &format!("{}_diagnostics_operations", sp_id),
+                                        &serialized.to_spvalue(),
+                                    )
+                                    .await
+                                }
+                                Err(e) => {
+                                    log::error!(target: &log_target, "Serialization failed with {e}.")
+                                }
                             }
                         }
+                    };
+                }
+            }
+            LogMsg::TransitionMsg(msg) => {
+                if let Err(_) = connection_manager.check_redis_health(&log_target).await {
+                    continue;
+                }
+                let mut con = connection_manager.get_connection().await;
+                let redis_key = format!("{}_diagnostics_transitions", sp_id);
+                let mut log: Vec<TransitionMsg> = if let Some(log_spvalue) =
+                    StateManager::get_sp_value(&mut con, &redis_key).await
+                {
+                    if let SPValue::String(StringOrUnknown::String(string_log)) = log_spvalue {
+                        serde_json::from_str(&string_log).unwrap_or_default()
+                    } else {
+                        Vec::new()
                     }
+                } else {
+                    Vec::new()
+                };
 
-                    match serde_json::to_string(&log) {
-                        Ok(serialized) => {
-                            StateManager::set_sp_value(
-                                &mut con,
-                                &format!("{}_diagnostics_operations", sp_id),
-                                &serialized.to_spvalue(),
-                            )
-                            .await
-                        }
-                        Err(e) => {
-                            log::error!(target: &log_target, "Serialization failed with {e}.")
-                        }
+                log.push(msg);
+
+                match serde_json::to_string(&log) {
+                    Ok(serialized) => {
+                        StateManager::set_sp_value(
+                            &mut con,
+                            &redis_key,
+                            &serialized.to_spvalue(),
+                        )
+                        .await
+                    }
+                    Err(e) => {
+                        log::error!(target: &log_target, "Serialization failed for transition with {e}.")
                     }
                 }
-            };
+            }
         }
     }
 }

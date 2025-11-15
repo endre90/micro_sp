@@ -38,13 +38,12 @@ pub async fn main_runner(
     // let sp_id_clone = sp_id.clone();
     // tokio::task::spawn(async move { plan_runner(&sp_id_clone, &model_clone, tx_clone).await.unwrap() });
 
-    let (op_diag_tx, op_diag_rx) = mpsc::channel::<OperationMsg>(100);
+    let (op_diag_tx, op_diag_rx) = mpsc::channel::<LogMsg>(100);
     log::info!(target: &format!("{sp_id}_micro_sp"), "Spawning operation diagnostics receiver.");
     let con_clone = connection_manager.clone();
     let sp_id_clone = sp_id.clone();
     tokio::task::spawn(async move {
-        operation_diagnostics_receiver_task(op_diag_rx, &con_clone, &sp_id_clone)
-            .await
+        operation_diagnostics_receiver_task(op_diag_rx, &con_clone, &sp_id_clone).await
     });
 
     log::info!(target:  &format!("{sp_id}_micro_sp"), "Spawning SOP runner.");
@@ -71,10 +70,16 @@ pub async fn main_runner(
     log::info!(target: &format!("{sp_id}_micro_sp"), "Spawning auto transition runner");
     let model_clone = model.clone();
     let con_clone = connection_manager.clone();
+    let op_diag_tx_clone = op_diag_tx.clone();
     tokio::task::spawn(async move {
-        auto_transition_runner(&model_clone.name, &model_clone, &con_clone)
-            .await
-            .unwrap()
+        auto_transition_runner(
+            &model_clone.name,
+            &model_clone,
+            &con_clone,
+            op_diag_tx_clone,
+        )
+        .await
+        .unwrap()
     });
 
     log::info!(target: &format!("{sp_id}_micro_sp"), "Spawning auto operation runner");
@@ -82,9 +87,14 @@ pub async fn main_runner(
     let con_clone = connection_manager.clone();
     let op_diag_tx_clone = op_diag_tx.clone();
     tokio::task::spawn(async move {
-        auto_operation_runner(&model_clone.name, &model_clone, op_diag_tx_clone, &con_clone)
-            .await
-            .unwrap()
+        auto_operation_runner(
+            &model_clone.name,
+            &model_clone,
+            op_diag_tx_clone,
+            &con_clone,
+        )
+        .await
+        .unwrap()
     });
 
     log::info!(target: &format!("{sp_id}_micro_sp"), "Spawning time runner");

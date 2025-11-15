@@ -9,7 +9,7 @@ pub static OPERAION_RUNNER_TICK_INTERVAL_MS: u64 = 200;
 
 pub async fn planned_operation_runner(
     model: &Model,
-    diagnostics_tx: mpsc::Sender<OperationMsg>,
+    diagnostics_tx: mpsc::Sender<LogMsg>,
     connection_manager: &Arc<ConnectionManager>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let sp_id = &model.name;
@@ -74,7 +74,7 @@ async fn process_plan_tick(
     // con: redis::aio::MultiplexedConnection,
     model: &Model,
     state: &State,
-    diagnostics_tx: mpsc::Sender<OperationMsg>,
+    diagnostics_tx: mpsc::Sender<LogMsg>,
     log_target: &str,
 ) -> State {
     let mut new_state = state.clone();

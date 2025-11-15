@@ -21,7 +21,7 @@ pub(super) async fn process_operation(
     operation_processing_type: OperationProcessingType,
     plan_current_step: Option<&mut i64>,
     plan_state: Option<&mut String>,
-    diagnostics_tx: mpsc::Sender<OperationMsg>,
+    diagnostics_tx: mpsc::Sender<LogMsg>,
     // mut con: redis::aio::MultiplexedConnection,
     log_target: &str,
 ) -> State {
@@ -290,7 +290,8 @@ pub(super) async fn process_operation(
             state: OperationState::from_str(&operation_state),
             log: diagnostics_log.to_string(),
         };
-        match diagnostics_tx.send(operation_msg).await {
+        let log_msg = LogMsg::OperationMsg(operation_msg);
+        match diagnostics_tx.send(log_msg).await {
             Ok(()) => (),
             Err(e) => log::error!(target: &log_target, "Failed to send diagnostics with: {e}."),
         }
