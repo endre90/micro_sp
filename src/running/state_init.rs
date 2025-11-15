@@ -53,6 +53,13 @@ pub fn generate_runner_state_variables(name: &str) -> State {
     let time_duration_ms = iv!(&&format!("{}_time_duration_ms", name));
     let time_elapsed_ms = iv!(&&format!("{}_time_elapsed_ms", name));
 
+    // Pause, Stop, Run/Play/Continue
+    let sp_dashboard_command = v!(&&format!("{}_dashboard_command", name));
+    state = state.add(assign!(
+        sp_dashboard_command,
+        SPValue::String(StringOrUnknown::UNKNOWN)
+    ));
+
     // Diagnostics:
     let empty_diag_log: Vec<Vec<OperationLog>> = vec![vec![]];
     let diagnostics_operations = v!(&&format!("{}_diagnostics_operations", name));
