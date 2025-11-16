@@ -156,6 +156,7 @@ pub async fn auto_operation_runner(
 
         for operation in &active_operations {
             new_state = process_operation(
+                &name,
                 new_state,
                 operation,
                 OperationProcessingType::Automatic,
@@ -193,6 +194,7 @@ pub async fn auto_operation_runner(
 
             if let Some(random_operation) = maybe_random_op {
                 new_state = process_operation(
+                    &name,
                     new_state,
                     random_operation,
                     OperationProcessingType::Automatic,

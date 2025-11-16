@@ -179,6 +179,7 @@ async fn process_sop_node_tick(
     match sop {
         SOP::Operation(operation) => {
             state = running::process_operation::process_operation(
+                &sp_id,
                 state,
                 operation,
                 OperationProcessingType::SOP,

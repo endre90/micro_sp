@@ -325,6 +325,17 @@ impl Operation {
         }
     }
 
+    pub fn cancel(&self, state: &State, log_target: &str) -> State {
+        let assignment = state.get_assignment(&self.name, &log_target);
+        if assignment.val == OperationState::Disabled.to_spvalue() || assignment.val == OperationState::Executing.to_spvalue() {
+            let action = Action::new(assignment.var, OperationState::Cancelled.to_spvalue().wrap());
+            action.assign(&state, &log_target)
+        } else {
+            log::error!(target: &log_target, "Can't cancel an operation which is not in its executing or disabled state.");
+            state.clone()
+        }
+    }
+
     /// Start executing the operation. Check for eval_running() first.
     pub fn start(&self, state: &State, log_target: &str) -> State {
         let assignment = state.get_assignment(&self.name, &log_target);

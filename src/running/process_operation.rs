@@ -10,6 +10,7 @@ pub enum OperationProcessingType {
 }
 
 pub(super) async fn process_operation(
+    sp_id: &str, 
     mut new_state: State,
     operation: &Operation,
     operation_processing_type: OperationProcessingType,
@@ -76,6 +77,11 @@ pub(super) async fn process_operation(
                     format!("Timeout for disabled operation '{}'.", operation.name).to_string();
                 diagnostics_log = format!("Timeout for operation.");
                 op_info_level = log::Level::Warn;
+            } else if operation.can_be_cancelled(&sp_id, &new_state, &log_target) {
+                new_state = operation.clone().cancel(&new_state, &log_target);
+                new_op_info = format!("Cancelling operation '{}'.", operation.name).to_string();
+                diagnostics_log = format!("Cancelling operation.");
+                op_info_level = log::Level::Warn;
             } else {
                 let mut or_clause = vec![];
                 let mut or_clause_full = vec![];
@@ -114,6 +120,11 @@ pub(super) async fn process_operation(
                 new_op_info =
                     format!("Timeout for executing operation '{}'.", operation.name).to_string();
                 diagnostics_log = format!("Timeout for operation.");
+                op_info_level = log::Level::Warn;
+            } else if operation.can_be_cancelled(&sp_id, &new_state, &log_target) {
+                new_state = operation.clone().cancel(&new_state, &log_target);
+                new_op_info = format!("Cancelling operation '{}'.", operation.name).to_string();
+                diagnostics_log = format!("Cancelling operation.");
                 op_info_level = log::Level::Warn;
             } else {
                 new_op_info = format!(
@@ -262,12 +273,6 @@ pub(super) async fn process_operation(
 
         OperationState::Cancelled => {}
 
-        // OperationState::Terminated => {
-        //     new_op_info = format!("Operation '{}' terminated.", operation.name);
-        //     op_info_level = OperationInfoLevel::Info;
-        //     new_state = new_state.remove(&operation.name, log_target);
-        //     StateManager::remove_sp_value(&mut con, &operation.name).await;
-        // }
         OperationState::UNKNOWN => {
             new_state = operation.initialize(&new_state, &log_target);
         }

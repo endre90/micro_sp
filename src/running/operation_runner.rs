@@ -118,6 +118,7 @@ async fn process_plan_tick(
                 match model.operations.iter().find(|op| op.name == *op_name) {
                     Some(operation) => {
                         new_state = running::process_operation::process_operation(
+                            &sp_id,
                             new_state,
                             operation,
                             OperationProcessingType::Planned,
