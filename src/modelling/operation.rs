@@ -42,7 +42,7 @@ impl OperationState {
             "fatal" => OperationState::Fatal,
             "completed" => OperationState::Completed,
             "bypassed" => OperationState::Bypassed,
-            // "terminated" => OperationState::Terminated,
+            "cancelled" => OperationState::Cancelled,
             _ => OperationState::UNKNOWN,
         }
     }
@@ -82,7 +82,7 @@ pub struct Operation {
     pub failure_transitions: Vec<Transition>,
     pub bypass_transitions: Vec<Transition>,
     pub timeout_transitions: Vec<Transition>,
-    pub reset_transitions: Vec<Transition>,
+    pub cancel_transitions: Vec<Transition>,
 }
 
 impl Default for Operation {
@@ -100,7 +100,7 @@ impl Default for Operation {
             failure_transitions: Vec::new(),
             timeout_transitions: Vec::new(),
             bypass_transitions: Vec::new(),
-            reset_transitions: Vec::new(),
+            cancel_transitions: Vec::new(),
         }
     }
 }
@@ -118,7 +118,7 @@ impl Operation {
         failure_transitions: Vec<Transition>,
         timeout_transitions: Vec<Transition>,
         bypass_transitions: Vec<Transition>,
-        reset_transitions: Vec<Transition>,
+        cancel_transitions: Vec<Transition>,
     ) -> Operation {
         Operation {
             name: name.to_string(),
@@ -145,7 +145,7 @@ impl Operation {
             postconditions,
             failure_transitions,
             bypass_transitions,
-            reset_transitions,
+            cancel_transitions,
         }
     }
 
@@ -279,18 +279,18 @@ impl Operation {
     }
 
     /// Check the running reset_transition guard.
-    pub fn can_be_reset(&self, state: &State, log_target: &str) -> bool {
-        if let Some(value) = state.get_value(&self.name, &log_target) {
-            if value == OperationState::Completed.to_spvalue() {
-                for reset_transition in &self.reset_transitions {
-                    if reset_transition.clone().eval(&state, &log_target) {
-                        return true;
-                    }
-                }
-            }
-        }
-        false
-    }
+    // pub fn can_be_reset(&self, state: &State, log_target: &str) -> bool {
+    //     if let Some(value) = state.get_value(&self.name, &log_target) {
+    //         if value == OperationState::Completed.to_spvalue() {
+    //             for reset_transition in &self.reset_transitions {
+    //                 if reset_transition.clone().eval(&state, &log_target) {
+    //                     return true;
+    //                 }
+    //             }
+    //         }
+    //     }
+    //     false
+    // }
 
     /// Check if we can stop the execution and cancel the operations
     pub fn can_be_cancelled(&self, sp_id: &str, state: &State, log_target: &str) -> bool {
@@ -554,7 +554,7 @@ impl Operation {
                     .flat_map(|t| t.get_all_var_keys()),
             )
             .chain(
-                self.reset_transitions
+                self.cancel_transitions
                     .iter()
                     .flat_map(|t| t.get_all_var_keys()),
             )

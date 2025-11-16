@@ -52,16 +52,16 @@ pub(super) async fn process_operation(
     let mut op_info_level = log::Level::Info;
     match OperationState::from_str(&operation_state) {
         OperationState::Initial => {
-            if operation.eval(&new_state, &log_target) {
-                new_state = operation.start(&new_state, &log_target);
-                new_op_info = format!("Starting initialized operation '{}'.", operation.name);
-                diagnostics_log = format!("Starting operation.");
-                op_info_level = log::Level::Info;
-            } else if operation.can_be_cancelled(&sp_id, &new_state, &log_target) {
+            if operation.can_be_cancelled(&sp_id, &new_state, &log_target) {
                 new_state = operation.clone().cancel(&new_state, &log_target);
                 new_op_info = format!("Cancelling operation '{}'.", operation.name).to_string();
                 diagnostics_log = format!("Cancelling operation.");
                 op_info_level = log::Level::Warn;
+            } else if operation.eval(&new_state, &log_target) {
+                new_state = operation.start(&new_state, &log_target);
+                new_op_info = format!("Starting initialized operation '{}'.", operation.name);
+                diagnostics_log = format!("Starting operation.");
+                op_info_level = log::Level::Info;
             } else {
                 new_op_info = format!("Disabling operation '{}'.", operation.name).to_string();
                 diagnostics_log = format!("Disabling operation.");
@@ -71,22 +71,22 @@ pub(super) async fn process_operation(
         }
         OperationState::Disabled => {
             elapased_disabled_ms += OPERAION_RUNNER_TICK_INTERVAL_MS as i64;
-            if operation.eval(&new_state, &log_target) {
-                new_state = operation.start(&new_state, &log_target);
-                new_op_info = format!("Starting disabled operation '{}'.", operation.name);
-                diagnostics_log = format!("Starting operation.");
-                op_info_level = log::Level::Info;
+            if operation.can_be_cancelled(&sp_id, &new_state, &log_target) {
+                new_state = operation.clone().cancel(&new_state, &log_target);
+                new_op_info = format!("Cancelling operation '{}'.", operation.name).to_string();
+                diagnostics_log = format!("Cancelling operation.");
+                op_info_level = log::Level::Warn;
             } else if operation.can_be_timedout(&new_state, &log_target) {
                 new_state = operation.clone().timeout(&new_state, &log_target);
                 new_op_info =
                     format!("Timeout for disabled operation '{}'.", operation.name).to_string();
                 diagnostics_log = format!("Timeout for operation.");
                 op_info_level = log::Level::Warn;
-            } else if operation.can_be_cancelled(&sp_id, &new_state, &log_target) {
-                new_state = operation.clone().cancel(&new_state, &log_target);
-                new_op_info = format!("Cancelling operation '{}'.", operation.name).to_string();
-                diagnostics_log = format!("Cancelling operation.");
-                op_info_level = log::Level::Warn;
+            } else if operation.eval(&new_state, &log_target) {
+                new_state = operation.start(&new_state, &log_target);
+                new_op_info = format!("Starting disabled operation '{}'.", operation.name);
+                diagnostics_log = format!("Starting operation.");
+                op_info_level = log::Level::Info;
             } else {
                 let mut or_clause = vec![];
                 let mut or_clause_full = vec![];
@@ -110,11 +110,11 @@ pub(super) async fn process_operation(
         }
         OperationState::Executing => {
             elapased_executing_ms += OPERAION_RUNNER_TICK_INTERVAL_MS as i64;
-            if operation.can_be_completed(&new_state, &log_target) {
-                new_state = operation.clone().complete(&new_state, &log_target);
-                new_op_info = format!("Completing operation '{}'.", operation.name).to_string();
-                diagnostics_log = format!("Completing operation.");
-                op_info_level = log::Level::Info;
+            if operation.can_be_cancelled(&sp_id, &new_state, &log_target) {
+                new_state = operation.clone().cancel(&new_state, &log_target);
+                new_op_info = format!("Cancelling operation '{}'.", operation.name).to_string();
+                diagnostics_log = format!("Cancelling operation.");
+                op_info_level = log::Level::Warn;
             } else if operation.can_be_failed(&new_state, &log_target) {
                 new_state = operation.clone().fail(&new_state, &log_target);
                 new_op_info = format!("Failing operation '{}'.", operation.name).to_string();
@@ -126,11 +126,11 @@ pub(super) async fn process_operation(
                     format!("Timeout for executing operation '{}'.", operation.name).to_string();
                 diagnostics_log = format!("Timeout for operation.");
                 op_info_level = log::Level::Warn;
-            } else if operation.can_be_cancelled(&sp_id, &new_state, &log_target) {
-                new_state = operation.clone().cancel(&new_state, &log_target);
-                new_op_info = format!("Cancelling operation '{}'.", operation.name).to_string();
-                diagnostics_log = format!("Cancelling operation.");
-                op_info_level = log::Level::Warn;
+            } else if operation.can_be_completed(&new_state, &log_target) {
+                new_state = operation.clone().complete(&new_state, &log_target);
+                new_op_info = format!("Completing operation '{}'.", operation.name).to_string();
+                diagnostics_log = format!("Completing operation.");
+                op_info_level = log::Level::Info;
             } else {
                 new_op_info = format!(
                     "Waiting for operation '{}' to be completed.",
@@ -191,7 +191,12 @@ pub(super) async fn process_operation(
         }
 
         OperationState::Timedout => {
-            if operation_timeout_retry_counter < operation.timeout_retries {
+            if operation.can_be_cancelled(&sp_id, &new_state, &log_target) {
+                new_state = operation.clone().cancel(&new_state, &log_target);
+                new_op_info = format!("Cancelling operation '{}'.", operation.name).to_string();
+                diagnostics_log = format!("Cancelling operation.");
+                op_info_level = log::Level::Warn;
+            } else if operation_timeout_retry_counter < operation.timeout_retries {
                 operation_timeout_retry_counter += 1;
                 new_op_info = format!(
                     "Retrying operation (timeout) '{}'. Retry {} out of {}.",
@@ -207,11 +212,6 @@ pub(super) async fn process_operation(
                     &format!("{}_timeout_retry_counter", operation.name),
                     operation_timeout_retry_counter.to_spvalue(),
                 );
-            } else if operation.can_be_cancelled(&sp_id, &new_state, &log_target) {
-                new_state = operation.clone().cancel(&new_state, &log_target);
-                new_op_info = format!("Cancelling operation '{}'.", operation.name).to_string();
-                diagnostics_log = format!("Cancelling operation.");
-                op_info_level = log::Level::Warn;
             } else if operation.can_be_bypassed {
                 new_state = operation.bypass(&new_state, &log_target);
                 new_op_info = format!("Operation '{}' timedout. Bypassing.", operation.name);
@@ -225,7 +225,12 @@ pub(super) async fn process_operation(
             }
         }
         OperationState::Failed => {
-            if operation_failure_retry_counter < operation.failure_retries {
+            if operation.can_be_cancelled(&sp_id, &new_state, &log_target) {
+                new_state = operation.clone().cancel(&new_state, &log_target);
+                new_op_info = format!("Cancelling operation '{}'.", operation.name).to_string();
+                diagnostics_log = format!("Cancelling operation.");
+                op_info_level = log::Level::Warn;
+            } else if operation_failure_retry_counter < operation.failure_retries {
                 operation_failure_retry_counter += 1;
                 new_op_info = format!(
                     "Retrying operation (failure) '{}'. Retry {} out of {}.",
@@ -241,11 +246,6 @@ pub(super) async fn process_operation(
                     &format!("{}_failure_retry_counter", operation.name),
                     operation_failure_retry_counter.to_spvalue(),
                 );
-            } else if operation.can_be_cancelled(&sp_id, &new_state, &log_target) {
-                new_state = operation.clone().cancel(&new_state, &log_target);
-                new_op_info = format!("Cancelling operation '{}'.", operation.name).to_string();
-                diagnostics_log = format!("Cancelling operation.");
-                op_info_level = log::Level::Warn;
             } else {
                 if operation.can_be_bypassed {
                     new_state = operation.bypass(&new_state, &log_target);

@@ -36,7 +36,7 @@ impl Model {
                     failure_transitions: o.failure_transitions.clone(),
                     timeout_transitions: o.timeout_transitions.clone(),
                     bypass_transitions: o.bypass_transitions.clone(),
-                    reset_transitions: o.reset_transitions.clone(),
+                    cancel_transitions: o.cancel_transitions.clone(),
                     state: o.state.clone(),
                 })
                 .collect(),
@@ -61,7 +61,7 @@ impl Model {
                     failure_transitions: o.failure_transitions.clone(),
                     timeout_transitions: o.timeout_transitions.clone(),
                     bypass_transitions: o.bypass_transitions.clone(),
-                    reset_transitions: o.reset_transitions.clone(),
+                    cancel_transitions: o.cancel_transitions.clone(),
                     state: o.state.clone(),
                 })
                 .collect(),
