@@ -89,7 +89,7 @@ async fn process_plan_tick(
     let plan_of_sp_values =
         state.get_array_or_default_to_empty(&format!("{}_plan", sp_id), &log_target);
 
-    let plan: Vec<String> = plan_of_sp_values
+    let mut plan: Vec<String> = plan_of_sp_values
         .iter()
         .filter(|val| val.is_string())
         .map(|y| y.to_string())
@@ -141,6 +141,7 @@ async fn process_plan_tick(
         PlanState::Failed | PlanState::Completed | PlanState::Cancelled | PlanState::UNKNOWN => {
             plan_current_step = 0;
             new_state = reset_all_operations(&new_state, &model);
+            plan = vec!();
             plan_state_str = PlanState::Initial.to_string();
             planner_state = PlannerState::Ready.to_string();
         }
@@ -150,6 +151,10 @@ async fn process_plan_tick(
         .update(
             &format!("{}_plan_state", sp_id),
             plan_state_str.to_spvalue(),
+        )
+        .update(
+            &format!("{}_plan", sp_id),
+            plan.to_spvalue(),
         )
         .update(
             &format!("{}_planner_state", sp_id),

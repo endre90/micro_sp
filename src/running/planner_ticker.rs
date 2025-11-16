@@ -45,44 +45,6 @@ pub async fn planner_ticker(
             .collect::<Vec<String>>(),
     );
 
-    // let last_known_state: Arc<RwLock<Option<State>>> = Arc::new(RwLock::new(None));
-
-    // loop {
-    //     interval.tick().await;
-    //     let mut con = connection_manager.get_connection().await;
-
-    //     if let Err(e) = con.set::<_, _, ()>("heartbeat", "alive").await {
-    //         handle_redis_error(&e, &log_target, connection_manager).await;
-    //         continue;
-    //     }
-    //     match redis_get_state_for_keys(&mut con, &keys).await {
-    //         Some(current_state) => {
-    //             *last_known_state.write().await = Some(current_state.clone());
-    //             let old_info = current_state.get_string_or_default_to_unknown(
-    //                 &log_target,
-    //                 &format!("{}_planner_information", sp_id),
-    //             );
-
-    //             let new_state = process_planner_tick(sp_id, &model, &current_state, &log_target);
-
-    //             let new_info = new_state.get_string_or_default_to_unknown(
-    //                 &log_target,
-    //                 &format!("{}_planner_information", sp_id),
-    //             );
-    //             if old_info != new_info && !new_info.is_empty() {
-    //                 log::info!(target: log_target, "{}", new_info);
-    //             }
-
-    //             let modified_state = current_state.get_diff_partial_state(&new_state);
-    //             if !modified_state.state.is_empty() {
-    //                 redis_set_state(&mut con, modified_state).await;
-    //             }
-    //         }
-    //         None => restore_state_from_snapshot(&mut con, &last_known_state, &log_target).await,
-    //     }
-    // }
-
-    // let mut con = connection_manager.get_connection().await;
     loop {
         interval.tick().await;
         if let Err(_) = connection_manager.check_redis_health(&log_target).await {
