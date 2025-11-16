@@ -24,12 +24,13 @@ pub async fn planned_operation_runner(
         .flat_map(|t| t.get_all_var_keys())
         .collect();
 
-    // We also need some of the planner vars
+    // We also need some of the planner vars and dashboard
     keys.extend(vec![
         format!("{}_planner_state", sp_id),
         format!("{}_plan_state", sp_id),
         format!("{}_plan_current_step", sp_id),
         format!("{}_plan", sp_id),
+        format!("{}_dashboard_command", sp_id),
     ]);
 
     // And the vars to keep trask of operation states
