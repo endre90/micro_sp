@@ -295,8 +295,11 @@ impl Operation {
     /// Check if we can stop the execution and cancel the operations
     pub fn can_be_cancelled(&self, sp_id: &str, state: &State, log_target: &str) -> bool {
         if let Some(value) = state.get_value(&self.name, &log_target) {
-            if value == OperationState::Executing.to_spvalue()
-                || value == OperationState::Disabled.to_spvalue()
+            if value == OperationState::Initial.to_spvalue()
+                || value == OperationState::Executing.to_spvalue()
+                || value != OperationState::Disabled.to_spvalue()
+                || value != OperationState::Failed.to_spvalue()
+                || value != OperationState::Timedout.to_spvalue()
             {
                 if let Some(dashboard_command) =
                     state.get_value(&format!("{}_dashboard_command", sp_id), &log_target)
@@ -327,13 +330,11 @@ impl Operation {
 
     pub fn cancel(&self, state: &State, log_target: &str) -> State {
         let assignment = state.get_assignment(&self.name, &log_target);
-        if assignment.val == OperationState::Disabled.to_spvalue() || assignment.val == OperationState::Executing.to_spvalue() {
-            let action = Action::new(assignment.var, OperationState::Cancelled.to_spvalue().wrap());
-            action.assign(&state, &log_target)
-        } else {
-            log::error!(target: &log_target, "Can't cancel an operation which is not in its executing or disabled state.");
-            state.clone()
-        }
+        let action = Action::new(
+            assignment.var,
+            OperationState::Cancelled.to_spvalue().wrap(),
+        );
+        action.assign(&state, &log_target)
     }
 
     /// Start executing the operation. Check for eval_running() first.
