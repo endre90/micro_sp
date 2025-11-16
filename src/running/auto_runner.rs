@@ -92,6 +92,10 @@ pub async fn auto_operation_runner(
         .flat_map(|t| t.get_all_var_keys())
         .collect();
 
+    keys.extend(vec![
+        format!("{}_dashboard_command", name),
+    ]);
+
     keys.extend(
         model
             .auto_operations
