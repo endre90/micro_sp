@@ -303,6 +303,8 @@ pub fn generate_operation_state_variables(model: &Model, coverability_tracking: 
             let operation_elapsed_disabled_ms =
                 iv!(&&format!("{}_elapsed_disabled_ms", operation.name));
             let operation_retry_counter = iv!(&&format!("{}_retry_counter", operation.name)); // without scrapping the current plan, how many times has an operation retried
+            let operation_timeout_retry_counter =
+                iv!(&&format!("{}_timeout_retry_counter", operation.name));
             state = state.add(assign!(operation_state, "initial".to_spvalue()));
             state = state.add(assign!(
                 operation_information,
@@ -310,6 +312,10 @@ pub fn generate_operation_state_variables(model: &Model, coverability_tracking: 
             ));
             state = state.add(assign!(
                 operation_elapsed_executing_ms,
+                SPValue::Int64(IntOrUnknown::UNKNOWN)
+            ));
+            state = state.add(assign!(
+                operation_timeout_retry_counter,
                 SPValue::Int64(IntOrUnknown::UNKNOWN)
             ));
             state = state.add(assign!(
@@ -399,6 +405,7 @@ pub fn generate_operation_state_variables(model: &Model, coverability_tracking: 
             operation_elapsed_disabled_ms,
             SPValue::Int64(IntOrUnknown::UNKNOWN)
         ));
+
         state = state.add(assign!(
             operation_failure_retry_counter,
             SPValue::Int64(IntOrUnknown::UNKNOWN)
