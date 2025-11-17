@@ -162,9 +162,6 @@ pub(super) async fn process_operation(
             new_op_info = format!("Operation '{}' completed.", operation.name);
             diagnostics_log = format!("Operation completed.");
             op_info_level = log::Level::Info;
-            // new_state = new_state.remove(&operation.name, log_target);
-            // StateManager::remove_sp_value(&mut con, &operation.name).await;
-            // new_state = operation.terminate(&new_state, &log_target);
         }
 
         OperationState::Bypassed => {
@@ -185,9 +182,6 @@ pub(super) async fn process_operation(
                 }
             }
             op_info_level = log::Level::Warn;
-            // new_state = new_state.remove(&operation.name, log_target);
-            // StateManager::remove_sp_value(&mut con, &operation.name).await;
-            // new_state = operation.terminate(&new_state, &log_target);
         }
 
         OperationState::Timedout => {
@@ -287,9 +281,6 @@ pub(super) async fn process_operation(
                 }
                 _ => (),
             }
-            // new_state = new_state.remove(&operation.name, log_target);
-            // StateManager::remove_sp_value(&mut con, &operation.name).await;
-            // new_state = operation.terminate(&new_state, &log_target);
         }
 
         OperationState::Cancelled => {
