@@ -171,66 +171,6 @@ fn build_sop_tree(sop: &SOP) -> Tree<String> {
     }
 }
 
-// // To exec the pseudo async
-// // Inside your main async loop
-// loop {
-//     let (response_tx, response_rx) = oneshot::channel();
-//     command_sender
-//         .send(StateManagement::GetState(response_tx))
-//         .await?;
-//     let state = response_rx.await?;
-//     let mut new_state = state.clone();
-
-//     // Get the SOP runner state (Initial, Executing, etc.)
-//     let mut sop_overall_state = SOPState::from_str(&state.get_string_or_default(
-//         // ... your key logic
-//     ));
-
-//     match sop_overall_state {
-//         SOPState::Executing => {
-//             // Get the root SOP definition
-//             let root_sop = &model
-//                 .sops
-//                 .iter()
-//                 .find(|sop| sop.id == sop_id.to_string()) // assuming sop_id is fetched
-//                 .unwrap()
-//                 .to_owned();
-
-//             // Fetch the current stack from the state
-//             let stack_key = format!("{}_sop_stack", sp_id);
-//             let stack_json = state.get_string(&stack_key).unwrap_or_else(|| "[]".to_string());
-
-//             // *** CALL THE NEW TICK FUNCTION ***
-//             let (updated_state, new_stack_json) = run_sop_tick(&state, stack_json, root_sop).await;
-//             new_state = updated_state;
-
-//             // Update the stack in the new_state object
-//             new_state = new_state.update(&stack_key, new_stack_json.to_spvalue());
-
-//             // If the new stack is empty, the SOP is finished
-//             if new_stack_json == "[]" {
-//                 sop_overall_state = SOPState::Completed;
-//             }
-//         }
-//         // ... other SOPState match arms (Initial, Completed, Failed)
-//     }
-
-//     new_state = new_state.update(
-//         &format!("{}_sop_state", sp_id),
-//         sop_overall_state.to_string().to_spvalue()
-//     );
-
-//     // Commit all changes (operation states AND stack state)
-//     let modified_state = state.get_diff_partial_state(&new_state);
-//     if !modified_state.is_empty() {
-//         command_sender
-//             .send(StateManagement::SetPartialState(modified_state))
-//             .await?;
-//     }
-
-//     interval.tick().await;
-// }
-
 #[cfg(test)]
 mod tests {
     use super::*; // Import everything from the parent module
