@@ -307,8 +307,8 @@ pub(super) async fn process_operation(
 
     // For now, skip logging the SOP operations
     if new_op_info != old_operation_information {
-        match operation_processing_type {
-            OperationProcessingType::Planned | OperationProcessingType::Automatic => {
+        // match operation_processing_type {
+            // OperationProcessingType::Planned | OperationProcessingType::Automatic => {
                 match op_info_level {
                     log::Level::Info => log::info!(target: &log_target, "{}", new_op_info),
                     log::Level::Warn => log::warn!(target: &log_target, "{}", new_op_info),
@@ -329,9 +329,9 @@ pub(super) async fn process_operation(
                         log::error!(target: &log_target, "Failed to send diagnostics with: {e}.")
                     }
                 }
-            }
-            _ => (),
-        }
+            // }
+            // _ => (),
+        // }
     }
 
     new_state
