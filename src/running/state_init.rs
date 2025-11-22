@@ -60,11 +60,26 @@ pub fn generate_runner_state_variables(name: &str) -> State {
         SPValue::String(StringOrUnknown::UNKNOWN)
     ));
 
-    // Diagnostics:
+    // Logging:
     let empty_diag_log: Vec<Vec<OperationLog>> = vec![vec![]];
-    let diagnostics_operations = v!(&&format!("{}_diagnostics_operations", name));
+    let logger_planned_operations = v!(&&format!("{}_logger_planned_operations", name));
     state = state.add(assign!(
-        diagnostics_operations,
+        logger_planned_operations,
+        SPValue::String(StringOrUnknown::String(
+            serde_json::to_string(&empty_diag_log).unwrap()
+        ))
+    ));
+    let logger_automatic_operations = v!(&&format!("{}_logger_automatic_operations", name));
+    state = state.add(assign!(
+        logger_automatic_operations,
+        SPValue::String(StringOrUnknown::String(
+            serde_json::to_string(&empty_diag_log).unwrap()
+        ))
+    ));
+
+    let logger_sop_operations = v!(&&format!("{}_logger_sop_operations", name));
+    state = state.add(assign!(
+        logger_sop_operations,
         SPValue::String(StringOrUnknown::String(
             serde_json::to_string(&empty_diag_log).unwrap()
         ))

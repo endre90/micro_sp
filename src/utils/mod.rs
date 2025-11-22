@@ -1,3 +1,3 @@
-pub mod logger;
+pub mod info_logger;
 pub mod metadata;
-pub mod diagnostics;
+pub mod op_logger;

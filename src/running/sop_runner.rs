@@ -10,8 +10,7 @@ static TICK_INTERVAL: u64 = 100; // millis
 pub async fn sop_runner(
     sp_id: &str,
     model: &Model,
-    diagnostics_tx: mpsc::Sender<LogMsg>,
-    sop_op_diagnostics_tx: mpsc::Sender<LogMsg>,
+    logging_tx: mpsc::Sender<LogMsg>,
     connection_manager: &Arc<ConnectionManager>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     initialize_env_logger();
@@ -50,8 +49,7 @@ pub async fn sop_runner(
             model,
             &state,
             con_clone,
-            diagnostics_tx.clone(),
-            sop_op_diagnostics_tx.clone(),
+            logging_tx.clone(),
             &log_target,
         )
         .await?;
@@ -68,8 +66,8 @@ async fn process_sop_tick(
     model: &Model,
     state: &State,
     con: redis::aio::MultiplexedConnection,
-    diagnostics_tx: mpsc::Sender<LogMsg>,
-    sop_op_diagnostics_tx: mpsc::Sender<LogMsg>,
+    logging_tx: mpsc::Sender<LogMsg>,
+
     log_target: &str,
 ) -> Result<State, Box<dyn std::error::Error>> {
     let mut new_state = state.clone();
@@ -94,8 +92,7 @@ async fn process_sop_tick(
                 &mut new_state,
                 &mut sop_overall_state,
                 con,
-                diagnostics_tx,
-                sop_op_diagnostics_tx,
+                logging_tx,
                 &log_target,
             )
             .await;
@@ -136,8 +133,8 @@ async fn handle_sop_executing(
     new_state: &mut State,
     sop_overall_state: &mut String,
     con: redis::aio::MultiplexedConnection,
-    diagnostics_tx: mpsc::Sender<LogMsg>,
-    sop_op_diagnostics_tx: mpsc::Sender<LogMsg>,
+    logging_tx: mpsc::Sender<LogMsg>,
+
     log_target: &str,
 ) {
     let sop_id = state.get_string_or_default_to_unknown(&format!("{}_sop_id", sp_id), &log_target);
@@ -153,8 +150,7 @@ async fn handle_sop_executing(
         state.clone(),
         &root_sop_container.sop,
         con,
-        diagnostics_tx.clone(),
-        sop_op_diagnostics_tx.clone(),
+        logging_tx.clone(),
         &log_target,
     )
     .await;
@@ -174,8 +170,8 @@ async fn process_sop_node_tick(
     mut state: State,
     sop: &SOP,
     con: redis::aio::MultiplexedConnection,
-    diagnostics_tx: mpsc::Sender<LogMsg>,
-    sop_op_diagnostics_tx: mpsc::Sender<LogMsg>,
+    logging_tx: mpsc::Sender<LogMsg>,
+
     log_target: &str,
 ) -> State {
     if is_sop_completed(sp_id, sop, &state, log_target)
@@ -193,8 +189,7 @@ async fn process_sop_node_tick(
                 OperationProcessingType::SOP,
                 None,
                 None,
-                diagnostics_tx,
-                sop_op_diagnostics_tx,
+                logging_tx,
                 log_target,
             )
             .await;
@@ -211,8 +206,7 @@ async fn process_sop_node_tick(
                     state,
                     active_child,
                     con,
-                    diagnostics_tx,
-                    sop_op_diagnostics_tx,
+                    logging_tx,
                     log_target,
                 ))
                 .await;
@@ -229,8 +223,7 @@ async fn process_sop_node_tick(
                     state,
                     child,
                     con.clone(),
-                    diagnostics_tx.clone(),
-                    sop_op_diagnostics_tx.clone(),
+                    logging_tx.clone(),
                     log_target,
                 ))
                 .await;
@@ -251,8 +244,7 @@ async fn process_sop_node_tick(
                     state,
                     path,
                     con,
-                    diagnostics_tx,
-                    sop_op_diagnostics_tx,
+                    logging_tx,
                     log_target,
                 ))
                 .await;
@@ -268,8 +260,7 @@ async fn process_sop_node_tick(
                         state,
                         path_to_start,
                         con,
-                        diagnostics_tx,
-                        sop_op_diagnostics_tx,
+                        logging_tx,
                         log_target,
                     ))
                     .await;

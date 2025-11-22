@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use std::{fmt::Write, sync::Arc};
 use tokio::sync::mpsc;
 
-use crate::{ConnectionManager, OperationState, SPValue, StateManager, StringOrUnknown, ToSPValue};
+use crate::{ConnectionManager, OperationState, SPValue, StateManager, StringOrUnknown, ToSPValue, running::process_operation::OperationProcessingType};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub enum LogMsg {
@@ -16,6 +16,7 @@ pub enum LogMsg {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct OperationMsg {
     pub operation_name: String,
+    pub operation_processing_type: OperationProcessingType,
     pub state: OperationState,
     pub timestamp: DateTime<Utc>,
     pub severity: log::Level,
@@ -36,12 +37,13 @@ pub struct OperationLog {
     pub log: Vec<OperationMsg>,
 }
 
-pub async fn operation_diagnostics_receiver_task(
+pub async fn operation_log_receiver_task(
     mut rx: mpsc::Receiver<LogMsg>,
+    // op_proc_type: OperationProcessingType,
     connection_manager: &Arc<ConnectionManager>,
     sp_id: &str,
 ) {
-    let log_target = format!("{}_diagnostics_receiver", sp_id);
+    let log_target = format!("{}_logger_receiver", sp_id);
     while let Some(log_msg) = rx.recv().await {
         match log_msg {
             LogMsg::OperationMsg(msg) => {
@@ -49,9 +51,16 @@ pub async fn operation_diagnostics_receiver_task(
                     continue;
                 }
                 let mut con = connection_manager.get_connection().await;
+
+                let which_op_type_logger = match msg.operation_processing_type {
+                    OperationProcessingType::Planned => &format!("{}_logger_planned_operations", sp_id),
+                    OperationProcessingType::Automatic => &format!("{}_logger_automatic_operations", sp_id),
+                    OperationProcessingType::SOP => &format!("{}_logger_sop_operations", sp_id),
+                };
+
                 if let Some(log_spvalue) = StateManager::get_sp_value(
                     &mut con,
-                    &format!("{}_diagnostics_operations", sp_id),
+                    &which_op_type_logger,
                 )
                 .await
                 {
@@ -383,6 +392,7 @@ fn test_log_formatter_with_colors() {
         log: vec![
             OperationMsg {
                 operation_name: op_name_1.clone(),
+                operation_processing_type: OperationProcessingType::Automatic,
                 state: OperationState::Initial,
                 timestamp: ts(36, 769_744_256),
                 severity: log::Level::Info,
@@ -390,6 +400,7 @@ fn test_log_formatter_with_colors() {
             },
             OperationMsg {
                 operation_name: op_name_1.clone(),
+                operation_processing_type: OperationProcessingType::Automatic,
                 state: OperationState::Executing,
                 timestamp: ts(36, 969_458_646),
                 severity: log::Level::Info,
@@ -397,6 +408,7 @@ fn test_log_formatter_with_colors() {
             },
             OperationMsg {
                 operation_name: op_name_1.clone(),
+                operation_processing_type: OperationProcessingType::Automatic,
                 state: OperationState::Executing,
                 timestamp: ts(37, 569_480_353),
                 severity: log::Level::Warn,
@@ -404,6 +416,7 @@ fn test_log_formatter_with_colors() {
             },
             OperationMsg {
                 operation_name: op_name_1.clone(),
+                operation_processing_type: OperationProcessingType::Automatic,
                 state: OperationState::Timedout,
                 timestamp: ts(37, 769_515_608),
                 severity: log::Level::Warn,
@@ -411,6 +424,7 @@ fn test_log_formatter_with_colors() {
             },
             OperationMsg {
                 operation_name: op_name_1.clone(),
+                operation_processing_type: OperationProcessingType::Automatic,
                 state: OperationState::Fatal,
                 timestamp: ts(37, 969_277_368),
                 severity: log::Level::Error,
@@ -425,6 +439,7 @@ fn test_log_formatter_with_colors() {
         log: vec![
             OperationMsg {
                 operation_name: op_name_2.clone(),
+                operation_processing_type: OperationProcessingType::Automatic,
                 state: OperationState::Initial,
                 timestamp: ts(38, 100_000_000),
                 severity: log::Level::Info,
@@ -432,6 +447,7 @@ fn test_log_formatter_with_colors() {
             },
             OperationMsg {
                 operation_name: op_name_2.clone(),
+                operation_processing_type: OperationProcessingType::Automatic,
                 state: OperationState::Executing,
                 timestamp: ts(38, 200_000_000),
                 severity: log::Level::Info,
@@ -439,6 +455,7 @@ fn test_log_formatter_with_colors() {
             },
             OperationMsg {
                 operation_name: op_name_2.clone(),
+                operation_processing_type: OperationProcessingType::Automatic,
                 state: OperationState::Executing,
                 timestamp: ts(39, 300_000_000),
                 severity: log::Level::Info,
@@ -446,6 +463,7 @@ fn test_log_formatter_with_colors() {
             },
             OperationMsg {
                 operation_name: op_name_2.clone(),
+                operation_processing_type: OperationProcessingType::Automatic,
                 state: OperationState::Completed,
                 timestamp: ts(40, 400_000_000),
                 severity: log::Level::Info,
@@ -460,6 +478,7 @@ fn test_log_formatter_with_colors() {
         log: vec![
             OperationMsg {
                 operation_name: op_name_3.clone(),
+                operation_processing_type: OperationProcessingType::Automatic,
                 state: OperationState::Initial,
                 timestamp: ts(41, 0),
                 severity: log::Level::Info,
@@ -467,6 +486,7 @@ fn test_log_formatter_with_colors() {
             },
             OperationMsg {
                 operation_name: op_name_3.clone(),
+                operation_processing_type: OperationProcessingType::Automatic,
                 state: OperationState::Executing,
                 timestamp: ts(41, 100_000_000),
                 severity: log::Level::Info,
@@ -474,6 +494,7 @@ fn test_log_formatter_with_colors() {
             },
             OperationMsg {
                 operation_name: op_name_3.clone(),
+                operation_processing_type: OperationProcessingType::Automatic,
                 state: OperationState::Completed,
                 timestamp: ts(41, 200_000_000),
                 severity: log::Level::Info,

@@ -48,9 +48,9 @@ pub use crate::transforms::lookup::*;
 pub use crate::transforms::treeviz::*;
 
 pub mod utils;
-pub use crate::utils::logger::*;
+pub use crate::utils::info_logger::*;
 pub use crate::utils::metadata::*;
-pub use crate::utils::diagnostics::*;
+pub use crate::utils::op_logger::*;
 
 pub mod macros;
 #[allow(unused_imports)]

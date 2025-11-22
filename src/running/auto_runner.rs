@@ -1,5 +1,7 @@
 use crate::{
-    ConnectionManager, LogMsg, Model, OPERAION_RUNNER_TICK_INTERVAL_MS, OperationState, State, StateManager, Transition, TransitionMsg, initialize_env_logger, running::process_operation::{OperationProcessingType, process_operation}
+    ConnectionManager, LogMsg, Model, OPERAION_RUNNER_TICK_INTERVAL_MS, OperationState, State,
+    StateManager, Transition, TransitionMsg, initialize_env_logger,
+    running::process_operation::{OperationProcessingType, process_operation},
 };
 use chrono::Utc;
 use rand::prelude::*;
@@ -14,7 +16,7 @@ async fn process_transition(
     con: &mut MultiplexedConnection,
     transition: &Transition,
     state: &State,
-    diagnostics_tx: mpsc::Sender<LogMsg>,
+    logging_tx: mpsc::Sender<LogMsg>,
     log_target: &str,
 ) {
     if !transition.to_owned().eval(state, &log_target) {
@@ -31,9 +33,9 @@ async fn process_transition(
         log: format!("Executed auto transition."),
     };
     let log_msg = LogMsg::TransitionMsg(transition_msg);
-    match diagnostics_tx.send(log_msg).await {
+    match logging_tx.send(log_msg).await {
         Ok(()) => (),
-        Err(e) => log::error!(target: &log_target, "Failed to send diagnostics with: {e}."),
+        Err(e) => log::error!(target: &log_target, "Failed to send logging with: {e}."),
     }
 
     let modified_state = state.get_diff_partial_state(&new_state);
@@ -44,7 +46,7 @@ pub async fn auto_transition_runner(
     name: &str,
     model: &Model,
     connection_manager: &Arc<ConnectionManager>,
-        diagnostics_tx: mpsc::Sender<LogMsg>,
+    logging_tx: mpsc::Sender<LogMsg>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     initialize_env_logger();
     let mut interval = interval(Duration::from_millis(TRANSITION_RUNNER_TICK_INTERVAL_MS));
@@ -70,7 +72,7 @@ pub async fn auto_transition_runner(
         };
 
         for t in &model.auto_transitions {
-            process_transition(&mut con, t, &state, diagnostics_tx.clone(), &log_target).await;
+            process_transition(&mut con, t, &state, logging_tx.clone(), &log_target).await;
         }
     }
 }
@@ -78,8 +80,7 @@ pub async fn auto_transition_runner(
 pub async fn auto_operation_runner(
     name: &str,
     model: &Model,
-    diagnostics_tx: mpsc::Sender<LogMsg>,
-    op_sop_diagnostics_tx: mpsc::Sender<LogMsg>,
+    logging_tx: mpsc::Sender<LogMsg>,
     connection_manager: &Arc<ConnectionManager>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     initialize_env_logger();
@@ -93,9 +94,7 @@ pub async fn auto_operation_runner(
         .flat_map(|t| t.get_all_var_keys())
         .collect();
 
-    keys.extend(vec![
-        format!("{}_dashboard_command", name),
-    ]);
+    keys.extend(vec![format!("{}_dashboard_command", name)]);
 
     keys.extend(
         model
@@ -167,8 +166,7 @@ pub async fn auto_operation_runner(
                 OperationProcessingType::Automatic,
                 None,
                 None,
-                diagnostics_tx.clone(),
-                op_sop_diagnostics_tx.clone(),
+                logging_tx.clone(),
                 &log_target,
             )
             .await;
@@ -206,8 +204,7 @@ pub async fn auto_operation_runner(
                     OperationProcessingType::Automatic,
                     None,
                     None,
-                    diagnostics_tx.clone(),
-                    op_sop_diagnostics_tx.clone(),
+                    logging_tx.clone(),
                     &log_target,
                 )
                 .await;
