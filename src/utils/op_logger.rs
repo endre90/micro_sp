@@ -5,7 +5,10 @@ use serde::{Deserialize, Serialize};
 use std::{fmt::Write, sync::Arc};
 use tokio::sync::mpsc;
 
-use crate::{ConnectionManager, OperationState, SPValue, StateManager, StringOrUnknown, ToSPValue, running::process_operation::OperationProcessingType};
+use crate::{
+    ConnectionManager, OperationState, SPValue, StateManager, StringOrUnknown, ToSPValue,
+    running::process_operation::OperationProcessingType,
+};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub enum LogMsg {
@@ -53,16 +56,17 @@ pub async fn operation_log_receiver_task(
                 let mut con = connection_manager.get_connection().await;
 
                 let which_op_type_logger = match msg.operation_processing_type {
-                    OperationProcessingType::Planned => &format!("{}_logger_planned_operations", sp_id),
-                    OperationProcessingType::Automatic => &format!("{}_logger_automatic_operations", sp_id),
+                    OperationProcessingType::Planned => {
+                        &format!("{}_logger_planned_operations", sp_id)
+                    }
+                    OperationProcessingType::Automatic => {
+                        &format!("{}_logger_automatic_operations", sp_id)
+                    }
                     OperationProcessingType::SOP => &format!("{}_logger_sop_operations", sp_id),
                 };
 
-                if let Some(log_spvalue) = StateManager::get_sp_value(
-                    &mut con,
-                    &which_op_type_logger,
-                )
-                .await
+                if let Some(log_spvalue) =
+                    StateManager::get_sp_value(&mut con, &which_op_type_logger).await
                 {
                     if let SPValue::String(StringOrUnknown::String(string_log)) = log_spvalue {
                         if let Ok(mut log) =
@@ -86,6 +90,7 @@ pub async fn operation_log_receiver_task(
                                             OperationState::Completed
                                                 | OperationState::Bypassed
                                                 | OperationState::Fatal
+                                                | OperationState::Cancelled
                                         )
                                     )
                                 });
@@ -105,7 +110,7 @@ pub async fn operation_log_receiver_task(
                                             Some(
                                                 OperationState::Completed
                                                 | OperationState::Bypassed
-                                                | OperationState::Fatal,
+                                                | OperationState::Fatal | OperationState::Cancelled,
                                             ) => {
                                                 old_last_vec.push(op);
                                             }
@@ -173,12 +178,8 @@ pub async fn operation_log_receiver_task(
 
                 match serde_json::to_string(&log) {
                     Ok(serialized) => {
-                        StateManager::set_sp_value(
-                            &mut con,
-                            &redis_key,
-                            &serialized.to_spvalue(),
-                        )
-                        .await
+                        StateManager::set_sp_value(&mut con, &redis_key, &serialized.to_spvalue())
+                            .await
                     }
                     Err(e) => {
                         log::error!(target: &log_target, "Serialization failed for transition with {e}.")

@@ -97,7 +97,32 @@ async fn process_sop_tick(
             )
             .await;
         }
-        SOPState::Completed | SOPState::Failed => {}
+        SOPState::Completed => {
+            handle_sop_completed(
+                sp_id,
+                model,
+                state,
+                &mut new_state,
+                &mut sop_overall_state,
+                con,
+                logging_tx,
+                &log_target,
+            )
+            .await;
+        }
+        SOPState::Failed => {
+            handle_sop_failed(
+                sp_id,
+                model,
+                state,
+                &mut new_state,
+                &mut sop_overall_state,
+                con,
+                logging_tx,
+                &log_target,
+            )
+            .await;
+        }
         SOPState::UNKNOWN => {
             // log::warn!(target: &log_target, "SOP in UNKNOWN state. Resetting.");
             sop_overall_state = SOPState::Initial.to_string();
@@ -157,12 +182,78 @@ async fn handle_sop_executing(
     *new_state = updated_state;
 
     if is_sop_completed(sp_id, &root_sop_container.sop, new_state, &log_target) {
-        log::info!(target: &log_target, "SOP root is complete. SOP Completed.");
+        log::info!(target: &log_target, "SOP root is complete. Completing SOP.");
         *sop_overall_state = SOPState::Completed.to_string();
     } else if is_sop_failed(sp_id, &root_sop_container.sop, new_state, &log_target) {
-        log::error!(target: &log_target, "Fatal error detected in SOP. SOP Failed.");
+        log::error!(target: &log_target, "Fatal error detected in SOP. Failing SOP.");
         *sop_overall_state = SOPState::Failed.to_string();
     }
+}
+
+async fn handle_sop_completed(
+    sp_id: &str,
+    model: &Model,
+    state: &State,
+    new_state: &mut State,
+    sop_overall_state: &mut String,
+    con: redis::aio::MultiplexedConnection,
+    logging_tx: mpsc::Sender<LogMsg>,
+
+    log_target: &str,
+) {
+    let sop_id = state.get_string_or_default_to_unknown(&format!("{}_sop_id", sp_id), &log_target);
+
+    let Some(root_sop_container) = model.sops.iter().find(|s| s.id == sop_id) else {
+        log::error!(target: &log_target, "SOP with id '{}' not found in model. Failing.", sop_id);
+        *sop_overall_state = SOPState::Failed.to_string();
+        return;
+    };
+
+    let updated_state = process_sop_node_tick(
+        sp_id,
+        state.clone(),
+        &root_sop_container.sop,
+        con,
+        logging_tx.clone(),
+        &log_target,
+    )
+    .await;
+    *new_state = updated_state;
+
+    log::info!(target: &log_target, "SOP completed.");
+}
+
+async fn handle_sop_failed(
+    sp_id: &str,
+    model: &Model,
+    state: &State,
+    new_state: &mut State,
+    sop_overall_state: &mut String,
+    con: redis::aio::MultiplexedConnection,
+    logging_tx: mpsc::Sender<LogMsg>,
+
+    log_target: &str,
+) {
+    let sop_id = state.get_string_or_default_to_unknown(&format!("{}_sop_id", sp_id), &log_target);
+
+    let Some(root_sop_container) = model.sops.iter().find(|s| s.id == sop_id) else {
+        log::error!(target: &log_target, "SOP with id '{}' not found in model. Failing.", sop_id);
+        *sop_overall_state = SOPState::Failed.to_string();
+        return;
+    };
+
+    let updated_state = process_sop_node_tick(
+        sp_id,
+        state.clone(),
+        &root_sop_container.sop,
+        con,
+        logging_tx.clone(),
+        &log_target,
+    )
+    .await;
+    *new_state = updated_state;
+
+    log::info!(target: &log_target, "SOP failed.");
 }
 
 async fn process_sop_node_tick(
@@ -240,12 +331,7 @@ async fn process_sop_node_tick(
             if let Some(path) = active_path {
                 // If a path is active, keep processing it
                 state = Box::pin(process_sop_node_tick(
-                    sp_id,
-                    state,
-                    path,
-                    con,
-                    logging_tx,
-                    log_target,
+                    sp_id, state, path, con, logging_tx, log_target,
                 ))
                 .await;
             } else {
