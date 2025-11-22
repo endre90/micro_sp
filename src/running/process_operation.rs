@@ -305,24 +305,32 @@ pub(super) async fn process_operation(
         }
     }
 
+    // For now, skip logging the SOP operations
     if new_op_info != old_operation_information {
-        match op_info_level {
-            log::Level::Info => log::info!(target: &log_target, "{}", new_op_info),
-            log::Level::Warn => log::warn!(target: &log_target, "{}", new_op_info),
-            log::Level::Error => log::error!(target: &log_target, "{}", new_op_info),
+        match operation_processing_type {
+            OperationProcessingType::Planned | OperationProcessingType::Automatic => {
+                match op_info_level {
+                    log::Level::Info => log::info!(target: &log_target, "{}", new_op_info),
+                    log::Level::Warn => log::warn!(target: &log_target, "{}", new_op_info),
+                    log::Level::Error => log::error!(target: &log_target, "{}", new_op_info),
+                    _ => (),
+                }
+                let operation_msg = OperationMsg {
+                    operation_name: operation.name.clone(),
+                    timestamp: Utc::now(),
+                    severity: op_info_level,
+                    state: OperationState::from_str(&operation_state),
+                    log: diagnostics_log.to_string(),
+                };
+                let log_msg = LogMsg::OperationMsg(operation_msg);
+                match diagnostics_tx.send(log_msg).await {
+                    Ok(()) => (),
+                    Err(e) => {
+                        log::error!(target: &log_target, "Failed to send diagnostics with: {e}.")
+                    }
+                }
+            }
             _ => (),
-        }
-        let operation_msg = OperationMsg {
-            operation_name: operation.name.clone(),
-            timestamp: Utc::now(),
-            severity: op_info_level,
-            state: OperationState::from_str(&operation_state),
-            log: diagnostics_log.to_string(),
-        };
-        let log_msg = LogMsg::OperationMsg(operation_msg);
-        match diagnostics_tx.send(log_msg).await {
-            Ok(()) => (),
-            Err(e) => log::error!(target: &log_target, "Failed to send diagnostics with: {e}."),
         }
     }
 
