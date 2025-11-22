@@ -61,19 +61,19 @@ pub fn generate_runner_state_variables(name: &str) -> State {
     ));
 
     // Logging:
-    let empty_diag_log: Vec<Vec<OperationLog>> = vec![vec![]];
+    let empty_log: Vec<Vec<OperationLog>> = vec![vec![]];
     let logger_planned_operations = v!(&&format!("{}_logger_planned_operations", name));
     state = state.add(assign!(
         logger_planned_operations,
         SPValue::String(StringOrUnknown::String(
-            serde_json::to_string(&empty_diag_log).unwrap()
+            serde_json::to_string(&empty_log).unwrap()
         ))
     ));
     let logger_automatic_operations = v!(&&format!("{}_logger_automatic_operations", name));
     state = state.add(assign!(
         logger_automatic_operations,
         SPValue::String(StringOrUnknown::String(
-            serde_json::to_string(&empty_diag_log).unwrap()
+            serde_json::to_string(&empty_log).unwrap()
         ))
     ));
 
@@ -81,7 +81,7 @@ pub fn generate_runner_state_variables(name: &str) -> State {
     state = state.add(assign!(
         logger_sop_operations,
         SPValue::String(StringOrUnknown::String(
-            serde_json::to_string(&empty_diag_log).unwrap()
+            serde_json::to_string(&empty_log).unwrap()
         ))
     ));
 

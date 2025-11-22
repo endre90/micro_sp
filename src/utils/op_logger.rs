@@ -138,7 +138,7 @@ pub async fn operation_log_receiver_task(
                                 Ok(serialized) => {
                                     StateManager::set_sp_value(
                                         &mut con,
-                                        &format!("{}_diagnostics_operations", sp_id),
+                                        &which_op_type_logger,
                                         &serialized.to_spvalue(),
                                     )
                                     .await
@@ -156,7 +156,7 @@ pub async fn operation_log_receiver_task(
                     continue;
                 }
                 let mut con = connection_manager.get_connection().await;
-                let redis_key = format!("{}_diagnostics_transitions", sp_id);
+                let redis_key = format!("{}_logger_automatic_transitions", sp_id);
                 let mut log: Vec<TransitionMsg> = if let Some(log_spvalue) =
                     StateManager::get_sp_value(&mut con, &redis_key).await
                 {
