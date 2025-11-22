@@ -11,6 +11,7 @@ pub async fn sop_runner(
     sp_id: &str,
     model: &Model,
     diagnostics_tx: mpsc::Sender<LogMsg>,
+    sop_op_diagnostics_tx: mpsc::Sender<LogMsg>,
     connection_manager: &Arc<ConnectionManager>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     initialize_env_logger();
@@ -50,6 +51,7 @@ pub async fn sop_runner(
             &state,
             con_clone,
             diagnostics_tx.clone(),
+            sop_op_diagnostics_tx.clone(),
             &log_target,
         )
         .await?;
@@ -67,6 +69,7 @@ async fn process_sop_tick(
     state: &State,
     con: redis::aio::MultiplexedConnection,
     diagnostics_tx: mpsc::Sender<LogMsg>,
+    sop_op_diagnostics_tx: mpsc::Sender<LogMsg>,
     log_target: &str,
 ) -> Result<State, Box<dyn std::error::Error>> {
     let mut new_state = state.clone();
@@ -92,6 +95,7 @@ async fn process_sop_tick(
                 &mut sop_overall_state,
                 con,
                 diagnostics_tx,
+                sop_op_diagnostics_tx,
                 &log_target,
             )
             .await;
@@ -133,6 +137,7 @@ async fn handle_sop_executing(
     sop_overall_state: &mut String,
     con: redis::aio::MultiplexedConnection,
     diagnostics_tx: mpsc::Sender<LogMsg>,
+    sop_op_diagnostics_tx: mpsc::Sender<LogMsg>,
     log_target: &str,
 ) {
     let sop_id = state.get_string_or_default_to_unknown(&format!("{}_sop_id", sp_id), &log_target);
@@ -149,6 +154,7 @@ async fn handle_sop_executing(
         &root_sop_container.sop,
         con,
         diagnostics_tx.clone(),
+        sop_op_diagnostics_tx.clone(),
         &log_target,
     )
     .await;
@@ -169,6 +175,7 @@ async fn process_sop_node_tick(
     sop: &SOP,
     con: redis::aio::MultiplexedConnection,
     diagnostics_tx: mpsc::Sender<LogMsg>,
+    sop_op_diagnostics_tx: mpsc::Sender<LogMsg>,
     log_target: &str,
 ) -> State {
     if is_sop_completed(sp_id, sop, &state, log_target)
@@ -187,6 +194,7 @@ async fn process_sop_node_tick(
                 None,
                 None,
                 diagnostics_tx,
+                sop_op_diagnostics_tx,
                 log_target,
             )
             .await;
@@ -204,6 +212,7 @@ async fn process_sop_node_tick(
                     active_child,
                     con,
                     diagnostics_tx,
+                    sop_op_diagnostics_tx,
                     log_target,
                 ))
                 .await;
@@ -221,6 +230,7 @@ async fn process_sop_node_tick(
                     child,
                     con.clone(),
                     diagnostics_tx.clone(),
+                    sop_op_diagnostics_tx.clone(),
                     log_target,
                 ))
                 .await;
@@ -242,6 +252,7 @@ async fn process_sop_node_tick(
                     path,
                     con,
                     diagnostics_tx,
+                    sop_op_diagnostics_tx,
                     log_target,
                 ))
                 .await;
@@ -258,6 +269,7 @@ async fn process_sop_node_tick(
                         path_to_start,
                         con,
                         diagnostics_tx,
+                        sop_op_diagnostics_tx,
                         log_target,
                     ))
                     .await;

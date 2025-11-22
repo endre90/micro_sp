@@ -79,6 +79,7 @@ pub async fn auto_operation_runner(
     name: &str,
     model: &Model,
     diagnostics_tx: mpsc::Sender<LogMsg>,
+    op_sop_diagnostics_tx: mpsc::Sender<LogMsg>,
     connection_manager: &Arc<ConnectionManager>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     initialize_env_logger();
@@ -167,6 +168,7 @@ pub async fn auto_operation_runner(
                 None,
                 None,
                 diagnostics_tx.clone(),
+                op_sop_diagnostics_tx.clone(),
                 &log_target,
             )
             .await;
@@ -205,6 +207,7 @@ pub async fn auto_operation_runner(
                     None,
                     None,
                     diagnostics_tx.clone(),
+                    op_sop_diagnostics_tx.clone(),
                     &log_target,
                 )
                 .await;

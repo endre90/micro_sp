@@ -17,6 +17,7 @@ pub(super) async fn process_operation(
     plan_current_step: Option<&mut i64>,
     plan_state: Option<&mut String>,
     diagnostics_tx: mpsc::Sender<LogMsg>,
+    op_sop_diagnostics_tx: mpsc::Sender<LogMsg>,
     // mut con: redis::aio::MultiplexedConnection,
     log_target: &str,
 ) -> State {
@@ -307,9 +308,7 @@ pub(super) async fn process_operation(
 
     // For now, skip logging the SOP operations
     if new_op_info != old_operation_information {
-        // match operation_processing_type {
-            // OperationProcessingType::Planned | OperationProcessingType::Automatic => {
-                match op_info_level {
+                        match op_info_level {
                     log::Level::Info => log::info!(target: &log_target, "{}", new_op_info),
                     log::Level::Warn => log::warn!(target: &log_target, "{}", new_op_info),
                     log::Level::Error => log::error!(target: &log_target, "{}", new_op_info),
@@ -323,15 +322,26 @@ pub(super) async fn process_operation(
                     log: diagnostics_log.to_string(),
                 };
                 let log_msg = LogMsg::OperationMsg(operation_msg);
+        match operation_processing_type {
+            OperationProcessingType::Planned | OperationProcessingType::Automatic => {
+
+                
                 match diagnostics_tx.send(log_msg).await {
                     Ok(()) => (),
                     Err(e) => {
                         log::error!(target: &log_target, "Failed to send diagnostics with: {e}.")
                     }
                 }
-            // }
-            // _ => (),
-        // }
+            }
+            OperationProcessingType::SOP => {
+                match op_sop_diagnostics_tx.send(log_msg).await {
+                    Ok(()) => (),
+                    Err(e) => {
+                        log::error!(target: &log_target, "Failed to send diagnostics with: {e}.")
+                    }
+                }
+            },
+        }
     }
 
     new_state

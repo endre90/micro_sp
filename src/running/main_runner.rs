@@ -46,13 +46,23 @@ pub async fn main_runner(
         operation_diagnostics_receiver_task(op_diag_rx, &con_clone, &sp_id_clone).await
     });
 
+    // and one for SOP operations
+    let (sop_op_diag_tx, sop_op_diag_rx) = mpsc::channel::<LogMsg>(100);
+    log::info!(target: &format!("{sp_id}_micro_sp"), "Spawning operation diagnostics receiver.");
+    let con_clone = connection_manager.clone();
+    let sp_id_clone = sp_id.clone();
+    tokio::task::spawn(async move {
+        operation_diagnostics_receiver_task(sop_op_diag_rx, &con_clone, &sp_id_clone).await
+    });
+
     log::info!(target:  &format!("{sp_id}_micro_sp"), "Spawning SOP runner.");
     let model_clone = model.clone();
     let con_clone = connection_manager.clone();
     let sp_id_clone = sp_id.clone();
     let op_diag_tx_clone = op_diag_tx.clone();
+    let sop_diag_tx_clone = sop_op_diag_tx.clone();
     tokio::task::spawn(async move {
-        sop_runner(&sp_id_clone, &model_clone, op_diag_tx_clone, &con_clone)
+        sop_runner(&sp_id_clone, &model_clone, op_diag_tx_clone, sop_diag_tx_clone, &con_clone)
             .await
             .unwrap()
     });
@@ -61,8 +71,9 @@ pub async fn main_runner(
     let model_clone = model.clone();
     let con_clone = connection_manager.clone();
     let op_diag_tx_clone = op_diag_tx.clone();
+    let sop_diag_tx_clone = sop_op_diag_tx.clone();
     tokio::task::spawn(async move {
-        planned_operation_runner(&model_clone, op_diag_tx_clone, &con_clone)
+        planned_operation_runner(&model_clone, op_diag_tx_clone, sop_diag_tx_clone, &con_clone)
             .await
             .unwrap()
     });
@@ -86,11 +97,13 @@ pub async fn main_runner(
     let model_clone = model.clone();
     let con_clone = connection_manager.clone();
     let op_diag_tx_clone = op_diag_tx.clone();
+    let sop_diag_tx_clone = sop_op_diag_tx.clone();
     tokio::task::spawn(async move {
         auto_operation_runner(
             &model_clone.name,
             &model_clone,
             op_diag_tx_clone,
+            sop_diag_tx_clone,
             &con_clone,
         )
         .await

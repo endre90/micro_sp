@@ -10,6 +10,7 @@ pub static OPERAION_RUNNER_TICK_INTERVAL_MS: u64 = 200;
 pub async fn planned_operation_runner(
     model: &Model,
     diagnostics_tx: mpsc::Sender<LogMsg>,
+    op_sop_diagnostics_tx: mpsc::Sender<LogMsg>,
     connection_manager: &Arc<ConnectionManager>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let sp_id = &model.name;
@@ -63,7 +64,7 @@ pub async fn planned_operation_runner(
         };
         // let con_clone = con.clone();
         let new_state =
-            process_plan_tick(sp_id, &model, &state, diagnostics_tx.clone(), &log_target).await;
+            process_plan_tick(sp_id, &model, &state, diagnostics_tx.clone(), op_sop_diagnostics_tx.clone(), &log_target).await;
         let modified_state = state.get_diff_partial_state(&new_state);
         // StateManager::set_state(con, &modified_state).await;
         StateManager::set_state(&mut con, &modified_state).await;
@@ -76,6 +77,7 @@ async fn process_plan_tick(
     model: &Model,
     state: &State,
     diagnostics_tx: mpsc::Sender<LogMsg>,
+    op_sop_diagnostics_tx: mpsc::Sender<LogMsg>,
     log_target: &str,
 ) -> State {
     let mut new_state = state.clone();
@@ -115,6 +117,7 @@ async fn process_plan_tick(
                             Some(&mut plan_current_step),
                             Some(&mut plan_state_str),
                             diagnostics_tx,
+                            op_sop_diagnostics_tx,
                             log_target,
                         )
                         .await;
