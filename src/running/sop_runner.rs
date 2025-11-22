@@ -13,6 +13,7 @@ pub async fn sop_runner(
     diagnostics_tx: mpsc::Sender<LogMsg>,
     connection_manager: &Arc<ConnectionManager>,
 ) -> Result<(), Box<dyn std::error::Error>> {
+    initialize_env_logger();
     let mut interval = interval(Duration::from_millis(TICK_INTERVAL));
     let log_target = &format!("{}_sop_runner", sp_id);
 
