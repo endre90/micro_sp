@@ -226,7 +226,6 @@ impl Operation {
     pub fn can_be_completed(&self, state: &State, log_target: &str) -> bool {
         if let Some(value) = state.get_value(&self.name, &log_target) {
             if value == OperationState::Executing.to_spvalue() {
-                
                 for postcondition in &self.postconditions {
                     if postcondition.clone().eval(&state, &log_target) {
                         return true;

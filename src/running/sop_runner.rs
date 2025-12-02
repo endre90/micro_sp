@@ -420,24 +420,24 @@ fn can_sop_start(sp_id: &str, sop: &SOP, state: &State, log_target: &str) -> boo
     }
 }
 
-pub fn uniquify_sop_operations(sop: SOP) -> SOP {
-    match sop {
-        SOP::Operation(op) => {
-            let unique_id = nanoid::nanoid!(6);
-            let new_name = format!("{}_{}", op.name, unique_id);
-            SOP::Operation(Box::new(Operation {
-                name: new_name,
-                ..*op
-            }))
-        }
-        SOP::Sequence(sops) => {
-            SOP::Sequence(sops.into_iter().map(uniquify_sop_operations).collect())
-        }
-        SOP::Parallel(sops) => {
-            SOP::Parallel(sops.into_iter().map(uniquify_sop_operations).collect())
-        }
-        SOP::Alternative(sops) => {
-            SOP::Alternative(sops.into_iter().map(uniquify_sop_operations).collect())
-        }
-    }
-}
+// pub fn uniquify_sop_operations(sop: SOP) -> SOP {
+//     match sop {
+//         SOP::Operation(op) => {
+//             let unique_id = nanoid::nanoid!(6);
+//             let new_name = format!("{}_{}", op.name, unique_id);
+//             SOP::Operation(Box::new(Operation {
+//                 name: new_name,
+//                 ..*op
+//             }))
+//         }
+//         SOP::Sequence(sops) => {
+//             SOP::Sequence(sops.into_iter().map(uniquify_sop_operations).collect())
+//         }
+//         SOP::Parallel(sops) => {
+//             SOP::Parallel(sops.into_iter().map(uniquify_sop_operations).collect())
+//         }
+//         SOP::Alternative(sops) => {
+//             SOP::Alternative(sops.into_iter().map(uniquify_sop_operations).collect())
+//         }
+//     }
+// }
