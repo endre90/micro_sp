@@ -114,6 +114,7 @@ async fn process_plan_tick(
                             OperationProcessingType::Planned,
                             Some(&mut plan_current_step),
                             Some(&mut plan_state_str),
+                            None, 
                             logging_tx,
                             log_target,
                         )

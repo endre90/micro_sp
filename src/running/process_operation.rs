@@ -18,6 +18,7 @@ pub(super) async fn process_operation(
     operation_processing_type: OperationProcessingType,
     plan_current_step: Option<&mut i64>,
     plan_state: Option<&mut String>,
+    sop_state: Option<&mut String>,
     logging_tx: mpsc::Sender<LogMsg>,
     // mut con: redis::aio::MultiplexedConnection,
     log_target: &str,
@@ -132,10 +133,6 @@ pub(super) async fn process_operation(
                 new_state = operation.clone().complete(&new_state, &log_target);
                 new_op_info = format!("Completing operation '{}'.", operation.name).to_string();
                 logging_log = format!("Completing operation.");
-                // Since the Completed state is kipped in the SOP runner
-                if let OperationProcessingType::SOP = operation_processing_type {
-                    new_state = operation.initialize(&new_state, &log_target);
-                }
                 op_info_level = log::Level::Info;
             } else {
                 new_op_info = format!(
@@ -171,7 +168,14 @@ pub(super) async fn process_operation(
             new_op_info = format!("Operation '{}' completed.", operation.name);
             logging_log = format!("Operation completed.");
             op_info_level = log::Level::Info;
-            // new_state = operation.terminate(&new_state, &log_target);
+            match operation_processing_type {
+                OperationProcessingType::SOP => {
+                    if let Some(sop_state) = sop_state {
+                        *sop_state = SOPState::Advanceable.to_string();
+                    }
+                }
+                _ => (),
+            }
         }
 
         OperationState::Bypassed => {
@@ -192,7 +196,14 @@ pub(super) async fn process_operation(
                 }
             }
             op_info_level = log::Level::Warn;
-            // new_state = operation.terminate(&new_state, &log_target);
+            match operation_processing_type {
+                OperationProcessingType::SOP => {
+                    if let Some(sop_state) = sop_state {
+                        *sop_state = SOPState::Advanceable.to_string();
+                    }
+                }
+                _ => (),
+            }
         }
 
         OperationState::Timedout => {
@@ -290,6 +301,11 @@ pub(super) async fn process_operation(
                         *plan_state = PlanState::Failed.to_string();
                     }
                 }
+                OperationProcessingType::SOP => {
+                    if let Some(sop_state) = sop_state {
+                        *sop_state = SOPState::Failed.to_string();
+                    }
+                }
                 _ => (),
             }
             // new_state = operation.terminate(&new_state, &log_target);
@@ -314,6 +330,11 @@ pub(super) async fn process_operation(
                 OperationProcessingType::Planned => {
                     if let Some(plan_state) = plan_state {
                         *plan_state = PlanState::Cancelled.to_string();
+                    }
+                }
+                OperationProcessingType::SOP => {
+                    if let Some(sop_state) = sop_state {
+                        *sop_state = SOPState::Cancelled.to_string();
                     }
                 }
                 _ => (),

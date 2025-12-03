@@ -71,16 +71,16 @@ async fn process_sop_tick(
     log_target: &str,
 ) -> Result<State, Box<dyn std::error::Error>> {
     let mut new_state = state.clone();
-    let mut sop_overall_state =
+    let mut sop_state =
         state.get_string_or_default_to_unknown(&format!("{}_sop_state", sp_id), &log_target);
 
-    match SOPState::from_str(&sop_overall_state) {
+    match SOPState::from_str(&sop_state) {
         SOPState::Initial => {
             handle_sop_initial(
                 sp_id,
                 state,
                 &mut new_state,
-                &mut sop_overall_state,
+                &mut sop_state,
                 &log_target,
             )?;
         }
@@ -90,7 +90,7 @@ async fn process_sop_tick(
                 model,
                 state,
                 &mut new_state,
-                &mut sop_overall_state,
+                &mut sop_state,
                 con,
                 logging_tx,
                 &log_target,
@@ -103,7 +103,7 @@ async fn process_sop_tick(
                 model,
                 state,
                 &mut new_state,
-                &mut sop_overall_state,
+                &mut sop_state,
                 con,
                 logging_tx,
                 &log_target,
@@ -116,22 +116,36 @@ async fn process_sop_tick(
                 model,
                 state,
                 &mut new_state,
-                &mut sop_overall_state,
+                &mut sop_state,
                 con,
                 logging_tx,
                 &log_target,
             )
             .await;
         }
+        SOPState::Advanceable => {
+            handle_sop_advanceable(
+                sp_id,
+                model,
+                state,
+                &mut new_state,
+                &mut sop_state,
+                con,
+                logging_tx,
+                &log_target,
+            )
+            .await;
+        }
+        SOPState::Cancelled => todo!(),
         SOPState::UNKNOWN => {
             // log::warn!(target: &log_target, "SOP in UNKNOWN state. Resetting.");
-            sop_overall_state = SOPState::Initial.to_string();
+            sop_state = SOPState::Initial.to_string();
         }
     }
 
     new_state = new_state.update(
         &format!("{}_sop_state", sp_id),
-        sop_overall_state.to_spvalue(),
+        sop_state.to_spvalue(),
     );
     Ok(new_state)
 }
@@ -140,13 +154,13 @@ fn handle_sop_initial(
     sp_id: &str,
     state: &State,
     new_state: &mut State,
-    sop_overall_state: &mut String,
+    sop_state: &mut String,
     log_target: &str,
 ) -> Result<(), Box<dyn std::error::Error>> {
     if state.get_bool_or_default_to_false(&format!("{}_sop_enabled", sp_id), &log_target) {
         log::info!(target: &log_target, "SOP enabled. Transitioning to Executing.");
         *new_state = new_state.update(&format!("{}_sop_enabled", sp_id), false.to_spvalue());
-        *sop_overall_state = SOPState::Executing.to_string();
+        *sop_state = SOPState::Executing.to_string();
     }
     Ok(())
 }
@@ -156,7 +170,7 @@ async fn handle_sop_executing(
     model: &Model,
     state: &State,
     new_state: &mut State,
-    sop_overall_state: &mut String,
+    sop_state: &mut String,
     con: redis::aio::MultiplexedConnection,
     logging_tx: mpsc::Sender<LogMsg>,
 
@@ -166,13 +180,14 @@ async fn handle_sop_executing(
 
     let Some(root_sop_container) = model.sops.iter().find(|s| s.id == sop_id) else {
         log::error!(target: &log_target, "SOP with id '{}' not found in model. Failing.", sop_id);
-        *sop_overall_state = SOPState::Failed.to_string();
+        *sop_state = SOPState::Failed.to_string();
         return;
     };
 
     let updated_state = process_sop_node_tick(
         sp_id,
         state.clone(),
+        sop_state,
         &root_sop_container.sop,
         con,
         logging_tx.clone(),
@@ -183,11 +198,12 @@ async fn handle_sop_executing(
 
     if is_sop_completed(sp_id, &root_sop_container.sop, new_state, &log_target) {
         log::info!(target: &log_target, "SOP root is complete. Completing SOP.");
-        *sop_overall_state = SOPState::Completed.to_string();
+        *sop_state = SOPState::Completed.to_string();
     } else if is_sop_failed(sp_id, &root_sop_container.sop, new_state, &log_target) {
         log::error!(target: &log_target, "Fatal error detected in SOP. Failing SOP.");
-        *sop_overall_state = SOPState::Failed.to_string();
+        *sop_state = SOPState::Failed.to_string();
     }
+    // else if sop is advanceable... advance sop
 }
 
 async fn handle_sop_completed(
@@ -195,7 +211,7 @@ async fn handle_sop_completed(
     model: &Model,
     state: &State,
     new_state: &mut State,
-    sop_overall_state: &mut String,
+    sop_state: &mut String,
     con: redis::aio::MultiplexedConnection,
     logging_tx: mpsc::Sender<LogMsg>,
 
@@ -205,13 +221,48 @@ async fn handle_sop_completed(
 
     let Some(root_sop_container) = model.sops.iter().find(|s| s.id == sop_id) else {
         log::error!(target: &log_target, "SOP with id '{}' not found in model. Failing.", sop_id);
-        *sop_overall_state = SOPState::Failed.to_string();
+        *sop_state = SOPState::Failed.to_string();
         return;
     };
 
     let updated_state = process_sop_node_tick(
         sp_id,
         state.clone(),
+        sop_state,
+        &root_sop_container.sop,
+        con,
+        logging_tx.clone(),
+        &log_target,
+    )
+    .await;
+    *new_state = updated_state;
+
+    // log::info!(target: &log_target, "SOP completed.");
+}
+
+async fn handle_sop_advanceable(
+    sp_id: &str,
+    model: &Model,
+    state: &State,
+    new_state: &mut State,
+    sop_state: &mut String,
+    con: redis::aio::MultiplexedConnection,
+    logging_tx: mpsc::Sender<LogMsg>,
+
+    log_target: &str,
+) {
+    let sop_id = state.get_string_or_default_to_unknown(&format!("{}_sop_id", sp_id), &log_target);
+
+    let Some(root_sop_container) = model.sops.iter().find(|s| s.id == sop_id) else {
+        log::error!(target: &log_target, "SOP with id '{}' not found in model. Failing.", sop_id);
+        *sop_state = SOPState::Failed.to_string();
+        return;
+    };
+
+    let updated_state = process_sop_node_tick(
+        sp_id,
+        state.clone(),
+        sop_state,
         &root_sop_container.sop,
         con,
         logging_tx.clone(),
@@ -228,7 +279,7 @@ async fn handle_sop_failed(
     model: &Model,
     state: &State,
     new_state: &mut State,
-    sop_overall_state: &mut String,
+    sop_state: &mut String,
     con: redis::aio::MultiplexedConnection,
     logging_tx: mpsc::Sender<LogMsg>,
 
@@ -238,13 +289,14 @@ async fn handle_sop_failed(
 
     let Some(root_sop_container) = model.sops.iter().find(|s| s.id == sop_id) else {
         log::error!(target: &log_target, "SOP with id '{}' not found in model. Failing.", sop_id);
-        *sop_overall_state = SOPState::Failed.to_string();
+        *sop_state = SOPState::Failed.to_string();
         return;
     };
 
     let updated_state = process_sop_node_tick(
         sp_id,
         state.clone(),
+        sop_state,
         &root_sop_container.sop,
         con,
         logging_tx.clone(),
@@ -259,17 +311,18 @@ async fn handle_sop_failed(
 async fn process_sop_node_tick(
     sp_id: &str,
     mut state: State,
+    mut sop_state: &mut String,
     sop: &SOP,
     con: redis::aio::MultiplexedConnection,
     logging_tx: mpsc::Sender<LogMsg>,
 
     log_target: &str,
 ) -> State {
-    if is_sop_completed(sp_id, sop, &state, log_target)
-        || is_sop_failed(sp_id, sop, &state, log_target)
-    {
-        return state;
-    }
+    // if is_sop_completed(sp_id, sop, &state, log_target)
+    //     || is_sop_failed(sp_id, sop, &state, log_target)
+    // {
+    //     return state;
+    // }
 
     match sop {
         SOP::Operation(operation) => {
@@ -280,6 +333,7 @@ async fn process_sop_node_tick(
                 OperationProcessingType::SOP,
                 None,
                 None,
+                Some(&mut sop_state),
                 logging_tx,
                 log_target,
             )
@@ -292,15 +346,18 @@ async fn process_sop_node_tick(
                 .iter()
                 .find(|child| !is_sop_completed(sp_id, child, &state, log_target))
             {
-                state = Box::pin(process_sop_node_tick(
-                    sp_id,
-                    state,
-                    active_child,
-                    con,
-                    logging_tx,
-                    log_target,
-                ))
-                .await;
+                if SOPState::from_str(&sop_state) == SOPState::Advanceable { // Ensure that the operation has ticked in the completed state
+                    state = Box::pin(process_sop_node_tick(
+                        sp_id,
+                        state,
+                        sop_state,
+                        active_child,
+                        con,
+                        logging_tx,
+                        log_target,
+                    ))
+                    .await;
+                }
             }
         }
 
@@ -312,6 +369,7 @@ async fn process_sop_node_tick(
                 state = Box::pin(process_sop_node_tick(
                     sp_id,
                     state,
+                    sop_state,
                     child,
                     con.clone(),
                     logging_tx.clone(),
@@ -331,7 +389,7 @@ async fn process_sop_node_tick(
             if let Some(path) = active_path {
                 // If a path is active, keep processing it
                 state = Box::pin(process_sop_node_tick(
-                    sp_id, state, path, con, logging_tx, log_target,
+                    sp_id, state, sop_state, path, con, logging_tx, log_target,
                 ))
                 .await;
             } else {
@@ -344,6 +402,7 @@ async fn process_sop_node_tick(
                     state = Box::pin(process_sop_node_tick(
                         sp_id,
                         state,
+                        sop_state,
                         path_to_start,
                         con,
                         logging_tx,
