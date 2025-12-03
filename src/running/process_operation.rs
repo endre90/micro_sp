@@ -166,7 +166,7 @@ pub(super) async fn process_operation(
             new_op_info = format!("Operation '{}' completed.", operation.name);
             logging_log = format!("Operation completed.");
             op_info_level = log::Level::Info;
-            new_state = operation.terminate(&new_state, &log_target);
+            // new_state = operation.terminate(&new_state, &log_target);
         }
 
         OperationState::Bypassed => {
@@ -187,7 +187,7 @@ pub(super) async fn process_operation(
                 }
             }
             op_info_level = log::Level::Warn;
-            new_state = operation.terminate(&new_state, &log_target);
+            // new_state = operation.terminate(&new_state, &log_target);
         }
 
         OperationState::Timedout => {
@@ -287,17 +287,17 @@ pub(super) async fn process_operation(
                 }
                 _ => (),
             }
-            new_state = operation.terminate(&new_state, &log_target);
+            // new_state = operation.terminate(&new_state, &log_target);
         }
 
-        OperationState::Terminated => {
-            new_op_info = format!(
-                "Operation '{}' terminated.",
-                operation.name
-            );
-            logging_log = format!("Operation terminated.");
-            op_info_level = log::Level::Info;
-        }
+        // OperationState::Terminated => {
+        //     new_op_info = format!(
+        //         "Operation '{}' terminated.",
+        //         operation.name
+        //     );
+        //     logging_log = format!("Operation terminated.");
+        //     op_info_level = log::Level::Info;
+        // }
 
         OperationState::Cancelled => {
             new_op_info = format!(
@@ -314,7 +314,7 @@ pub(super) async fn process_operation(
                 }
                 _ => (),
             }
-            new_state = operation.terminate(&new_state, &log_target);
+            // new_state = operation.terminate(&new_state, &log_target);
         }
 
         OperationState::UNKNOWN => {
