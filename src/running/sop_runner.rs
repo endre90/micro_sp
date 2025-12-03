@@ -146,7 +146,7 @@ fn handle_sop_initial(
     if state.get_bool_or_default_to_false(&format!("{}_sop_enabled", sp_id), &log_target) {
         log::info!(target: &log_target, "SOP enabled. Transitioning to Executing.");
         *new_state = new_state.update(&format!("{}_sop_enabled", sp_id), false.to_spvalue());
-        *sop_overall_state = OperationState::Executing.to_string();
+        *sop_overall_state = SOPState::Executing.to_string();
     }
     Ok(())
 }
@@ -165,8 +165,8 @@ async fn handle_sop_executing(
     let sop_id = state.get_string_or_default_to_unknown(&format!("{}_sop_id", sp_id), &log_target);
 
     let Some(root_sop_container) = model.sops.iter().find(|s| s.id == sop_id) else {
-        log::error!(target: &log_target, "SOP with id '{}' not found in model. Fataling.", sop_id);
-        *sop_overall_state = OperationState::Fatal.to_string();
+        log::error!(target: &log_target, "SOP with id '{}' not found in model. Failing.", sop_id);
+        *sop_overall_state = SOPState::Failed.to_string();
         return;
     };
 
@@ -181,8 +181,11 @@ async fn handle_sop_executing(
     .await;
     *new_state = updated_state;
 
-    if is_sop_fatal(sp_id, &root_sop_container.sop, new_state, &log_target) {
-        log::info!(target: &log_target, "SOP root is fatal. Terminating SOP.");
+    if is_sop_completed(sp_id, &root_sop_container.sop, new_state, &log_target) {
+        log::info!(target: &log_target, "SOP root is complete. Completing SOP.");
+        *sop_overall_state = SOPState::Completed.to_string();
+    } else if is_sop_failed(sp_id, &root_sop_container.sop, new_state, &log_target) {
+        log::error!(target: &log_target, "Fatal error detected in SOP. Failing SOP.");
         *sop_overall_state = SOPState::Failed.to_string();
     }
 }
@@ -201,8 +204,8 @@ async fn handle_sop_completed(
     let sop_id = state.get_string_or_default_to_unknown(&format!("{}_sop_id", sp_id), &log_target);
 
     let Some(root_sop_container) = model.sops.iter().find(|s| s.id == sop_id) else {
-        log::error!(target: &log_target, "SOP with id '{}' not found in model. Fataling.", sop_id);
-        *sop_overall_state = OperationState::Fatal.to_string();
+        log::error!(target: &log_target, "SOP with id '{}' not found in model. Failing.", sop_id);
+        *sop_overall_state = SOPState::Failed.to_string();
         return;
     };
 
@@ -234,8 +237,8 @@ async fn handle_sop_failed(
     let sop_id = state.get_string_or_default_to_unknown(&format!("{}_sop_id", sp_id), &log_target);
 
     let Some(root_sop_container) = model.sops.iter().find(|s| s.id == sop_id) else {
-        log::error!(target: &log_target, "SOP with id '{}' not found in model. Fataled.", sop_id);
-        *sop_overall_state = OperationState::Fatal.to_string();
+        log::error!(target: &log_target, "SOP with id '{}' not found in model. Failing.", sop_id);
+        *sop_overall_state = SOPState::Failed.to_string();
         return;
     };
 
@@ -253,223 +256,20 @@ async fn handle_sop_failed(
     log::info!(target: &log_target, "SOP failed.");
 }
 
-// Working old
-// async fn process_sop_node_tick(
-//     sp_id: &str,
-//     mut state: State,
-//     sop: &SOP,
-//     con: redis::aio::MultiplexedConnection,
-//     logging_tx: mpsc::Sender<LogMsg>,
-
-//     log_target: &str,
-// ) -> State {
-//     // if is_sop_completed(sp_id, sop, &state, log_target)
-//     //     || is_sop_failed(sp_id, sop, &state, log_target)
-//     // {
-//     //     return state;
-//     // }
-
-//     match sop {
-//         SOP::Operation(operation) => {
-
-//             state = running::process_operation::process_operation(
-//                 &sp_id,
-//                 state,
-//                 operation,
-//                 OperationProcessingType::SOP,
-//                 None,
-//                 None,
-//                 logging_tx,
-//                 log_target,
-//             )
-//             .await;
-//         }
-
-//         SOP::Sequence(sops) => {
-//             // Find the first child that is not yet completed and process it
-//             if let Some(active_child) = sops
-//                 .iter()
-//                 .find(|child| !is_sop_completed(sp_id, child, &state, log_target))
-//             {
-//                 state = Box::pin(process_sop_node_tick(
-//                     sp_id,
-//                     state,
-//                     active_child,
-//                     con,
-//                     logging_tx,
-//                     log_target,
-//                 ))
-//                 .await;
-//             }
-//         }
-
-//         SOP::Parallel(sops) => {
-//             // Process ALL children that are not yet completed
-//             for child in sops {
-//                 // The state is threaded through each call, so updates from one branch
-//                 // are visible to the next within the same tick
-//                 state = Box::pin(process_sop_node_tick(
-//                     sp_id,
-//                     state,
-//                     child,
-//                     con.clone(),
-//                     logging_tx.clone(),
-//                     log_target,
-//                 ))
-//                 .await;
-//             }
-//         }
-
-//         SOP::Alternative(sops) => {
-//             let active_path = sops.iter().find(|child| {
-//                 !is_sop_initial(sp_id, child, &state, log_target)
-//                     && !is_sop_completed(sp_id, child, &state, log_target)
-//             });
-
-//             if let Some(path) = active_path {
-//                 // If a path is active, keep processing it
-//                 state = Box::pin(process_sop_node_tick(
-//                     sp_id, state, path, con, logging_tx, log_target,
-//                 ))
-//                 .await;
-//             } else {
-//                 // If no path is active, find the first one that can start
-//                 if let Some(path_to_start) = sops
-//                     .iter()
-//                     .find(|child| can_sop_start(sp_id, child, &state, log_target))
-//                 {
-//                     log::info!(target: log_target, "Found valid alternative path to start.");
-//                     state = Box::pin(process_sop_node_tick(
-//                         sp_id,
-//                         state,
-//                         path_to_start,
-//                         con,
-//                         logging_tx,
-//                         log_target,
-//                     ))
-//                     .await;
-//                 }
-//             }
-//         }
-//     }
-
-//     state
-// }
-
-// / Intermadiate
-// async fn process_sop_node_tick(
-//     sp_id: &str,
-//     mut state: State,
-//     sop: &SOP,
-//     con: redis::aio::MultiplexedConnection,
-//     logging_tx: mpsc::Sender<LogMsg>,
-//     log_target: &str,
-// ) -> State {
-//     match sop {
-//         SOP::Operation(operation) => {
-//             state = running::process_operation::process_operation(
-//                 &sp_id,
-//                 state,
-//                 operation,
-//                 OperationProcessingType::SOP,
-//                 None,
-//                 None,
-//                 logging_tx,
-//                 log_target,
-//             )
-//             .await;
-//         }
-
-//         SOP::Sequence(sops) => {
-//             if let Some(active_child) = sops
-//                 .iter()
-//                 .find(|child| !is_sop_completed(sp_id, child, &state, log_target))
-//             {
-//                 // FIX: Only process the child if it's already running OR if it's allowed to start.
-//                 if !is_sop_initial(sp_id, active_child, &state, log_target)
-//                     || can_sop_start(sp_id, active_child, &state, log_target)
-//                 {
-//                     state = Box::pin(process_sop_node_tick(
-//                         sp_id,
-//                         state,
-//                         active_child,
-//                         con,
-//                         logging_tx,
-//                         log_target,
-//                     ))
-//                     .await;
-//                 }
-//             }
-//         }
-
-//         SOP::Parallel(sops) => {
-//             for child in sops {
-//                 // FIX: Apply the same logic to Parallel to prevent premature starting
-//                 if !is_sop_completed(sp_id, child, &state, log_target) {
-//                     if !is_sop_initial(sp_id, child, &state, log_target)
-//                         || can_sop_start(sp_id, child, &state, log_target)
-//                     {
-//                         state = Box::pin(process_sop_node_tick(
-//                             sp_id,
-//                             state,
-//                             child,
-//                             con.clone(),
-//                             logging_tx.clone(),
-//                             log_target,
-//                         ))
-//                         .await;
-//                     }
-//                 }
-//             }
-//         }
-
-//         SOP::Alternative(sops) => {
-//             let active_path = sops.iter().find(|child| {
-//                 !is_sop_initial(sp_id, child, &state, log_target)
-//                     && !is_sop_completed(sp_id, child, &state, log_target)
-//             });
-
-//             if let Some(path) = active_path {
-//                 state = Box::pin(process_sop_node_tick(
-//                     sp_id, state, path, con, logging_tx, log_target,
-//                 ))
-//                 .await;
-//             } else {
-//                 if let Some(path_to_start) = sops
-//                     .iter()
-//                     .find(|child| can_sop_start(sp_id, child, &state, log_target))
-//                 {
-//                     log::info!(target: log_target, "Found valid alternative path to start.");
-//                     state = Box::pin(process_sop_node_tick(
-//                         sp_id,
-//                         state,
-//                         path_to_start,
-//                         con,
-//                         logging_tx,
-//                         log_target,
-//                     ))
-//                     .await;
-//                 }
-//             }
-//         }
-//     }
-
-//     state
-// }
-
 async fn process_sop_node_tick(
     sp_id: &str,
     mut state: State,
     sop: &SOP,
     con: redis::aio::MultiplexedConnection,
     logging_tx: mpsc::Sender<LogMsg>,
+
     log_target: &str,
 ) -> State {
-    // if is_sop_completed(sp_id, sop, &state, log_target)
-    //     || is_sop_failed(sp_id, sop, &state, log_target)
-    // {
-    //     return state;
-    // }
+    if is_sop_completed(sp_id, sop, &state, log_target)
+        || is_sop_failed(sp_id, sop, &state, log_target)
+    {
+        return state;
+    }
 
     match sop {
         SOP::Operation(operation) => {
@@ -487,31 +287,11 @@ async fn process_sop_node_tick(
         }
 
         SOP::Sequence(sops) => {
-            // Find the index of the first child that is not yet completed
-            let active_idx = sops
+            // Find the first child that is not yet completed and process it
+            if let Some(active_child) = sops
                 .iter()
-                .position(|child| !is_sop_completed(sp_id, child, &state, log_target));
-
-            if let Some(idx) = active_idx {
-                let active_child = &sops[idx];
-
-                // FIX: If the active child is still Initial (meaning we just transitioned or are waiting),
-                // we FORCEFULLY tick the previous completed child one more time.
-                // This ensures the 'Completed' state logic of the previous operation runs.
-                if idx > 0 && is_sop_initial(sp_id, active_child, &state, log_target) {
-                    let prev_child = &sops[idx - 1];
-                    state = Box::pin(process_sop_node_tick(
-                        sp_id,
-                        state,
-                        prev_child,
-                        con.clone(),
-                        logging_tx.clone(),
-                        log_target,
-                    ))
-                    .await;
-                }
-
-                // Process the active child
+                .find(|child| !is_sop_completed(sp_id, child, &state, log_target))
+            {
                 state = Box::pin(process_sop_node_tick(
                     sp_id,
                     state,
@@ -542,8 +322,9 @@ async fn process_sop_node_tick(
         }
 
         SOP::Alternative(sops) => {
+            // Check if a path is already active (i.e., not initial and not completed)
             let active_path = sops.iter().find(|child| {
-                !is_sop_initial(sp_id, child, &state, log_target)
+                !is_sop_in_initial_state(sp_id, child, &state, log_target)
                     && !is_sop_completed(sp_id, child, &state, log_target)
             });
 
@@ -577,43 +358,15 @@ async fn process_sop_node_tick(
     state
 }
 
-fn is_sop_initial(sp_id: &str, sop: &SOP, state: &State, log_target: &str) -> bool {
+fn is_sop_failed(sp_id: &str, sop: &SOP, state: &State, log_target: &str) -> bool {
     match sop {
         SOP::Operation(operation) => {
-            let operation_state =
-                state.get_string_or_default_to_unknown(&format!("{}", operation.name), &log_target);
-            let op_state = OperationState::from_str(&operation_state);
-            op_state == OperationState::Initial || op_state == OperationState::UNKNOWN
+            let op_state_str = state.get_string_or_default_to_unknown(&operation.name, &log_target);
+            OperationState::from_str(&op_state_str) == OperationState::Fatal
         }
         SOP::Sequence(sops) | SOP::Parallel(sops) | SOP::Alternative(sops) => sops
             .iter()
-            .all(|child_sop| is_sop_initial(sp_id, child_sop, state, &log_target)),
-    }
-}
-
-// fn is_sop_executing(sp_id: &str, sop: &SOP, state: &State, log_target: &str) -> bool {
-//     match sop {
-//         SOP::Operation(operation) => {
-//             let operation_state =
-//                 state.get_string_or_default_to_unknown(&format!("{}", operation.name), &log_target);
-//             OperationState::from_str(&operation_state) == OperationState::Executing
-//         }
-//         SOP::Sequence(sops) | SOP::Parallel(sops) | SOP::Alternative(sops) => sops
-//             .iter()
-//             .any(|child_sop| is_sop_executing(sp_id, child_sop, state, &log_target))
-//     }
-// }
-
-fn is_sop_fatal(sp_id: &str, sop: &SOP, state: &State, log_target: &str) -> bool {
-    match sop {
-        SOP::Operation(operation) => {
-            let operation_state =
-                state.get_string_or_default_to_unknown(&format!("{}", operation.name), &log_target);
-            OperationState::from_str(&operation_state) == OperationState::Fatal
-        }
-        SOP::Sequence(sops) | SOP::Parallel(sops) | SOP::Alternative(sops) => sops
-            .iter()
-            .any(|child_sop| is_sop_fatal(sp_id, child_sop, state, &log_target))
+            .any(|child_sop| is_sop_failed(sp_id, child_sop, state, &log_target)),
     }
 }
 
@@ -624,22 +377,28 @@ fn is_sop_completed(sp_id: &str, sop: &SOP, state: &State, log_target: &str) -> 
                 state.get_string_or_default_to_unknown(&format!("{}", operation.name), &log_target);
             OperationState::from_str(&operation_state) == OperationState::Completed
         }
-        SOP::Sequence(sops) | SOP::Parallel(sops)  => {
-            sops
+        SOP::Sequence(sops) | SOP::Parallel(sops) => sops
             .iter()
-            .all(|child_sop| is_sop_completed(sp_id, child_sop, state, &log_target))
-        }
-        SOP::Alternative(sops)  => {
-            sops
+            .all(|child_sop| is_sop_completed(sp_id, child_sop, state, &log_target)),
+        SOP::Alternative(sops) => sops
             .iter()
-            .any(|child_sop| is_sop_completed(sp_id, child_sop, state, &log_target))
-        }
+            .any(|child_sop| is_sop_completed(sp_id, child_sop, state, &log_target)),
     }
 }
 
-// fn can_sop_advance(guard: bool, sp_id: &str, sop: &SOP, state: &State, log_target: &str) -> bool {
-//     guard && is_sop_completed(sp_id, sop, state, log_target)
-// }
+fn is_sop_in_initial_state(sp_id: &str, sop: &SOP, state: &State, log_target: &str) -> bool {
+    match sop {
+        SOP::Operation(operation) => {
+            let operation_state =
+                state.get_string_or_default_to_unknown(&format!("{}", operation.name), &log_target);
+            let op_state = OperationState::from_str(&operation_state);
+            op_state == OperationState::Initial || op_state == OperationState::UNKNOWN
+        }
+        SOP::Sequence(sops) | SOP::Parallel(sops) | SOP::Alternative(sops) => sops
+            .iter()
+            .all(|child_sop| is_sop_in_initial_state(sp_id, child_sop, state, &log_target)),
+    }
+}
 
 fn can_sop_start(sp_id: &str, sop: &SOP, state: &State, log_target: &str) -> bool {
     match sop {

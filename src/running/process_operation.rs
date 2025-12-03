@@ -132,6 +132,10 @@ pub(super) async fn process_operation(
                 new_state = operation.clone().complete(&new_state, &log_target);
                 new_op_info = format!("Completing operation '{}'.", operation.name).to_string();
                 logging_log = format!("Completing operation.");
+                // Since the Completed state is kipped in the SOP runner
+                if let OperationProcessingType::SOP = operation_processing_type {
+                    new_state = operation.initialize(&new_state, &log_target);
+                }
                 op_info_level = log::Level::Info;
             } else {
                 new_op_info = format!(
@@ -158,8 +162,9 @@ pub(super) async fn process_operation(
                     *plan_current_step += 1;
                 }
             }
-            // This could work but in SOP execution, the operaion never enters the complete state. Why?
-            if let OperationProcessingType::Automatic | OperationProcessingType::SOP = operation_processing_type {
+            if let OperationProcessingType::Automatic =
+                operation_processing_type
+            {
                 new_state = operation.initialize(&new_state, &log_target);
                 // maybe we can also initialize the sop operation and avoid having unique names...?
             }
@@ -298,7 +303,6 @@ pub(super) async fn process_operation(
         //     logging_log = format!("Operation terminated.");
         //     op_info_level = log::Level::Info;
         // }
-
         OperationState::Cancelled => {
             new_op_info = format!(
                 "Operation '{}' cancelled. Stopping execution.",
