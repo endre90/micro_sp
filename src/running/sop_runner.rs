@@ -220,7 +220,7 @@ async fn handle_sop_completed(
     .await;
     *new_state = updated_state;
 
-    log::info!(target: &log_target, "SOP completed.");
+    // log::info!(target: &log_target, "SOP completed.");
 }
 
 async fn handle_sop_failed(
