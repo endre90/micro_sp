@@ -352,18 +352,18 @@ async fn process_sop_node_tick(
                             log_target,
                         ))
                         .await;
-                    } else {
-                        state = Box::pin(process_sop_node_tick(
-                            sp_id,
-                            state,
-                            sop_state,
-                            active_child,
-                            con,
-                            logging_tx,
-                            log_target,
-                        ))
-                        .await;
                     }
+                } else {
+                    state = Box::pin(process_sop_node_tick(
+                        sp_id,
+                        state,
+                        sop_state,
+                        active_child,
+                        con,
+                        logging_tx,
+                        log_target,
+                    ))
+                    .await;
                 }
             }
         }
