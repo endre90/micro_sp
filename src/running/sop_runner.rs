@@ -271,6 +271,11 @@ async fn process_sop_node_tick(
     //     return state;
     // }
 
+    if is_sop_terminated(sp_id, sop, &state, log_target)
+    {
+        return state;
+    }
+
     match sop {
         SOP::Operation(operation) => {
 
@@ -291,7 +296,7 @@ async fn process_sop_node_tick(
             // Find the first child that is not yet completed and process it
             if let Some(active_child) = sops
                 .iter()
-                .find(|child| !is_sop_completed(sp_id, child, &state, log_target))
+                .find(|child| !is_sop_terminated(sp_id, child, &state, log_target))
             {
                 state = Box::pin(process_sop_node_tick(
                     sp_id,
@@ -326,7 +331,7 @@ async fn process_sop_node_tick(
             // Check if a path is already active (i.e., not initial and not completed)
             let active_path = sops.iter().find(|child| {
                 !is_sop_in_initial_state(sp_id, child, &state, log_target)
-                    && !is_sop_completed(sp_id, child, &state, log_target)
+                    && !is_sop_terminated(sp_id, child, &state, log_target)
             });
 
             if let Some(path) = active_path {
@@ -384,6 +389,22 @@ fn is_sop_completed(sp_id: &str, sop: &SOP, state: &State, log_target: &str) -> 
         SOP::Alternative(sops) => sops
             .iter()
             .any(|child_sop| is_sop_completed(sp_id, child_sop, state, &log_target)),
+    }
+}
+
+fn is_sop_terminated(sp_id: &str, sop: &SOP, state: &State, log_target: &str) -> bool {
+    match sop {
+        SOP::Operation(operation) => {
+            let operation_state =
+                state.get_string_or_default_to_unknown(&format!("{}", operation.name), &log_target);
+            OperationState::from_str(&operation_state) == OperationState::Terminated
+        }
+        SOP::Sequence(sops) | SOP::Parallel(sops) => sops
+            .iter()
+            .all(|child_sop| is_sop_terminated(sp_id, child_sop, state, &log_target)),
+        SOP::Alternative(sops) => sops
+            .iter()
+            .any(|child_sop| is_sop_terminated(sp_id, child_sop, state, &log_target)),
     }
 }
 
