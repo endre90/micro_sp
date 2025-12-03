@@ -44,8 +44,8 @@ impl Model {
                 .iter()
                 .map(|sop| SOPStruct {
                     id: sop.id.clone(),
-                    // sop: uniquify_sop_operations(sop.sop.clone()), // Maybe we don't need this, let's try with initializing when complete
-                    sop: sop.sop.clone()
+                    // sop: uniquify_sop_operations(sop.sop.clone()),
+                    sop: sop.sop.clone(),
                 })
                 .collect(),
             operations: operations

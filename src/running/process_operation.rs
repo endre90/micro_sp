@@ -158,6 +158,7 @@ pub(super) async fn process_operation(
                     *plan_current_step += 1;
                 }
             }
+            // This could work but in SOP execution, the operaion never enters the complete state. Why?
             if let OperationProcessingType::Automatic | OperationProcessingType::SOP = operation_processing_type {
                 new_state = operation.initialize(&new_state, &log_target);
                 // maybe we can also initialize the sop operation and avoid having unique names...?

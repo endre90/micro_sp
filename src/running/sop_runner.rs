@@ -265,14 +265,15 @@ async fn process_sop_node_tick(
 
     log_target: &str,
 ) -> State {
-    if is_sop_completed(sp_id, sop, &state, log_target)
-        || is_sop_failed(sp_id, sop, &state, log_target)
-    {
-        return state;
-    }
+    // if is_sop_completed(sp_id, sop, &state, log_target)
+    //     || is_sop_failed(sp_id, sop, &state, log_target)
+    // {
+    //     return state;
+    // }
 
     match sop {
         SOP::Operation(operation) => {
+
             state = running::process_operation::process_operation(
                 &sp_id,
                 state,
