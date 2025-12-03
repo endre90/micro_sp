@@ -76,13 +76,7 @@ async fn process_sop_tick(
 
     match SOPState::from_str(&sop_state) {
         SOPState::Initial => {
-            handle_sop_initial(
-                sp_id,
-                state,
-                &mut new_state,
-                &mut sop_state,
-                &log_target,
-            )?;
+            handle_sop_initial(sp_id, state, &mut new_state, &mut sop_state, &log_target)?;
         }
         SOPState::Executing => {
             handle_sop_executing(
@@ -143,10 +137,7 @@ async fn process_sop_tick(
         }
     }
 
-    new_state = new_state.update(
-        &format!("{}_sop_state", sp_id),
-        sop_state.to_spvalue(),
-    );
+    new_state = new_state.update(&format!("{}_sop_state", sp_id), sop_state.to_spvalue());
     Ok(new_state)
 }
 
@@ -341,26 +332,63 @@ async fn process_sop_node_tick(
         }
 
         SOP::Sequence(sops) => {
-            // Find the first child that is not yet completed and process it
-            if let Some(active_child) = sops
+            let active_idx = sops
                 .iter()
-                .find(|child| !is_sop_completed(sp_id, child, &state, log_target))
-            {
-                if SOPState::from_str(&sop_state) == SOPState::Advanceable { // Ensure that the operation has ticked in the completed state
-                    state = Box::pin(process_sop_node_tick(
-                        sp_id,
-                        state,
-                        sop_state,
-                        active_child,
-                        con,
-                        logging_tx,
-                        log_target,
-                    ))
-                    .await;
+                .position(|child| !is_sop_completed(sp_id, child, &state, log_target));
+
+            if let Some(idx) = active_idx {
+                let active_child = &sops[idx];
+
+                if idx > 0 {
+                    if SOPState::from_str(&sop_state) == SOPState::Advanceable {
+                        // Ensure that the operation has ticked in the completed state
+                        state = Box::pin(process_sop_node_tick(
+                            sp_id,
+                            state,
+                            sop_state,
+                            active_child,
+                            con,
+                            logging_tx,
+                            log_target,
+                        ))
+                        .await;
+                    } else {
+                        state = Box::pin(process_sop_node_tick(
+                            sp_id,
+                            state,
+                            sop_state,
+                            active_child,
+                            con,
+                            logging_tx,
+                            log_target,
+                        ))
+                        .await;
+                    }
                 }
             }
         }
 
+        // if idx > 0
+        //     // Find the first child that is not yet completed and process it
+        //     if let Some(active_child) = sops
+        //         .iter()
+        //         .find(|child| !is_sop_completed(sp_id, child, &state, log_target))
+        //     {
+        //         if
+        //         // if SOPState::from_str(&sop_state) == SOPState::Advanceable { // Ensure that the operation has ticked in the completed state
+        //             state = Box::pin(process_sop_node_tick(
+        //                 sp_id,
+        //                 state,
+        //                 sop_state,
+        //                 active_child,
+        //                 con,
+        //                 logging_tx,
+        //                 log_target,
+        //             ))
+        //             .await;
+        //         // }
+        //     }
+        // }
         SOP::Parallel(sops) => {
             // Process ALL children that are not yet completed
             for child in sops {
