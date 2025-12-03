@@ -163,7 +163,6 @@ pub(super) async fn process_operation(
                 operation_processing_type
             {
                 new_state = operation.initialize(&new_state, &log_target);
-                // maybe we can also initialize the sop operation and avoid having unique names...?
             }
             new_op_info = format!("Operation '{}' completed.", operation.name);
             logging_log = format!("Operation completed.");
@@ -308,17 +307,8 @@ pub(super) async fn process_operation(
                 }
                 _ => (),
             }
-            // new_state = operation.terminate(&new_state, &log_target);
         }
 
-        // OperationState::Terminated => {
-        //     new_op_info = format!(
-        //         "Operation '{}' terminated.",
-        //         operation.name
-        //     );
-        //     logging_log = format!("Operation terminated.");
-        //     op_info_level = log::Level::Info;
-        // }
         OperationState::Cancelled => {
             new_op_info = format!(
                 "Operation '{}' cancelled. Stopping execution.",
@@ -339,7 +329,6 @@ pub(super) async fn process_operation(
                 }
                 _ => (),
             }
-            // new_state = operation.terminate(&new_state, &log_target);
         }
 
         OperationState::UNKNOWN => {

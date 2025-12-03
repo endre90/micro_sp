@@ -331,39 +331,85 @@ async fn process_sop_node_tick(
             .await;
         }
 
+        // SOP::Sequence(sops) => {
+        //     let active_idx = sops
+        //         .iter()
+        //         .position(|child| !is_sop_completed(sp_id, child, &state, log_target));
+
+        //     if let Some(idx) = active_idx {
+        //         let active_child = &sops[idx];
+
+        //         if idx > 0 {
+        //             if SOPState::from_str(&sop_state) == SOPState::Advanceable {
+        //                 // Ensure that the operation has ticked in the completed state
+        //                 state = Box::pin(process_sop_node_tick(
+        //                     sp_id,
+        //                     state,
+        //                     sop_state,
+        //                     active_child,
+        //                     con,
+        //                     logging_tx,
+        //                     log_target,
+        //                 ))
+        //                 .await;
+        //             }
+        //         } else {
+        //             state = Box::pin(process_sop_node_tick(
+        //                 sp_id,
+        //                 state,
+        //                 sop_state,
+        //                 active_child,
+        //                 con,
+        //                 logging_tx,
+        //                 log_target,
+        //             ))
+        //             .await;
+        //         }
+        //     }
+        // }
+
         SOP::Sequence(sops) => {
-            let active_idx = sops
-                .iter()
-                .position(|child| !is_sop_completed(sp_id, child, &state, log_target));
+            for child in sops {
+                let is_completed = is_sop_completed(sp_id, child, &state, log_target);
+                // We only skip a completed node if the runner has officially acknowledged it (Advanceable)
+                let is_acknowledged = SOPState::from_str(sop_state) == SOPState::Advanceable;
 
-            if let Some(idx) = active_idx {
-                let active_child = &sops[idx];
-
-                if idx > 0 {
-                    if SOPState::from_str(&sop_state) == SOPState::Advanceable {
-                        // Ensure that the operation has ticked in the completed state
-                        state = Box::pin(process_sop_node_tick(
-                            sp_id,
-                            state,
-                            sop_state,
-                            active_child,
-                            con,
-                            logging_tx,
-                            log_target,
-                        ))
-                        .await;
-                    }
-                } else {
+                if !is_completed {
+                    // Case 1: The child is running (Initial, Executing, etc.). Process it.
                     state = Box::pin(process_sop_node_tick(
                         sp_id,
                         state,
                         sop_state,
-                        active_child,
-                        con,
-                        logging_tx,
+                        child,
+                        con.clone(),
+                        logging_tx.clone(),
                         log_target,
                     ))
                     .await;
+                    // We found the active child, stop processing the rest of the sequence for this tick.
+                    break; 
+                } else {
+                    // Case 2: The child is Completed.
+                    if !is_acknowledged {
+                        // It is Completed in Redis, but we haven't done the "Victory Lap" tick yet.
+                        // We must tick it so 'process_operation' can log "Completed" and set 'sop_state' to 'Advanceable'.
+                        state = Box::pin(process_sop_node_tick(
+                            sp_id,
+                            state,
+                            sop_state,
+                            child,
+                            con.clone(),
+                            logging_tx.clone(),
+                            log_target,
+                        ))
+                        .await;
+                        break;
+                    } else {
+                        // Case 3: It is Completed AND Acknowledged (Advanceable).
+                        // We are done with this child. Reset the signal and move to the next child in the loop.
+                        *sop_state = SOPState::Executing.to_string(); 
+                        continue;
+                    }
                 }
             }
         }
