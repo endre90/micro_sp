@@ -187,7 +187,7 @@ async fn handle_sop_executing(
     .await;
     *new_state = updated_state;
 
-    if is_sop_completed(sp_id, &root_sop_container.sop, new_state, &log_target) {
+    if is_sop_terminated(sp_id, &root_sop_container.sop, new_state, &log_target) {
         log::info!(target: &log_target, "SOP root is complete. Completing SOP.");
         *sop_state = SOPState::Completed.to_string();
     } else if is_sop_failed(sp_id, &root_sop_container.sop, new_state, &log_target) {
