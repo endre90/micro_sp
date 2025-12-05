@@ -32,7 +32,7 @@ pub enum SOPState {
     // Empty,
     Initial,
     Executing,
-    Advanceable,
+    // Advanceable,
     Failed,
     // NotFound,
     Completed,
@@ -105,7 +105,7 @@ impl SOPState {
             "failed" => SOPState::Failed,
             // "not_found" => SOPState::NotFound,
             "completed" => SOPState::Completed,
-            "advanceable" => SOPState::Advanceable,
+            // "advanceable" => SOPState::Advanceable,
             // "cancelled" => SOPState::Cancelled,
             _ => SOPState::UNKNOWN,
         }
@@ -119,7 +119,7 @@ impl SOPState {
             SOPState::Failed => "failed".to_spvalue(),
             // SOPState::NotFound => "not_found".to_spvalue(),
             SOPState::Completed => "completed".to_spvalue(),
-            SOPState::Advanceable => "advanceable".to_spvalue(),
+            // SOPState::Advanceable => "advanceable".to_spvalue(),
             SOPState::Cancelled => "cancelled".to_spvalue(),
             SOPState::UNKNOWN => "UNKNOWN".to_spvalue(),
         }
@@ -172,7 +172,7 @@ impl fmt::Display for SOPState {
             SOPState::Failed => write!(f, "failed"),
             // SOPState::NotFound => write!(f, "not_found"),
             SOPState::Completed => write!(f, "completed"),
-            SOPState::Advanceable => write!(f, "advanceable"),
+            // SOPState::Advanceable => write!(f, "advanceable"),
             SOPState::Cancelled => write!(f, "cancelled"),
         }
     }
