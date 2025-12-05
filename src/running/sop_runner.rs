@@ -182,7 +182,7 @@ async fn handle_sop_executing(
     .await;
     *new_state = updated_state;
 
-    if is_sop_completed(sp_id, &root_sop_container.sop, new_state, &log_target) {
+    if is_sop_terminated(sp_id, &root_sop_container.sop, new_state, &log_target) {
         log::info!(target: &log_target, "SOP root is complete. Completing SOP.");
         *sop_overall_state = SOPState::Completed.to_string();
     } else if is_sop_failed(sp_id, &root_sop_container.sop, new_state, &log_target) {
@@ -266,11 +266,11 @@ async fn process_sop_node_tick(
 
     log_target: &str,
 ) -> State {
-    // if is_sop_terminated(sp_id, sop, &state, log_target)
-    //     || is_sop_failed(sp_id, sop, &state, log_target)
-    // {
-    //     return state;
-    // }
+    if is_sop_terminated(sp_id, sop, &state, log_target)
+        || is_sop_failed(sp_id, sop, &state, log_target)
+    {
+        return state;
+    }
 
     match sop {
         SOP::Operation(operation) => {
