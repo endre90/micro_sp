@@ -333,7 +333,10 @@ pub(super) async fn process_operation(
         }
         OperationState::Terminated(termination_reason) => match termination_reason {
             TerminationReason::Bypassed => todo!(),
-            TerminationReason::Completed => todo!(),
+            TerminationReason::Completed => new_op_info = format!(
+                "Operation '{}' terminated. Reason:completed.",
+                operation.name
+            ),
             TerminationReason::Fatal => todo!(),
             TerminationReason::Cancelled => todo!()
         },
