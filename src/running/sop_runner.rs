@@ -266,11 +266,11 @@ async fn process_sop_node_tick(
 
     log_target: &str,
 ) -> State {
-    if is_sop_terminated(sp_id, sop, &state, log_target)
-        || is_sop_failed(sp_id, sop, &state, log_target)
-    {
-        return state;
-    }
+    // if is_sop_completed(sp_id, sop, &state, log_target) // TRY LIKE THIS.
+    //     || is_sop_failed(sp_id, sop, &state, log_target)
+    // {
+    //     return state;
+    // }
 
     match sop {
         SOP::Operation(operation) => {
@@ -293,15 +293,17 @@ async fn process_sop_node_tick(
                 .iter()
                 .find(|child| !is_sop_terminated(sp_id, child, &state, log_target))
             {
-                state = Box::pin(process_sop_node_tick(
-                    sp_id,
-                    state,
-                    active_child,
-                    con,
-                    logging_tx,
-                    log_target,
-                ))
-                .await;
+                if can_sop_start(sp_id, active_child, &state, log_target) {
+                    state = Box::pin(process_sop_node_tick(
+                        sp_id,
+                        state,
+                        active_child,
+                        con,
+                        logging_tx,
+                        log_target,
+                    ))
+                    .await;
+                }
             }
         }
 
@@ -406,7 +408,8 @@ fn is_sop_terminated(sp_id: &str, sop: &SOP, state: &State, log_target: &str) ->
         SOP::Operation(operation) => {
             let operation_state =
                 state.get_string_or_default_to_unknown(&format!("{}", operation.name), &log_target);
-            OperationState::from_str(&operation_state) == OperationState::Terminated(TerminationReason::Completed)
+            OperationState::from_str(&operation_state)
+                == OperationState::Terminated(TerminationReason::Completed)
         }
         SOP::Sequence(sops) | SOP::Parallel(sops) => sops
             .iter()
@@ -458,9 +461,6 @@ pub fn uniquify_sop_operations(sop: SOP) -> SOP {
         }
     }
 }
-
-
-
 
 //
 // use crate::{running::process_operation::OperationProcessingType, *};
@@ -870,7 +870,7 @@ pub fn uniquify_sop_operations(sop: SOP) -> SOP {
 //         //             ))
 //         //             .await;
 //         //             // We found the active child, stop processing the rest of the sequence for this tick.
-//         //             break; 
+//         //             break;
 //         //         } else {
 //         //             // Case 2: The child is Completed.
 //         //             if !is_acknowledged {
@@ -890,7 +890,7 @@ pub fn uniquify_sop_operations(sop: SOP) -> SOP {
 //         //             } else {
 //         //                 // Case 3: It is Completed AND Acknowledged (Advanceable).
 //         //                 // We are done with this child. Reset the signal and move to the next child in the loop.
-//         //                 *sop_state = SOPState::Executing.to_string(); 
+//         //                 *sop_state = SOPState::Executing.to_string();
 //         //                 continue;
 //         //             }
 //         //         }
