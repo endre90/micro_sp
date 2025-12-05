@@ -166,7 +166,6 @@ pub async fn auto_operation_runner(
                 OperationProcessingType::Automatic,
                 None,
                 None,
-                None,
                 logging_tx.clone(),
                 &log_target,
             )
@@ -203,7 +202,6 @@ pub async fn auto_operation_runner(
                     new_state,
                     random_operation,
                     OperationProcessingType::Automatic,
-                    None,
                     None,
                     None,
                     logging_tx.clone(),

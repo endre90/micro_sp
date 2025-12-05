@@ -178,7 +178,7 @@ async fn handle_sop_executing(
     let updated_state = process_sop_node_tick(
         sp_id,
         state.clone(),
-        sop_state,
+        // sop_state,
         &root_sop_container.sop,
         con,
         logging_tx.clone(),
@@ -219,7 +219,7 @@ async fn handle_sop_completed(
     let updated_state = process_sop_node_tick(
         sp_id,
         state.clone(),
-        sop_state,
+        // sop_state,
         &root_sop_container.sop,
         con,
         logging_tx.clone(),
@@ -253,7 +253,7 @@ async fn handle_sop_advanceable(
     let updated_state = process_sop_node_tick(
         sp_id,
         state.clone(),
-        sop_state,
+        // sop_state,
         &root_sop_container.sop,
         con,
         logging_tx.clone(),
@@ -287,7 +287,7 @@ async fn handle_sop_failed(
     let updated_state = process_sop_node_tick(
         sp_id,
         state.clone(),
-        sop_state,
+        // sop_state,
         &root_sop_container.sop,
         con,
         logging_tx.clone(),
@@ -302,7 +302,7 @@ async fn handle_sop_failed(
 async fn process_sop_node_tick(
     sp_id: &str,
     mut state: State,
-    mut sop_state: &mut String,
+    // mut sop_state: &mut String,
     sop: &SOP,
     con: redis::aio::MultiplexedConnection,
     logging_tx: mpsc::Sender<LogMsg>,
@@ -324,11 +324,29 @@ async fn process_sop_node_tick(
                 OperationProcessingType::SOP,
                 None,
                 None,
-                Some(&mut sop_state),
+                // Some(&mut sop_state),
                 logging_tx,
                 log_target,
             )
             .await;
+        }
+
+        SOP::Sequence(sops) => {
+            // Find the first child that is not yet completed and process it
+            if let Some(active_child) = sops
+                .iter()
+                .find(|child| !is_sop_terminated(sp_id, child, &state, log_target))
+            {
+                state = Box::pin(process_sop_node_tick(
+                    sp_id,
+                    state,
+                    active_child,
+                    con,
+                    logging_tx,
+                    log_target,
+                ))
+                .await;
+            }
         }
 
         // SOP::Sequence(sops) => {
@@ -368,51 +386,51 @@ async fn process_sop_node_tick(
         //     }
         // }
 
-        SOP::Sequence(sops) => {
-            for child in sops {
-                let is_completed = is_sop_completed(sp_id, child, &state, log_target);
-                // We only skip a completed node if the runner has officially acknowledged it (Advanceable)
-                let is_acknowledged = SOPState::from_str(sop_state) == SOPState::Advanceable;
+        // SOP::Sequence(sops) => {
+        //     for child in sops {
+        //         let is_completed = is_sop_completed(sp_id, child, &state, log_target);
+        //         // We only skip a completed node if the runner has officially acknowledged it (Advanceable)
+        //         let is_acknowledged = SOPState::from_str(sop_state) == SOPState::Advanceable;
 
-                if !is_completed {
-                    // Case 1: The child is running (Initial, Executing, etc.). Process it.
-                    state = Box::pin(process_sop_node_tick(
-                        sp_id,
-                        state,
-                        sop_state,
-                        child,
-                        con.clone(),
-                        logging_tx.clone(),
-                        log_target,
-                    ))
-                    .await;
-                    // We found the active child, stop processing the rest of the sequence for this tick.
-                    break; 
-                } else {
-                    // Case 2: The child is Completed.
-                    if !is_acknowledged {
-                        // It is Completed in Redis, but we haven't done the "Victory Lap" tick yet.
-                        // We must tick it so 'process_operation' can log "Completed" and set 'sop_state' to 'Advanceable'.
-                        state = Box::pin(process_sop_node_tick(
-                            sp_id,
-                            state,
-                            sop_state,
-                            child,
-                            con.clone(),
-                            logging_tx.clone(),
-                            log_target,
-                        ))
-                        .await;
-                        break;
-                    } else {
-                        // Case 3: It is Completed AND Acknowledged (Advanceable).
-                        // We are done with this child. Reset the signal and move to the next child in the loop.
-                        *sop_state = SOPState::Executing.to_string(); 
-                        continue;
-                    }
-                }
-            }
-        }
+        //         if !is_completed {
+        //             // Case 1: The child is running (Initial, Executing, etc.). Process it.
+        //             state = Box::pin(process_sop_node_tick(
+        //                 sp_id,
+        //                 state,
+        //                 sop_state,
+        //                 child,
+        //                 con.clone(),
+        //                 logging_tx.clone(),
+        //                 log_target,
+        //             ))
+        //             .await;
+        //             // We found the active child, stop processing the rest of the sequence for this tick.
+        //             break; 
+        //         } else {
+        //             // Case 2: The child is Completed.
+        //             if !is_acknowledged {
+        //                 // It is Completed in Redis, but we haven't done the "Victory Lap" tick yet.
+        //                 // We must tick it so 'process_operation' can log "Completed" and set 'sop_state' to 'Advanceable'.
+        //                 state = Box::pin(process_sop_node_tick(
+        //                     sp_id,
+        //                     state,
+        //                     sop_state,
+        //                     child,
+        //                     con.clone(),
+        //                     logging_tx.clone(),
+        //                     log_target,
+        //                 ))
+        //                 .await;
+        //                 break;
+        //             } else {
+        //                 // Case 3: It is Completed AND Acknowledged (Advanceable).
+        //                 // We are done with this child. Reset the signal and move to the next child in the loop.
+        //                 *sop_state = SOPState::Executing.to_string(); 
+        //                 continue;
+        //             }
+        //         }
+        //     }
+        // }
 
         // if idx > 0
         //     // Find the first child that is not yet completed and process it
@@ -443,7 +461,7 @@ async fn process_sop_node_tick(
                 state = Box::pin(process_sop_node_tick(
                     sp_id,
                     state,
-                    sop_state,
+                    // sop_state,
                     child,
                     con.clone(),
                     logging_tx.clone(),
@@ -463,7 +481,7 @@ async fn process_sop_node_tick(
             if let Some(path) = active_path {
                 // If a path is active, keep processing it
                 state = Box::pin(process_sop_node_tick(
-                    sp_id, state, sop_state, path, con, logging_tx, log_target,
+                    sp_id, state, path, con, logging_tx, log_target,
                 ))
                 .await;
             } else {
@@ -476,7 +494,7 @@ async fn process_sop_node_tick(
                     state = Box::pin(process_sop_node_tick(
                         sp_id,
                         state,
-                        sop_state,
+                        // sop_state,
                         path_to_start,
                         con,
                         logging_tx,
@@ -519,6 +537,22 @@ fn is_sop_completed(sp_id: &str, sop: &SOP, state: &State, log_target: &str) -> 
     }
 }
 
+fn is_sop_terminated(sp_id: &str, sop: &SOP, state: &State, log_target: &str) -> bool {
+    match sop {
+        SOP::Operation(operation) => {
+            let operation_state =
+                state.get_string_or_default_to_unknown(&format!("{}", operation.name), &log_target);
+            OperationState::from_str(&operation_state) == OperationState::Terminated(TerminationReason::Completed)
+        }
+        SOP::Sequence(sops) | SOP::Parallel(sops) => sops
+            .iter()
+            .all(|child_sop| is_sop_terminated(sp_id, child_sop, state, &log_target)),
+        SOP::Alternative(sops) => sops
+            .iter()
+            .any(|child_sop| is_sop_terminated(sp_id, child_sop, state, &log_target)),
+    }
+}
+
 fn is_sop_in_initial_state(sp_id: &str, sop: &SOP, state: &State, log_target: &str) -> bool {
     match sop {
         SOP::Operation(operation) => {
@@ -553,24 +587,24 @@ fn can_sop_start(sp_id: &str, sop: &SOP, state: &State, log_target: &str) -> boo
     }
 }
 
-// pub fn uniquify_sop_operations(sop: SOP) -> SOP {
-//     match sop {
-//         SOP::Operation(op) => {
-//             let unique_id = nanoid::nanoid!(6);
-//             let new_name = format!("{}_{}", op.name, unique_id);
-//             SOP::Operation(Box::new(Operation {
-//                 name: new_name,
-//                 ..*op
-//             }))
-//         }
-//         SOP::Sequence(sops) => {
-//             SOP::Sequence(sops.into_iter().map(uniquify_sop_operations).collect())
-//         }
-//         SOP::Parallel(sops) => {
-//             SOP::Parallel(sops.into_iter().map(uniquify_sop_operations).collect())
-//         }
-//         SOP::Alternative(sops) => {
-//             SOP::Alternative(sops.into_iter().map(uniquify_sop_operations).collect())
-//         }
-//     }
-// }
+pub fn uniquify_sop_operations(sop: SOP) -> SOP {
+    match sop {
+        SOP::Operation(op) => {
+            let unique_id = nanoid::nanoid!(6);
+            let new_name = format!("{}_{}", op.name, unique_id);
+            SOP::Operation(Box::new(Operation {
+                name: new_name,
+                ..*op
+            }))
+        }
+        SOP::Sequence(sops) => {
+            SOP::Sequence(sops.into_iter().map(uniquify_sop_operations).collect())
+        }
+        SOP::Parallel(sops) => {
+            SOP::Parallel(sops.into_iter().map(uniquify_sop_operations).collect())
+        }
+        SOP::Alternative(sops) => {
+            SOP::Alternative(sops.into_iter().map(uniquify_sop_operations).collect())
+        }
+    }
+}

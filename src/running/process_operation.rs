@@ -18,7 +18,7 @@ pub(super) async fn process_operation(
     operation_processing_type: OperationProcessingType,
     plan_current_step: Option<&mut i64>,
     plan_state: Option<&mut String>,
-    sop_state: Option<&mut String>,
+    // sop_state: Option<&mut String>,
     logging_tx: mpsc::Sender<LogMsg>,
     // mut con: redis::aio::MultiplexedConnection,
     log_target: &str,
@@ -144,7 +144,6 @@ pub(super) async fn process_operation(
                 op_info_level = log::Level::Info;
             }
         }
-
         OperationState::Completed => {
             new_state = new_state.update(
                 &format!("{}_failure_retry_counter", operation.name),
@@ -169,15 +168,15 @@ pub(super) async fn process_operation(
             op_info_level = log::Level::Info;
             match operation_processing_type {
                 OperationProcessingType::SOP => {
-                    new_state = operation.initialize(&new_state, &log_target);
-                    if let Some(sop_state) = sop_state {
-                        *sop_state = SOPState::Advanceable.to_string();
-                    }
+                    // new_state = operation.initialize(&new_state, &log_target);
+                    new_state = operation.terminate(&new_state, TerminationReason::Completed, &log_target);
+                    // if let Some(sop_state) = sop_state {
+                    //     *sop_state = SOPState::Advanceable.to_string();
+                    // }
                 }
                 _ => (),
             }
         }
-
         OperationState::Bypassed => {
             if operation.can_be_cancelled(&sp_id, &new_state, &log_target) {
                 new_state = operation.clone().cancel(&new_state, &log_target);
@@ -196,16 +195,15 @@ pub(super) async fn process_operation(
                 }
             }
             op_info_level = log::Level::Warn;
-            match operation_processing_type {
-                OperationProcessingType::SOP => {
-                    if let Some(sop_state) = sop_state {
-                        *sop_state = SOPState::Advanceable.to_string();
-                    }
-                }
-                _ => (),
-            }
+            // match operation_processing_type {
+            //     OperationProcessingType::SOP => {
+            //         if let Some(sop_state) = sop_state {
+            //             *sop_state = SOPState::Advanceable.to_string();
+            //         }
+            //     }
+            //     _ => (),
+            // }
         }
-
         OperationState::Timedout => {
             if operation.can_be_cancelled(&sp_id, &new_state, &log_target) {
                 new_state = operation.clone().cancel(&new_state, &log_target);
@@ -301,15 +299,14 @@ pub(super) async fn process_operation(
                         *plan_state = PlanState::Failed.to_string();
                     }
                 }
-                OperationProcessingType::SOP => {
-                    if let Some(sop_state) = sop_state {
-                        *sop_state = SOPState::Failed.to_string();
-                    }
-                }
+                // OperationProcessingType::SOP => {
+                //     if let Some(sop_state) = sop_state {
+                //         *sop_state = SOPState::Failed.to_string();
+                //     }
+                // }
                 _ => (),
             }
         }
-
         OperationState::Cancelled => {
             new_op_info = format!(
                 "Operation '{}' cancelled. Stopping execution.",
@@ -323,18 +320,23 @@ pub(super) async fn process_operation(
                         *plan_state = PlanState::Cancelled.to_string();
                     }
                 }
-                OperationProcessingType::SOP => {
-                    if let Some(sop_state) = sop_state {
-                        *sop_state = SOPState::Cancelled.to_string();
-                    }
-                }
+                // OperationProcessingType::SOP => {
+                //     if let Some(sop_state) = sop_state {
+                //         *sop_state = SOPState::Cancelled.to_string();
+                //     }
+                // }
                 _ => (),
             }
         }
-
         OperationState::UNKNOWN => {
             new_state = operation.initialize(&new_state, &log_target);
         }
+        OperationState::Terminated(termination_reason) => match termination_reason {
+            TerminationReason::Bypassed => todo!(),
+            TerminationReason::Completed => todo!(),
+            TerminationReason::Fatal => todo!(),
+            TerminationReason::Cancelled => todo!()
+        },
     }
 
     // For now, skip logging the SOP operations
