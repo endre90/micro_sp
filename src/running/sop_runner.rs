@@ -266,11 +266,11 @@ async fn process_sop_node_tick(
 
     log_target: &str,
 ) -> State {
-    // if is_sop_completed(sp_id, sop, &state, log_target) // TRY LIKE THIS.
-    //     || is_sop_failed(sp_id, sop, &state, log_target)
-    // {
-    //     return state;
-    // }
+    if is_sop_terminated(sp_id, sop, &state, log_target)
+        || is_sop_failed(sp_id, sop, &state, log_target)
+    {
+        return state;
+    }
 
     match sop {
         SOP::Operation(operation) => {
@@ -293,7 +293,7 @@ async fn process_sop_node_tick(
                 .iter()
                 .find(|child| !is_sop_terminated(sp_id, child, &state, log_target))
             {
-                if can_sop_start(sp_id, active_child, &state, log_target) {
+                // if can_sop_start(sp_id, active_child, &state, log_target) {
                     state = Box::pin(process_sop_node_tick(
                         sp_id,
                         state,
@@ -303,7 +303,7 @@ async fn process_sop_node_tick(
                         log_target,
                     ))
                     .await;
-                }
+                // }
             }
         }
 
