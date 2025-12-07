@@ -68,6 +68,7 @@ pub async fn sop_runner(
                 }
             }
             SOPState::Executing => {
+                log::info!(target: &log_target, "SOP {sop_id} executing.");
                 let con_clone = con.clone();
                 new_state = process_sop_node_tick(
                     sp_id,
@@ -79,10 +80,10 @@ pub async fn sop_runner(
                 )
                 .await;
             }
-            SOPState::Fatal => {},
-            SOPState::Completed => {},
-            SOPState::Cancelled => {},
-            SOPState::UNKNOWN => {}
+            SOPState::Fatal => {log::info!(target: &log_target, "SOP {sop_id} Fatal.");},
+            SOPState::Completed => {log::info!(target: &log_target, "SOP {sop_id} Completed.");},
+            SOPState::Cancelled => {log::info!(target: &log_target, "SOP {sop_id} Cancelled.");},
+            SOPState::UNKNOWN => {log::info!(target: &log_target, "SOP {sop_id} UNKNOWN.");}
         }
 
         let modified_state = state.get_diff_partial_state(&new_state);
