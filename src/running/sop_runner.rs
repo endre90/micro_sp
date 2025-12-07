@@ -68,7 +68,7 @@ pub async fn sop_runner(
                 }
             }
             SOPState::Executing => {
-                log::info!(target: &log_target, "SOP {sop_id} executing.");
+                // log::info!(target: &log_target, "SOP {sop_id} executing.");
                 let con_clone = con.clone();
                 new_state = process_sop_node_tick(
                     sp_id,
@@ -113,7 +113,7 @@ async fn process_sop_node_tick(
 ) -> State {
     match sop {
         SOP::Operation(operation) => {
-            log::info!("ticking process operation");
+            // log::info!("ticking process operation");
             state = running::process_operation::process_operation(
                 &sp_id,
                 state,
@@ -128,13 +128,13 @@ async fn process_sop_node_tick(
         }
 
         SOP::Sequence(sops) => {
-            log::info!("ticking process sequence");
+            // log::info!("ticking process sequence");
             let active_child = sops.iter().find(|child| {
-                child.get_state() != SOPState::Completed
+                child.get_state(&state, &log_target) != SOPState::Completed
             });
 
             if let Some(child) = active_child {
-                log::info!("next shild should be: {:?}", child);
+                // log::info!("next shild should be: {:?}", child);
                 state = Box::pin(process_sop_node_tick(
                     sp_id,
                     state,
@@ -202,11 +202,12 @@ async fn process_sop_node_tick(
     state
 }
 
+// might not even need this for alternative because the processoperation hanfldless all the logic
 fn can_sop_start(sp_id: &str, sop: &SOP, state: &State, log_target: &str) -> bool {
     match sop {
         SOP::Operation(operation) => {
             // We can reuse get_state here to check for Initial, but we MUST check eval manually
-            let current_state = sop.get_state();
+            let current_state = sop.get_state(&state, &log_target);
             current_state == SOPState::Initial && operation.eval(state, log_target)
         }
         SOP::Sequence(sops) => sops.first().map_or(false, |first| {

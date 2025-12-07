@@ -1,4 +1,4 @@
-use crate::{Operation, OperationState, SOPState};
+use crate::{Operation, OperationState, SOPState, State};
 use serde::{Deserialize, Serialize};
 use termtree::Tree;
 
@@ -81,9 +81,44 @@ impl SOP {
         operations
     }
 
-   pub fn get_state(&self) -> SOPState {
+
+//     pub fn get_state(&self, state: &State, log_target: &str) -> SOPState {
+//         match self {
+//             SOP::Operation(op) => {
+//                 // LOOKUP: Get the real state from the runtime map, not op.state
+//                 let raw_state = state.get_string_or_default_to_unknown(&op.name, log_target);
+//                 let current_op_state = OperationState::from_str(&raw_state).unwrap_or(OperationState::UNKNOWN);
+
+//                 match current_op_state { // Check the looked-up state
+//                     OperationState::Initial => SOPState::Initial,
+//                     OperationState::Bypassed | OperationState::Completed => SOPState::Completed,
+//                     OperationState::Fatal => SOPState::Fatal,
+//                     OperationState::Cancelled => SOPState::Cancelled,
+//                     // Disabled, Executing, Timedout, Failed -> Executing
+//                     _ => SOPState::Executing, 
+//                 }
+//             },
+//             // The recursive calls below must also pass 'state'
+//             SOP::Sequence(sops) => {
+//                  let states: Vec<SOPState> = sops.iter().map(|s| s.get_state(state, log_target)).collect();
+//                  // ... rest of aggregation logic ...
+//             },
+//             // ... apply similar updates to Parallel and Alternative ...
+//             _ => todo!() // Shortened for brevity
+//         }
+//     }
+
+
+// }
+
+// 2. Update the find loop in process_sop_node_tick:
+// Rust
+
+   pub fn get_state(&self, state: &State, log_target: &str) -> SOPState {
         match self {
-            SOP::Operation(op) => match op.state {
+            SOP::Operation(op) => {
+            let operation_state = state.get_string_or_default_to_unknown(&format!("{}", op.name), &log_target);
+            match OperationState::from_str(&operation_state) {
                 OperationState::Initial => SOPState::Initial,
                 OperationState::Disabled => SOPState::Executing,
                 OperationState::Executing => SOPState::Executing,
@@ -94,13 +129,13 @@ impl SOP {
                 OperationState::Fatal => SOPState::Fatal,
                 OperationState::Cancelled => SOPState::Cancelled,
                 OperationState::UNKNOWN => SOPState::UNKNOWN,
-            },
+            }},
             SOP::Sequence(sops) => {
                 if sops.is_empty() {
                     return SOPState::Completed;
                 }
 
-                let states: Vec<SOPState> = sops.iter().map(|s| s.get_state()).collect();
+                let states: Vec<SOPState> = sops.iter().map(|s| s.get_state(state, log_target)).collect();
 
                 let any_fatal = states.iter().any(|s| *s == SOPState::Fatal);
                 let any_cancelled = states.iter().any(|s| *s == SOPState::Cancelled);
