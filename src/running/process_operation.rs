@@ -328,6 +328,7 @@ pub(super) async fn process_operation(
 
         // For now only to handle SOP, but I didn't get rid of the problem of not entering the state,
         // now instead of not entering Completed, I don't enter Terminated...
+        // Once terminated, we can log ant then remove the unique operations and all accompanying vars from the state
         OperationState::Terminated(termination_reason) => match termination_reason {
             TerminationReason::Bypassed => {
                 new_op_info = format!(
@@ -336,7 +337,6 @@ pub(super) async fn process_operation(
                 )
             }
             TerminationReason::Completed => {
-                new_state = operation.initialize(&new_state, &log_target);
                 new_op_info = format!(
                     "Operation '{}' terminated. Reason: Completed.",
                     operation.name
