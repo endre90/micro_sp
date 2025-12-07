@@ -147,7 +147,7 @@ async fn process_sop_node_tick(
             }
         }
 
-        SOP::Parallel(sops) => todo!(),
+        SOP::Parallel(_sops) => todo!(),
         // {
         //     // Process ALL children that are not yet completed
         //     for child in sops {
@@ -164,7 +164,7 @@ async fn process_sop_node_tick(
         //         .await;
         //     }
         // }
-        SOP::Alternative(sops) => todo!(),
+        SOP::Alternative(_sops) => todo!(),
         //     {
         //         // Check if a path is already active (i.e., not initial and not completed)
         //         let active_path = sops.iter().find(|child| {
