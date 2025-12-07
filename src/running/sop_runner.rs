@@ -44,7 +44,7 @@ pub async fn sop_runner(
 
         let Some(root_sop_container) = model.sops.iter().find(|s| s.id == sop_id) else {
             log::error!(target: &log_target, "SOP with id '{}' not found in model. Skipping evaluation.", sop_id);
-            continue
+            continue;
         };
 
         if old_sop_id != sop_id && !sop_id.is_empty() {
@@ -80,10 +80,18 @@ pub async fn sop_runner(
                 )
                 .await;
             }
-            SOPState::Fatal => {log::info!(target: &log_target, "SOP {sop_id} Fatal.");},
-            SOPState::Completed => {log::info!(target: &log_target, "SOP {sop_id} Completed.");},
-            SOPState::Cancelled => {log::info!(target: &log_target, "SOP {sop_id} Cancelled.");},
-            SOPState::UNKNOWN => {log::info!(target: &log_target, "SOP {sop_id} UNKNOWN.");}
+            SOPState::Fatal => {
+                log::info!(target: &log_target, "SOP {sop_id} Fatal.");
+            }
+            SOPState::Completed => {
+                log::info!(target: &log_target, "SOP {sop_id} Completed.");
+            }
+            SOPState::Cancelled => {
+                log::info!(target: &log_target, "SOP {sop_id} Cancelled.");
+            }
+            SOPState::UNKNOWN => {
+                log::info!(target: &log_target, "SOP {sop_id} UNKNOWN.");
+            }
         }
 
         let modified_state = state.get_diff_partial_state(&new_state);
@@ -103,9 +111,9 @@ async fn process_sop_node_tick(
 
     log_target: &str,
 ) -> State {
-
     match sop {
         SOP::Operation(operation) => {
+            log::info!("ticking process operation");
             state = running::process_operation::process_operation(
                 &sp_id,
                 state,
@@ -120,6 +128,7 @@ async fn process_sop_node_tick(
         }
 
         SOP::Sequence(sops) => {
+            log::info!("ticking process sequence");
             let active_child = sops.iter().find(|child| {
                 child.get_state() != SOPState::Completed
             });
@@ -154,40 +163,39 @@ async fn process_sop_node_tick(
         //         .await;
         //     }
         // }
-
         SOP::Alternative(sops) => todo!(),
-    //     {
-    //         // Check if a path is already active (i.e., not initial and not completed)
-    //         let active_path = sops.iter().find(|child| {
-    //             !is_sop_in_initial_state(sp_id, child, &state, log_target)
-    //                 && !is_sop_completed(sp_id, child, &state, log_target)
-    //         });
+        //     {
+        //         // Check if a path is already active (i.e., not initial and not completed)
+        //         let active_path = sops.iter().find(|child| {
+        //             !is_sop_in_initial_state(sp_id, child, &state, log_target)
+        //                 && !is_sop_completed(sp_id, child, &state, log_target)
+        //         });
 
-    //         if let Some(path) = active_path {
-    //             // If a path is active, keep processing it
-    //             state = Box::pin(process_sop_node_tick(
-    //                 sp_id, state, path, con, logging_tx, log_target,
-    //             ))
-    //             .await;
-    //         } else {
-    //             // If no path is active, find the first one that can start
-    //             if let Some(path_to_start) = sops
-    //                 .iter()
-    //                 .find(|child| can_sop_start(sp_id, child, &state, log_target))
-    //             {
-    //                 log::info!(target: log_target, "Found valid alternative path to start.");
-    //                 state = Box::pin(process_sop_node_tick(
-    //                     sp_id,
-    //                     state,
-    //                     path_to_start,
-    //                     con,
-    //                     logging_tx,
-    //                     log_target,
-    //                 ))
-    //                 .await;
-    //             }
-    //         }
-    //     }
+        //         if let Some(path) = active_path {
+        //             // If a path is active, keep processing it
+        //             state = Box::pin(process_sop_node_tick(
+        //                 sp_id, state, path, con, logging_tx, log_target,
+        //             ))
+        //             .await;
+        //         } else {
+        //             // If no path is active, find the first one that can start
+        //             if let Some(path_to_start) = sops
+        //                 .iter()
+        //                 .find(|child| can_sop_start(sp_id, child, &state, log_target))
+        //             {
+        //                 log::info!(target: log_target, "Found valid alternative path to start.");
+        //                 state = Box::pin(process_sop_node_tick(
+        //                     sp_id,
+        //                     state,
+        //                     path_to_start,
+        //                     con,
+        //                     logging_tx,
+        //                     log_target,
+        //                 ))
+        //                 .await;
+        //             }
+        //         }
+        //     }
     }
 
     state
