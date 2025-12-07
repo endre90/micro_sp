@@ -166,16 +166,16 @@ pub(super) async fn process_operation(
             new_op_info = format!("Operation '{}' completed.", operation.name);
             logging_log = format!("Operation completed.");
             op_info_level = log::Level::Info;
-            match operation_processing_type {
-                OperationProcessingType::SOP => {
-                    // new_state = operation.initialize(&new_state, &log_target);
-                    new_state = operation.terminate(&new_state, TerminationReason::Completed, &log_target);
-                    // if let Some(sop_state) = sop_state {
-                    //     *sop_state = SOPState::Advanceable.to_string();
-                    // }
-                }
-                _ => (),
-            }
+            // match operation_processing_type {
+            //     OperationProcessingType::SOP => {
+            //         // new_state = operation.initialize(&new_state, &log_target);
+            //         new_state = operation.terminate(&new_state, TerminationReason::Completed, &log_target);
+            //         // if let Some(sop_state) = sop_state {
+            //         //     *sop_state = SOPState::Advanceable.to_string();
+            //         // }
+            //     }
+            //     _ => (),
+            // }
         }
         OperationState::Bypassed => {
             if operation.can_be_cancelled(&sp_id, &new_state, &log_target) {
@@ -232,7 +232,7 @@ pub(super) async fn process_operation(
                 logging_log = format!("Operation timedout. Bypassing.");
                 op_info_level = log::Level::Warn;
             } else {
-                new_state = operation.unrecover(&new_state, &log_target);
+                new_state = operation.fatal(&new_state, &log_target);
                 new_op_info = format!("Operation '{}' timedout.", operation.name);
                 logging_log = format!("Operation timedout.");
                 op_info_level = log::Level::Warn;
@@ -270,7 +270,7 @@ pub(super) async fn process_operation(
                     logging_log = format!("Operation failed. Bypassing.");
                     op_info_level = log::Level::Warn;
                 } else {
-                    new_state = operation.unrecover(&new_state, &log_target);
+                    new_state = operation.fatal(&new_state, &log_target);
                     new_op_info =
                         format!("Operation '{}' has no more retries left.", operation.name);
                     logging_log = format!("Operation has no more retries left.");
@@ -331,15 +331,18 @@ pub(super) async fn process_operation(
         OperationState::UNKNOWN => {
             new_state = operation.initialize(&new_state, &log_target);
         }
-        OperationState::Terminated(termination_reason) => match termination_reason {
-            TerminationReason::Bypassed => todo!(),
-            TerminationReason::Completed => new_op_info = format!(
-                "Operation '{}' terminated. Reason:completed.",
-                operation.name
-            ),
-            TerminationReason::Fatal => todo!(),
-            TerminationReason::Cancelled => todo!()
-        },
+
+        // For now only to handle SOP, but I didn't get rid of the problem of not entering the state, 
+        // now instead of not entering Completed, I don't enter Terminated...
+        // OperationState::Terminated(termination_reason) => match termination_reason {
+        //     TerminationReason::Bypassed => todo!(),
+        //     TerminationReason::Completed => new_op_info = format!(
+        //         "Operation '{}' terminated. Reason: Completed.",
+        //         operation.name
+        //     ),
+        //     TerminationReason::Fatal => todo!(),
+        //     TerminationReason::Cancelled => todo!()
+        // },
     }
 
     // For now, skip logging the SOP operations

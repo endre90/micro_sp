@@ -1,4 +1,4 @@
-use crate::Operation;
+use crate::{Operation, OperationState, SOPState};
 use serde::{Deserialize, Serialize};
 use termtree::Tree;
 
@@ -67,6 +67,7 @@ impl SOP {
             }
         }
     }
+    
     pub fn get_all_operation_names(&self) -> Vec<String> {
         let mut operations: Vec<String> = vec![];
         match self {
@@ -78,6 +79,60 @@ impl SOP {
             }
         };
         operations
+    }
+
+   pub fn get_state(&self) -> SOPState {
+        match self {
+            SOP::Operation(op) => match op.state {
+                OperationState::Initial => SOPState::Initial,
+                OperationState::Disabled => SOPState::Executing,
+                OperationState::Executing => SOPState::Executing,
+                OperationState::Timedout => SOPState::Executing,
+                OperationState::Failed => SOPState::Executing,
+                OperationState::Bypassed => SOPState::Completed,
+                OperationState::Completed => SOPState::Completed,
+                OperationState::Fatal => SOPState::Fatal,
+                OperationState::Cancelled => SOPState::Cancelled,
+                OperationState::UNKNOWN => SOPState::UNKNOWN,
+            },
+            SOP::Sequence(sops) => {
+                if sops.is_empty() {
+                    return SOPState::Completed;
+                }
+
+                let states: Vec<SOPState> = sops.iter().map(|s| s.get_state()).collect();
+
+                let any_fatal = states.iter().any(|s| *s == SOPState::Fatal);
+                let any_cancelled = states.iter().any(|s| *s == SOPState::Cancelled);
+                let all_initial = states.iter().all(|s| *s == SOPState::Initial);
+                let all_completed = states.iter().all(|s| *s == SOPState::Completed);
+                let any_not_initial = states.iter().any(|s| *s != SOPState::Initial);
+
+                if any_fatal {
+                    return SOPState::Fatal;
+                }
+                
+                if any_cancelled {
+                    return SOPState::Cancelled;
+                }
+
+                if all_initial {
+                    return SOPState::Initial;
+                }
+
+                if all_completed {
+                    return SOPState::Completed;
+                }
+
+                if !all_completed && any_not_initial && !any_fatal && !any_cancelled {
+                    return SOPState::Executing;
+                }
+
+                SOPState::UNKNOWN
+            },
+            SOP::Parallel(_) => todo!(),
+            SOP::Alternative(_) => todo!(),
+        }
     }
 }
 
