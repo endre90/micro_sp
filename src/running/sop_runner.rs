@@ -134,6 +134,7 @@ async fn process_sop_node_tick(
             });
 
             if let Some(child) = active_child {
+                log::info!("next shild should be: {:?}", child);
                 state = Box::pin(process_sop_node_tick(
                     sp_id,
                     state,
