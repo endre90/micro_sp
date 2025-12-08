@@ -52,42 +52,6 @@ pub async fn sop_runner(
 
         // StateManager::remove_sp_values(&mut con, &keys_to_remove).await;
 
-        let terminated_triggers: Vec<&String> = state
-            .state
-            .iter()
-            .filter_map(|(key, value)| {
-                if let SPValue::String(StringOrUnknown::String(s)) = &value.val {
-                    if s == "terminated_completed" {
-                        return Some(key);
-                    }
-                }
-                None
-            })
-            .collect();
-
-        // Optimization: If there are no terminated keys, we can exit immediately
-        // and save the cost of the second iteration.
-        if !terminated_triggers.is_empty() {
-            // 2. Single pass to find all matches
-            // We check every key in the state; if it contains *any* trigger, it gets collected.
-            let keys_to_remove: Vec<String> = state
-                .state
-                .keys()
-                .filter(|key| {
-                    // Check if this key contains any of the terminated keys as a substring
-                    // Note: This includes the terminated key itself (since "A".contains("A") is true)
-                    terminated_triggers
-                        .iter()
-                        .any(|trigger| key.contains(trigger.as_str()))
-                })
-                .cloned() // Clone only the keys we are actually removing
-                .collect();
-
-            if !keys_to_remove.is_empty() {
-                StateManager::remove_sp_values(&mut con, &keys_to_remove).await;
-            }
-        }
-
         let mut new_state = state.clone();
         let sop_state =
             state.get_string_or_default_to_unknown(&format!("{}_sop_state", sp_id), &log_target);
@@ -99,7 +63,7 @@ pub async fn sop_runner(
             state.get_string_or_default_to_unknown(&format!("{}_sop_id", sp_id), &log_target);
 
         let Some(root_sop_container) = model.sops.iter().find(|s| s.id == sop_id) else {
-            log::error!(target: &log_target, "SOP with id '{}' not found in model. Skipping evaluation.", sop_id);
+            log::debug!(target: &log_target, "SOP with id '{}' not found in model. Skipping evaluation.", sop_id);
             continue;
         };
 
@@ -107,6 +71,38 @@ pub async fn sop_runner(
             if let Some(root_sop) = model.sops.iter().find(|s| s.id == sop_id) {
                 log::info!(target: &log_target, "Now executing new SOP '{}':", sop_id);
                 log::info!(target: &log_target, "{:?}", visualize_sop(&root_sop.sop));
+                
+                // It looks like that this is also extremely slow, at leas for startup. TEST!
+                // Maybe once the SOP is done do this cleaning
+                let terminated_triggers: Vec<&String> = state
+                    .state
+                    .iter()
+                    .filter_map(|(key, value)| {
+                        if let SPValue::String(StringOrUnknown::String(s)) = &value.val {
+                            if s == "terminated_completed" {
+                                return Some(key);
+                            }
+                        }
+                        None
+                    })
+                    .collect();
+
+                if !terminated_triggers.is_empty() {
+                    let keys_to_remove: Vec<String> = state
+                        .state
+                        .keys()
+                        .filter(|key| {
+                            terminated_triggers
+                                .iter()
+                                .any(|trigger| key.contains(trigger.as_str()))
+                        })
+                        .cloned()
+                        .collect();
+
+                    if !keys_to_remove.is_empty() {
+                        StateManager::remove_sp_values(&mut con, &keys_to_remove).await;
+                    }
+                }
             }
             old_sop_id = sop_id.clone();
         }
@@ -140,6 +136,7 @@ pub async fn sop_runner(
                 log::info!(target: &log_target, "SOP {sop_id} Fatal.");
             }
             SOPState::Completed => {
+                
                 log::info!(target: &log_target, "SOP {sop_id} Completed.");
             }
             SOPState::Cancelled => {
