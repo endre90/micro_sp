@@ -114,16 +114,16 @@ pub async fn sop_runner(
                 log::info!(target: &log_target, "SOP {sop_id} Fatal.");
             }
             SOPState::Completed => {
-                let con_clone = con.clone();
-                new_state = process_sop_node_tick(
-                    sp_id,
-                    state.clone(),
-                    &root_sop_container.sop,
-                    con_clone,
-                    logging_tx.clone(),
-                    &log_target,
-                )
-                .await;
+                // let con_clone = con.clone();
+                // new_state = process_sop_node_tick(
+                //     sp_id,
+                //     state.clone(),
+                //     &root_sop_container.sop,
+                //     con_clone,
+                //     logging_tx.clone(),
+                //     &log_target,
+                // )
+                // .await;
                 log::info!(target: &log_target, "SOP {sop_id} Completed.");
             }
             SOPState::Cancelled => {
