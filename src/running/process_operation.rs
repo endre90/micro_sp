@@ -164,13 +164,13 @@ pub(super) async fn process_operation(
             new_op_info = format!("Operation '{}' completed.", operation.name);
             logging_log = format!("Operation completed.");
             op_info_level = log::Level::Info;
-            // match operation_processing_type {
-            //     OperationProcessingType::SOP => {
-            //         new_state =
-            //             operation.terminate(&new_state, TerminationReason::Completed, &log_target);
-            //     }
-            //     _ => (),
-            // }
+            match operation_processing_type {
+                OperationProcessingType::SOP => {
+                    new_state =
+                        operation.terminate(&new_state, TerminationReason::Completed, &log_target);
+                }
+                _ => (),
+            }
         }
         OperationState::Bypassed => {
             if operation.can_be_cancelled(&sp_id, &new_state, &log_target) {
@@ -190,13 +190,13 @@ pub(super) async fn process_operation(
                 }
             }
             op_info_level = log::Level::Warn;
-            // match operation_processing_type {
-            //     OperationProcessingType::SOP => {
-            //         new_state =
-            //             operation.terminate(&new_state, TerminationReason::Bypassed, &log_target);
-            //     }
-            //     _ => (),
-            // }
+            match operation_processing_type {
+                OperationProcessingType::SOP => {
+                    new_state =
+                        operation.terminate(&new_state, TerminationReason::Bypassed, &log_target);
+                }
+                _ => (),
+            }
         }
         OperationState::Timedout => {
             if operation.can_be_cancelled(&sp_id, &new_state, &log_target) {
@@ -294,10 +294,10 @@ pub(super) async fn process_operation(
                     }
                 }
 
-                // OperationProcessingType::SOP => {
-                //     new_state =
-                //         operation.terminate(&new_state, TerminationReason::Fatal, &log_target);
-                // }
+                OperationProcessingType::SOP => {
+                    new_state =
+                        operation.terminate(&new_state, TerminationReason::Fatal, &log_target);
+                }
                 _ => (),
             }
         }
@@ -314,43 +314,40 @@ pub(super) async fn process_operation(
                         *plan_state = PlanState::Cancelled.to_string();
                     }
                 }
-                // OperationProcessingType::SOP => {
-                //     new_state =
-                //         operation.terminate(&new_state, TerminationReason::Cancelled, &log_target);
-                // }
+                OperationProcessingType::SOP => {
+                    new_state =
+                        operation.terminate(&new_state, TerminationReason::Cancelled, &log_target);
+                }
                 _ => (),
             }
         }
         OperationState::UNKNOWN => {
             new_state = operation.initialize(&new_state, &log_target);
         }
-
-        // For now only to handle SOP, but I didn't get rid of the problem of not entering the state,
-        // now instead of not entering Completed, I don't enter Terminated...
-        // Once terminated, we can log ant then remove the unique operations and all accompanying vars from the state
-        // OperationState::Terminated(termination_reason) => match termination_reason {
-        //     TerminationReason::Bypassed => {
-        //         new_op_info = format!(
-        //             "Operation '{}' terminated. Reason: Bypassed.",
-        //             operation.name
-        //         )
-        //     }
-        //     TerminationReason::Completed => {
-        //         new_op_info = format!(
-        //             "Operation '{}' terminated. Reason: Completed.",
-        //             operation.name
-        //         )
-        //     }
-        //     TerminationReason::Fatal => {
-        //         new_op_info = format!("Operation '{}' terminated. Reason: Fatal.", operation.name)
-        //     }
-        //     TerminationReason::Cancelled => {
-        //         new_op_info = format!(
-        //             "Operation '{}' terminated. Reason: Cancelled.",
-        //             operation.name
-        //         )
-        //     }
-        // },
+        OperationState::Terminated(termination_reason) => match termination_reason {
+            TerminationReason::Bypassed => {
+                new_op_info = format!(
+                    "Operation '{}' terminated. Reason: Bypassed.",
+                    operation.name
+                )
+            }
+            TerminationReason::Completed => {
+                new_op_info = format!(
+                    "Operation '{}' terminated. Reason: Completed.",
+                    operation.name
+                )
+            }
+            TerminationReason::Fatal => {
+                new_op_info = format!("Operation '{}' terminated. Reason: Fatal.", operation.name)
+            }
+            TerminationReason::Cancelled => {
+                new_op_info = format!(
+                    "Operation '{}' terminated. Reason: Cancelled.",
+                    operation.name
+                )
+            }
+        },
+        OperationState::Void => (),
     }
 
     // For now, skip logging the SOP operations

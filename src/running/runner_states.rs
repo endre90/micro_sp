@@ -34,6 +34,7 @@ pub enum SOPState {
     Fatal,
     Completed,
     Cancelled,
+    Terminated,
     UNKNOWN,
 }
 
@@ -116,7 +117,7 @@ impl SOPState {
             SOPState::Fatal => "fatal".to_spvalue(),
             // SOPState::NotFound => "not_found".to_spvalue(),
             SOPState::Completed => "completed".to_spvalue(),
-            // SOPState::Advanceable => "advanceable".to_spvalue(),
+            SOPState::Terminated => "terminated".to_spvalue(),
             SOPState::Cancelled => "cancelled".to_spvalue(),
             SOPState::UNKNOWN => "UNKNOWN".to_spvalue(),
         }
@@ -169,7 +170,7 @@ impl fmt::Display for SOPState {
             SOPState::Fatal => write!(f, "fatal"),
             // SOPState::NotFound => write!(f, "not_found"),
             SOPState::Completed => write!(f, "completed"),
-            // SOPState::Advanceable => write!(f, "advanceable"),
+            SOPState::Terminated => write!(f, "terminated"),
             SOPState::Cancelled => write!(f, "cancelled"),
         }
     }

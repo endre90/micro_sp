@@ -21,7 +21,8 @@ pub enum OperationState {
     Failed,
     Fatal,
     Cancelled,
-    // Terminated(TerminationReason),
+    Terminated(TerminationReason),
+    Void,
     // Paused,
     UNKNOWN,
 }
@@ -76,16 +77,17 @@ impl fmt::Display for OperationState {
             OperationState::Completed => write!(f, "completed"),
             OperationState::Bypassed => write!(f, "bypassed"),
             OperationState::Cancelled => write!(f, "cancelled"),
-            // OperationState::Terminated(TerminationReason::Completed) => {
-            //     write!(f, "terminated_completed")
-            // }
-            // OperationState::Terminated(TerminationReason::Bypassed) => {
-            //     write!(f, "terminated_bypassed")
-            // }
-            // OperationState::Terminated(TerminationReason::Fatal) => write!(f, "terminated_fatal"),
-            // OperationState::Terminated(TerminationReason::Cancelled) => {
-            //     write!(f, "terminated_cancelled")
-            // }
+            OperationState::Terminated(TerminationReason::Completed) => {
+                write!(f, "terminated_completed")
+            }
+            OperationState::Terminated(TerminationReason::Bypassed) => {
+                write!(f, "terminated_bypassed")
+            }
+            OperationState::Terminated(TerminationReason::Fatal) => write!(f, "terminated_fatal"),
+            OperationState::Terminated(TerminationReason::Cancelled) => {
+                write!(f, "terminated_cancelled")
+            }
+            OperationState::Void => write!(f, "void"),
             OperationState::UNKNOWN => write!(f, "UNKNOWN"),
         }
     }
@@ -429,31 +431,47 @@ impl Operation {
         }
     }
 
-    // pub fn terminate(
-    //     &self,
-    //     state: &State,
-    //     termination_reason: TerminationReason,
-    //     log_target: &str,
-    // ) -> State {
-    //     let assignment = state.get_assignment(&self.name, &log_target);
-    //     match termination_reason {
-    //         TerminationReason::Completed => {
-    //             if assignment.val == OperationState::Completed.to_spvalue() {
-    //                 let action = Action::new(
-    //                     assignment.var,
-    //                     OperationState::Terminated(TerminationReason::Completed)
-    //                         .to_spvalue()
-    //                         .wrap(),
-    //                 );
-    //                 action.assign(&state, &log_target)
-    //             } else {
-    //                 log::error!(target: &log_target, "Can't terminate_complete an operation which is not completed.");
-    //                 state.clone()
-    //             }
-    //         }
-    //         _ => state.clone(),
-    //     }
-    // }
+    pub fn terminate(
+        &self,
+        state: &State,
+        termination_reason: TerminationReason,
+        log_target: &str,
+    ) -> State {
+        let assignment = state.get_assignment(&self.name, &log_target);
+        match termination_reason {
+            TerminationReason::Completed => {
+                if assignment.val == OperationState::Completed.to_spvalue() {
+                    let action = Action::new(
+                        assignment.var,
+                        OperationState::Terminated(TerminationReason::Completed)
+                            .to_spvalue()
+                            .wrap(),
+                    );
+                    action.assign(&state, &log_target)
+                } else {
+                    log::error!(target: &log_target, "Can't terminate_complete an operation which is not completed.");
+                    state.clone()
+                }
+            }
+            _ => state.clone(),
+        }
+    }
+
+    pub fn void(&self, state: &State, log_target: &str) -> State {
+        let assignment = state.get_assignment(&self.name, &log_target);
+        if assignment.val == OperationState::Terminated(TerminationReason::Completed).to_spvalue() {
+            let action = Action::new(
+                assignment.var,
+                OperationState::Void
+                    .to_spvalue()
+                    .wrap(),
+            );
+            action.assign(&state, &log_target)
+        } else {
+            log::error!(target: &log_target, "Can't void an operation which is not terminated.");
+            state.clone()
+        }
+    }
 
     pub fn bypass(&self, state: &State, log_target: &str) -> State {
         let assignment = state.get_assignment(&self.name, &log_target);

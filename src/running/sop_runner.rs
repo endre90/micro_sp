@@ -129,6 +129,9 @@ pub async fn sop_runner(
             SOPState::Cancelled => {
                 log::info!(target: &log_target, "SOP {sop_id} Cancelled.");
             }
+            SOPState::Terminated => {
+                log::info!(target: &log_target, "SOP {sop_id} Terminated. This should never print.");
+            }
             SOPState::UNKNOWN => {
                 log::info!(target: &log_target, "SOP {sop_id} UNKNOWN.");
             }
@@ -171,7 +174,7 @@ async fn process_sop_node_tick(
             // log::info!("ticking process sequence");
             let active_child = sops
                 .iter()
-                .find(|child| child.get_state(&state, &log_target) != SOPState::Completed);
+                .find(|child| child.get_state(&state, &log_target) != SOPState::Terminated);
 
             if let Some(child) = active_child {
                 // log::info!("next shild should be: {:?}", child);
