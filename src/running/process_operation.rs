@@ -166,7 +166,6 @@ pub(super) async fn process_operation(
             op_info_level = log::Level::Info;
             match operation_processing_type {
                 OperationProcessingType::SOP => {
-                    // new_state = operation.initialize(&new_state, &log_target)
                     new_state =
                         operation.terminate(&new_state, TerminationReason::Completed, &log_target);
                 }

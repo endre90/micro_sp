@@ -8,6 +8,7 @@ mod get_state_for_keys;
 mod set_sp_value;
 mod set_state;
 mod remove_sp_value;
+mod remove_sp_values;
 mod flush_state;
 
 pub struct StateManager {}
@@ -39,6 +40,10 @@ impl StateManager {
 
     pub async fn remove_sp_value(con: &mut MultiplexedConnection, key: &str) {
         remove_sp_value::remove_sp_value(con, key).await
+    }
+
+    pub async fn remove_sp_values(con: &mut MultiplexedConnection, keys: &[String]) {
+        remove_sp_values::remove_sp_values(con, keys).await
     }
 
     pub fn build_state(keys: Vec<String>, values: Vec<Option<String>>) -> State {

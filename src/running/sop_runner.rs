@@ -32,6 +32,62 @@ pub async fn sop_runner(
             None => continue,
         };
 
+        // // Clean the state here from the terminated operations and accompanying vars
+        // // This could be very demanding, test...
+        // let mut keys_to_remove = vec![];
+        // for (primary_key, value) in &state.state {
+        //     if let SPValue::String(StringOrUnknown::String(s)) = &value.val {
+        //         if s == "terminated_completed" {
+        //             for candidate_key in state.state.keys() {
+        //                 if candidate_key.contains(primary_key) {
+        //                     keys_to_remove.push(candidate_key.clone());
+        //                 }
+        //             }
+        //         }
+        //     }
+        // }
+
+        // keys_to_remove.sort();
+        // keys_to_remove.dedup();
+
+        // StateManager::remove_sp_values(&mut con, &keys_to_remove).await;
+
+        let terminated_triggers: Vec<&String> = state
+            .state
+            .iter()
+            .filter_map(|(key, value)| {
+                if let SPValue::String(StringOrUnknown::String(s)) = &value.val {
+                    if s == "terminated_completed" {
+                        return Some(key);
+                    }
+                }
+                None
+            })
+            .collect();
+
+        // Optimization: If there are no terminated keys, we can exit immediately
+        // and save the cost of the second iteration.
+        if !terminated_triggers.is_empty() {
+            // 2. Single pass to find all matches
+            // We check every key in the state; if it contains *any* trigger, it gets collected.
+            let keys_to_remove: Vec<String> = state
+                .state
+                .keys()
+                .filter(|key| {
+                    // Check if this key contains any of the terminated keys as a substring
+                    // Note: This includes the terminated key itself (since "A".contains("A") is true)
+                    terminated_triggers
+                        .iter()
+                        .any(|trigger| key.contains(trigger.as_str()))
+                })
+                .cloned() // Clone only the keys we are actually removing
+                .collect();
+
+            if !keys_to_remove.is_empty() {
+                StateManager::remove_sp_values(&mut con, &keys_to_remove).await;
+            }
+        }
+
         let mut new_state = state.clone();
         let sop_state =
             state.get_string_or_default_to_unknown(&format!("{}_sop_state", sp_id), &log_target);
@@ -129,19 +185,14 @@ async fn process_sop_node_tick(
 
         SOP::Sequence(sops) => {
             // log::info!("ticking process sequence");
-            let active_child = sops.iter().find(|child| {
-                child.get_state(&state, &log_target) != SOPState::Completed
-            });
+            let active_child = sops
+                .iter()
+                .find(|child| child.get_state(&state, &log_target) != SOPState::Completed);
 
             if let Some(child) = active_child {
                 // log::info!("next shild should be: {:?}", child);
                 state = Box::pin(process_sop_node_tick(
-                    sp_id,
-                    state,
-                    child,
-                    con,
-                    logging_tx,
-                    log_target,
+                    sp_id, state, child, con, logging_tx, log_target,
                 ))
                 .await;
             }
@@ -203,30 +254,30 @@ async fn process_sop_node_tick(
 }
 
 // might not even need this for alternative because the processoperation hanfldless all the logic
-fn can_sop_start(sp_id: &str, sop: &SOP, state: &State, log_target: &str) -> bool {
-    match sop {
-        SOP::Operation(operation) => {
-            // We can reuse get_state here to check for Initial, but we MUST check eval manually
-            let current_state = sop.get_state(&state, &log_target);
-            current_state == SOPState::Initial && operation.eval(state, log_target)
-        }
-        SOP::Sequence(sops) => sops.first().map_or(false, |first| {
-            can_sop_start(sp_id, first, state, log_target)
-        }),
-        SOP::Parallel(sops) => sops
-            .iter()
-            .all(|child| can_sop_start(sp_id, child, state, log_target)),
-        SOP::Alternative(sops) => sops
-            .iter()
-            .any(|child| can_sop_start(sp_id, child, state, log_target)),
-    }
-}
+// fn can_sop_start(sp_id: &str, sop: &SOP, state: &State, log_target: &str) -> bool {
+//     match sop {
+//         SOP::Operation(operation) => {
+//             // We can reuse get_state here to check for Initial, but we MUST check eval manually
+//             let current_state = sop.get_state(&state, &log_target);
+//             current_state == SOPState::Initial && operation.eval(state, log_target)
+//         }
+//         SOP::Sequence(sops) => sops.first().map_or(false, |first| {
+//             can_sop_start(sp_id, first, state, log_target)
+//         }),
+//         SOP::Parallel(sops) => sops
+//             .iter()
+//             .all(|child| can_sop_start(sp_id, child, state, log_target)),
+//         SOP::Alternative(sops) => sops
+//             .iter()
+//             .any(|child| can_sop_start(sp_id, child, state, log_target)),
+//     }
+// }
 
 pub fn uniquify_sop_operations(sop: SOP) -> SOP {
     match sop {
         SOP::Operation(op) => {
-            let unique_id = nanoid::nanoid!(6);
-            let new_name = format!("{}_{}", op.name, unique_id);
+            let unique_id = nanoid::nanoid!(10); // 64^10 unique ids
+            let new_name = format!("op_{}_{}", op.name, unique_id);
             SOP::Operation(Box::new(Operation {
                 name: new_name,
                 ..*op
