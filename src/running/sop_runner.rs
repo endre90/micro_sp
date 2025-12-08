@@ -32,26 +32,6 @@ pub async fn sop_runner(
             None => continue,
         };
 
-        // // Clean the state here from the terminated operations and accompanying vars
-        // // This could be very demanding, test...
-        // let mut keys_to_remove = vec![];
-        // for (primary_key, value) in &state.state {
-        //     if let SPValue::String(StringOrUnknown::String(s)) = &value.val {
-        //         if s == "terminated_completed" {
-        //             for candidate_key in state.state.keys() {
-        //                 if candidate_key.contains(primary_key) {
-        //                     keys_to_remove.push(candidate_key.clone());
-        //                 }
-        //             }
-        //         }
-        //     }
-        // }
-
-        // keys_to_remove.sort();
-        // keys_to_remove.dedup();
-
-        // StateManager::remove_sp_values(&mut con, &keys_to_remove).await;
-
         let mut new_state = state.clone();
         let sop_state =
             state.get_string_or_default_to_unknown(&format!("{}_sop_state", sp_id), &log_target);
@@ -71,9 +51,7 @@ pub async fn sop_runner(
             if let Some(root_sop) = model.sops.iter().find(|s| s.id == sop_id) {
                 log::info!(target: &log_target, "Now executing new SOP '{}':", sop_id);
                 log::info!(target: &log_target, "{:?}", visualize_sop(&root_sop.sop));
-                
-                // It looks like that this is also extremely slow, at leas for startup. TEST!
-                // Maybe once the SOP is done do this cleaning
+
                 let terminated_triggers: Vec<&String> = state
                     .state
                     .iter()
@@ -136,7 +114,16 @@ pub async fn sop_runner(
                 log::info!(target: &log_target, "SOP {sop_id} Fatal.");
             }
             SOPState::Completed => {
-                
+                let con_clone = con.clone();
+                new_state = process_sop_node_tick(
+                    sp_id,
+                    state.clone(),
+                    &root_sop_container.sop,
+                    con_clone,
+                    logging_tx.clone(),
+                    &log_target,
+                )
+                .await;
                 log::info!(target: &log_target, "SOP {sop_id} Completed.");
             }
             SOPState::Cancelled => {
