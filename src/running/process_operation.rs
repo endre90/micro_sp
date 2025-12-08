@@ -347,7 +347,7 @@ pub(super) async fn process_operation(
                 )
             }
         },
-        OperationState::Void => (),
+        // OperationState::Void => (),
     }
 
     // For now, skip logging the SOP operations

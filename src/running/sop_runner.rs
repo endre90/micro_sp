@@ -174,7 +174,7 @@ async fn process_sop_node_tick(
             // log::info!("ticking process sequence");
             let active_child = sops
                 .iter()
-                .find(|child| child.get_state(&state, &log_target) != SOPState::Terminated);
+                .find(|child| child.get_state(&state, &log_target) != SOPState::Completed);
 
             if let Some(child) = active_child {
                 // log::info!("next shild should be: {:?}", child);

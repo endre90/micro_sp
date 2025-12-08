@@ -127,7 +127,6 @@ impl SOP {
                 OperationState::Bypassed => SOPState::Executing,
                 OperationState::Completed => SOPState::Executing,
                 OperationState::Terminated(_) => SOPState::Completed,
-                OperationState::Void => SOPState::Terminated,
                 OperationState::Fatal => SOPState::Fatal,
                 OperationState::Cancelled => SOPState::Cancelled,
                 OperationState::UNKNOWN => SOPState::UNKNOWN,

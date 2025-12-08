@@ -248,7 +248,7 @@ pub fn format_log_rows(log_rows: &Vec<Vec<OperationLog>>) -> String {
                     OperationState::Failed => state_raw.yellow(),
                     OperationState::Cancelled => state_raw.yellow(),
                     OperationState::Terminated(_) => state_raw.green(),
-                    OperationState::Void => state_raw.green(),
+                    // OperationState::Void => state_raw.green(),
                     OperationState::UNKNOWN => state_raw.red(),
                 };
 

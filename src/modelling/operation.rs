@@ -22,7 +22,6 @@ pub enum OperationState {
     Fatal,
     Cancelled,
     Terminated(TerminationReason),
-    Void,
     // Paused,
     UNKNOWN,
 }
@@ -87,7 +86,7 @@ impl fmt::Display for OperationState {
             OperationState::Terminated(TerminationReason::Cancelled) => {
                 write!(f, "terminated_cancelled")
             }
-            OperationState::Void => write!(f, "void"),
+            // OperationState::Void => write!(f, "void"),
             OperationState::UNKNOWN => write!(f, "UNKNOWN"),
         }
     }
@@ -457,21 +456,21 @@ impl Operation {
         }
     }
 
-    pub fn void(&self, state: &State, log_target: &str) -> State {
-        let assignment = state.get_assignment(&self.name, &log_target);
-        if assignment.val == OperationState::Terminated(TerminationReason::Completed).to_spvalue() {
-            let action = Action::new(
-                assignment.var,
-                OperationState::Void
-                    .to_spvalue()
-                    .wrap(),
-            );
-            action.assign(&state, &log_target)
-        } else {
-            log::error!(target: &log_target, "Can't void an operation which is not terminated.");
-            state.clone()
-        }
-    }
+    // pub fn void(&self, state: &State, log_target: &str) -> State {
+    //     let assignment = state.get_assignment(&self.name, &log_target);
+    //     if assignment.val == OperationState::Terminated(TerminationReason::Completed).to_spvalue() {
+    //         let action = Action::new(
+    //             assignment.var,
+    //             OperationState::Void
+    //                 .to_spvalue()
+    //                 .wrap(),
+    //         );
+    //         action.assign(&state, &log_target)
+    //     } else {
+    //         log::error!(target: &log_target, "Can't void an operation which is not terminated.");
+    //         state.clone()
+    //     }
+    // }
 
     pub fn bypass(&self, state: &State, log_target: &str) -> State {
         let assignment = state.get_assignment(&self.name, &log_target);
