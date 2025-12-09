@@ -52,10 +52,10 @@ impl OperationState {
             "completed" => OperationState::Completed,
             "bypassed" => OperationState::Bypassed,
             "cancelled" => OperationState::Cancelled,
-            // "terminated_completed" => OperationState::Terminated(TerminationReason::Completed),
-            // "terminated_bypassed" => OperationState::Terminated(TerminationReason::Bypassed),
-            // "terminated_fatal" => OperationState::Terminated(TerminationReason::Fatal),
-            // "terminated_cancelled" => OperationState::Terminated(TerminationReason::Cancelled),
+            "terminated_completed" => OperationState::Terminated(TerminationReason::Completed),
+            "terminated_bypassed" => OperationState::Terminated(TerminationReason::Bypassed),
+            "terminated_fatal" => OperationState::Terminated(TerminationReason::Fatal),
+            "terminated_cancelled" => OperationState::Terminated(TerminationReason::Cancelled),
             _ => OperationState::UNKNOWN,
         }
     }

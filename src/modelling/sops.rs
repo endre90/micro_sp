@@ -102,63 +102,6 @@ impl SOP {
             SOP::Alternative(_) => todo!(),
         }
     }
-
-    //    pub fn get_state(&self, state: &State, log_target: &str) -> SOPState {
-    //         match self {
-    //             SOP::Operation(op) => {
-    //             let operation_state = state.get_string_or_default_to_unknown(&format!("{}", op.name), &log_target);
-    //             match OperationState::from_str(&operation_state) {
-    //                 OperationState::Initial => SOPState::Initial,
-    //                 OperationState::Disabled => SOPState::Executing,
-    //                 OperationState::Executing => SOPState::Executing,
-    //                 OperationState::Timedout => SOPState::Executing,
-    //                 OperationState::Failed => SOPState::Executing,
-    //                 OperationState::Bypassed => SOPState::Executing,
-    //                 OperationState::Completed => SOPState::Executing,
-    //                 OperationState::Terminated(_) => SOPState::Completed,
-    //                 OperationState::Fatal => SOPState::Fatal,
-    //                 OperationState::Cancelled => SOPState::Cancelled,
-    //                 OperationState::UNKNOWN => SOPState::UNKNOWN,
-    //             }},
-    //             SOP::Sequence(sops) => {
-    //                 if sops.is_empty() {
-    //                     return SOPState::Completed;
-    //                 }
-
-    //                 let states: Vec<SOPState> = sops.iter().map(|s| s.get_state(state, log_target)).collect();
-
-    //                 let any_fatal = states.iter().any(|s| *s == SOPState::Fatal);
-    //                 let any_cancelled = states.iter().any(|s| *s == SOPState::Cancelled);
-    //                 let all_initial = states.iter().all(|s| *s == SOPState::Initial);
-    //                 let all_completed = states.iter().all(|s| *s == SOPState::Completed);
-    //                 let any_not_initial = states.iter().any(|s| *s != SOPState::Initial);
-
-    //                 if any_fatal {
-    //                     return SOPState::Fatal;
-    //                 }
-
-    //                 if any_cancelled {
-    //                     return SOPState::Cancelled;
-    //                 }
-
-    //                 if all_initial {
-    //                     return SOPState::Initial;
-    //                 }
-
-    //                 if all_completed {
-    //                     return SOPState::Completed;
-    //                 }
-
-    //                 if !all_completed && any_not_initial && !any_fatal && !any_cancelled {
-    //                     return SOPState::Executing;
-    //                 }
-
-    //                 SOPState::UNKNOWN
-    //             },
-    //             SOP::Parallel(_) => todo!(),
-    //             SOP::Alternative(_) => todo!(),
-    //         }
-    //     }
 }
 
 /// Creates a visual representation of a SOP tree and prints it to the console.
