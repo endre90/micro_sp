@@ -231,7 +231,6 @@ async fn process_sop_node_tick(
                 .find(|child| child.get_state(&state, &log_target) != SOPState::Completed);
 
             if let Some(child) = active_child {
-                // log::info!("next shild should be: {:?}", child);
                 state = Box::pin(process_sop_node_tick(
                     sp_id, state, child, con, logging_tx, log_target,
                 ))
@@ -239,23 +238,19 @@ async fn process_sop_node_tick(
             }
         }
 
-        SOP::Parallel(_sops) => todo!(),
-        // {
-        //     // Process ALL children that are not yet completed
-        //     for child in sops {
-        //         // The state is threaded through each call, so updates from one branch
-        //         // are visible to the next within the same tick
-        //         state = Box::pin(process_sop_node_tick(
-        //             sp_id,
-        //             state,
-        //             child,
-        //             con.clone(),
-        //             logging_tx.clone(),
-        //             log_target,
-        //         ))
-        //         .await;
-        //     }
-        // }
+        SOP::Parallel(sops) => {
+            for child in sops {
+                state = Box::pin(process_sop_node_tick(
+                    sp_id,
+                    state,
+                    child,
+                    con.clone(),
+                    logging_tx.clone(),
+                    log_target,
+                ))
+                .await;
+            }
+        }
         SOP::Alternative(_sops) => todo!(),
         //     {
         //         // Check if a path is already active (i.e., not initial and not completed)

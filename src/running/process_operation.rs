@@ -350,7 +350,6 @@ pub(super) async fn process_operation(
 
     }
 
-    // For now, skip logging the SOP operations
     if new_op_info != old_operation_information {
         match op_info_level {
             log::Level::Info => log::info!(target: &log_target, "{}", new_op_info),
