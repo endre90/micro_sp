@@ -63,7 +63,7 @@ impl SOP {
                     OperationState::UNKNOWN => SOPState::UNKNOWN,
                 }
             }
-            SOP::Sequence(sops) => {
+            SOP::Sequence(sops) | SOP::Parallel(sops) => {
                 if sops.is_empty() {
                     return SOPState::Completed;
                 }
@@ -101,7 +101,6 @@ impl SOP {
 
                 SOPState::UNKNOWN
             }
-            SOP::Parallel(_) => todo!(),
             SOP::Alternative(_) => todo!(),
         }
     }
