@@ -109,6 +109,20 @@ pub async fn sop_runner(
                     &log_target,
                 )
                 .await;
+
+                // This is the fix for progressing to completed state
+                // Of course, we have to transition to the completed state
+                // let calculated_root_state =
+                //     root_sop_container.sop.get_state(&new_state, &log_target);
+
+                // if calculated_root_state != SOPState::Executing {
+                //     log::info!(target: &log_target, "SOP {sop_id} transitioning: Executing -> {:?}", calculated_root_state);
+
+                //     new_state = new_state.update(
+                //         &format!("{}_sop_state", sp_id),
+                //         calculated_root_state.to_string().to_spvalue(),
+                //     );
+                // }
             }
             SOPState::Fatal => {
                 log::info!(target: &log_target, "SOP {sop_id} Fatal.");
