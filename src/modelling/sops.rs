@@ -1,4 +1,4 @@
-use crate::{Operation, OperationState, SOPState, State};
+use crate::{Operation, OperationState, SOPState, State, TerminationReason};
 use serde::{Deserialize, Serialize};
 use termtree::Tree;
 
@@ -54,9 +54,12 @@ impl SOP {
                     OperationState::Failed => SOPState::Executing,
                     OperationState::Bypassed => SOPState::Executing,
                     OperationState::Completed => SOPState::Executing,
-                    OperationState::Terminated(_) => SOPState::Completed,
+                    OperationState::Terminated(TerminationReason::Completed) => SOPState::Completed,
+                    OperationState::Terminated(TerminationReason::Bypassed) => SOPState::Completed,
                     OperationState::Fatal => SOPState::Fatal,
                     OperationState::Cancelled => SOPState::Cancelled,
+                    OperationState::Terminated(TerminationReason::Fatal) => SOPState::Fatal,
+                    OperationState::Terminated(TerminationReason::Cancelled) => SOPState::Cancelled,
                     OperationState::UNKNOWN => SOPState::UNKNOWN,
                 }
             }

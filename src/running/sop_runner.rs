@@ -47,10 +47,21 @@ pub async fn sop_runner(
             continue;
         };
 
+        let old_sop_information = new_state
+            .get_string_or_default_to_unknown(&format!("{}_sop_information", sop_id), &log_target);
+
+        let mut new_sop_info = old_sop_information.clone();
+        let mut sop_info_level = log::Level::Info;
+
         if old_sop_id != sop_id && !sop_id.is_empty() {
             if let Some(root_sop) = model.sops.iter().find(|s| s.id == sop_id) {
-                log::info!(target: &log_target, "Now executing new SOP '{}':", sop_id);
-                log::info!(target: &log_target, "{:?}", visualize_sop(&root_sop.sop));
+                new_sop_info = format!(
+                    "Initializing a new SOP '{}':\n{:?}",
+                    sop_id,
+                    visualize_sop(&root_sop.sop)
+                );
+                // log::info!(target: &log_target, "Now executing new SOP '{}':", sop_id);
+                // log::info!(target: &log_target, "{:?}", visualize_sop(&root_sop.sop));
 
                 let terminated_triggers: Vec<&String> = state
                     .state
@@ -88,7 +99,8 @@ pub async fn sop_runner(
         match SOPState::from_str(&sop_state) {
             SOPState::Initial => {
                 if sop_enabled {
-                    log::info!(target: &log_target, "SOP {sop_id} enabled, starting execution.");
+                    new_sop_info = format!("SOP '{sop_id}' is enabled, starting execution.");
+                    sop_info_level = log::Level::Info;
                     new_state = new_state
                         .update(&format!("{}_sop_enabled", sp_id), false.to_spvalue())
                         .update(
@@ -98,8 +110,9 @@ pub async fn sop_runner(
                 }
             }
             SOPState::Executing => {
-                // log::info!(target: &log_target, "SOP {sop_id} executing.");
                 let con_clone = con.clone();
+                new_sop_info = format!("Executing SOP '{sop_id}'.");
+                sop_info_level = log::Level::Info;
                 new_state = process_sop_node_tick(
                     sp_id,
                     state.clone(),
@@ -110,43 +123,71 @@ pub async fn sop_runner(
                 )
                 .await;
 
-                // This is the fix for progressing to completed state
-                // Of course, we have to transition to the completed state
-                // let calculated_root_state =
-                //     root_sop_container.sop.get_state(&new_state, &log_target);
+                let calculated_root_state =
+                    root_sop_container.sop.get_state(&new_state, &log_target);
 
-                // if calculated_root_state != SOPState::Executing {
-                //     log::info!(target: &log_target, "SOP {sop_id} transitioning: Executing -> {:?}", calculated_root_state);
+                if calculated_root_state != SOPState::Executing {
+                    new_sop_info = format!("Completing SOP '{sop_id}'.");
+                    sop_info_level = log::Level::Info;
 
-                //     new_state = new_state.update(
-                //         &format!("{}_sop_state", sp_id),
-                //         calculated_root_state.to_string().to_spvalue(),
-                //     );
-                // }
+                    new_state = new_state.update(
+                        &format!("{}_sop_state", sp_id),
+                        calculated_root_state.to_string().to_spvalue(),
+                    );
+                }
             }
             SOPState::Fatal => {
-                log::info!(target: &log_target, "SOP {sop_id} Fatal.");
+                new_sop_info = format!("Fataled SOP '{sop_id}'.");
+                sop_info_level = log::Level::Error;
             }
             SOPState::Completed => {
-                // let con_clone = con.clone();
-                // new_state = process_sop_node_tick(
-                //     sp_id,
-                //     state.clone(),
-                //     &root_sop_container.sop,
-                //     con_clone,
-                //     logging_tx.clone(),
-                //     &log_target,
-                // )
-                // .await;
-                log::info!(target: &log_target, "SOP {sop_id} Completed.");
+                new_sop_info = format!("Completed SOP '{sop_id}'.");
+                sop_info_level = log::Level::Info;
             }
             SOPState::Cancelled => {
-                log::info!(target: &log_target, "SOP {sop_id} Cancelled.");
+                new_sop_info = format!("Cancelled SOP '{sop_id}'.");
+                sop_info_level = log::Level::Warn;
             }
             SOPState::UNKNOWN => {
-                log::info!(target: &log_target, "SOP {sop_id} UNKNOWN.");
+                new_sop_info = format!("SOP '{sop_id}' state id UNKNOWN.");
+                sop_info_level = log::Level::Info;
             }
         }
+
+        if new_sop_info != old_sop_information {
+            match sop_info_level {
+                log::Level::Info => log::info!(target: &log_target, "{}", new_sop_info),
+                log::Level::Warn => log::warn!(target: &log_target, "{}", new_sop_info),
+                log::Level::Error => log::error!(target: &log_target, "{}", new_sop_info),
+                _ => (),
+            }
+            // let operation_msg = OperationMsg {
+            //     operation_name: operation.name.clone(),
+            //     operation_processing_type: operation_processing_type,
+            //     timestamp: Utc::now(),
+            //     severity: op_info_level,
+            //     state: OperationState::from_str(&operation_state),
+            //     log: logging_log.to_string(),
+            // };
+            // let log_msg = LogMsg::OperationMsg(operation_msg);
+            // match logging_tx.send(log_msg).await {
+            //     Ok(()) => (),
+            //     Err(e) => {
+            //         log::error!(target: &log_target, "Failed to send logging with: {e}.")
+            //     }
+            // }
+        }
+
+        new_state = new_state
+        .update(
+            &format!("{}_sop_information", sop_id),
+            new_sop_info.to_spvalue(),
+        );
+        // This we actually have in the wrapper operation
+        // .update(
+        //     &format!("{}_sop_elapsed_executing_ms", sop_id),
+        //     elapased_executing_ms.to_spvalue(),
+        // );
 
         let modified_state = state.get_diff_partial_state(&new_state);
 
