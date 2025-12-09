@@ -7,6 +7,12 @@ use tokio::{
 
 static TICK_INTERVAL: u64 = 100; // millis
 
+const NANOID_ALPHABET: [char; 62] = [
+        '0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
+        'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z',
+        'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z',
+    ];
+
 pub async fn sop_runner(
     sp_id: &str,
     model: &Model,
@@ -60,8 +66,6 @@ pub async fn sop_runner(
                     sop_id,
                     visualize_sop(&root_sop.sop)
                 );
-                // log::info!(target: &log_target, "Now executing new SOP '{}':", sop_id);
-                // log::info!(target: &log_target, "{:?}", visualize_sop(&root_sop.sop));
 
                 let terminated_triggers: Vec<&String> = state
                     .state
@@ -208,7 +212,6 @@ async fn process_sop_node_tick(
 ) -> State {
     match sop {
         SOP::Operation(operation) => {
-            // log::info!("ticking process operation");
             state = running::process_operation::process_operation(
                 &sp_id,
                 state,
@@ -223,7 +226,6 @@ async fn process_sop_node_tick(
         }
 
         SOP::Sequence(sops) => {
-            // log::info!("ticking process sequence");
             let active_child = sops
                 .iter()
                 .find(|child| child.get_state(&state, &log_target) != SOPState::Completed);
@@ -315,7 +317,7 @@ async fn process_sop_node_tick(
 pub fn uniquify_sop_operations(sop: SOP) -> SOP {
     match sop {
         SOP::Operation(op) => {
-            let unique_id = nanoid::nanoid!(10); // 64^10 unique ids
+            let unique_id = nanoid::nanoid!(10, &NANOID_ALPHABET); // 64^10 unique ids
             let new_name = format!("op_{}_{}", op.name, unique_id);
             SOP::Operation(Box::new(Operation {
                 name: new_name,
