@@ -65,16 +65,6 @@ pub async fn operation_log_receiver_task(
                     OperationProcessingType::SOP => format!("{}_logger_sop_operations", sp_id),
                 };
 
-                // Create a clone for the aggregate log before 'msg' is moved
-                let agg_msg = OperationMsg {
-                    operation_name: msg.operation_name.clone(),
-                    operation_processing_type: msg.operation_processing_type.clone(),
-                    state: msg.state.clone(),
-                    timestamp: msg.timestamp,
-                    severity: msg.severity,
-                    log: msg.log.clone(),
-                };
-
                 let agg_key = format!("{}_agg", which_op_type_logger);
 
                 if let Some(log_spvalue) =
@@ -158,27 +148,34 @@ pub async fn operation_log_receiver_task(
                                 )
                                 .await;
                             }
+                            // Aggregate log
+                            let mut agg_log: Vec<Vec<Vec<OperationLog>>> =
+                                if let Some(log_spvalue) =
+                                    StateManager::get_sp_value(&mut con, &agg_key).await
+                                {
+                                    if let SPValue::String(StringOrUnknown::String(string_log)) =
+                                        log_spvalue
+                                    {
+                                        serde_json::from_str(&string_log).unwrap_or_default()
+                                    } else {
+                                        Vec::new()
+                                    }
+                                } else {
+                                    Vec::new()
+                                };
+
+                            agg_log.push(log);
+
+                            if let Ok(serialized) = serde_json::to_string(&agg_log) {
+                                StateManager::set_sp_value(
+                                    &mut con,
+                                    &agg_key,
+                                    &serialized.to_spvalue(),
+                                )
+                                .await;
+                            }
                         }
                     };
-                }
-
-                // Aggregate log
-                let mut agg_log: Vec<OperationMsg> =
-                    if let Some(log_spvalue) = StateManager::get_sp_value(&mut con, &agg_key).await
-                    {
-                        if let SPValue::String(StringOrUnknown::String(string_log)) = log_spvalue {
-                            serde_json::from_str(&string_log).unwrap_or_default()
-                        } else {
-                            Vec::new()
-                        }
-                    } else {
-                        Vec::new()
-                    };
-
-                agg_log.push(agg_msg);
-
-                if let Ok(serialized) = serde_json::to_string(&agg_log) {
-                    StateManager::set_sp_value(&mut con, &agg_key, &serialized.to_spvalue()).await;
                 }
             }
             LogMsg::TransitionMsg(msg) => {
@@ -209,8 +206,6 @@ pub async fn operation_log_receiver_task(
         }
     }
 }
-
-
 
 // pub async fn operation_log_receiver_task(
 //     mut rx: mpsc::Receiver<LogMsg>,
