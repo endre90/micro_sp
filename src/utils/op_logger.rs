@@ -388,14 +388,14 @@ pub fn format_log_rows(log_rows: &Vec<Vec<OperationLog>>) -> String {
         for op_log in row {
             let mut log_lines: Vec<String> = Vec::new();
 
-            let title = format!("{}: {}", header, op_log.operation_name)
+            let title = format!("{}: {}", header, truncate_center(&op_log.operation_name, 30))
                 .bold()
                 .blue();
             let underline = format!("{:-<width$}", "", width = op_log.operation_name.len() + 1);
 
             // let title_width = measure_text_width(&title.to_string());
             // let underline_width = measure_text_width(&underline);
-            let max_line_width = 40;
+            let max_line_width = 42;
             // let mut max_line_width = std::cmp::max(title_width, underline_width);
 
             log_lines.push(title.to_string());
@@ -544,6 +544,30 @@ pub fn format_transition_log(log: &Vec<TransitionMsg>) -> String {
     }
 
     output
+}
+
+fn truncate_center(input: &str, max_len: usize) -> String {
+    if input.len() <= max_len {
+        return input.to_string();
+    }
+
+    let separator = "...";
+    let sep_len = separator.len();
+
+    if max_len < sep_len {
+        return input.chars().take(max_len).collect();
+    }
+
+    let available_chars = max_len - sep_len;
+    let keep_left = available_chars / 2;
+    let keep_right = available_chars - keep_left;
+
+    format!(
+        "{}{}{}",
+        &input[..keep_left],
+        separator,
+        &input[input.len() - keep_right..]
+    )
 }
 
 #[test]
