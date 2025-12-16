@@ -310,9 +310,9 @@ pub fn generate_operation_state_variables(model: &Model, coverability_tracking: 
         let ops_in_sop = get_all_operations(&sop.sop);
         let sop_information = v!(&&format!("{}_sop_information", sop.id));
         state = state.add(assign!(
-                sop_information,
-                SPValue::String(StringOrUnknown::UNKNOWN)
-            ));
+            sop_information,
+            SPValue::String(StringOrUnknown::UNKNOWN)
+        ));
         for operation in ops_in_sop {
             let operation_state = v!(&&format!("{}", operation.name)); // Initial, Executing, Failed, Completed, Unknown
             let operation_information = v!(&&format!("{}_information", operation.name));

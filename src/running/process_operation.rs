@@ -347,7 +347,6 @@ pub(super) async fn process_operation(
                 )
             }
         },
-
     }
 
     if new_op_info != old_operation_information {
@@ -357,19 +356,24 @@ pub(super) async fn process_operation(
             log::Level::Error => log::error!(target: &log_target, "{}", new_op_info),
             _ => (),
         }
-        let operation_msg = OperationMsg {
-            operation_name: operation.name.clone(),
-            operation_processing_type: operation_processing_type,
-            timestamp: Utc::now(),
-            severity: op_info_level,
-            state: OperationState::from_str(&operation_state),
-            log: logging_log.to_string(),
-        };
-        let log_msg = LogMsg::OperationMsg(operation_msg);
-        match logging_tx.send(log_msg).await {
-            Ok(()) => (),
-            Err(e) => {
-                log::error!(target: &log_target, "Failed to send logging with: {e}.")
+        // No need to log terminated
+        if OperationState::from_str(&operation_state)
+            != OperationState::Terminated(TerminationReason::Completed)
+        {
+            let operation_msg = OperationMsg {
+                operation_name: operation.name.clone(),
+                operation_processing_type: operation_processing_type,
+                timestamp: Utc::now(),
+                severity: op_info_level,
+                state: OperationState::from_str(&operation_state),
+                log: logging_log.to_string(),
+            };
+            let log_msg = LogMsg::OperationMsg(operation_msg);
+            match logging_tx.send(log_msg).await {
+                Ok(()) => (),
+                Err(e) => {
+                    log::error!(target: &log_target, "Failed to send logging with: {e}.")
+                }
             }
         }
     }
