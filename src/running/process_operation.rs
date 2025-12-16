@@ -4,7 +4,7 @@ use tokio::sync::mpsc;
 
 use crate::*;
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum OperationProcessingType {
     Planned,
     SOP,

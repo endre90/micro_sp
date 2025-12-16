@@ -40,9 +40,9 @@ pub struct OperationLog {
     pub log: Vec<OperationMsg>,
 }
 
+// new untested
 pub async fn operation_log_receiver_task(
     mut rx: mpsc::Receiver<LogMsg>,
-    // op_proc_type: OperationProcessingType,
     connection_manager: &Arc<ConnectionManager>,
     sp_id: &str,
 ) {
@@ -57,13 +57,25 @@ pub async fn operation_log_receiver_task(
 
                 let which_op_type_logger = match msg.operation_processing_type {
                     OperationProcessingType::Planned => {
-                        &format!("{}_logger_planned_operations", sp_id)
+                        format!("{}_logger_planned_operations", sp_id)
                     }
                     OperationProcessingType::Automatic => {
-                        &format!("{}_logger_automatic_operations", sp_id)
+                        format!("{}_logger_automatic_operations", sp_id)
                     }
-                    OperationProcessingType::SOP => &format!("{}_logger_sop_operations", sp_id),
+                    OperationProcessingType::SOP => format!("{}_logger_sop_operations", sp_id),
                 };
+
+                // Create a clone for the aggregate log before 'msg' is moved
+                let agg_msg = OperationMsg {
+                    operation_name: msg.operation_name.clone(),
+                    operation_processing_type: msg.operation_processing_type.clone(),
+                    state: msg.state.clone(),
+                    timestamp: msg.timestamp,
+                    severity: msg.severity,
+                    log: msg.log.clone(),
+                };
+
+                let agg_key = format!("{}_agg", which_op_type_logger);
 
                 if let Some(log_spvalue) =
                     StateManager::get_sp_value(&mut con, &which_op_type_logger).await
@@ -99,10 +111,8 @@ pub async fn operation_log_receiver_task(
                                     log.push(Vec::new());
                                     let log_len = log.len();
                                     let (prefix, suffix) = log.split_at_mut(log_len - 1);
-
                                     let old_last_vec = &mut prefix[prefix.len() - 1];
                                     let new_last_vec = &mut suffix[0];
-
                                     let ops_to_partition = std::mem::take(old_last_vec);
 
                                     for op in ops_to_partition {
@@ -110,7 +120,8 @@ pub async fn operation_log_receiver_task(
                                             Some(
                                                 OperationState::Completed
                                                 | OperationState::Bypassed
-                                                | OperationState::Fatal | OperationState::Cancelled,
+                                                | OperationState::Fatal
+                                                | OperationState::Cancelled,
                                             ) => {
                                                 old_last_vec.push(op);
                                             }
@@ -139,21 +150,35 @@ pub async fn operation_log_receiver_task(
                                 }
                             }
 
-                            match serde_json::to_string(&log) {
-                                Ok(serialized) => {
-                                    StateManager::set_sp_value(
-                                        &mut con,
-                                        &which_op_type_logger,
-                                        &serialized.to_spvalue(),
-                                    )
-                                    .await
-                                }
-                                Err(e) => {
-                                    log::error!(target: &log_target, "Serialization failed with {e}.")
-                                }
+                            if let Ok(serialized) = serde_json::to_string(&log) {
+                                StateManager::set_sp_value(
+                                    &mut con,
+                                    &which_op_type_logger,
+                                    &serialized.to_spvalue(),
+                                )
+                                .await;
                             }
                         }
                     };
+                }
+
+                // Aggregate log
+                let mut agg_log: Vec<OperationMsg> =
+                    if let Some(log_spvalue) = StateManager::get_sp_value(&mut con, &agg_key).await
+                    {
+                        if let SPValue::String(StringOrUnknown::String(string_log)) = log_spvalue {
+                            serde_json::from_str(&string_log).unwrap_or_default()
+                        } else {
+                            Vec::new()
+                        }
+                    } else {
+                        Vec::new()
+                    };
+
+                agg_log.push(agg_msg);
+
+                if let Ok(serialized) = serde_json::to_string(&agg_log) {
+                    StateManager::set_sp_value(&mut con, &agg_key, &serialized.to_spvalue()).await;
                 }
             }
             LogMsg::TransitionMsg(msg) => {
@@ -176,19 +201,166 @@ pub async fn operation_log_receiver_task(
 
                 log.push(msg);
 
-                match serde_json::to_string(&log) {
-                    Ok(serialized) => {
-                        StateManager::set_sp_value(&mut con, &redis_key, &serialized.to_spvalue())
-                            .await
-                    }
-                    Err(e) => {
-                        log::error!(target: &log_target, "Serialization failed for transition with {e}.")
-                    }
+                if let Ok(serialized) = serde_json::to_string(&log) {
+                    StateManager::set_sp_value(&mut con, &redis_key, &serialized.to_spvalue())
+                        .await;
                 }
             }
         }
     }
 }
+
+
+
+// pub async fn operation_log_receiver_task(
+//     mut rx: mpsc::Receiver<LogMsg>,
+//     // op_proc_type: OperationProcessingType,
+//     connection_manager: &Arc<ConnectionManager>,
+//     sp_id: &str,
+// ) {
+//     let log_target = format!("{}_logger_receiver", sp_id);
+//     while let Some(log_msg) = rx.recv().await {
+//         match log_msg {
+//             LogMsg::OperationMsg(msg) => {
+//                 if let Err(_) = connection_manager.check_redis_health(&log_target).await {
+//                     continue;
+//                 }
+//                 let mut con = connection_manager.get_connection().await;
+
+//                 let which_op_type_logger = match msg.operation_processing_type {
+//                     OperationProcessingType::Planned => {
+//                         &format!("{}_logger_planned_operations", sp_id)
+//                     }
+//                     OperationProcessingType::Automatic => {
+//                         &format!("{}_logger_automatic_operations", sp_id)
+//                     }
+//                     OperationProcessingType::SOP => &format!("{}_logger_sop_operations", sp_id),
+//                 };
+
+//                 if let Some(log_spvalue) =
+//                     StateManager::get_sp_value(&mut con, &which_op_type_logger).await
+//                 {
+//                     if let SPValue::String(StringOrUnknown::String(string_log)) = log_spvalue {
+//                         if let Ok(mut log) =
+//                             serde_json::from_str::<Vec<Vec<OperationLog>>>(&string_log)
+//                         {
+//                             let is_last_empty = log.last().map_or(true, |v| v.is_empty());
+
+//                             if is_last_empty {
+//                                 if log.is_empty() {
+//                                     log.push(Vec::new());
+//                                 }
+//                                 log.last_mut().unwrap().push(OperationLog {
+//                                     operation_name: msg.operation_name.clone(),
+//                                     log: vec![msg],
+//                                 });
+//                             } else {
+//                                 let needs_partition = log.last().unwrap().iter().any(|op| {
+//                                     matches!(
+//                                         op.log.last().map(|s| &s.state),
+//                                         Some(
+//                                             OperationState::Completed
+//                                                 | OperationState::Bypassed
+//                                                 | OperationState::Fatal
+//                                                 | OperationState::Cancelled
+//                                         )
+//                                     )
+//                                 });
+
+//                                 if needs_partition {
+//                                     log.push(Vec::new());
+//                                     let log_len = log.len();
+//                                     let (prefix, suffix) = log.split_at_mut(log_len - 1);
+
+//                                     let old_last_vec = &mut prefix[prefix.len() - 1];
+//                                     let new_last_vec = &mut suffix[0];
+
+//                                     let ops_to_partition = std::mem::take(old_last_vec);
+
+//                                     for op in ops_to_partition {
+//                                         match op.log.last().map(|s| &s.state) {
+//                                             Some(
+//                                                 OperationState::Completed
+//                                                 | OperationState::Bypassed
+//                                                 | OperationState::Fatal | OperationState::Cancelled,
+//                                             ) => {
+//                                                 old_last_vec.push(op);
+//                                             }
+//                                             _ => {
+//                                                 new_last_vec.push(op);
+//                                             }
+//                                         }
+//                                     }
+//                                 }
+
+//                                 let last_vector = log.last_mut().unwrap();
+
+//                                 match last_vector
+//                                     .iter_mut()
+//                                     .find(|log| log.operation_name == msg.operation_name)
+//                                 {
+//                                     Some(exists) => {
+//                                         exists.log.push(msg);
+//                                     }
+//                                     None => {
+//                                         last_vector.push(OperationLog {
+//                                             operation_name: msg.operation_name.clone(),
+//                                             log: vec![msg],
+//                                         });
+//                                     }
+//                                 }
+//                             }
+
+//                             match serde_json::to_string(&log) {
+//                                 Ok(serialized) => {
+//                                     StateManager::set_sp_value(
+//                                         &mut con,
+//                                         &which_op_type_logger,
+//                                         &serialized.to_spvalue(),
+//                                     )
+//                                     .await
+//                                 }
+//                                 Err(e) => {
+//                                     log::error!(target: &log_target, "Serialization failed with {e}.")
+//                                 }
+//                             }
+//                         }
+//                     };
+//                 }
+//             }
+//             LogMsg::TransitionMsg(msg) => {
+//                 if let Err(_) = connection_manager.check_redis_health(&log_target).await {
+//                     continue;
+//                 }
+//                 let mut con = connection_manager.get_connection().await;
+//                 let redis_key = format!("{}_logger_automatic_transitions", sp_id);
+//                 let mut log: Vec<TransitionMsg> = if let Some(log_spvalue) =
+//                     StateManager::get_sp_value(&mut con, &redis_key).await
+//                 {
+//                     if let SPValue::String(StringOrUnknown::String(string_log)) = log_spvalue {
+//                         serde_json::from_str(&string_log).unwrap_or_default()
+//                     } else {
+//                         Vec::new()
+//                     }
+//                 } else {
+//                     Vec::new()
+//                 };
+
+//                 log.push(msg);
+
+//                 match serde_json::to_string(&log) {
+//                     Ok(serialized) => {
+//                         StateManager::set_sp_value(&mut con, &redis_key, &serialized.to_spvalue())
+//                             .await
+//                     }
+//                     Err(e) => {
+//                         log::error!(target: &log_target, "Serialization failed for transition with {e}.")
+//                     }
+//                 }
+//             }
+//         }
+//     }
+// }
 
 fn format_timestamp(utc_ts: &DateTime<Utc>) -> String {
     let cet = chrono::FixedOffset::east_opt(1 * 3600).unwrap();
