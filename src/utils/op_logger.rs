@@ -384,19 +384,15 @@ pub fn format_log_rows(log_rows: &Vec<Vec<OperationLog>>) -> String {
         let mut max_log_height = 0;
         let mut rendered_logs: Vec<Vec<String>> = Vec::new();
         let mut max_widths: Vec<usize> = Vec::new();
-        let max_line_width = 42;
+                    let max_line_width = 42;
 
         for op_log in row {
             let mut log_lines: Vec<String> = Vec::new();
 
-            let title = format!(
-                "{}: {}",
-                header,
-                truncate_center(&op_log.operation_name, 30)
-            )
-            .bold()
-            .blue();
-            let underline = format!("{:-<width$}", "", width = op_log.operation_name.len() + 1);
+            let title = format!("{}: {}", header, truncate_center(&op_log.operation_name, 30))
+                .bold()
+                .blue();
+            let underline = format!("{:-<width$}", "", width = max_line_width - 2);
 
             // let title_width = measure_text_width(&title.to_string());
             // let underline_width = measure_text_width(&underline);
@@ -462,7 +458,7 @@ pub fn format_log_rows(log_rows: &Vec<Vec<OperationLog>>) -> String {
                 log_lines.push(" ".repeat(width));
             }
 
-            let border_top = format!("+{:-<width$}+", "", width = max_line_width + 2);
+            let border_top = format!("+{:-<width$}+", "", width = width + 2);
             padded_box_lines.push(border_top.clone());
             for line in log_lines {
                 padded_box_lines.push(format!("| {} |", line));
