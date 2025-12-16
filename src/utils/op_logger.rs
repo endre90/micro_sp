@@ -148,7 +148,7 @@ pub async fn operation_log_receiver_task(
                                 )
                                 .await;
                             }
-                            // Aggregate log
+                            // Aggregate log => has purpose for testing, but it might aggregate a lot and slow down redis?
                             let mut agg_log: Vec<Vec<Vec<OperationLog>>> =
                                 if let Some(log_spvalue) =
                                     StateManager::get_sp_value(&mut con, &agg_key).await
@@ -393,9 +393,10 @@ pub fn format_log_rows(log_rows: &Vec<Vec<OperationLog>>) -> String {
                 .blue();
             let underline = format!("{:-<width$}", "", width = op_log.operation_name.len() + 1);
 
-            let title_width = measure_text_width(&title.to_string());
-            let underline_width = measure_text_width(&underline);
-            let mut max_line_width = std::cmp::max(title_width, underline_width);
+            // let title_width = measure_text_width(&title.to_string());
+            // let underline_width = measure_text_width(&underline);
+            let max_line_width = 40;
+            // let mut max_line_width = std::cmp::max(title_width, underline_width);
 
             log_lines.push(title.to_string());
             log_lines.push(underline.to_string());
@@ -424,16 +425,16 @@ pub fn format_log_rows(log_rows: &Vec<Vec<OperationLog>>) -> String {
                     log::Level::Warn => msg.log.yellow(),
                     _ => msg.log.normal(),
                 };
-
                 let colored_line = format!(
-                    "[{ts} | {state:<10}] {log}",
+                    "[{ts} | {state:<10}] {log:<13.13}",
                     ts = ts.dimmed(),
                     state = state_colored,
                     log = log_colored
                 );
 
-                let line_width = measure_text_width(&colored_line);
-                max_line_width = std::cmp::max(max_line_width, line_width);
+                // let line_width = measure_text_width(&colored_line);
+                // max_line_width = std::cmp::max(max_line_width, line_width);
+                // max_line_width
                 log_lines.push(colored_line);
             }
 
