@@ -370,10 +370,10 @@ pub fn format_log_rows(log_rows: &Vec<Vec<OperationLog>>) -> String {
 
     for (i, row) in log_rows.iter().enumerate() {
         let header = if i == total_rows - 1 {
-            "Current".to_string()
+            "Running".to_string()
         } else {
             let relative_index = i as isize - (total_rows as isize - 1);
-            format!("Past {}", relative_index)
+            format!("Done {}", relative_index)
         };
 
         if row.is_empty() {
@@ -392,7 +392,7 @@ pub fn format_log_rows(log_rows: &Vec<Vec<OperationLog>>) -> String {
             let title = format!("{}: {}", header, truncate_center(&op_log.operation_name, 30))
                 .bold()
                 .blue();
-            let underline = format!("{:-<width$}", "", width = max_line_width + 2);
+            let underline = format!("{:-<width$}", "", width = max_line_width);
 
             // let title_width = measure_text_width(&title.to_string());
             // let underline_width = measure_text_width(&underline);
