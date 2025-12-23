@@ -40,7 +40,7 @@ pub struct OperationLog {
     pub log: Vec<OperationMsg>,
 }
 
-// new untested
+// with agg for testing purposes, comment out the agg for running
 pub async fn operation_log_receiver_task(
     mut rx: mpsc::Receiver<LogMsg>,
     connection_manager: &Arc<ConnectionManager>,
