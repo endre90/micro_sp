@@ -392,7 +392,7 @@ pub fn format_log_rows(log_rows: &Vec<Vec<OperationLog>>) -> String {
             let title = format!("{}: {}", header, truncate_center(&op_log.operation_name, 30))
                 .bold()
                 .blue();
-            let underline = format!("{:-<width$}", "", width = max_line_width - 2);
+            let underline = format!("{:-<width$}", "", width = max_line_width + 2);
 
             // let title_width = measure_text_width(&title.to_string());
             // let underline_width = measure_text_width(&underline);
