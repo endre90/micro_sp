@@ -370,7 +370,7 @@ pub fn format_log_rows(log_rows: &Vec<Vec<OperationLog>>) -> String {
 
     for (i, row) in log_rows.iter().enumerate() {
         let header = if i == total_rows - 1 {
-            "Running".to_string()
+            "Latest".to_string()
         } else {
             let relative_index = i as isize - (total_rows as isize - 1);
             format!("Done {}", relative_index)
