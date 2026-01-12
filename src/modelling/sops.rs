@@ -101,7 +101,44 @@ impl SOP {
 
                 SOPState::UNKNOWN
             }
-            SOP::Alternative(_) => todo!(),
+            SOP::Alternative(sops) => {
+                if sops.is_empty() {
+                    return SOPState::Completed;
+                }
+
+                let states: Vec<SOPState> = sops
+                    .iter()
+                    .map(|s| s.get_state(state, log_target))
+                    .collect();
+
+                let any_fatal = states.iter().any(|s| *s == SOPState::Fatal);
+                let any_cancelled = states.iter().any(|s| *s == SOPState::Cancelled);
+                let all_initial = states.iter().all(|s| *s == SOPState::Initial);
+                let any_completed = states.iter().any(|s| *s == SOPState::Completed);
+                let any_not_initial = states.iter().any(|s| *s != SOPState::Initial);
+
+                if any_fatal {
+                    return SOPState::Fatal;
+                }
+
+                if any_cancelled {
+                    return SOPState::Cancelled;
+                }
+
+                if all_initial {
+                    return SOPState::Initial;
+                }
+
+                if any_completed {
+                    return SOPState::Completed;
+                }
+
+                if !any_completed && any_not_initial && !any_fatal && !any_cancelled {
+                    return SOPState::Executing;
+                }
+
+                SOPState::UNKNOWN
+            },
         }
     }
 }
@@ -121,43 +158,6 @@ pub fn visualize_sop(root_sop: &SOP) {
     }
     // println!("{}", tree);
 }
-
-// fn build_sop_tree(sop: &SOP) -> Tree<String> {
-//     match sop {
-//         // A leaf node in the tree
-//         SOP::Operation(id, op) => {
-//             let label = format!("Operation {id}: {}", op.name);
-//             Tree::new(label)
-//         }
-
-//         // A branch node for sequential operations
-//         SOP::Sequence(id, sops) => {
-//             let mut tree = Tree::new(format!("Sequence {id}"));
-//             for child_sop in sops {
-//                 tree.push(build_sop_tree(child_sop));
-//             }
-//             tree
-//         }
-
-//         // A branch node for parallel operations
-//         SOP::Parallel(id, sops) => {
-//             let mut tree = Tree::new(format!("Parallel {id}"));
-//             for child_sop in sops {
-//                 tree.push(build_sop_tree(child_sop));
-//             }
-//             tree
-//         }
-
-//         // A branch node for alternative operations
-//         SOP::Alternative(id, sops) => {
-//             let mut tree = Tree::new(format!("Alternative {id}"));
-//             for child_sop in sops {
-//                 tree.push(build_sop_tree(child_sop));
-//             }
-//             tree
-//         }
-//     }
-// }
 
 fn build_sop_tree(sop: &SOP) -> Tree<String> {
     match sop {
