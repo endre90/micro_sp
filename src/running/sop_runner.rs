@@ -7,12 +7,6 @@ use tokio::{
 
 static TICK_INTERVAL: u64 = 100; // millis
 
-const NANOID_ALPHABET: [char; 62] = [
-        '0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
-        'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z',
-        'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z',
-    ];
-
 pub async fn sop_runner(
     sp_id: &str,
     model: &Model,
@@ -158,6 +152,7 @@ pub async fn sop_runner(
             }
         }
 
+        // log sops similarily to ops
         if new_sop_info != old_sop_information {
             match sop_info_level {
                 log::Level::Info => log::info!(target: &log_target, "{}", new_sop_info),
@@ -182,8 +177,7 @@ pub async fn sop_runner(
             // }
         }
 
-        new_state = new_state
-        .update(
+        new_state = new_state.update(
             &format!("{}_sop_information", sop_id),
             new_sop_info.to_spvalue(),
         );
@@ -251,63 +245,60 @@ async fn process_sop_node_tick(
                 .await;
             }
         }
-        SOP::Alternative(_sops) => todo!(),
-        //     {
-        //         // Check if a path is already active (i.e., not initial and not completed)
-        //         let active_path = sops.iter().find(|child| {
-        //             !is_sop_in_initial_state(sp_id, child, &state, log_target)
-        //                 && !is_sop_completed(sp_id, child, &state, log_target)
-        //         });
 
-        //         if let Some(path) = active_path {
-        //             // If a path is active, keep processing it
-        //             state = Box::pin(process_sop_node_tick(
-        //                 sp_id, state, path, con, logging_tx, log_target,
-        //             ))
-        //             .await;
-        //         } else {
-        //             // If no path is active, find the first one that can start
-        //             if let Some(path_to_start) = sops
-        //                 .iter()
-        //                 .find(|child| can_sop_start(sp_id, child, &state, log_target))
-        //             {
-        //                 log::info!(target: log_target, "Found valid alternative path to start.");
-        //                 state = Box::pin(process_sop_node_tick(
-        //                     sp_id,
-        //                     state,
-        //                     path_to_start,
-        //                     con,
-        //                     logging_tx,
-        //                     log_target,
-        //                 ))
-        //                 .await;
-        //             }
-        //         }
-        //     }
+        SOP::Alternative(sops) => {
+            let active_child = sops.iter().find(|child| {
+                let child_state = child.get_state(&state, &log_target);
+                child_state != SOPState::Initial && child_state != SOPState::Completed
+            });
+
+            // If a path is active, keep processing it
+            if let Some(child) = active_child {
+                state = Box::pin(process_sop_node_tick(
+                    sp_id, state, child, con, logging_tx, log_target,
+                ))
+                .await;
+            } else {
+                // If no path is active, find the first one that can start
+                if let Some(path_to_start) = sops
+                    .iter()
+                    .find(|child| can_sop_start(sp_id, child, &state, log_target))
+                {
+                    log::info!(target: log_target, "Found valid alternative path to start.");
+                    state = Box::pin(process_sop_node_tick(
+                        sp_id,
+                        state,
+                        path_to_start,
+                        con,
+                        logging_tx,
+                        log_target,
+                    ))
+                    .await;
+                }
+            }
+        }
     }
 
     state
 }
 
-// might not even need this for alternative because the processoperation hanfldless all the logic
-// fn can_sop_start(sp_id: &str, sop: &SOP, state: &State, log_target: &str) -> bool {
-//     match sop {
-//         SOP::Operation(operation) => {
-//             // We can reuse get_state here to check for Initial, but we MUST check eval manually
-//             let current_state = sop.get_state(&state, &log_target);
-//             current_state == SOPState::Initial && operation.eval(state, log_target)
-//         }
-//         SOP::Sequence(sops) => sops.first().map_or(false, |first| {
-//             can_sop_start(sp_id, first, state, log_target)
-//         }),
-//         SOP::Parallel(sops) => sops
-//             .iter()
-//             .all(|child| can_sop_start(sp_id, child, state, log_target)),
-//         SOP::Alternative(sops) => sops
-//             .iter()
-//             .any(|child| can_sop_start(sp_id, child, state, log_target)),
-//     }
-// }
+fn can_sop_start(sp_id: &str, sop: &SOP, state: &State, log_target: &str) -> bool {
+    match sop {
+        SOP::Operation(operation) => {
+            let current_state = sop.get_state(&state, &log_target);
+            current_state == SOPState::Initial && operation.eval(state, log_target)
+        }
+        SOP::Sequence(sops) => sops.first().map_or(false, |first| {
+            can_sop_start(sp_id, first, state, log_target)
+        }),
+        SOP::Parallel(sops) => sops
+            .iter()
+            .all(|child| can_sop_start(sp_id, child, state, log_target)),
+        SOP::Alternative(sops) => sops
+            .iter()
+            .any(|child| can_sop_start(sp_id, child, state, log_target)),
+    }
+}
 
 pub fn uniquify_sop_operations(sop: SOP) -> SOP {
     match sop {
