@@ -192,21 +192,21 @@ pub async fn goal_runner(
         };
 
         let current_goal_state = state.get_string_or_default_to_unknown(
-            &log_target,
             &format!("{}_current_goal_state", sp_id),
+            &log_target,
         );
 
         let mut goal_runner_information = state.get_string_or_default_to_unknown(
-            &log_target,
             &format!("{}_goal_runner_information", sp_id),
+            &log_target,
         );
 
         let plan_state =
-            state.get_string_or_default_to_unknown(&log_target, &format!("{}_plan_state", sp_id));
+            state.get_string_or_default_to_unknown(&format!("{}_plan_state", sp_id), &log_target);
 
         // Should be array of arrays Array(Goal1(array(id, prio, pred), Goal2(Array(id, prio, pred))))))
         let scheduled_goals_sp_val =
-            state.get_array_or_default_to_empty(&log_target, &format!("{}_scheduled_goals", sp_id));
+            state.get_array_or_default_to_empty(&format!("{}_scheduled_goals", sp_id), &log_target);
 
         let mut scheduled_goals = vec![];
         for goal_sp_val in scheduled_goals_sp_val {
