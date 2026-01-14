@@ -1,208 +1,318 @@
 use crate::*;
-use tokio::{
-    sync::{mpsc, oneshot},
-    time::{interval, Duration},
-};
+use serde::{Deserialize, Serialize};
+use std::{fmt, sync::Arc};
+use tokio::time::{Duration, interval};
+
+static TICK_INTERVAL: u64 = 500; // millis
+
+#[derive(Debug, PartialEq, Clone, Hash, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+pub enum GoalPriority {
+    High,
+    Normal,
+    Low,
+}
+
+#[derive(Debug, PartialEq, Clone, Hash, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+pub struct Goal {
+    pub id: String, // use nanoid(10)
+    pub priority: GoalPriority,
+    pub predicate: String,
+}
+
+pub fn goal_to_sp_value(goal: &Goal) -> SPValue {
+    let id_val = SPValue::String(StringOrUnknown::String(goal.id.clone()));
+    let priority_val = SPValue::Int64(IntOrUnknown::Int64(goal.priority.to_int()));
+    let predicate_val = SPValue::String(StringOrUnknown::String(goal.predicate.clone()));
+
+    SPValue::Array(ArrayOrUnknown::Array(vec![
+        id_val,
+        priority_val,
+        predicate_val,
+    ]))
+}
+
+pub fn sp_value_to_goal(sp_value: &SPValue) -> Result<Goal, String> {
+    let arr = match sp_value {
+        SPValue::Array(ArrayOrUnknown::Array(a)) => a,
+        SPValue::Array(ArrayOrUnknown::UNKNOWN) => return Err("Goal Array is UNKNOWN".to_string()),
+        _ => return Err(format!("Expected SPValue::Array, found {:?}", sp_value)),
+    };
+
+    if arr.len() != 3 {
+        return Err(format!("Goal array expected length 3, found {}", arr.len()));
+    }
+
+    let id = match &arr[0] {
+        SPValue::String(StringOrUnknown::String(s)) => s.clone(),
+        _ => return Err(format!("ID expected String, found {:?}", arr[0])),
+    };
+
+    let priority = match &arr[1] {
+        SPValue::Int64(IntOrUnknown::Int64(p)) => *p,
+        _ => return Err(format!("Priority expected Int64, found {:?}", arr[1])),
+    };
+
+    let predicate = match &arr[2] {
+        SPValue::String(StringOrUnknown::String(s)) => s.clone(),
+        _ => return Err(format!("Predicate expected String, found {:?}", arr[2])),
+    };
+
+    Ok(Goal {
+        id,
+        priority: GoalPriority::from_int(&priority),
+        predicate,
+    })
+}
+
+#[derive(Debug, PartialEq, Clone, Hash, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+pub enum GoalState {
+    // Empty,
+    Initial,
+    Executing,
+    // Paused,
+    Failed,
+    Cancelled,
+    Completed,
+    UNKNOWN,
+}
+
+impl GoalPriority {
+    pub fn from_int(x: &i64) -> GoalPriority {
+        match x {
+            1 => GoalPriority::High,
+            2 => GoalPriority::Normal,
+            3 => GoalPriority::Low,
+            _ => {
+                log::error!(target: &&format!("goal_priority"), 
+                    "Priority out of range [1, 2, 3], defaulting to low.");
+                GoalPriority::Low
+            }
+        }
+    }
+
+    pub fn to_int(&self) -> i64 {
+        match self {
+            GoalPriority::High => 1,
+            GoalPriority::Normal => 2,
+            GoalPriority::Low => 3,
+        }
+    }
+
+    pub fn from_str(x: &str) -> GoalPriority {
+        match x {
+            "high" => GoalPriority::High,
+            "normal" => GoalPriority::Normal,
+            "low" => GoalPriority::Low,
+            _ => {
+                log::error!(target: &&format!("goal_priority"), 
+                    "Unknown priority {}, defaulting to low.", x);
+                GoalPriority::Low
+            }
+        }
+    }
+}
+
+impl fmt::Display for GoalPriority {
+    fn fmt(&self, fmtr: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            GoalPriority::High => write!(fmtr, "high"),
+            GoalPriority::Normal => write!(fmtr, "normal"),
+            GoalPriority::Low => write!(fmtr, "low"),
+        }
+    }
+}
+
+impl GoalState {
+    pub fn from_str(x: &str) -> GoalState {
+        match x {
+            // "empty" => CurrentGoalState::Empty,
+            "initial" => GoalState::Initial,
+            "executing" => GoalState::Executing,
+            "failed" => GoalState::Failed,
+            // "paused" => CurrentGoalState::Paused,
+            "cancelled" => GoalState::Cancelled,
+            "completed" => GoalState::Completed,
+            "unknown" => GoalState::UNKNOWN,
+            _ => {
+                // log::error!(target: &&format!("goal_priority"),
+                //     "Unknown goal state {}, defaulting to empty.", x);
+                GoalState::UNKNOWN
+            }
+        }
+    }
+    pub fn to_spvalue(self) -> SPValue {
+        self.to_string().to_spvalue()
+    }
+}
+
+impl fmt::Display for GoalState {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            // GoalState::Empty => write!(f, "empty"),
+            GoalState::Initial => write!(f, "initial"),
+            GoalState::Executing => write!(f, "executing"),
+            GoalState::Cancelled => write!(f, "cancelled"),
+            // GoalState::Paused => write!(f, "paused"),
+            GoalState::Failed => write!(f, "failed"),
+            GoalState::Completed => write!(f, "completed"),
+            GoalState::UNKNOWN => write!(f, "unknown"),
+        }
+    }
+}
 
 pub async fn goal_runner(
     sp_id: &str,
-    _model: &Model,
-    command_sender: mpsc::Sender<StateManagement>,
+    connection_manager: &Arc<ConnectionManager>,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let mut interval = interval(Duration::from_millis(100));
+    initialize_env_logger();
+    let mut interval = interval(Duration::from_millis(TICK_INTERVAL));
+    let log_target = &format!("{}_goal_runner", sp_id);
+
+    log::info!(target: log_target, "Online.");
 
     // For nicer logging
-    let mut goal_runner_information_old = "".to_string();
-    // let mut current_goal_state_old = "".to_string();
+    let mut goal_info_old = String::new();
 
-    log::info!(target: &&format!("{}_goal_runner", sp_id), "Online.");
+    let keys: Vec<String> = vec![
+        format!("{}_current_goal_state", sp_id),
+        format!("{}_goal_runner_information", sp_id),
+        format!("{}_plan_state", sp_id),
+        format!("{}_scheduled_goals", sp_id),
+    ];
 
     loop {
-        let (response_tx, response_rx) = oneshot::channel();
-        command_sender
-            .send(StateManagement::GetState(response_tx))
-            .await?;
-        let state = response_rx.await?;
+        interval.tick().await;
+        if let Err(_) = connection_manager.check_redis_health(&log_target).await {
+            continue;
+        }
+        let mut con = connection_manager.get_connection().await;
+        let state = match StateManager::get_state_for_keys(&mut con, &keys, &log_target).await {
+            Some(s) => s,
+            None => continue,
+        };
 
-        let mut current_goal_state = state.get_string_or_default_to_unknown(
-            &format!("{}_goal_runner", sp_id),
+        let current_goal_state = state.get_string_or_default_to_unknown(
+            &log_target,
             &format!("{}_current_goal_state", sp_id),
         );
 
         let mut goal_runner_information = state.get_string_or_default_to_unknown(
-            &format!("{}_goal_runner", sp_id),
+            &log_target,
             &format!("{}_goal_runner_information", sp_id),
         );
 
-        let mut current_goal_id = state.get_string_or_default_to_unknown(
-            &format!("{}_goal_runner", sp_id),
-            &format!("{}_current_goal_id", sp_id),
-        );
+        let plan_state =
+            state.get_string_or_default_to_unknown(&log_target, &format!("{}_plan_state", sp_id));
 
-        let plan_state = state.get_string_or_default_to_unknown(
-            &format!("{}_goal_runner", sp_id),
-            &format!("{}_plan_state", sp_id),
-        );
+        // Should be array of arrays Array(Goal1(array(id, prio, pred), Goal2(Array(id, prio, pred))))))
+        let scheduled_goals_sp_val =
+            state.get_array_or_default_to_empty(&log_target, &format!("{}_scheduled_goals", sp_id));
 
-        let current_goal_predicate = state.get_string_or_default_to_unknown(
-            &format!("{}_goal_runner", sp_id),
-            &format!("{}_current_goal_predicate", sp_id),
-        );
-
-        let scheduled_goals = state.get_map_or_default_to_empty(
-            &format!("{}_goal_runner", sp_id),
-            &format!("{}_scheduled_goals", sp_id),
-        );
-
-        let mut rest_of_the_goals = scheduled_goals.clone();
-
-        if goal_runner_information_old != goal_runner_information {
-            log::info!(target: &format!("{}_goal_runner", sp_id), "{goal_runner_information}");
-            goal_runner_information_old = goal_runner_information.clone()
+        let mut scheduled_goals = vec![];
+        for goal_sp_val in scheduled_goals_sp_val {
+            match sp_value_to_goal(&goal_sp_val) {
+                Ok(goal) => scheduled_goals.push(goal),
+                Err(_) => (),
+            }
         }
 
-        match CurrentGoalState::from_str(&current_goal_state.to_string()) {
-            CurrentGoalState::Empty => {
-                goal_runner_information = "Current goal state is Empty.".to_string();
-                // Load the first goal from the schedule to be executed
-                // remove it from the schedule and move up the goals
-                match scheduled_goals.split_first() {
-                    Some((first, rest)) => {
-                        current_goal_id = first.0.to_string();
-                        rest_of_the_goals = rest.to_vec();
+        if goal_info_old != goal_runner_information {
+            log::info!(target: &format!("{}_goal_runner", sp_id), "{goal_runner_information}");
+            goal_info_old = goal_runner_information.clone()
+        }
+
+        let mut new_state = state.clone();
+
+        // Can't check if scheduled goals is empty because it can be and we still have one goal executing
+        match GoalState::from_str(&current_goal_state.to_string()) {
+            GoalState::Initial => {
+                if !scheduled_goals.is_empty() {
+                    match scheduled_goals.split_first() {
+                        Some((current, rest)) => {
+                            let rest_of_the_goals: Vec<SPValue> =
+                                rest.iter().map(|x| goal_to_sp_value(x)).collect();
+                            goal_runner_information =
+                                format!("Scheduling goal with id: {}", current.id);
+                            new_state = new_state
+                                .update(
+                                    &format!("{}_scheduled_goals", sp_id),
+                                    rest_of_the_goals.to_spvalue(),
+                                )
+                                .update(
+                                    &format!("{}_current_goal_id", sp_id),
+                                    current.id.to_string().to_spvalue(),
+                                )
+                                .update(
+                                    &format!("{}_current_goal_state", sp_id),
+                                    GoalState::Executing.to_string().to_spvalue(),
+                                )
+                                .update(
+                                    &format!("{}_current_goal_predicate", sp_id),
+                                    current.predicate.to_string().to_spvalue(),
+                                )
+                                .update(&format!("{}_replan_trigger", sp_id), true.to_spvalue())
+                                .update(&format!("{}_replanned", sp_id), false.to_spvalue())
+                                .update(&format!("{}_plan_current_step", sp_id), 0.to_spvalue())
+                        }
+                        None => log::error!(target: log_target, "This shouldn't happen."),
                     }
-                    None => (),
+                } else {
+                    goal_runner_information = "No goals scheduled, list is empty.".to_string();
                 }
-
-                // if let Some((first_goal_id, rest_of_the_goals)) = scheduled_goals.split_first() {
-                //     let current_goal_id = first_goal_id.0.to_string();
-
-                //     current_goal_state = CurrentGoalState::Initial.to_string();
-                // }
             }
-            CurrentGoalState::Initial => {
-                goal_runner_information = format!("Initializing goal: {current_goal_id}.");
-                let current_goal_state = CurrentGoalState::Executing;
 
-                let new_state = state
-                    .update(&format!("{}_replan_trigger", sp_id), true.to_spvalue())
-                    .update(&format!("{}_replanned", sp_id), false.to_spvalue())
-                    .update(&format!("{}_plan_current_step", sp_id), 0.to_spvalue())
+            GoalState::Executing => match PlanState::from_str(&plan_state) {
+                PlanState::Initial => todo!(),
+                PlanState::Executing => todo!(),
+                PlanState::Failed => {
+                    new_state = new_state.update(
+                        &format!("{}_current_goal_state", sp_id),
+                        GoalState::Failed.to_string().to_spvalue(),
+                    )
+                }
+                PlanState::Completed => {
+                    new_state = new_state.update(
+                        &format!("{}_current_goal_state", sp_id),
+                        GoalState::Completed.to_string().to_spvalue(),
+                    )
+                }
+                PlanState::Cancelled => {
+                    new_state = new_state.update(
+                        &format!("{}_current_goal_state", sp_id),
+                        GoalState::Cancelled.to_string().to_spvalue(),
+                    )
+                }
+                PlanState::UNKNOWN => {
+                    new_state = new_state.update(
+                        &format!("{}_current_goal_state", sp_id),
+                        GoalState::UNKNOWN.to_string().to_spvalue(),
+                    )
+                }
+            },
+            GoalState::Failed
+            | GoalState::Completed
+            | GoalState::Cancelled
+            | GoalState::UNKNOWN => {
+                new_state = new_state
+                    .update(
+                        &format!("{}_current_goal_id", sp_id),
+                        "".to_string().to_spvalue(),
+                    )
                     .update(
                         &format!("{}_current_goal_state", sp_id),
-                        current_goal_state.to_spvalue(),
-                    );
-
-                let modified_state = state.get_diff_partial_state(&new_state);
-                command_sender
-                    .send(StateManagement::SetPartialState(modified_state))
-                    .await?;
-            }
-            CurrentGoalState::Executing => {
-                goal_runner_information = format!("Executing goal: {current_goal_id}.");
-                match PlanState::from_str(&plan_state) {
-                    PlanState::Failed => {
-                        // For now we fail, but maybe later we can don something about this
-                        // Like change something so that the goal remains the same but we try to find
-                        // another plan that doesn't fail
-
-                        // TODO: store this goal in a failed goals archive and continue with the schedule
-
-                        current_goal_state = CurrentGoalState::Failed.to_string();
-
-                        // let new_state = state.update(
-                        //     &format!("{}_current_goal_state", sp_id),
-                        //     current_goal_state.to_spvalue(),
-                        // );
-
-                        // let modified_state = state.get_diff_partial_state(&new_state);
-                        // command_sender
-                        //     .send(StateManagement::SetPartialState(modified_state))
-                        //     .await?;
-                    }
-                    // PlanState::NotFound => {
-                    //     // For now we fail, but maybe later we can don something about this
-                    //     // Like change something so that the goal remains the same but we try to find
-                    //     // another plan that doesn't fail
-
-                    //     // TODO: store this goal in a failed goals ARCHIVE and continue with the schedule
-                    //     // Also mention the reason, log time, etc. Maybe operator can do this instead.
-
-                    //     current_goal_state = CurrentGoalState::Failed.to_string();
-
-                    //     // let new_state = state.update(
-                    //     //     &format!("{}_current_goal_state", sp_id),
-                    //     //     current_goal_state.to_spvalue(),
-                    //     // );
-
-                    //     // let modified_state = state.get_diff_partial_state(&new_state);
-                    //     // command_sender
-                    //     //     .send(StateManagement::SetPartialState(modified_state))
-                    //     //     .await?;
-                    // }
-                    PlanState::Completed => {
-                        current_goal_state = CurrentGoalState::Completed.to_string();
-
-                        // let new_state = state.update(
-                        //     &format!("{}_current_goal_state", sp_id),
-                        //     current_goal_state.to_spvalue(),
-                        // );
-
-                        // let modified_state = state.get_diff_partial_state(&new_state);
-                        // command_sender
-                        //     .send(StateManagement::SetPartialState(modified_state))
-                        //     .await?;
-                    }
-                    _ => (),
-                }
-            }
-            CurrentGoalState::Paused => {
-                goal_runner_information = "The goal runner is paused.".to_string();
-            }
-            CurrentGoalState::Failed => {
-                goal_runner_information = format!("Goal failed: {current_goal_id}.");
-                // Remove from the list and move on to the next one in the queue.
-                // Maybe safe the goal in the pile of failed/cancelled/notfound goals
-            }
-            CurrentGoalState::Cancelled => {
-                goal_runner_information = format!("Goal cancelled: {current_goal_id}.");
-                // Remove from the list and move on to the next one in the queue.
-                // Maybe safe the goal in the pile of failed/cancelled/notfound goals
-            }
-            CurrentGoalState::Completed => {
-                goal_runner_information = format!("Goal completed: {current_goal_id}.");
-                // Remove from the list and move on to the next one in the queue.
-                // Log success
+                        GoalState::Initial.to_string().to_spvalue(),
+                    )
+                    .update(
+                        &format!("{}_current_goal_predicate", sp_id),
+                        "".to_string().to_spvalue(),
+                    )
             }
         }
-
-        let new_state = state
-            .update(
-                &format!("{}_goal_runner_information", sp_id),
-                goal_runner_information.to_spvalue(),
-            )
-            .update(
-                &format!("{}_current_goal_id", sp_id),
-                current_goal_id.to_spvalue(),
-            )
-            .update(
-                &format!("{}_current_goal_predicate", sp_id),
-                current_goal_predicate.to_spvalue(),
-            )
-            .update(
-                &format!("{}_current_goal_state", sp_id),
-                current_goal_state.to_spvalue(),
-            )
-            .update(
-                &format!("{}_scheduled_goals", sp_id),
-                SPValue::Map(MapOrUnknown::Map(rest_of_the_goals.to_vec())),
-            );
-
+        new_state = new_state.update(
+            &format!("{}_goal_runner_information", sp_id),
+            goal_runner_information.to_string().to_spvalue(),
+        );
         let modified_state = state.get_diff_partial_state(&new_state);
-        command_sender
-            .send(StateManagement::SetPartialState(modified_state))
-            .await?;
-
-        interval.tick().await;
+        StateManager::set_state(&mut con, &modified_state).await;
     }
 }
