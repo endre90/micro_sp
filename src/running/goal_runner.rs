@@ -255,7 +255,6 @@ pub async fn goal_runner(
 
         let mut new_state = state.clone();
 
-        // Can't check if scheduled goals is empty because it can be and we still have one goal executing
         match GoalState::from_str(&current_goal_state.to_string()) {
             GoalState::Initial => {
                 if !scheduled_goals.is_empty() {
