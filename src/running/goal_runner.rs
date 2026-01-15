@@ -191,10 +191,11 @@ pub async fn goal_runner(
         format!("{}_current_goal_id", sp_id),
         format!("{}_current_goal_predicate", sp_id),
         format!("{}_goal_runner_information", sp_id),
+        format!("{}_planner_state", sp_id),
         format!("{}_plan_state", sp_id),
+        format!("{}_plan", sp_id),
         format!("{}_scheduled_goals", sp_id),
         format!("{}_replan_trigger", sp_id),
-        format!("{}_replanned", sp_id),
         format!("{}_replanned", sp_id),
         format!("{}_plan_current_step", sp_id),
     ];
@@ -220,8 +221,20 @@ pub async fn goal_runner(
             &log_target,
         );
 
-        let plan_state =
+        let mut plan_state =
             state.get_string_or_default_to_unknown(&format!("{}_plan_state", sp_id), &log_target);
+
+        let mut planner_state =
+            state.get_string_or_default_to_unknown(&format!("{}_planner_state", sp_id), &log_target);
+
+        let plan_of_sp_values =
+            state.get_array_or_default_to_empty(&format!("{}_plan", sp_id), &log_target);
+
+        let mut plan: Vec<String> = plan_of_sp_values
+            .iter()
+            .filter(|val| val.is_string())
+            .map(|y| y.to_string())
+            .collect();
 
         // Should be array of arrays Array(Goal1(array(id, prio, pred), Goal2(Array(id, prio, pred))))))
         let scheduled_goals_sp_val =
@@ -263,10 +276,10 @@ pub async fn goal_runner(
                                     &format!("{}_current_goal_id", sp_id),
                                     current.id.to_string().to_spvalue(),
                                 )
-                                // .update(
-                                //     &format!("{}_current_goal_state", sp_id),
-                                //     GoalState::Executing.to_string().to_spvalue(),
-                                // )
+                                .update(
+                                    &format!("{}_current_goal_state", sp_id),
+                                    GoalState::Executing.to_string().to_spvalue(),
+                                )
                                 .update(
                                     &format!("{}_current_goal_predicate", sp_id),
                                     current.predicate.to_string().to_spvalue(),
@@ -274,6 +287,12 @@ pub async fn goal_runner(
                                 .update(&format!("{}_replan_trigger", sp_id), true.to_spvalue())
                                 .update(&format!("{}_replanned", sp_id), false.to_spvalue())
                                 .update(&format!("{}_plan_current_step", sp_id), 0.to_spvalue())
+                                .update(
+                                    &format!("{}_plan", sp_id),
+                                    Vec::<String>::new().to_spvalue(),
+                                )
+                                .update(&format!("{}_plan_state", sp_id), "initial".to_spvalue())
+                                .update(&format!("{}_planner_state", sp_id), "ready".to_spvalue())
                         }
                         None => log::error!(target: log_target, "This shouldn't happen."),
                     }
@@ -290,6 +309,7 @@ pub async fn goal_runner(
             | GoalState::Cancelled
             | GoalState::UNKNOWN => {
                 goal_runner_information = "Goal is terminated.".to_string();
+
                 new_state = new_state
                     .update(
                         &format!("{}_current_goal_id", sp_id),

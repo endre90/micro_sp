@@ -110,7 +110,7 @@ async fn process_plan_tick(
             }
         }
         PlanState::Executing => {
-            goal_state = GoalState::Executing.to_string();
+            // goal_state = GoalState::Executing.to_string();
             if let Some(op_name) = plan.get(plan_current_step as usize) {
                 match model.operations.iter().find(|op| op.name == *op_name) {
                     Some(operation) => {
@@ -136,38 +136,40 @@ async fn process_plan_tick(
                 plan_state_str = PlanState::Completed.to_string();
             }
         }
+        // _ => (),
         // TODO: Later, a goal might not be failed only if a plan fails, we can replan towards the same goal...
         PlanState::Failed => {
             goal_state = GoalState::Failed.to_string();
-            plan_current_step = 0;
+            // plan_current_step = 0;
             new_state = reset_all_operations(&new_state, &model);
-            plan = vec![];
-            plan_state_str = PlanState::Initial.to_string();
-            planner_state = PlannerState::Ready.to_string();
+            // plan = vec![];
+            // // Maybe move these to the goal runner
+            // plan_state_str = PlanState::Initial.to_string();
+            // planner_state = PlannerState::Ready.to_string();
         }
         PlanState::Completed => {
             goal_state = GoalState::Completed.to_string();
-            plan_current_step = 0;
+            // plan_current_step = 0;
             new_state = reset_all_operations(&new_state, &model);
-            plan = vec![];
-            plan_state_str = PlanState::Initial.to_string();
-            planner_state = PlannerState::Ready.to_string();
+            // plan = vec![];
+            // plan_state_str = PlanState::Initial.to_string();
+            // planner_state = PlannerState::Ready.to_string();
         },
         PlanState::Cancelled => {
             goal_state = GoalState::Cancelled.to_string();
-            plan_current_step = 0;
+            // plan_current_step = 0;
             new_state = reset_all_operations(&new_state, &model);
-            plan = vec![];
-            plan_state_str = PlanState::Initial.to_string();
-            planner_state = PlannerState::Ready.to_string();
+            // plan = vec![];
+            // plan_state_str = PlanState::Initial.to_string();
+            // planner_state = PlannerState::Ready.to_string();
         },
         PlanState::UNKNOWN => {
             goal_state = GoalState::UNKNOWN.to_string();
-            plan_current_step = 0;
+            // plan_current_step = 0;
             new_state = reset_all_operations(&new_state, &model);
-            plan = vec![];
-            plan_state_str = PlanState::Initial.to_string();
-            planner_state = PlannerState::Ready.to_string();
+            // plan = vec![];
+            // plan_state_str = PlanState::Initial.to_string();
+            // planner_state = PlannerState::Ready.to_string();
         },
     }
 
