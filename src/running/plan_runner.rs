@@ -32,6 +32,7 @@ pub async fn planned_operation_runner(
         format!("{}_planner_state", sp_id),
         format!("{}_plan_state", sp_id),
         format!("{}_plan_current_step", sp_id),
+        format!("{}_current_goal_state", sp_id),
         format!("{}_plan", sp_id),
         format!("{}_dashboard_command", sp_id),
     ]);
