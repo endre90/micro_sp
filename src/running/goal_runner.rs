@@ -281,43 +281,42 @@ pub async fn goal_runner(
             }
 
             GoalState::Executing => match PlanState::from_str(&plan_state) {
-                PlanState::Initial | PlanState::Executing => (),
-                _ => {
+                PlanState::Initial => {goal_runner_information = "Goal is executing, plan is initial.".to_string();},
+                PlanState::Executing => {goal_runner_information = "Goal is executing, plan is executing.".to_string();},
+                PlanState::Failed => {
+                    goal_runner_information = "Goal is executing, plan is failed.".to_string();
                     new_state = new_state.update(
                         &format!("{}_current_goal_state", sp_id),
-                        GoalState::Initial.to_string().to_spvalue(),
+                        GoalState::Failed.to_string().to_spvalue(),
                     )
                 }
-                // PlanState::Executing => (),
-                // PlanState::Failed => {
-                //     new_state = new_state.update(
-                //         &format!("{}_current_goal_state", sp_id),
-                //         GoalState::Failed.to_string().to_spvalue(),
-                //     )
-                // }
-                // PlanState::Completed => {
-                //     new_state = new_state.update(
-                //         &format!("{}_current_goal_state", sp_id),
-                //         GoalState::Completed.to_string().to_spvalue(),
-                //     )
-                // }
-                // PlanState::Cancelled => {
-                //     new_state = new_state.update(
-                //         &format!("{}_current_goal_state", sp_id),
-                //         GoalState::Cancelled.to_string().to_spvalue(),
-                //     )
-                // }
-                // PlanState::UNKNOWN => {
-                //     new_state = new_state.update(
-                //         &format!("{}_current_goal_state", sp_id),
-                //         GoalState::UNKNOWN.to_string().to_spvalue(),
-                //     )
-                // }
+                PlanState::Completed => {
+                    goal_runner_information = "Goal is executing, plan is completed.".to_string();
+                    new_state = new_state.update(
+                        &format!("{}_current_goal_state", sp_id),
+                        GoalState::Completed.to_string().to_spvalue(),
+                    )
+                }
+                PlanState::Cancelled => {
+                    goal_runner_information = "Goal is executing, plan is cancelled.".to_string();
+                    new_state = new_state.update(
+                        &format!("{}_current_goal_state", sp_id),
+                        GoalState::Cancelled.to_string().to_spvalue(),
+                    )
+                }
+                PlanState::UNKNOWN => {
+                    goal_runner_information = "Goal is executing, plan is unknown.".to_string();
+                    new_state = new_state.update(
+                        &format!("{}_current_goal_state", sp_id),
+                        GoalState::UNKNOWN.to_string().to_spvalue(),
+                    )
+                }
             },
             GoalState::Failed
             | GoalState::Completed
             | GoalState::Cancelled
             | GoalState::UNKNOWN => {
+                goal_runner_information = "Goal is terminated.".to_string();
                 new_state = new_state
                     .update(
                         &format!("{}_current_goal_id", sp_id),
