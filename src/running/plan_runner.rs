@@ -86,7 +86,7 @@ async fn process_plan_tick(
         state.get_string_or_default_to_unknown(&format!("{}_planner_state", sp_id), &log_target);
 
     let mut goal_state =
-        state.get_string_or_default_to_unknown(&format!("{}_goal_state", sp_id), &log_target);
+        state.get_string_or_default_to_unknown(&format!("{}_current_goal_state", sp_id), &log_target);
 
     let mut plan_state_str =
         state.get_string_or_default_to_unknown(&format!("{}_plan_state", sp_id), &log_target);
@@ -189,7 +189,7 @@ async fn process_plan_tick(
             &format!("{}_planner_state", sp_id),
             planner_state.to_spvalue(),
         ).update(
-            &format!("{}_goal_state", sp_id),
+            &format!("{}_current_goal_state", sp_id),
             goal_state.to_spvalue(),
         )
         .update(
