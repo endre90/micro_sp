@@ -31,6 +31,19 @@ pub fn goal_to_sp_value(goal: &Goal) -> SPValue {
     ]))
 }
 
+pub fn goal_predicate_to_sp_value(goal: &String, priority: GoalPriority) -> SPValue {
+    let unique_id = nanoid::nanoid!(10, &NANOID_ALPHABET); // 64^10 unique ids
+    let id_val = SPValue::String(StringOrUnknown::String(unique_id));
+    let priority_val = SPValue::Int64(IntOrUnknown::Int64(priority.to_int()));
+    let predicate_val = SPValue::String(StringOrUnknown::String(goal.clone()));
+
+    SPValue::Array(ArrayOrUnknown::Array(vec![
+        id_val,
+        priority_val,
+        predicate_val,
+    ]))
+}
+
 pub fn sp_value_to_goal(sp_value: &SPValue) -> Result<Goal, String> {
     let arr = match sp_value {
         SPValue::Array(ArrayOrUnknown::Array(a)) => a,
