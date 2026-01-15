@@ -281,8 +281,8 @@ pub async fn goal_runner(
             }
 
             GoalState::Executing => match PlanState::from_str(&plan_state) {
-                PlanState::Initial => todo!(),
-                PlanState::Executing => todo!(),
+                PlanState::Initial => (),
+                PlanState::Executing => (),
                 PlanState::Failed => {
                     new_state = new_state.update(
                         &format!("{}_current_goal_state", sp_id),
