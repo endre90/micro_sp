@@ -250,8 +250,10 @@ pub async fn goal_runner(
                         Some((current, rest)) => {
                             let rest_of_the_goals: Vec<SPValue> =
                                 rest.iter().map(|x| goal_to_sp_value(x)).collect();
-                            goal_runner_information =
-                                format!("Got new goal '{}' with id: '{}'.", current.predicate, current.id);
+                            goal_runner_information = format!(
+                                "Got new goal '{}' with id: '{}'.",
+                                current.predicate, current.id
+                            );
                             new_state = new_state
                                 .update(
                                     &format!("{}_scheduled_goals", sp_id),
@@ -261,10 +263,10 @@ pub async fn goal_runner(
                                     &format!("{}_current_goal_id", sp_id),
                                     current.id.to_string().to_spvalue(),
                                 )
-                                .update(
-                                    &format!("{}_current_goal_state", sp_id),
-                                    GoalState::Executing.to_string().to_spvalue(),
-                                )
+                                // .update(
+                                //     &format!("{}_current_goal_state", sp_id),
+                                //     GoalState::Executing.to_string().to_spvalue(),
+                                // )
                                 .update(
                                     &format!("{}_current_goal_predicate", sp_id),
                                     current.predicate.to_string().to_spvalue(),
@@ -280,38 +282,9 @@ pub async fn goal_runner(
                 }
             }
 
-            GoalState::Executing => match PlanState::from_str(&plan_state) {
-                PlanState::Initial => {goal_runner_information = "Goal is executing, plan is initial.".to_string();},
-                PlanState::Executing => {goal_runner_information = "Goal is executing, plan is executing.".to_string();},
-                PlanState::Failed => {
-                    goal_runner_information = "Goal is executing, plan is failed.".to_string();
-                    new_state = new_state.update(
-                        &format!("{}_current_goal_state", sp_id),
-                        GoalState::Failed.to_string().to_spvalue(),
-                    )
-                }
-                PlanState::Completed => {
-                    goal_runner_information = "Goal is executing, plan is completed.".to_string();
-                    new_state = new_state.update(
-                        &format!("{}_current_goal_state", sp_id),
-                        GoalState::Completed.to_string().to_spvalue(),
-                    )
-                }
-                PlanState::Cancelled => {
-                    goal_runner_information = "Goal is executing, plan is cancelled.".to_string();
-                    new_state = new_state.update(
-                        &format!("{}_current_goal_state", sp_id),
-                        GoalState::Cancelled.to_string().to_spvalue(),
-                    )
-                }
-                PlanState::UNKNOWN => {
-                    goal_runner_information = "Goal is executing, plan is unknown.".to_string();
-                    new_state = new_state.update(
-                        &format!("{}_current_goal_state", sp_id),
-                        GoalState::UNKNOWN.to_string().to_spvalue(),
-                    )
-                }
-            },
+            GoalState::Executing => {
+                goal_runner_information = "Goal is executing.".to_string();
+            }
             GoalState::Failed
             | GoalState::Completed
             | GoalState::Cancelled

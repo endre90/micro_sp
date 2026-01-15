@@ -1,4 +1,7 @@
-use crate::{running::process_operation::OperationProcessingType, *};
+use crate::{
+    running::{goal_runner::GoalState, process_operation::OperationProcessingType},
+    *,
+};
 use std::sync::Arc;
 use tokio::{
     sync::mpsc,
@@ -82,6 +85,9 @@ async fn process_plan_tick(
     let mut planner_state =
         state.get_string_or_default_to_unknown(&format!("{}_planner_state", sp_id), &log_target);
 
+    let mut goal_state =
+        state.get_string_or_default_to_unknown(&format!("{}_goal_state", sp_id), &log_target);
+
     let mut plan_state_str =
         state.get_string_or_default_to_unknown(&format!("{}_plan_state", sp_id), &log_target);
     let mut plan_current_step =
@@ -102,8 +108,8 @@ async fn process_plan_tick(
                 plan_current_step = 0;
             }
         }
-
         PlanState::Executing => {
+            goal_state = GoalState::Executing.to_string();
             if let Some(op_name) = plan.get(plan_current_step as usize) {
                 match model.operations.iter().find(|op| op.name == *op_name) {
                     Some(operation) => {
@@ -114,7 +120,7 @@ async fn process_plan_tick(
                             OperationProcessingType::Planned,
                             Some(&mut plan_current_step),
                             Some(&mut plan_state_str),
-                            // None, 
+                            // None,
                             logging_tx,
                             log_target,
                         )
@@ -129,16 +135,49 @@ async fn process_plan_tick(
                 plan_state_str = PlanState::Completed.to_string();
             }
         }
-
-        // add plan logging here as well and regular logging to track when what happened
-        PlanState::Failed | PlanState::Completed | PlanState::Cancelled | PlanState::UNKNOWN => {
+        // TODO: Later, a goal might not be failed only if a plan fails, we can replan towards the same goal...
+        PlanState::Failed => {
+            goal_state = GoalState::Failed.to_string();
             plan_current_step = 0;
             new_state = reset_all_operations(&new_state, &model);
             plan = vec![];
             plan_state_str = PlanState::Initial.to_string();
             planner_state = PlannerState::Ready.to_string();
         }
+        PlanState::Completed => {
+            goal_state = GoalState::Completed.to_string();
+            plan_current_step = 0;
+            new_state = reset_all_operations(&new_state, &model);
+            plan = vec![];
+            plan_state_str = PlanState::Initial.to_string();
+            planner_state = PlannerState::Ready.to_string();
+        },
+        PlanState::Cancelled => {
+            goal_state = GoalState::Cancelled.to_string();
+            plan_current_step = 0;
+            new_state = reset_all_operations(&new_state, &model);
+            plan = vec![];
+            plan_state_str = PlanState::Initial.to_string();
+            planner_state = PlannerState::Ready.to_string();
+        },
+        PlanState::UNKNOWN => {
+            goal_state = GoalState::UNKNOWN.to_string();
+            plan_current_step = 0;
+            new_state = reset_all_operations(&new_state, &model);
+            plan = vec![];
+            plan_state_str = PlanState::Initial.to_string();
+            planner_state = PlannerState::Ready.to_string();
+        },
     }
+
+    // add plan logging here as well and regular logging to track when what happened
+    // PlanState::Failed | PlanState::Completed | PlanState::Cancelled | PlanState::UNKNOWN => {
+    //     plan_current_step = 0;
+    //     new_state = reset_all_operations(&new_state, &model);
+    //     plan = vec![];
+    //     plan_state_str = PlanState::Initial.to_string();
+    //     planner_state = PlannerState::Ready.to_string();
+    // }
 
     new_state = new_state
         .update(
@@ -149,6 +188,9 @@ async fn process_plan_tick(
         .update(
             &format!("{}_planner_state", sp_id),
             planner_state.to_spvalue(),
+        ).update(
+            &format!("{}_goal_state", sp_id),
+            goal_state.to_spvalue(),
         )
         .update(
             &format!("{}_plan_current_step", sp_id),
