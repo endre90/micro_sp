@@ -32,7 +32,7 @@ pub fn generate_runner_state_variables(name: &str) -> State {
     let replan_fail_counter = iv!(&&format!("{}_replan_fail_counter", name)); // How many times has the planner failed in
     let replan_trigger = bv!(&&format!("{}_replan_trigger", name)); // boolean for tracking the planner triggering
     let incoming_goals = mv!(&&format!("{}_incoming_goals", name));
-    let scheduled_goals = mv!(&&format!("{}_scheduled_goals", name));
+    let scheduled_goals = av!(&&format!("{}_scheduled_goals", name));
     let sop_enabled = bv!(&&format!("{}_sop_enabled", name));
     // let sop_request_state = v!(&&format!("{}_sop_request_state", name));
     let sop_current_step = iv!(&&format!("{}_sop_current_step", name));
