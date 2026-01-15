@@ -195,7 +195,7 @@ pub fn generate_runner_state_variables(name: &str) -> State {
     state = state.add(assign!(incoming_goals, SPValue::Map(MapOrUnknown::UNKNOWN)));
     state = state.add(assign!(
         scheduled_goals,
-        SPValue::Map(MapOrUnknown::UNKNOWN)
+        SPValue::Array(ArrayOrUnknown::UNKNOWN)
     ));
     state = state.add(assign!(sop_id, SPValue::String(StringOrUnknown::UNKNOWN)));
     state = state.add(assign!(
