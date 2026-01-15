@@ -251,7 +251,7 @@ pub async fn goal_runner(
                             let rest_of_the_goals: Vec<SPValue> =
                                 rest.iter().map(|x| goal_to_sp_value(x)).collect();
                             goal_runner_information =
-                                format!("Scheduling goal with id: {}", current.id);
+                                format!("Got new goal '{}' with id: '{}'.", current.predicate, current.id);
                             new_state = new_state
                                 .update(
                                     &format!("{}_scheduled_goals", sp_id),
@@ -281,32 +281,38 @@ pub async fn goal_runner(
             }
 
             GoalState::Executing => match PlanState::from_str(&plan_state) {
-                PlanState::Initial => (),
-                PlanState::Executing => (),
-                PlanState::Failed => {
+                PlanState::Initial | PlanState::Executing => (),
+                _ => {
                     new_state = new_state.update(
                         &format!("{}_current_goal_state", sp_id),
-                        GoalState::Failed.to_string().to_spvalue(),
+                        GoalState::Initial.to_string().to_spvalue(),
                     )
                 }
-                PlanState::Completed => {
-                    new_state = new_state.update(
-                        &format!("{}_current_goal_state", sp_id),
-                        GoalState::Completed.to_string().to_spvalue(),
-                    )
-                }
-                PlanState::Cancelled => {
-                    new_state = new_state.update(
-                        &format!("{}_current_goal_state", sp_id),
-                        GoalState::Cancelled.to_string().to_spvalue(),
-                    )
-                }
-                PlanState::UNKNOWN => {
-                    new_state = new_state.update(
-                        &format!("{}_current_goal_state", sp_id),
-                        GoalState::UNKNOWN.to_string().to_spvalue(),
-                    )
-                }
+                // PlanState::Executing => (),
+                // PlanState::Failed => {
+                //     new_state = new_state.update(
+                //         &format!("{}_current_goal_state", sp_id),
+                //         GoalState::Failed.to_string().to_spvalue(),
+                //     )
+                // }
+                // PlanState::Completed => {
+                //     new_state = new_state.update(
+                //         &format!("{}_current_goal_state", sp_id),
+                //         GoalState::Completed.to_string().to_spvalue(),
+                //     )
+                // }
+                // PlanState::Cancelled => {
+                //     new_state = new_state.update(
+                //         &format!("{}_current_goal_state", sp_id),
+                //         GoalState::Cancelled.to_string().to_spvalue(),
+                //     )
+                // }
+                // PlanState::UNKNOWN => {
+                //     new_state = new_state.update(
+                //         &format!("{}_current_goal_state", sp_id),
+                //         GoalState::UNKNOWN.to_string().to_spvalue(),
+                //     )
+                // }
             },
             GoalState::Failed
             | GoalState::Completed
