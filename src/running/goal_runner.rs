@@ -221,20 +221,20 @@ pub async fn goal_runner(
             &log_target,
         );
 
-        let mut plan_state =
-            state.get_string_or_default_to_unknown(&format!("{}_plan_state", sp_id), &log_target);
+        // let mut plan_state =
+            // state.get_string_or_default_to_unknown(&format!("{}_plan_state", sp_id), &log_target);
 
-        let mut planner_state =
-            state.get_string_or_default_to_unknown(&format!("{}_planner_state", sp_id), &log_target);
+        // let mut planner_state =
+            // state.get_string_or_default_to_unknown(&format!("{}_planner_state", sp_id), &log_target);
 
-        let plan_of_sp_values =
-            state.get_array_or_default_to_empty(&format!("{}_plan", sp_id), &log_target);
+        // let plan_of_sp_values =
+            // state.get_array_or_default_to_empty(&format!("{}_plan", sp_id), &log_target);
 
-        let mut plan: Vec<String> = plan_of_sp_values
-            .iter()
-            .filter(|val| val.is_string())
-            .map(|y| y.to_string())
-            .collect();
+        // let mut plan: Vec<String> = plan_of_sp_values
+        //     .iter()
+        //     .filter(|val| val.is_string())
+        //     .map(|y| y.to_string())
+        //     .collect();
 
         // Should be array of arrays Array(Goal1(array(id, prio, pred), Goal2(Array(id, prio, pred))))))
         let scheduled_goals_sp_val =
@@ -309,20 +309,19 @@ pub async fn goal_runner(
             | GoalState::Cancelled
             | GoalState::UNKNOWN => {
                 goal_runner_information = "Goal is terminated.".to_string();
-
                 new_state = new_state
-                    .update(
-                        &format!("{}_current_goal_id", sp_id),
-                        "".to_string().to_spvalue(),
-                    )
+                    // .update(
+                    //     &format!("{}_current_goal_id", sp_id),
+                    //     "".to_string().to_spvalue(),
+                    // )
                     .update(
                         &format!("{}_current_goal_state", sp_id),
                         GoalState::Initial.to_string().to_spvalue(),
                     )
-                    .update(
-                        &format!("{}_current_goal_predicate", sp_id),
-                        "".to_string().to_spvalue(),
-                    )
+                    // .update(
+                        // &format!("{}_current_goal_predicate", sp_id),
+                        // "".to_string().to_spvalue(),
+                    // )
             }
         }
         new_state = new_state.update(

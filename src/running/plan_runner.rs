@@ -139,7 +139,7 @@ async fn process_plan_tick(
         // _ => (),
         // TODO: Later, a goal might not be failed only if a plan fails, we can replan towards the same goal...
         PlanState::Failed => {
-            goal_state = GoalState::Failed.to_string();
+            // goal_state = GoalState::Failed.to_string();
             // plan_current_step = 0;
             new_state = reset_all_operations(&new_state, &model);
             // plan = vec![];
@@ -148,7 +148,7 @@ async fn process_plan_tick(
             // planner_state = PlannerState::Ready.to_string();
         }
         PlanState::Completed => {
-            goal_state = GoalState::Completed.to_string();
+            // goal_state = GoalState::Completed.to_string();
             // plan_current_step = 0;
             new_state = reset_all_operations(&new_state, &model);
             // plan = vec![];
@@ -156,7 +156,7 @@ async fn process_plan_tick(
             // planner_state = PlannerState::Ready.to_string();
         },
         PlanState::Cancelled => {
-            goal_state = GoalState::Cancelled.to_string();
+            // goal_state = GoalState::Cancelled.to_string();
             // plan_current_step = 0;
             new_state = reset_all_operations(&new_state, &model);
             // plan = vec![];
@@ -164,7 +164,7 @@ async fn process_plan_tick(
             // planner_state = PlannerState::Ready.to_string();
         },
         PlanState::UNKNOWN => {
-            goal_state = GoalState::UNKNOWN.to_string();
+            // goal_state = GoalState::UNKNOWN.to_string();
             // plan_current_step = 0;
             new_state = reset_all_operations(&new_state, &model);
             // plan = vec![];
