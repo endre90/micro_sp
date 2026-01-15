@@ -175,8 +175,13 @@ pub async fn goal_runner(
 
     let keys: Vec<String> = vec![
         format!("{}_current_goal_state", sp_id),
+        format!("{}_current_goal_id", sp_id),
+        format!("{}_current_goal_predicate", sp_id),
         format!("{}_goal_runner_information", sp_id),
         format!("{}_plan_state", sp_id),
+        format!("{}_scheduled_goals", sp_id),
+        format!("{}_replan_trigger", sp_id),
+        format!("{}_replanned", sp_id),
         format!("{}_scheduled_goals", sp_id),
     ];
 
