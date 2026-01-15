@@ -221,8 +221,8 @@ pub async fn goal_runner(
             &log_target,
         );
 
-        // let mut plan_state =
-            // state.get_string_or_default_to_unknown(&format!("{}_plan_state", sp_id), &log_target);
+        let plan_state =
+            state.get_string_or_default_to_unknown(&format!("{}_plan_state", sp_id), &log_target);
 
         // let mut planner_state =
             // state.get_string_or_default_to_unknown(&format!("{}_planner_state", sp_id), &log_target);
@@ -303,6 +303,38 @@ pub async fn goal_runner(
 
             GoalState::Executing => {
                 goal_runner_information = "Goal is executing.".to_string();
+            match PlanState::from_str(&plan_state) {
+                PlanState::Initial => (),
+                PlanState::Executing => (),
+                PlanState::Failed => {
+                    new_state = new_state
+                    .update(
+                        &format!("{}_current_goal_state", sp_id),
+                        GoalState::Failed.to_string().to_spvalue(),
+                    )
+                },
+                PlanState::Completed => {
+                    new_state = new_state
+                    .update(
+                        &format!("{}_current_goal_state", sp_id),
+                        GoalState::Completed.to_string().to_spvalue(),
+                    )
+                },
+                PlanState::Cancelled => {
+                    new_state = new_state
+                    .update(
+                        &format!("{}_current_goal_state", sp_id),
+                        GoalState::Cancelled.to_string().to_spvalue(),
+                    )
+                },
+                PlanState::UNKNOWN => {
+                    new_state = new_state
+                    .update(
+                        &format!("{}_current_goal_state", sp_id),
+                        GoalState::UNKNOWN.to_string().to_spvalue(),
+                    )
+                },
+            }
             }
             GoalState::Failed
             | GoalState::Completed

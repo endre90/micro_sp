@@ -1,5 +1,5 @@
 use crate::{
-    running::{goal_runner::GoalState, process_operation::OperationProcessingType},
+    running::process_operation::OperationProcessingType,
     *,
 };
 use std::sync::Arc;
@@ -83,10 +83,10 @@ async fn process_plan_tick(
     log_target: &str,
 ) -> State {
     let mut new_state = state.clone();
-    let mut planner_state =
+    let planner_state =
         state.get_string_or_default_to_unknown(&format!("{}_planner_state", sp_id), &log_target);
 
-    let mut goal_state =
+    let goal_state =
         state.get_string_or_default_to_unknown(&format!("{}_current_goal_state", sp_id), &log_target);
 
     let mut plan_state_str =
@@ -96,7 +96,7 @@ async fn process_plan_tick(
     let plan_of_sp_values =
         state.get_array_or_default_to_empty(&format!("{}_plan", sp_id), &log_target);
 
-    let mut plan: Vec<String> = plan_of_sp_values
+    let plan: Vec<String> = plan_of_sp_values
         .iter()
         .filter(|val| val.is_string())
         .map(|y| y.to_string())
