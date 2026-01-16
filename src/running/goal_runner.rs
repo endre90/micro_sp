@@ -264,7 +264,7 @@ pub async fn goal_runner(
                             let rest_of_the_goals: Vec<SPValue> =
                                 rest.iter().map(|x| goal_to_sp_value(x)).collect();
                             goal_runner_information = format!(
-                                "Initializing goal {}: \n       {}",
+                                "Initializing new goal {}: \n       {}",
                                 current.id, current.predicate
                             );
                             new_state = new_state

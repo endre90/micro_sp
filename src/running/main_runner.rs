@@ -1,12 +1,17 @@
 use tokio::sync::mpsc;
 
-use crate::{running::goal_runner::goal_runner, transforms::interface::tf_interface, *};
+use crate::{
+    running::goal_runner::goal_runner,
+    transforms::interface::tf_interface,
+    *,
+};
 use std::sync::Arc;
 
 // Run everything and provide a model
 pub async fn main_runner(
     sp_id: &String,
     model: Model,
+    goal_runner_enabled: bool,
     connection_manager: &Arc<ConnectionManager>,
 ) {
     // Logs from extern crates to stdout
@@ -68,14 +73,9 @@ pub async fn main_runner(
     let con_clone = connection_manager.clone();
     let op_log_tx_clone = op_log_tx.clone();
     tokio::task::spawn(async move {
-        auto_transition_runner(
-            &model_clone.name,
-            &model_clone,
-            &con_clone,
-            op_log_tx_clone,
-        )
-        .await
-        .unwrap()
+        auto_transition_runner(&model_clone.name, &model_clone, &con_clone, op_log_tx_clone)
+            .await
+            .unwrap()
     });
 
     log::info!(target: &format!("{sp_id}_micro_sp"), "Spawning auto operation runner");
@@ -104,14 +104,12 @@ pub async fn main_runner(
             .unwrap()
     });
 
-    log::info!(target: &format!("{sp_id}_micro_sp"), "Spawning time runner");
-    let con_clone = connection_manager.clone();
-    let sp_id_clone = sp_id.clone();
-    tokio::task::spawn(async move {
-        goal_runner(&sp_id_clone, &con_clone)
-            .await
-            .unwrap()
-    });
+    if goal_runner_enabled {
+        log::info!(target: &format!("{sp_id}_micro_sp"), "Spawning time runner");
+        let con_clone = connection_manager.clone();
+        let sp_id_clone = sp_id.clone();
+        tokio::task::spawn(async move { goal_runner(&sp_id_clone, &con_clone).await.unwrap() });
+    }
 
     log::info!(target: &format!("{sp_id}_micro_sp"), "Spawning TF interface");
     let con_clone = connection_manager.clone();
