@@ -250,7 +250,10 @@ pub async fn goal_runner(
         }
 
         if goal_info_old != goal_runner_information {
-            log::info!(target: &format!("{}_goal_runner", sp_id), "{goal_runner_information}");
+            if goal_runner_information != "UNKNOWN".to_string() {
+                log::info!(target: &format!("{}_goal_runner", sp_id), "{goal_runner_information}");
+            }
+
             goal_info_old = goal_runner_information.clone()
         }
 
@@ -341,16 +344,15 @@ pub async fn goal_runner(
             // Skip replanning here, for now replanning only in postcondition when nondeterministic outcome. Test.
             GoalState::Failed => {
                 // if replan_failed_goal {
-                    goal_runner_information = format!(
-                        "Goal {} failed: \n       {}",
-                        current_goal_id, current_goal_predicate
-                    );
-                    new_state = new_state.update(
-                        &format!("{}_current_goal_state", sp_id),
-                        GoalState::Executing.to_string().to_spvalue(),
-                    )
+                goal_runner_information = format!(
+                    "Goal {} failed: \n       {}",
+                    current_goal_id, current_goal_predicate
+                );
+                new_state = new_state.update(
+                    &format!("{}_current_goal_state", sp_id),
+                    GoalState::Executing.to_string().to_spvalue(),
+                )
                 // }
-                
             }
             GoalState::Completed => {
                 goal_runner_information = format!(
@@ -373,10 +375,10 @@ pub async fn goal_runner(
                 )
             }
             GoalState::UNKNOWN => {
-                goal_runner_information = format!(
-                    "Goal {} in UNKNOWN state: \n       {}",
-                    current_goal_id, current_goal_predicate
-                );
+                // goal_runner_information = format!(
+                //     "Goal {} in UNKNOWN state: \n       {}",
+                //     current_goal_id, current_goal_predicate
+                // );
                 new_state = new_state.update(
                     &format!("{}_current_goal_state", sp_id),
                     GoalState::Initial.to_string().to_spvalue(),
