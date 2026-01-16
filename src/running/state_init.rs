@@ -13,6 +13,7 @@ pub fn generate_runner_state_variables(name: &str) -> State {
     let current_goal_id = v!(&&format!("{}_current_goal_id", name)); // goal as a string predicate
     let current_goal_state = v!(&&format!("{}_current_goal_state", name)); // goal as a string predicate
     let plan = av!(&&format!("{}_plan", name)); // plan as array of string
+    let plan_id = v!(&&format!("{}_plan_id", name)); // unique plan id
     let plan_counter = iv!(&&format!("{}_plan_counter", name)); // How many times has a plan been found
     let plan_exists = bv!(&&format!("{}_plan_exists", name)); // does nothing for now
     let plan_name = v!(&&format!("{}_plan_name", name)); // same as model name, should add nanoid!
@@ -132,6 +133,10 @@ pub fn generate_runner_state_variables(name: &str) -> State {
     state = state.add(assign!(plan_exists, SPValue::Bool(BoolOrUnknown::UNKNOWN)));
     state = state.add(assign!(
         plan_name,
+        SPValue::String(StringOrUnknown::UNKNOWN)
+    ));
+        state = state.add(assign!(
+        plan_id,
         SPValue::String(StringOrUnknown::UNKNOWN)
     ));
     state = state.add(assign!(
