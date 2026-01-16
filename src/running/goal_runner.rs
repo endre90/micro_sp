@@ -3,8 +3,7 @@ use serde::{Deserialize, Serialize};
 use std::{fmt, sync::Arc};
 use tokio::time::{Duration, interval};
 
-// Slower, in order to catch the replan flag
-static TICK_INTERVAL: u64 = 50; // millis
+static TICK_INTERVAL: u64 = 100; // millis
 
 #[derive(Debug, PartialEq, Clone, Hash, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum GoalPriority {
