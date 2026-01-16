@@ -3,7 +3,8 @@ use serde::{Deserialize, Serialize};
 use std::{fmt, sync::Arc};
 use tokio::time::{Duration, interval};
 
-static TICK_INTERVAL: u64 = 100; // millis
+// Slower, in order to catch the replan flag
+static TICK_INTERVAL: u64 = 500; // millis
 
 #[derive(Debug, PartialEq, Clone, Hash, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum GoalPriority {
@@ -198,7 +199,7 @@ pub async fn goal_runner(
         format!("{}_replan_trigger", sp_id),
         format!("{}_replanned", sp_id),
         format!("{}_plan_current_step", sp_id),
-        // format!("{}_replan_failed_goal", sp_id),
+        format!("{}_replan_for_same_goal", sp_id),
     ];
 
     loop {
@@ -230,10 +231,8 @@ pub async fn goal_runner(
             &log_target,
         );
 
-        // let replan_failed_goal = state.get_bool_or_default_to_false(
-        //     &format!("{}_replan_failed_goal", sp_id),
-        //     &log_target,
-        // );
+        let replan_for_same_goal = state
+            .get_bool_or_default_to_false(&format!("{}_replan_for_same_goal", sp_id), &log_target);
 
         let plan_state =
             state.get_string_or_default_to_unknown(&format!("{}_plan_state", sp_id), &log_target);
@@ -261,48 +260,76 @@ pub async fn goal_runner(
 
         match GoalState::from_str(&current_goal_state.to_string()) {
             GoalState::Initial => {
-                if !scheduled_goals.is_empty() {
-                    match scheduled_goals.split_first() {
-                        Some((current, rest)) => {
-                            let rest_of_the_goals: Vec<SPValue> =
-                                rest.iter().map(|x| goal_to_sp_value(x)).collect();
-                            goal_runner_information = format!(
-                                "Initializing new goal {}: \n       {}",
-                                current.id, current.predicate
-                            );
-                            new_state = new_state
-                                .update(
-                                    &format!("{}_scheduled_goals", sp_id),
-                                    rest_of_the_goals.to_spvalue(),
-                                )
-                                .update(
-                                    &format!("{}_current_goal_id", sp_id),
-                                    current.id.to_string().to_spvalue(),
-                                )
-                                .update(
-                                    &format!("{}_current_goal_state", sp_id),
-                                    GoalState::Executing.to_string().to_spvalue(),
-                                )
-                                .update(
-                                    &format!("{}_current_goal_predicate", sp_id),
-                                    current.predicate.to_string().to_spvalue(),
-                                )
-                                .update(&format!("{}_replan_trigger", sp_id), true.to_spvalue())
-                                .update(&format!("{}_replanned", sp_id), false.to_spvalue())
-                                .update(&format!("{}_plan_current_step", sp_id), 0.to_spvalue())
-                                .update(
-                                    &format!("{}_plan", sp_id),
-                                    Vec::<String>::new().to_spvalue(),
-                                )
-                                .update(&format!("{}_plan_state", sp_id), "initial".to_spvalue())
-                                .update(&format!("{}_planner_state", sp_id), "ready".to_spvalue())
-                        }
-                        None => {
-                            log::error!(target: log_target, "This shouldn't happen, investigate.")
-                        }
-                    }
+                if replan_for_same_goal {
+                    goal_runner_information = format!(
+                        "Replan for same goal {}: \n       {}",
+                        current_goal_id, current_goal_predicate
+                    );
+                    new_state = new_state
+                        .update(
+                            &format!("{}_replan_for_same_goal", sp_id),
+                            false.to_spvalue(),
+                        )
+                        .update(&format!("{}_replan_trigger", sp_id), true.to_spvalue())
+                        .update(&format!("{}_replanned", sp_id), false.to_spvalue())
+                        .update(&format!("{}_plan_current_step", sp_id), 0.to_spvalue())
+                        .update(
+                            &format!("{}_plan", sp_id),
+                            Vec::<String>::new().to_spvalue(),
+                        )
+                        .update(&format!("{}_plan_state", sp_id), "initial".to_spvalue())
+                        .update(&format!("{}_planner_state", sp_id), "ready".to_spvalue());
                 } else {
-                    goal_runner_information = "No goals scheduled, goal list is empty.".to_string();
+                    if !scheduled_goals.is_empty() {
+                        match scheduled_goals.split_first() {
+                            Some((current, rest)) => {
+                                let rest_of_the_goals: Vec<SPValue> =
+                                    rest.iter().map(|x| goal_to_sp_value(x)).collect();
+                                goal_runner_information = format!(
+                                    "Initializing new goal {}: \n       {}",
+                                    current.id, current.predicate
+                                );
+                                new_state = new_state
+                                    .update(
+                                        &format!("{}_scheduled_goals", sp_id),
+                                        rest_of_the_goals.to_spvalue(),
+                                    )
+                                    .update(
+                                        &format!("{}_current_goal_id", sp_id),
+                                        current.id.to_string().to_spvalue(),
+                                    )
+                                    .update(
+                                        &format!("{}_current_goal_state", sp_id),
+                                        GoalState::Executing.to_string().to_spvalue(),
+                                    )
+                                    .update(
+                                        &format!("{}_current_goal_predicate", sp_id),
+                                        current.predicate.to_string().to_spvalue(),
+                                    )
+                                    .update(&format!("{}_replan_trigger", sp_id), true.to_spvalue())
+                                    .update(&format!("{}_replanned", sp_id), false.to_spvalue())
+                                    .update(&format!("{}_plan_current_step", sp_id), 0.to_spvalue())
+                                    .update(
+                                        &format!("{}_plan", sp_id),
+                                        Vec::<String>::new().to_spvalue(),
+                                    )
+                                    .update(
+                                        &format!("{}_plan_state", sp_id),
+                                        "initial".to_spvalue(),
+                                    )
+                                    .update(
+                                        &format!("{}_planner_state", sp_id),
+                                        "ready".to_spvalue(),
+                                    )
+                            }
+                            None => {
+                                log::error!(target: log_target, "This shouldn't happen, investigate.")
+                            }
+                        }
+                    } else {
+                        goal_runner_information =
+                            "No goals scheduled, goal list is empty.".to_string();
+                    }
                 }
             }
 
