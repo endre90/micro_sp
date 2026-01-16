@@ -88,6 +88,7 @@ struct PlannerContext {
     replan_counter_total: i64,
     planner_state: String,
     plan: Vec<String>,
+    plan_id: String,
     planner_information: String,
 }
 
@@ -104,6 +105,8 @@ fn process_planner_tick(sp_id: &str, model: &Model, state: &State, log_target: &
             .get_int_or_default_to_zero(&format!("{}_replan_counter_total", sp_id), &log_target),
         planner_state: state
             .get_string_or_default_to_unknown(&format!("{}_planner_state", sp_id), &log_target),
+        plan_id: state
+            .get_string_or_default_to_unknown(&format!("{}_plan_id", sp_id), &log_target),
         plan: state
             .get_array_or_default_to_empty(&format!("{}_plan", sp_id), &log_target)
             .iter()
@@ -150,6 +153,10 @@ fn process_planner_tick(sp_id: &str, model: &Model, state: &State, log_target: &
             &format!("{}_planner_state", sp_id),
             ctx.planner_state.to_spvalue(),
         )
+        .update(
+            &format!("{}_plan_id", sp_id),
+            ctx.plan_id.to_spvalue(),
+        )
         .update(&format!("{}_plan", sp_id), ctx.plan.to_spvalue())
         .update(
             &format!("{}_planner_information", sp_id),
@@ -192,6 +199,7 @@ fn handle_replan_request(
     );
 
     if !plan_result.found {
+        ctx.plan_id = "".to_string();
         ctx.planner_information = format!(
             "Planner triggered (try {}/{}): No plan was found.",
             ctx.replan_counter, MAX_REPLAN_RETRIES
@@ -200,6 +208,7 @@ fn handle_replan_request(
     } else {
         ctx.planner_information = "Planning completed.".to_string();
         ctx.planner_state = PlannerState::Found.to_string();
+        ctx.plan_id = nanoid::nanoid!(10, &NANOID_ALPHABET);
         ctx.replan_counter = 0;
 
         if plan_result.length > 0 {
