@@ -341,18 +341,16 @@ pub async fn goal_runner(
                 }
             }
 
-            // Skip replanning here, for now replanning only in postcondition when nondeterministic outcome. Test.
+            // Plan fails only if operation is unrecoverable, so it is ok to go to initial here.
             GoalState::Failed => {
-                // if replan_failed_goal {
                 goal_runner_information = format!(
                     "Goal {} failed: \n       {}",
                     current_goal_id, current_goal_predicate
                 );
                 new_state = new_state.update(
                     &format!("{}_current_goal_state", sp_id),
-                    GoalState::Executing.to_string().to_spvalue(),
+                    GoalState::Initial.to_string().to_spvalue(),
                 )
-                // }
             }
             GoalState::Completed => {
                 goal_runner_information = format!(

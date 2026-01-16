@@ -217,7 +217,8 @@ fn handle_replan_request(
             ctx.plan_counter += 1;
             ctx.plan = plan_result.plan;
             ctx.planner_information = format!(
-                "Got a new plan:\n{}",
+                "Got a new plan {}:\n{}",
+                ctx.plan_id,
                 ctx.plan
                     .iter()
                     .enumerate()
