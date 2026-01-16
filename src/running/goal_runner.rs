@@ -4,7 +4,7 @@ use std::{fmt, sync::Arc};
 use tokio::time::{Duration, interval};
 
 // Slower, in order to catch the replan flag
-static TICK_INTERVAL: u64 = 500; // millis
+static TICK_INTERVAL: u64 = 50; // millis
 
 #[derive(Debug, PartialEq, Clone, Hash, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum GoalPriority {
