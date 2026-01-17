@@ -195,7 +195,7 @@ pub async fn goal_runner(
         format!("{}_plan_state", sp_id),
         format!("{}_plan", sp_id),
         format!("{}_scheduled_goals", sp_id),
-        format!("{}_incomming_goals", sp_id),
+        format!("{}_incoming_goals", sp_id),
         format!("{}_replan_trigger", sp_id),
         format!("{}_replanned", sp_id),
         format!("{}_plan_current_step", sp_id),
