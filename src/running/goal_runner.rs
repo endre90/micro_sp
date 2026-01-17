@@ -272,10 +272,19 @@ pub async fn goal_runner(
         // Handle incoming goals first
         scheduled_goals.extend(incoming_goals);
         scheduled_goals.sort_by_key(|g| g.priority);
-        new_state = new_state.update(
-            &format!("{}_incoming_goals", sp_id),
-            Vec::<SPValue>::new().to_spvalue(),
-        );
+        let scheduled_goals_sp_values: Vec<SPValue> = scheduled_goals
+            .iter()
+            .map(|x| goal_to_sp_value(x))
+            .collect();
+        new_state = new_state
+            .update(
+                &format!("{}_scheduled_goals", sp_id),
+                scheduled_goals_sp_values.to_spvalue(),
+            )
+            .update(
+                &format!("{}_incoming_goals", sp_id),
+                Vec::<SPValue>::new().to_spvalue(),
+            );
 
         match GoalState::from_str(&current_goal_state.to_string()) {
             GoalState::Initial => {
