@@ -5,7 +5,7 @@ use tokio::time::{Duration, interval};
 
 static TICK_INTERVAL: u64 = 100; // millis
 
-#[derive(Debug, PartialEq, Clone, Hash, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Copy, Clone, Hash, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum GoalPriority {
     High,
     Normal,
@@ -195,6 +195,7 @@ pub async fn goal_runner(
         format!("{}_plan_state", sp_id),
         format!("{}_plan", sp_id),
         format!("{}_scheduled_goals", sp_id),
+        format!("{}_incomming_goals", sp_id),
         format!("{}_replan_trigger", sp_id),
         format!("{}_replanned", sp_id),
         format!("{}_plan_current_step", sp_id),
@@ -247,6 +248,17 @@ pub async fn goal_runner(
             }
         }
 
+        let incoming_goals_sp_val =
+            state.get_array_or_default_to_empty(&format!("{}_incoming_goals", sp_id), &log_target);
+
+        let mut incoming_goals = vec![];
+        for goal_sp_val in incoming_goals_sp_val {
+            match sp_value_to_goal(&goal_sp_val) {
+                Ok(goal) => incoming_goals.push(goal),
+                Err(_) => (),
+            }
+        }
+
         if goal_info_old != goal_runner_information {
             if goal_runner_information != "UNKNOWN".to_string() {
                 log::info!(target: &format!("{}_goal_runner", sp_id), "{goal_runner_information}");
@@ -256,6 +268,14 @@ pub async fn goal_runner(
         }
 
         let mut new_state = state.clone();
+
+        // Handle incoming goals first
+        scheduled_goals.extend(incoming_goals);
+        scheduled_goals.sort_by_key(|g| g.priority);
+        new_state = new_state.update(
+            &format!("{}_incoming_goals", sp_id),
+            Vec::<SPValue>::new().to_spvalue(),
+        );
 
         match GoalState::from_str(&current_goal_state.to_string()) {
             GoalState::Initial => {
@@ -399,10 +419,6 @@ pub async fn goal_runner(
                 )
             }
             GoalState::UNKNOWN => {
-                // goal_runner_information = format!(
-                //     "Goal {} in UNKNOWN state: \n       {}",
-                //     current_goal_id, current_goal_predicate
-                // );
                 new_state = new_state.update(
                     &format!("{}_current_goal_state", sp_id),
                     GoalState::Initial.to_string().to_spvalue(),

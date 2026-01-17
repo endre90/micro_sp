@@ -33,7 +33,7 @@ pub fn generate_runner_state_variables(name: &str) -> State {
     let replan_counter = iv!(&&format!("{}_replan_counter", name)); // How many times has the planner tried to replan for the same problem
     let replan_fail_counter = iv!(&&format!("{}_replan_fail_counter", name)); // How many times has the planner failed in
     let replan_trigger = bv!(&&format!("{}_replan_trigger", name)); // boolean for tracking the planner triggering
-    let incoming_goals = mv!(&&format!("{}_incoming_goals", name));
+    let incoming_goals = av!(&&format!("{}_incoming_goals", name));
     let scheduled_goals = av!(&&format!("{}_scheduled_goals", name));
     let sop_enabled = bv!(&&format!("{}_sop_enabled", name));
     // let sop_request_state = v!(&&format!("{}_sop_request_state", name));
@@ -199,7 +199,7 @@ pub fn generate_runner_state_variables(name: &str) -> State {
         replan_trigger,
         SPValue::Bool(BoolOrUnknown::UNKNOWN)
     ));
-    state = state.add(assign!(incoming_goals, SPValue::Map(MapOrUnknown::UNKNOWN)));
+    state = state.add(assign!(incoming_goals, SPValue::Array(ArrayOrUnknown::UNKNOWN)));
     state = state.add(assign!(
         scheduled_goals,
         SPValue::Array(ArrayOrUnknown::UNKNOWN)
