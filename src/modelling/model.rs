@@ -43,22 +43,14 @@ impl Model {
             sops: sops
                 .iter()
                 .map(|sop| SOPStruct {
-                    id: {
-                        let unique_id = nanoid::nanoid!(10, &NANOID_ALPHABET); // 64^10 unique ids
-                        let new_name = format!("{}_{}", sop.id.clone(), unique_id);
-                        new_name
-                    },
+                    id: sop.id.clone(),
                     sop: uniquify_sop_operations(sop.sop.clone()),
                 })
                 .collect(),
             operations: operations
                 .iter()
                 .map(|o| Operation {
-                    name: {
-                        let unique_id = nanoid::nanoid!(10, &NANOID_ALPHABET); // 64^10 unique ids
-                        let new_name = format!("op_{}_{}", o.name, unique_id);
-                        new_name
-                    },
+                    name: format!("op_{}", o.name),
                     timeout_executing_ms: o.timeout_executing_ms,
                     timeout_disabled_ms: o.timeout_disabled_ms,
                     failure_retries: o.failure_retries,
