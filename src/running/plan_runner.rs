@@ -110,7 +110,6 @@ async fn process_plan_tick(
             }
         }
         PlanState::Executing => {
-            // goal_state = GoalState::Executing.to_string();
             if let Some(op_name) = plan.get(plan_current_step as usize) {
                 match model.operations.iter().find(|op| op.name == *op_name) {
                     Some(operation) => {
@@ -172,15 +171,6 @@ async fn process_plan_tick(
             // planner_state = PlannerState::Ready.to_string();
         },
     }
-
-    // add plan logging here as well and regular logging to track when what happened
-    // PlanState::Failed | PlanState::Completed | PlanState::Cancelled | PlanState::UNKNOWN => {
-    //     plan_current_step = 0;
-    //     new_state = reset_all_operations(&new_state, &model);
-    //     plan = vec![];
-    //     plan_state_str = PlanState::Initial.to_string();
-    //     planner_state = PlannerState::Ready.to_string();
-    // }
 
     new_state = new_state
         .update(

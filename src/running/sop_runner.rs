@@ -61,35 +61,37 @@ pub async fn sop_runner(
                     visualize_sop(&root_sop.sop)
                 );
 
-                let terminated_triggers: Vec<&String> = state
-                    .state
-                    .iter()
-                    .filter_map(|(key, value)| {
-                        if let SPValue::String(StringOrUnknown::String(s)) = &value.val {
-                            if s == "terminated_completed" {
-                                return Some(key);
-                            }
-                        }
-                        None
-                    })
-                    .collect();
+                // Not sure if this is working properly every time, skip dor now...
+                // let terminated_triggers: Vec<&String> = state
+                //     .state
+                //     .iter()
+                //     .filter_map(|(key, value)| {
+                //         if let SPValue::String(StringOrUnknown::String(s)) = &value.val {
+                //             if s == "terminated_completed" {
+                //                 return Some(key);
+                //             }
+                //         }
+                //         None
+                //     })
+                //     .collect();
 
-                if !terminated_triggers.is_empty() {
-                    let keys_to_remove: Vec<String> = state
-                        .state
-                        .keys()
-                        .filter(|key| {
-                            terminated_triggers
-                                .iter()
-                                .any(|trigger| key.contains(trigger.as_str()))
-                        })
-                        .cloned()
-                        .collect();
+                // Not sure if this is working properly every time, skip dor now...
+                // if !terminated_triggers.is_empty() {
+                //     let keys_to_remove: Vec<String> = state
+                //         .state
+                //         .keys()
+                //         .filter(|key| {
+                //             terminated_triggers
+                //                 .iter()
+                //                 .any(|trigger| key.contains(trigger.as_str()))
+                //         })
+                //         .cloned()
+                //         .collect();
 
-                    if !keys_to_remove.is_empty() {
-                        StateManager::remove_sp_values(&mut con, &keys_to_remove).await;
-                    }
-                }
+                //     if !keys_to_remove.is_empty() {
+                //         StateManager::remove_sp_values(&mut con, &keys_to_remove).await;
+                //     }
+                // }
             }
             old_sop_id = sop_id.clone();
         }
