@@ -53,48 +53,48 @@ pub async fn sop_runner(
         let mut new_sop_info = old_sop_information.clone();
         let mut sop_info_level = log::Level::Info;
 
-        if old_sop_id != sop_id && !sop_id.is_empty() {
-            if let Some(root_sop) = model.sops.iter().find(|s| s.id == sop_id) {
-                new_sop_info = format!(
-                    "Initializing a new SOP '{}':\n{:?}",
-                    sop_id,
-                    visualize_sop(&root_sop.sop)
-                );
+        // if old_sop_id != sop_id && !sop_id.is_empty() {
+        //     if let Some(root_sop) = model.sops.iter().find(|s| s.id == sop_id) {
+        //         new_sop_info = format!(
+        //             "Initializing a new SOP '{}':\n{:?}",
+        //             sop_id,
+        //             visualize_sop(&root_sop.sop)
+        //         );
 
-                // Not sure if this is working properly every time, skip dor now...
-                // let terminated_triggers: Vec<&String> = state
-                //     .state
-                //     .iter()
-                //     .filter_map(|(key, value)| {
-                //         if let SPValue::String(StringOrUnknown::String(s)) = &value.val {
-                //             if s == "terminated_completed" {
-                //                 return Some(key);
-                //             }
-                //         }
-                //         None
-                //     })
-                //     .collect();
+        //         // Not sure if this is working properly every time, skip dor now...
+        //         let terminated_triggers: Vec<&String> = state
+        //             .state
+        //             .iter()
+        //             .filter_map(|(key, value)| {
+        //                 if let SPValue::String(StringOrUnknown::String(s)) = &value.val {
+        //                     if s == "terminated_completed" {
+        //                         return Some(key);
+        //                     }
+        //                 }
+        //                 None
+        //             })
+        //             .collect();
 
-                // Not sure if this is working properly every time, skip dor now...
-                // if !terminated_triggers.is_empty() {
-                //     let keys_to_remove: Vec<String> = state
-                //         .state
-                //         .keys()
-                //         .filter(|key| {
-                //             terminated_triggers
-                //                 .iter()
-                //                 .any(|trigger| key.contains(trigger.as_str()))
-                //         })
-                //         .cloned()
-                //         .collect();
+        //         // Not sure if this is working properly every time, skip dor now...
+        //         if !terminated_triggers.is_empty() {
+        //             let keys_to_remove: Vec<String> = state
+        //                 .state
+        //                 .keys()
+        //                 .filter(|key| {
+        //                     terminated_triggers
+        //                         .iter()
+        //                         .any(|trigger| key.contains(trigger.as_str()))
+        //                 })
+        //                 .cloned()
+        //                 .collect();
 
-                //     if !keys_to_remove.is_empty() {
-                //         StateManager::remove_sp_values(&mut con, &keys_to_remove).await;
-                //     }
-                // }
-            }
-            old_sop_id = sop_id.clone();
-        }
+        //             if !keys_to_remove.is_empty() {
+        //                 StateManager::remove_sp_values(&mut con, &keys_to_remove).await;
+        //             }
+        //         }
+        //     }
+        //     old_sop_id = sop_id.clone();
+        // }
 
         match SOPState::from_str(&sop_state) {
             SOPState::Initial => {
