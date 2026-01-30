@@ -1,4 +1,7 @@
-use crate::{running::process_operation::{OperationProcessingType, process_operation}, *};
+use crate::{
+    running::process_operation::{OperationProcessingType, process_operation},
+    *,
+};
 use chrono::Utc;
 use redis::aio::MultiplexedConnection;
 use std::{sync::Arc, time::Duration};
@@ -108,6 +111,14 @@ pub async fn auto_operation_runner(
             keys.extend(op.get_all_var_keys());
         }
 
+        keys.extend(
+            model
+                .auto_operations
+                .iter()
+                .flat_map(|op| vec![format!("{}", op.name)])
+                .collect::<Vec<String>>(),
+        );
+
         keys.sort();
         keys.dedup();
 
@@ -117,12 +128,6 @@ pub async fn auto_operation_runner(
         };
         let mut new_state = state.clone();
 
-        //         state = state.add(assign!(
-        //     operation_information,
-        //     SPValue::String(StringOrUnknown::UNKNOWN)
-        // ));
-
-        // 3. SPAWNING LOGIC (Check Templates)
         for template in &model.auto_operations {
             // Check if this template should spawn a new instance
             // "Trigger is True" AND "No instance of this type is currently running"
@@ -138,7 +143,12 @@ pub async fn auto_operation_runner(
                 new_instance.name = new_name.clone();
 
                 // Initialize the new unique state in 'new_state' so it can start immediately
-                // e.g. set "gantry_calibrate_8x9d1_state" = "initial"
+                // LAter also add here the following if needed by the process operation:
+                //                     format!("{}_information", op.name),
+                //                     format!("{}_failure_retry_counter", op.name),
+                //                     format!("{}_timeout_retry_counter", op.name),
+                //                     format!("{}_elapsed_executing_ms", op.name),
+                //                     format!("{}_elapsed_disabled_ms", op.name),
                 let initial_state_key = v!(&&format!("{}", new_instance.name));
                 new_state = new_state.add(assign!(
                     initial_state_key,
