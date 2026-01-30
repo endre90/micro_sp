@@ -120,6 +120,9 @@ pub async fn auto_operation_runner(
             Some(s) => s,
             None => continue,
         };
+
+        println!("State: {}", state);
+
         let mut new_state = state.clone();
 
         for template in &model.auto_operations {
