@@ -159,6 +159,9 @@ pub async fn auto_operation_runner(
         }
 
         for operation in &active_operations {
+
+            // Here is where I have to add unique id for operations.
+
             new_state = process_operation(
                 &name,
                 new_state,
