@@ -1,7 +1,5 @@
 use crate::{
-    ConnectionManager, LogMsg, Model, OPERAION_RUNNER_TICK_INTERVAL_MS, OperationState, State,
-    StateManager, Transition, TransitionMsg, initialize_env_logger,
-    running::process_operation::{OperationProcessingType, process_operation},
+    ConnectionManager, LogMsg, Model, NANOID_ALPHABET, OPERAION_RUNNER_TICK_INTERVAL_MS, OperationState, State, StateManager, Transition, TransitionMsg, initialize_env_logger, running::process_operation::{OperationProcessingType, process_operation}
 };
 use chrono::Utc;
 use rand::prelude::*;
@@ -22,6 +20,10 @@ async fn process_transition(
     if !transition.to_owned().eval(state, &log_target) {
         return;
     }
+
+    let unique_id = nanoid::nanoid!(10, &NANOID_ALPHABET);
+    let mut transision = transition.clone();
+    transision.name = format!("{}_{}", transition.name, unique_id);
 
     let new_state = transition.to_owned().take(state, &log_target);
     log::info!(target: &log_target, "Executed auto transition: '{}'.", transition.name);
@@ -51,7 +53,7 @@ pub async fn auto_transition_runner(
     initialize_env_logger();
     let mut interval = interval(Duration::from_millis(TRANSITION_RUNNER_TICK_INTERVAL_MS));
     let model = model.clone();
-    let log_target = format!("{}_auto_tr_runner", name);
+    let log_target = format!("{}_auto_trans_runner", name);
     let keys: Vec<String> = model
         .auto_transitions
         .iter()
@@ -76,6 +78,7 @@ pub async fn auto_transition_runner(
         }
     }
 }
+
 
 pub async fn auto_operation_runner(
     name: &str,
