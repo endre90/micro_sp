@@ -317,171 +317,42 @@ pub fn generate_operation_state_variables(model: &Model, coverability_tracking: 
     let mut state = State::new();
     // operations should be put in the initial state once they are part of the plan
 
-    fn get_all_operations(sop: &SOP) -> Vec<Operation> {
-        let mut operations = Vec::new();
-        get_all_operations_recursive(sop, &mut operations);
-        operations
-    }
+    // fn get_all_operations(sop: &SOP) -> Vec<Operation> {
+    //     let mut operations = Vec::new();
+    //     get_all_operations_recursive(sop, &mut operations);
+    //     operations
+    // }
 
-    fn get_all_operations_recursive(sop: &SOP, operations: &mut Vec<Operation>) {
-        match sop {
-            // Base case: We found an operation. Clone it and add it to our list.
-            SOP::Operation(op) => {
-                operations.push(*op.clone());
-            }
-            // Recursive step: This is a container. Iterate through its children
-            // and call this function on each of them.
-            SOP::Sequence(sops) | SOP::Parallel(sops) | SOP::Alternative(sops) => {
-                for child_sop in sops {
-                    get_all_operations_recursive(child_sop, operations);
-                }
-            }
-        }
-    }
+    // fn get_all_operations_recursive(sop: &SOP, operations: &mut Vec<Operation>) {
+    //     match sop {
+    //         // Base case: We found an operation. Clone it and add it to our list.
+    //         SOP::Operation(op) => {
+    //             operations.push(*op.clone());
+    //         }
+    //         // Recursive step: This is a container. Iterate through its children
+    //         // and call this function on each of them.
+    //         SOP::Sequence(sops) | SOP::Parallel(sops) | SOP::Alternative(sops) => {
+    //             for child_sop in sops {
+    //                 get_all_operations_recursive(child_sop, operations);
+    //             }
+    //         }
+    //     }
+    // }
 
     for sop in &model.sops {
-        let ops_in_sop = get_all_operations(&sop.sop);
+        // let ops_in_sop = get_all_operations(&sop.sop);
         let sop_information = v!(&&format!("{}_sop_information", sop.id));
         state = state.add(assign!(
             sop_information,
             SPValue::String(StringOrUnknown::UNKNOWN)
         ));
-        for operation in ops_in_sop {
-            let operation_state = v!(&&format!("{}", operation.name)); // Initial, Executing, Failed, Completed, Unknown
-            let operation_information = v!(&&format!("{}_information", operation.name));
-            let operation_elapsed_executing_ms =
-                iv!(&&format!("{}_elapsed_executing_ms", operation.name)); // to timeout if it takes too long
-            let operation_failure_retry_counter =
-                iv!(&&format!("{}_failure_retry_counter", operation.name));
-            let operation_elapsed_disabled_ms =
-                iv!(&&format!("{}_elapsed_disabled_ms", operation.name));
-            let operation_retry_counter = iv!(&&format!("{}_retry_counter", operation.name)); // without scrapping the current plan, how many times has an operation retried
-            let operation_timeout_retry_counter =
-                iv!(&&format!("{}_timeout_retry_counter", operation.name));
-            state = state.add(assign!(operation_state, "initial".to_spvalue()));
-            state = state.add(assign!(
-                operation_information,
-                SPValue::String(StringOrUnknown::UNKNOWN)
-            ));
-            state = state.add(assign!(
-                operation_elapsed_executing_ms,
-                SPValue::Int64(IntOrUnknown::UNKNOWN)
-            ));
-            state = state.add(assign!(
-                operation_timeout_retry_counter,
-                SPValue::Int64(IntOrUnknown::UNKNOWN)
-            ));
-            state = state.add(assign!(
-                operation_failure_retry_counter,
-                SPValue::Int64(IntOrUnknown::UNKNOWN)
-            ));
-            state = state.add(assign!(
-                operation_elapsed_disabled_ms,
-                SPValue::Int64(IntOrUnknown::UNKNOWN)
-            ));
-            state = state.add(assign!(
-                operation_retry_counter,
-                SPValue::Int64(IntOrUnknown::UNKNOWN)
-            ));
-        }
+        // probably not needed anymore since we are doing this now live when the time comes to execute the operation
+        // state = add_operation_tracking_variables(&ops_in_sop, &state, false);
     }
 
-    for operation in &model.operations {
-        let operation_state = v!(&&format!("{}", operation.name)); // Initial, Executing, Failed, Completed, Unknown
-        let operation_information = v!(&&format!("{}_information", operation.name));
-        let operation_elapsed_executing_ms =
-            iv!(&&format!("{}_elapsed_executing_ms", operation.name)); // to timeout if it takes too long
-        let operation_elapsed_disabled_ms =
-            iv!(&&format!("{}_elapsed_disabled_ms", operation.name));
-        let operation_failure_retry_counter =
-            iv!(&&format!("{}_failure_retry_counter", operation.name)); // without scrapping the current plan, how many times has an operation retried
-        let operation_timeout_retry_counter =
-            iv!(&&format!("{}_timeout_retry_counter", operation.name));
-        state = state.add(assign!(operation_state, "initial".to_spvalue()));
-        state = state.add(assign!(
-            operation_information,
-            SPValue::String(StringOrUnknown::UNKNOWN)
-        ));
-        state = state.add(assign!(
-            operation_elapsed_executing_ms,
-            SPValue::Int64(IntOrUnknown::UNKNOWN)
-        ));
-        state = state.add(assign!(
-            operation_elapsed_disabled_ms,
-            SPValue::Int64(IntOrUnknown::UNKNOWN)
-        ));
-        state = state.add(assign!(
-            operation_failure_retry_counter,
-            SPValue::Int64(IntOrUnknown::UNKNOWN)
-        ));
-        state = state.add(assign!(
-            operation_timeout_retry_counter,
-            SPValue::Int64(IntOrUnknown::UNKNOWN)
-        ));
-
-        if coverability_tracking {
-            // coverability tracking does nothing for now
-            let initial = iv!(&&format!("{}_visited_initial", operation.name));
-            let executing = iv!(&&format!("{}_visited_executing", operation.name));
-            let timedout = iv!(&&format!("{}_visited_timedout", operation.name)); // Operation should have optional deadline field
-            let disabled = iv!(&&format!("{}_visited_disabled", operation.name));
-            let failed = iv!(&&format!("{}_visited_failed", operation.name));
-            let completed = iv!(&&format!("{}_visited_completed", operation.name));
-
-            for cov in vec![initial, executing, timedout, disabled, failed, completed] {
-                state = state.add(assign!(cov, 0.to_spvalue()));
-            }
-        }
-    }
-
-    for operation in &model.auto_operations {
-        let operation_state = v!(&&format!("{}", operation.name)); // Initial, Executing, Failed, Completed, Unknown
-        let operation_information = v!(&&format!("{}_information", operation.name));
-        let operation_elapsed_executing_ms =
-            iv!(&&format!("{}_elapsed_executing_ms", operation.name)); // to timeout if it takes too long
-        let operation_elapsed_disabled_ms =
-            iv!(&&format!("{}_elapsed_disabled_ms", operation.name));
-        let operation_failure_retry_counter =
-            iv!(&&format!("{}_failure_retry_counter", operation.name)); // without scrapping the current plan, how many times has an operation retried
-        let operation_timeout_retry_counter =
-            iv!(&&format!("{}_timeout_retry_counter", operation.name));
-        state = state.add(assign!(operation_state, "initial".to_spvalue()));
-        state = state.add(assign!(
-            operation_information,
-            SPValue::String(StringOrUnknown::UNKNOWN)
-        ));
-        state = state.add(assign!(
-            operation_elapsed_executing_ms,
-            SPValue::Int64(IntOrUnknown::UNKNOWN)
-        ));
-        state = state.add(assign!(
-            operation_elapsed_disabled_ms,
-            SPValue::Int64(IntOrUnknown::UNKNOWN)
-        ));
-
-        state = state.add(assign!(
-            operation_failure_retry_counter,
-            SPValue::Int64(IntOrUnknown::UNKNOWN)
-        ));
-        state = state.add(assign!(
-            operation_timeout_retry_counter,
-            SPValue::Int64(IntOrUnknown::UNKNOWN)
-        ));
-
-        if coverability_tracking {
-            // coverability tracking does nothing for now
-            let initial = iv!(&&format!("{}_visited_initial", operation.name));
-            let executing = iv!(&&format!("{}_visited_executing", operation.name));
-            let timedout = iv!(&&format!("{}_visited_timedout", operation.name)); // Operation should have optional deadline field
-            let disabled = iv!(&&format!("{}_visited_disabled", operation.name));
-            let failed = iv!(&&format!("{}_visited_failed", operation.name));
-            let completed = iv!(&&format!("{}_visited_completed", operation.name));
-
-            for cov in vec![initial, executing, timedout, disabled, failed, completed] {
-                state = state.add(assign!(cov, 0.to_spvalue()));
-            }
-        }
-    }
+    // probably not needed anymore since we are doing this now live when the time comes to execute the operation
+    // state = add_operation_tracking_variables(&model.operations, &state, false);
+    // state = add_operation_tracking_variables(&model.auto_operations, &state, false);
 
     for transition in &model.auto_transitions {
         if coverability_tracking {
@@ -597,4 +468,57 @@ mod tests {
         // let model = Model::new("ASDF", vec![], vec![]);
         let _ = generate_runner_state_variables("asdf");
     }
+}
+
+
+pub fn add_operation_tracking_variables(ops: &Vec<Operation>, state: &State, coverability_tracking: bool) -> State {
+    let mut state = state.clone();
+    for operation in ops {
+        let operation_state = v!(&&format!("{}", operation.name)); // Initial, Executing, Failed, Completed, Unknown
+        let operation_information = v!(&&format!("{}_information", operation.name));
+        let operation_elapsed_executing_ms =
+            iv!(&&format!("{}_elapsed_executing_ms", operation.name)); // to timeout if it takes too long
+        let operation_elapsed_disabled_ms =
+            iv!(&&format!("{}_elapsed_disabled_ms", operation.name));
+        let operation_failure_retry_counter =
+            iv!(&&format!("{}_failure_retry_counter", operation.name)); // without scrapping the current plan, how many times has an operation retried
+        let operation_timeout_retry_counter =
+            iv!(&&format!("{}_timeout_retry_counter", operation.name));
+        state = state.add(assign!(operation_state, "initial".to_spvalue()));
+        state = state.add(assign!(
+            operation_information,
+            SPValue::String(StringOrUnknown::UNKNOWN)
+        ));
+        state = state.add(assign!(
+            operation_elapsed_executing_ms,
+            SPValue::Int64(IntOrUnknown::UNKNOWN)
+        ));
+        state = state.add(assign!(
+            operation_elapsed_disabled_ms,
+            SPValue::Int64(IntOrUnknown::UNKNOWN)
+        ));
+        state = state.add(assign!(
+            operation_failure_retry_counter,
+            SPValue::Int64(IntOrUnknown::UNKNOWN)
+        ));
+        state = state.add(assign!(
+            operation_timeout_retry_counter,
+            SPValue::Int64(IntOrUnknown::UNKNOWN)
+        ));
+
+        if coverability_tracking {
+            // coverability tracking does nothing for now
+            let initial = iv!(&&format!("{}_visited_initial", operation.name));
+            let executing = iv!(&&format!("{}_visited_executing", operation.name));
+            let timedout = iv!(&&format!("{}_visited_timedout", operation.name)); // Operation should have optional deadline field
+            let disabled = iv!(&&format!("{}_visited_disabled", operation.name));
+            let failed = iv!(&&format!("{}_visited_failed", operation.name));
+            let completed = iv!(&&format!("{}_visited_completed", operation.name));
+
+            for cov in vec![initial, executing, timedout, disabled, failed, completed] {
+                state = state.add(assign!(cov, 0.to_spvalue()));
+            }
+        }
+    }
+    state
 }

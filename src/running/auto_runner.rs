@@ -142,20 +142,18 @@ pub async fn auto_operation_runner(
                 let mut new_instance = template.clone();
                 new_instance.name = new_name.clone();
 
-                // Initialize the new unique state in 'new_state' so it can start immediately
-                // LAter also add here the following if needed by the process operation:
-                //                     format!("{}_information", op.name),
-                //                     format!("{}_failure_retry_counter", op.name),
-                //                     format!("{}_timeout_retry_counter", op.name),
-                //                     format!("{}_elapsed_executing_ms", op.name),
-                //                     format!("{}_elapsed_disabled_ms", op.name),
                 let initial_state_key = v!(&&format!("{}", new_instance.name));
                 new_state = new_state.add(assign!(
                     initial_state_key,
                     SPValue::String(StringOrUnknown::String(OperationState::Initial.to_string()))
                 ));
+                new_state = add_operation_tracking_variables(
+                    &vec![new_instance.clone()],
+                    &new_state,
+                    false,
+                );
 
-                log::info!(target: &log_target, "Spawning {}", new_instance.name);
+                log::info!(target: &log_target, "Spawning unique operation {}.", new_instance.name);
                 active_instances.push(new_instance);
             }
         }
