@@ -91,6 +91,22 @@ pub async fn auto_operation_runner(
     // Currently running operation instances (template + uuid)
     let mut active_instances: Vec<Operation> = Vec::new();
 
+    // Keys for triggers (Templates) AND running operations (Instances)
+    let mut keys: Vec<String> = Vec::new();
+
+    // Keys from Templates to check if we should start new ones
+    for op in &model.auto_operations {
+        keys.extend(op.get_all_var_keys());
+    }
+
+    keys.extend(
+        model
+            .auto_operations
+            .iter()
+            .flat_map(|op| vec![format!("{}", op.name)])
+            .collect::<Vec<String>>(),
+    );
+
     loop {
         interval.tick().await;
         if let Err(_) = connection_manager.check_redis_health(&log_target).await {
@@ -98,29 +114,10 @@ pub async fn auto_operation_runner(
         }
         let mut con = connection_manager.get_connection().await;
 
-        // Keys for triggers (Templates) AND running operations (Instances)
-        let mut keys: Vec<String> = Vec::new();
-
-        // Keys from Templates to check if we should start new ones
-        for op in &model.auto_operations {
-            keys.extend(op.get_all_var_keys());
-        }
-
         // Keys from Active Instances to run them
         for op in &active_instances {
             keys.extend(op.get_all_var_keys());
         }
-
-        keys.extend(
-            model
-                .auto_operations
-                .iter()
-                .flat_map(|op| vec![format!("{}", op.name)])
-                .collect::<Vec<String>>(),
-        );
-
-        keys.sort();
-        keys.dedup();
 
         let state = match StateManager::get_state_for_keys(&mut con, &keys, &log_target).await {
             Some(s) => s,
