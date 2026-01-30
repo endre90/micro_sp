@@ -494,8 +494,8 @@ pub fn format_transition_log(log: &Vec<TransitionMsg>) -> String {
     let mut max_line_width;
     let mut rendered_lines: Vec<String> = Vec::new();
 
-    let title = "Transitions".bold().blue();
-    let underline = format!("{:-<width$}", "", width = "Transitions".len());
+    let title = "Automatic transitions".bold().blue();
+    let underline = format!("{:-<width$}", "", width = "Automatic transitions".len());
 
     max_line_width = std::cmp::max(
         measure_text_width(&title.to_string()),

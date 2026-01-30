@@ -32,7 +32,7 @@ async fn process_transition(
         transition_name: transition.name.clone(),
         timestamp: Utc::now(),
         severity: log::Level::Info,
-        log: format!("Executed auto transition."),
+        log: format!("Executed."),
     };
     let log_msg = LogMsg::TransitionMsg(transition_msg);
     match logging_tx.send(log_msg).await {
