@@ -94,11 +94,15 @@ pub async fn auto_operation_runner(
     // Keys for triggers (Templates) AND running operations (Instances)
     let mut keys: Vec<String> = Vec::new();
 
+    keys.extend(vec![format!("{}_dashboard_command", name)]);
+
     // Keys from Templates to check if we should start new ones
     for op in &model.auto_operations {
         keys.extend(op.get_all_var_keys());
         keys.push(op.name.clone());
     }
+
+    println!("{:?}", keys);
 
     loop {
         interval.tick().await;
