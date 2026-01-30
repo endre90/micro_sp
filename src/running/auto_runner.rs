@@ -85,22 +85,38 @@ pub async fn auto_operation_runner(
     logging_tx: mpsc::Sender<LogMsg>,
     connection_manager: &Arc<ConnectionManager>,
 ) -> Result<(), Box<dyn std::error::Error>> {
+    initialize_env_logger();
     let mut interval = interval(Duration::from_millis(OPERAION_RUNNER_TICK_INTERVAL_MS));
+    let model = model.clone();
     let log_target = format!("{}_auto_op_runner", name);
 
-    // Currently running operation instances (template + uuid)
-    let mut active_instances: Vec<Operation> = Vec::new();
-
-    // Keys for triggers (Templates) AND running operations (Instances)
-    let mut keys: Vec<String> = Vec::new();
+    let mut keys: Vec<String> = model
+        .auto_operations
+        .iter()
+        .flat_map(|o| o.get_all_var_keys())
+        .collect();
 
     keys.extend(vec![format!("{}_dashboard_command", name)]);
 
-    // Keys from Templates to check if we should start new ones
-    for op in &model.auto_operations {
-        keys.extend(op.get_all_var_keys());
-        keys.push(op.name.clone());
-    }
+    keys.extend(
+        model
+            .auto_operations
+            .iter()
+            .flat_map(|op| {
+                vec![
+                    format!("{}", op.name),
+                    // format!("{}_information", op.name),
+                    // format!("{}_failure_retry_counter", op.name),
+                    // format!("{}_timeout_retry_counter", op.name),
+                    // format!("{}_elapsed_executing_ms", op.name),
+                    // format!("{}_elapsed_disabled_ms", op.name),
+                ]
+            })
+            .collect::<Vec<String>>(),
+    );
+
+    // Currently running operation instances (template + uuid)
+    let mut active_instances: Vec<Operation> = Vec::new();
 
     println!("{:?}", keys);
 
