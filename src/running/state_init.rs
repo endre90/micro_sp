@@ -317,42 +317,45 @@ pub fn generate_operation_state_variables(model: &Model, coverability_tracking: 
     let mut state = State::new();
     // operations should be put in the initial state once they are part of the plan
 
-    // fn get_all_operations(sop: &SOP) -> Vec<Operation> {
-    //     let mut operations = Vec::new();
-    //     get_all_operations_recursive(sop, &mut operations);
-    //     operations
-    // }
+    fn get_all_operations(sop: &SOP) -> Vec<Operation> {
+        let mut operations = Vec::new();
+        get_all_operations_recursive(sop, &mut operations);
+        operations
+    }
 
-    // fn get_all_operations_recursive(sop: &SOP, operations: &mut Vec<Operation>) {
-    //     match sop {
-    //         // Base case: We found an operation. Clone it and add it to our list.
-    //         SOP::Operation(op) => {
-    //             operations.push(*op.clone());
-    //         }
-    //         // Recursive step: This is a container. Iterate through its children
-    //         // and call this function on each of them.
-    //         SOP::Sequence(sops) | SOP::Parallel(sops) | SOP::Alternative(sops) => {
-    //             for child_sop in sops {
-    //                 get_all_operations_recursive(child_sop, operations);
-    //             }
-    //         }
-    //     }
-    // }
+    fn get_all_operations_recursive(sop: &SOP, operations: &mut Vec<Operation>) {
+        match sop {
+            // Base case: We found an operation. Clone it and add it to our list.
+            SOP::Operation(op) => {
+                operations.push(*op.clone());
+            }
+            // Recursive step: This is a container. Iterate through its children
+            // and call this function on each of them.
+            SOP::Sequence(sops) | SOP::Parallel(sops) | SOP::Alternative(sops) => {
+                for child_sop in sops {
+                    get_all_operations_recursive(child_sop, operations);
+                }
+            }
+        }
+    }
 
     for sop in &model.sops {
-        // let ops_in_sop = get_all_operations(&sop.sop);
+        let ops_in_sop = get_all_operations(&sop.sop);
         let sop_information = v!(&&format!("{}_sop_information", sop.id));
         state = state.add(assign!(
             sop_information,
             SPValue::String(StringOrUnknown::UNKNOWN)
         ));
         // probably not needed anymore since we are doing this now live when the time comes to execute the operation
-        // state = add_operation_tracking_variables(&ops_in_sop, &state, false);
+        // state = add_operation_meta_tracking_variables(&ops_in_sop, &state, false);
+        state = add_operation_state_tracking_variable(&ops_in_sop, &state);
     }
 
     // probably not needed anymore since we are doing this now live when the time comes to execute the operation
-    // state = add_operation_tracking_variables(&model.operations, &state, false);
-    // state = add_operation_tracking_variables(&model.auto_operations, &state, false);
+    // state = add_operation_meta_tracking_variables(&model.operations, &state, false);
+    state = add_operation_state_tracking_variable(&model.operations, &state);
+    // state = add_operation_meta_tracking_variables(&model.auto_operations, &state, false);
+    state = add_operation_state_tracking_variable(&model.auto_operations, &state);
 
     for transition in &model.auto_transitions {
         if coverability_tracking {
@@ -471,10 +474,9 @@ mod tests {
 }
 
 
-pub fn add_operation_tracking_variables(ops: &Vec<Operation>, state: &State, coverability_tracking: bool) -> State {
+pub fn add_operation_meta_tracking_variables(ops: &Vec<Operation>, state: &State, coverability_tracking: bool) -> State {
     let mut state = state.clone();
     for operation in ops {
-        let operation_state = v!(&&format!("{}", operation.name)); // Initial, Executing, Failed, Completed, Unknown
         let operation_information = v!(&&format!("{}_information", operation.name));
         let operation_elapsed_executing_ms =
             iv!(&&format!("{}_elapsed_executing_ms", operation.name)); // to timeout if it takes too long
@@ -484,7 +486,6 @@ pub fn add_operation_tracking_variables(ops: &Vec<Operation>, state: &State, cov
             iv!(&&format!("{}_failure_retry_counter", operation.name)); // without scrapping the current plan, how many times has an operation retried
         let operation_timeout_retry_counter =
             iv!(&&format!("{}_timeout_retry_counter", operation.name));
-        state = state.add(assign!(operation_state, "initial".to_spvalue()));
         state = state.add(assign!(
             operation_information,
             SPValue::String(StringOrUnknown::UNKNOWN)
@@ -519,6 +520,15 @@ pub fn add_operation_tracking_variables(ops: &Vec<Operation>, state: &State, cov
                 state = state.add(assign!(cov, 0.to_spvalue()));
             }
         }
+    }
+    state
+}
+
+pub fn add_operation_state_tracking_variable(ops: &Vec<Operation>, state: &State) -> State {
+    let mut state = state.clone();
+    for operation in ops {
+        let operation_state = v!(&&format!("{}", operation.name)); // Initial, Executing, Failed, Completed, Unknown
+        state = state.add(assign!(operation_state, "initial".to_spvalue()));
     }
     state
 }

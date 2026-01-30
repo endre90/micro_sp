@@ -160,7 +160,7 @@ pub async fn auto_operation_runner(
                     initial_state_key,
                     SPValue::String(StringOrUnknown::String(OperationState::Initial.to_string()))
                 ));
-                new_state = add_operation_tracking_variables(
+                new_state = add_operation_meta_tracking_variables(
                     &vec![new_instance.clone()],
                     &new_state,
                     false,
