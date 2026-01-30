@@ -22,8 +22,8 @@ async fn process_transition(
     }
 
     let unique_id = nanoid::nanoid!(10, &NANOID_ALPHABET);
-    let mut transision = transition.clone();
-    transision.name = format!("{}_{}", transition.name, unique_id);
+    let mut transition = transition.clone();
+    transition.name = format!("{}_{}", transition.name, unique_id);
 
     let new_state = transition.to_owned().take(state, &log_target);
     log::info!(target: &log_target, "Executed auto transition: '{}'.", transition.name);
