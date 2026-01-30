@@ -97,15 +97,8 @@ pub async fn auto_operation_runner(
     // Keys from Templates to check if we should start new ones
     for op in &model.auto_operations {
         keys.extend(op.get_all_var_keys());
+        keys.push(op.name.clone());
     }
-
-    keys.extend(
-        model
-            .auto_operations
-            .iter()
-            .flat_map(|op| vec![format!("{}", op.name)])
-            .collect::<Vec<String>>(),
-    );
 
     loop {
         interval.tick().await;
