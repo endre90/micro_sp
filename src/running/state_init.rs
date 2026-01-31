@@ -54,6 +54,12 @@ pub fn generate_runner_state_variables(name: &str) -> State {
     let time_command = v!(&&format!("{}_time_command", name));
     let time_duration_ms = iv!(&&format!("{}_time_duration_ms", name));
     let time_elapsed_ms = iv!(&&format!("{}_time_elapsed_ms", name));
+    
+    let active_auto_operations = av!(&&format!("{}_active_auto_operations", name));
+    state = state.add(assign!(
+        active_auto_operations,
+        SPValue::Array(ArrayOrUnknown::UNKNOWN)
+    ));
 
     // Pause, Stop, Run/Play/Continue
     let sp_dashboard_command = v!(&&format!("{}_dashboard_command", name));
