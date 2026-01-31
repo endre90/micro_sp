@@ -116,9 +116,7 @@ pub async fn auto_operation_runner(
     );
 
     // Currently running operation instances (template + uuid)
-    let mut active_instances: Vec<Operation> = Vec::new();
-
-    println!("{:?}", keys);
+    let mut active_operations: Vec<Operation> = Vec::new();
 
     loop {
         interval.tick().await;
@@ -128,7 +126,7 @@ pub async fn auto_operation_runner(
         let mut con = connection_manager.get_connection().await;
 
         // Keys from Active Instances to run them
-        for op in &active_instances {
+        for op in &active_operations {
             keys.extend(op.get_all_var_keys());
         }
 
@@ -137,14 +135,12 @@ pub async fn auto_operation_runner(
             None => continue,
         };
 
-        println!("State: {}", state);
-
         let mut new_state = state.clone();
 
         for template in &model.auto_operations {
             // Check if this template should spawn a new instance
             // "Trigger is True" AND "No instance of this type is currently running"
-            let is_already_running = active_instances
+            let is_already_running = active_operations
                 .iter()
                 .any(|i| i.name.starts_with(&template.name));
 
@@ -167,14 +163,15 @@ pub async fn auto_operation_runner(
                 );
 
                 log::info!(target: &log_target, "Spawning unique operation {}.", new_instance.name);
-                active_instances.push(new_instance);
+                active_operations.push(new_instance);
+                continue; // This forces the state to pick up the active operations in the next iteration
             }
         }
 
         // We use a retain pattern to run and clean up in one pass
         let mut keep_indices = Vec::new();
 
-        for (i, instance) in active_instances.iter().enumerate() {
+        for (i, instance) in active_operations.iter().enumerate() {
             new_state = process_operation(
                 &name,
                 new_state,
@@ -206,9 +203,9 @@ pub async fn auto_operation_runner(
         }
 
         // Retain only active operations
-        active_instances = keep_indices
+        active_operations = keep_indices
             .iter()
-            .map(|&i| active_instances[i].clone())
+            .map(|&i| active_operations[i].clone())
             .collect();
 
         let modified_state = state.get_diff_partial_state(&new_state);
