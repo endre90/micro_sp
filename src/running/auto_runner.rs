@@ -118,7 +118,7 @@ pub async fn auto_operation_runner(
     // Currently running operation instances (template + uuid)
     let mut active_operations: Vec<Operation> = Vec::new();
 
-    loop {
+    'main: loop {
         interval.tick().await;
         if let Err(_) = connection_manager.check_redis_health(&log_target).await {
             continue;
@@ -128,6 +128,10 @@ pub async fn auto_operation_runner(
         // Keys from Active Instances to run them
         for op in &active_operations {
             keys.extend(op.get_all_var_keys());
+        }
+        println!("Active OPS:");
+        for op in &active_operations {
+            println!("{}", op.name);
         }
 
         let state = match StateManager::get_state_for_keys(&mut con, &keys, &log_target).await {
@@ -173,7 +177,7 @@ pub async fn auto_operation_runner(
 
                 log::info!(target: &log_target, "Spawning unique operation {}.", new_instance.name);
                 active_operations.push(new_instance);
-                continue; // This forces the state to pick up the active operations in the next iteration
+                continue 'main; // This forces the state to pick up the active operations in the next iteration
             }
         }
 
