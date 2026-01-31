@@ -135,6 +135,8 @@ pub async fn auto_operation_runner(
             None => continue,
         };
 
+        println!("A : {}", state);
+
         let mut new_state = state.clone();
 
         for template in &model.auto_operations {
@@ -162,6 +164,8 @@ pub async fn auto_operation_runner(
                     false,
                 );
 
+                println!("B : {}", new_state);
+
                 let modified_state = state.get_diff_partial_state(&new_state);
                 if !modified_state.state.is_empty() {
                     StateManager::set_state(&mut con, &modified_state).await;
@@ -175,6 +179,8 @@ pub async fn auto_operation_runner(
 
         // We use a retain pattern to run and clean up in one pass
         let mut keep_indices = Vec::new();
+
+        println!("C : {}", new_state);
 
         for (i, instance) in active_operations.iter().enumerate() {
             new_state = process_operation(
