@@ -80,7 +80,7 @@ pub async fn auto_transition_runner(
 }
 
 pub async fn auto_operation_runner(
-    name: &str,
+    sp_id: &str,
     model: &Model,
     logging_tx: mpsc::Sender<LogMsg>,
     connection_manager: &Arc<ConnectionManager>,
@@ -88,7 +88,7 @@ pub async fn auto_operation_runner(
     initialize_env_logger();
     let mut interval = interval(Duration::from_millis(OPERAION_RUNNER_TICK_INTERVAL_MS));
     let model = model.clone();
-    let log_target = format!("{}_auto_op_runner", name);
+    let log_target = format!("{}_auto_op_runner", sp_id);
 
     let mut keys: Vec<String> = model
         .auto_operations
@@ -96,7 +96,8 @@ pub async fn auto_operation_runner(
         .flat_map(|o| o.get_all_var_keys())
         .collect();
 
-    keys.extend(vec![format!("{}_dashboard_command", name)]);
+    keys.extend(vec![format!("{}_dashboard_command", sp_id)]);
+    keys.extend(vec![format!("{}_active_auto_operations", sp_id)]);
 
     keys.extend(
         model
@@ -116,7 +117,7 @@ pub async fn auto_operation_runner(
     );
 
     // Currently running operation instances (template + uuid)
-    let mut active_operations: Vec<Operation> = Vec::new();
+    // let mut active_operations: Vec<Operation> = Vec::new();
 
     'main: loop {
         interval.tick().await;
@@ -126,18 +127,33 @@ pub async fn auto_operation_runner(
         let mut con = connection_manager.get_connection().await;
 
         // Keys from Active Instances to run them
-        for op in &active_operations {
-            keys.extend(op.get_all_var_keys());
-        }
-        println!("Active OPS:");
-        for op in &active_operations {
-            println!("{}", op.name);
-        }
+        // for op in &active_operations {
+        //     keys.extend(op.get_all_var_keys());
+        // }
+        // println!("Active OPS:");
+        // for op in &active_operations {
+        //     println!("{}", op.name);
+        // }
 
         let state = match StateManager::get_state_for_keys(&mut con, &keys, &log_target).await {
             Some(s) => s,
             None => continue,
         };
+
+        let active_operations_spvalue = state.get_array_or_default_to_empty(
+            &format!("{}_active_auto_operations", sp_id),
+            &log_target,
+        );
+
+        let mut active_operations = vec![];
+        for op in active_operations_spvalue {
+            match op {
+                SPValue::String(StringOrUnknown::String(active_op)) => {
+                    active_operations.push(active_op)
+                }
+                _ => (),
+            }
+        }
 
         println!("A : {}", state);
 
@@ -148,7 +164,7 @@ pub async fn auto_operation_runner(
             // "Trigger is True" AND "No instance of this type is currently running"
             let is_already_running = active_operations
                 .iter()
-                .any(|i| i.name.starts_with(&template.name));
+                .any(|i| i.starts_with(&template.name));
 
             if !is_already_running && template.eval(&state, &log_target) {
                 let unique_id = nanoid::nanoid!(10, &NANOID_ALPHABET);
@@ -176,7 +192,7 @@ pub async fn auto_operation_runner(
                 }
 
                 log::info!(target: &log_target, "Spawning unique operation {}.", new_instance.name);
-                active_operations.push(new_instance);
+                active_operations.push(new_instance.name);
                 continue 'main; // This forces the state to pick up the active operations in the next iteration
             }
         }
@@ -187,10 +203,15 @@ pub async fn auto_operation_runner(
         println!("C : {}", new_state);
 
         for (i, instance) in active_operations.iter().enumerate() {
+            let instance_operation = model
+                .auto_operations
+                .iter()
+                .find(|op| op.name == *instance)
+                .unwrap();
             new_state = process_operation(
-                &name,
+                &sp_id,
                 new_state,
-                instance,
+                instance_operation,
                 OperationProcessingType::Automatic,
                 None,
                 None,
@@ -200,8 +221,7 @@ pub async fn auto_operation_runner(
             .await;
 
             // Check if finished
-            let op_state_str =
-                new_state.get_string_or_default_to_unknown(&instance.name, &log_target);
+            let op_state_str = new_state.get_string_or_default_to_unknown(&instance, &log_target);
             let op_state = OperationState::from_str(&op_state_str);
 
             match op_state {
@@ -209,7 +229,7 @@ pub async fn auto_operation_runner(
                 | OperationState::Failed
                 | OperationState::Timedout
                 | OperationState::Disabled => {
-                    log::info!(target: &log_target, "Finished {}", instance.name);
+                    log::info!(target: &log_target, "Finished {}", instance);
                 }
                 _ => {
                     keep_indices.push(i);
@@ -222,6 +242,11 @@ pub async fn auto_operation_runner(
             .iter()
             .map(|&i| active_operations[i].clone())
             .collect();
+
+        new_state = new_state.update(
+            &format!("{}_active_auto_operations", sp_id),
+            active_operations.to_spvalue(),
+        );
 
         let modified_state = state.get_diff_partial_state(&new_state);
         if !modified_state.state.is_empty() {
