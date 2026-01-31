@@ -162,6 +162,11 @@ pub async fn auto_operation_runner(
                     false,
                 );
 
+                let modified_state = state.get_diff_partial_state(&new_state);
+                if !modified_state.state.is_empty() {
+                    StateManager::set_state(&mut con, &modified_state).await;
+                }
+
                 log::info!(target: &log_target, "Spawning unique operation {}.", new_instance.name);
                 active_operations.push(new_instance);
                 continue; // This forces the state to pick up the active operations in the next iteration
