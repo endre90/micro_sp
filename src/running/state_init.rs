@@ -54,7 +54,7 @@ pub fn generate_runner_state_variables(name: &str) -> State {
     let time_command = v!(&&format!("{}_time_command", name));
     let time_duration_ms = iv!(&&format!("{}_time_duration_ms", name));
     let time_elapsed_ms = iv!(&&format!("{}_time_elapsed_ms", name));
-    
+
     let active_auto_operations = av!(&&format!("{}_active_auto_operations", name));
     state = state.add(assign!(
         active_auto_operations,
@@ -142,10 +142,7 @@ pub fn generate_runner_state_variables(name: &str) -> State {
         plan_name,
         SPValue::String(StringOrUnknown::UNKNOWN)
     ));
-        state = state.add(assign!(
-        plan_id,
-        SPValue::String(StringOrUnknown::UNKNOWN)
-    ));
+    state = state.add(assign!(plan_id, SPValue::String(StringOrUnknown::UNKNOWN)));
     state = state.add(assign!(
         plan_state,
         SPValue::String(StringOrUnknown::UNKNOWN)
@@ -187,7 +184,10 @@ pub fn generate_runner_state_variables(name: &str) -> State {
         SPValue::String(StringOrUnknown::UNKNOWN)
     ));
     state = state.add(assign!(replanned, SPValue::Bool(BoolOrUnknown::UNKNOWN)));
-    state = state.add(assign!(replan_for_same_goal, SPValue::Bool(BoolOrUnknown::UNKNOWN)));
+    state = state.add(assign!(
+        replan_for_same_goal,
+        SPValue::Bool(BoolOrUnknown::UNKNOWN)
+    ));
     state = state.add(assign!(
         replan_counter,
         SPValue::Int64(IntOrUnknown::UNKNOWN)
@@ -205,7 +205,10 @@ pub fn generate_runner_state_variables(name: &str) -> State {
         replan_trigger,
         SPValue::Bool(BoolOrUnknown::UNKNOWN)
     ));
-    state = state.add(assign!(incoming_goals, SPValue::Array(ArrayOrUnknown::UNKNOWN)));
+    state = state.add(assign!(
+        incoming_goals,
+        SPValue::Array(ArrayOrUnknown::UNKNOWN)
+    ));
     state = state.add(assign!(
         scheduled_goals,
         SPValue::Array(ArrayOrUnknown::UNKNOWN)
@@ -352,15 +355,40 @@ pub fn generate_operation_state_variables(model: &Model, coverability_tracking: 
             sop_information,
             SPValue::String(StringOrUnknown::UNKNOWN)
         ));
-        state = add_operation_meta_tracking_variables(&ops_in_sop.iter().map(|x| x.name.clone()).collect(), &state, false); // remove later for unique on the fly
-        state = add_operation_state_tracking_variable(&ops_in_sop.iter().map(|x| x.name.clone()).collect(), &state); // remove later for unique on the fly
+        state = add_operation_meta_tracking_variables(
+            &ops_in_sop.iter().map(|x| x.name.clone()).collect(),
+            &state,
+            false,
+        ); // remove later for unique on the fly
+        state = add_operation_state_tracking_variable(
+            &ops_in_sop.iter().map(|x| x.name.clone()).collect(),
+            &state,
+        ); // remove later for unique on the fly
     }
 
-    // state = add_operation_state_tracking_variable(&model.operations, &state);  // remove later for unique on the fly
-    // state = add_operation_meta_tracking_variables(&model.operations, &state, false); // remove later for unique on the fly
 
-    state = add_operation_state_tracking_variable(&model.auto_operations.iter().map(|x| x.name.clone()).collect(), &state);  // remove later for unique on the fly
-    state = add_operation_meta_tracking_variables(&model.auto_operations.iter().map(|x| x.name.clone()).collect(), &state, false);  // remove later for unique on the fly
+    // Not ideal, maybe there is a way to remove this dependancy
+    // Still need this for the BFS planning level because the BFS needs the state, and the template has to exist in the state
+    state = add_operation_state_tracking_variable(&model.operations.iter().map(|x| x.name.clone()).collect(), &state);  // remove later for unique on the fly
+    state = add_operation_meta_tracking_variables(&model.operations.iter().map(|x| x.name.clone()).collect(), &state, false); // remove later for unique on the fly
+
+    state = add_operation_state_tracking_variable(
+        &model
+            .auto_operations
+            .iter()
+            .map(|x| x.name.clone())
+            .collect(),
+        &state,
+    ); // remove later for unique on the fly
+    state = add_operation_meta_tracking_variables(
+        &model
+            .auto_operations
+            .iter()
+            .map(|x| x.name.clone())
+            .collect(),
+        &state,
+        false,
+    ); // remove later for unique on the fly
 
     for transition in &model.auto_transitions {
         if coverability_tracking {
@@ -478,19 +506,18 @@ mod tests {
     }
 }
 
-
-pub fn add_operation_meta_tracking_variables(ops: &Vec<String>, state: &State, coverability_tracking: bool) -> State {
+pub fn add_operation_meta_tracking_variables(
+    ops: &Vec<String>,
+    state: &State,
+    coverability_tracking: bool,
+) -> State {
     let mut state = state.clone();
     for operation in ops {
         let operation_information = v!(&&format!("{}_information", operation));
-        let operation_elapsed_executing_ms =
-            iv!(&&format!("{}_elapsed_executing_ms", operation)); // to timeout if it takes too long
-        let operation_elapsed_disabled_ms =
-            iv!(&&format!("{}_elapsed_disabled_ms", operation));
-        let operation_failure_retry_counter =
-            iv!(&&format!("{}_failure_retry_counter", operation)); // without scrapping the current plan, how many times has an operation retried
-        let operation_timeout_retry_counter =
-            iv!(&&format!("{}_timeout_retry_counter", operation));
+        let operation_elapsed_executing_ms = iv!(&&format!("{}_elapsed_executing_ms", operation)); // to timeout if it takes too long
+        let operation_elapsed_disabled_ms = iv!(&&format!("{}_elapsed_disabled_ms", operation));
+        let operation_failure_retry_counter = iv!(&&format!("{}_failure_retry_counter", operation)); // without scrapping the current plan, how many times has an operation retried
+        let operation_timeout_retry_counter = iv!(&&format!("{}_timeout_retry_counter", operation));
         state = state.add(assign!(
             operation_information,
             SPValue::String(StringOrUnknown::UNKNOWN)
