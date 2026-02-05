@@ -39,13 +39,14 @@ pub async fn planner_ticker(
 
     // And the operation names
     // Maybe we don't even need this if we are not resetting all operations when planning
-    // keys.extend(
-    //     model
-    //         .operations
-    //         .iter()
-    //         .flat_map(|op| vec![format!("{}", op.name)])
-    //         .collect::<Vec<String>>(),
-    // );
+    // Actually we do need it because the operation planner (bfs needs to access the steate, and the planning is done on the template level)
+    keys.extend(
+        model
+            .operations
+            .iter()
+            .flat_map(|op| vec![format!("{}", op.name)])
+            .collect::<Vec<String>>(),
+    );
 
     loop {
         interval.tick().await;
