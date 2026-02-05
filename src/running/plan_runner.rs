@@ -18,39 +18,42 @@ pub async fn planned_operation_runner(
 
     // Get only the relevant keys from the state
     log::info!(target: &log_target, "Online.");
-    let mut keys: Vec<String> = model
-        .operations
-        .iter()
-        .flat_map(|t| t.get_all_var_keys())
-        .collect();
+    // let mut keys: Vec<String> = model
+    //     .operations
+    //     .iter()
+    //     .flat_map(|t| t.get_all_var_keys())
+    //     .collect();
 
-    // We also need some of the planner vars and dashboard
-    keys.extend(vec![
-        format!("{}_planner_state", sp_id),
-        format!("{}_plan_state", sp_id),
-        format!("{}_plan_current_step", sp_id),
-        format!("{}_current_goal_state", sp_id),
-        format!("{}_plan", sp_id),
-        format!("{}_dashboard_command", sp_id),
-    ]);
+    // // We also need some of the planner vars and dashboard
+    // keys.extend(vec![
+    //     format!("{}_planner_state", sp_id),
+    //     format!("{}_plan_state", sp_id),
+    //     format!("{}_plan_current_step", sp_id),
+    //     format!("{}_current_goal_state", sp_id),
+    //     format!("{}_plan", sp_id),
+    //     format!("{}_dashboard_command", sp_id),
+    // ]);
 
     // And the vars to keep trask of operation states
-    keys.extend(
-        model
-            .operations
-            .iter()
-            .flat_map(|op| {
-                vec![
-                    format!("{}", op.name),
-                    format!("{}_information", op.name),
-                    format!("{}_failure_retry_counter", op.name),
-                    format!("{}_timeout_retry_counter", op.name),
-                    format!("{}_elapsed_executing_ms", op.name),
-                    format!("{}_elapsed_disabled_ms", op.name),
-                ]
-            })
-            .collect::<Vec<String>>(),
-    );
+    // Ok this is not enough now because we have unique operations... Now we have to get all that start with "op_"
+    // keys.extend(
+    //     model
+    //         .operations
+    //         .iter()
+    //         .flat_map(|op| {
+    //             vec![
+    //                 format!("{}", op.name),
+    //                 format!("{}_information", op.name),
+    //                 format!("{}_failure_retry_counter", op.name),
+    //                 format!("{}_timeout_retry_counter", op.name),
+    //                 format!("{}_elapsed_executing_ms", op.name),
+    //                 format!("{}_elapsed_disabled_ms", op.name),
+    //             ]
+    //         })
+    //         .collect::<Vec<String>>(),
+    // );
+
+
 
     loop {
         interval.tick().await;
@@ -58,10 +61,16 @@ pub async fn planned_operation_runner(
             continue;
         }
         let mut con = connection_manager.get_connection().await;
-        let state = match StateManager::get_state_for_keys(&mut con, &keys, &log_target).await {
+
+        let state = match StateManager::get_full_state(&mut con).await {
             Some(s) => s,
             None => continue,
         };
+
+        // let state = match StateManager::get_state_for_keys(&mut con, &keys, &log_target).await {
+        //     Some(s) => s,
+        //     None => continue,
+        // };
         // let con_clone = con.clone();
         let new_state =
             process_plan_tick(sp_id, &model, &state, logging_tx.clone(), &log_target).await;
