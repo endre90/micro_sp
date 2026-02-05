@@ -85,8 +85,8 @@ struct PlannerContext {
     replan_trigger: bool,
     replanned: bool,
     plan_counter: i64,
-    replan_counter: i64,
-    replan_counter_total: i64,
+    // replan_counter: i64,
+    // replan_counter_total: i64,
     planner_state: String,
     plan: Vec<String>,
     plan_id: String,
@@ -100,10 +100,10 @@ fn process_planner_tick(sp_id: &str, model: &Model, state: &State, log_target: &
         replanned: state.get_bool_or_default_to_false(&format!("{}_replanned", sp_id), &log_target),
         plan_counter: state
             .get_int_or_default_to_zero(&format!("{}_plan_counter", sp_id), &log_target),
-        replan_counter: state
-            .get_int_or_default_to_zero(&format!("{}_replan_counter", sp_id), &log_target),
-        replan_counter_total: state
-            .get_int_or_default_to_zero(&format!("{}_replan_counter_total", sp_id), &log_target),
+        // replan_counter: state
+        //     .get_int_or_default_to_zero(&format!("{}_replan_counter", sp_id), &log_target),
+        // replan_counter_total: state
+        //     .get_int_or_default_to_zero(&format!("{}_replan_counter_total", sp_id), &log_target),
         planner_state: state
             .get_string_or_default_to_unknown(&format!("{}_planner_state", sp_id), &log_target),
         plan_id: state
@@ -142,14 +142,15 @@ fn process_planner_tick(sp_id: &str, model: &Model, state: &State, log_target: &
             &format!("{}_plan_counter", sp_id),
             ctx.plan_counter.to_spvalue(),
         )
-        .update(
-            &format!("{}_replan_counter", sp_id),
-            ctx.replan_counter.to_spvalue(),
-        )
-        .update(
-            &format!("{}_replan_counter_total", sp_id),
-            ctx.replan_counter_total.to_spvalue(),
-        )
+        // Move this to the goal runner
+        // .update(
+        //     &format!("{}_replan_counter", sp_id),
+        //     ctx.replan_counter.to_spvalue(),
+        // )
+        // .update(
+        //     &format!("{}_replan_counter_total", sp_id),
+        //     ctx.replan_counter_total.to_spvalue(),
+        // )
         .update(
             &format!("{}_planner_state", sp_id),
             ctx.planner_state.to_spvalue(),
@@ -181,36 +182,36 @@ fn handle_replan_request(
         return;
     }
 
-    if ctx.replan_counter >= MAX_REPLAN_RETRIES {
-        ctx.planner_information = "Max allowed replan retries reached.".to_string();
-        ctx.replan_trigger = false;
-        return;
-    }
+    // Move this to the goal runner
+    // if ctx.replan_counter >= MAX_REPLAN_RETRIES {
+    //     ctx.planner_information = "Max allowed replan retries reached.".to_string();
+    //     ctx.replan_trigger = false;
+    //     return;
+    // }
 
-    ctx.replan_counter += 1;
-    ctx.replan_counter_total += 1;
+    // ctx.replan_counter += 1;
+    // ctx.replan_counter_total += 1;
 
     let goal = state.extract_goal(&sp_id);
     let plan_result = bfs_operation_planner(
         state.clone(),
         goal,
         model.operations.clone(),
-        20,
+        30,
         &log_target,
     );
 
     if !plan_result.found {
         ctx.plan_id = "".to_string();
         ctx.planner_information = format!(
-            "Planner triggered (try {}/{}): No plan was found.",
-            ctx.replan_counter, MAX_REPLAN_RETRIES
+            "Planner triggered but no plan was found.",
+            // ctx.replan_counter, MAX_REPLAN_RETRIES
         );
         ctx.planner_state = PlannerState::NotFound.to_string();
     } else {
-        ctx.planner_information = "Planning completed.".to_string();
         ctx.planner_state = PlannerState::Found.to_string();
         ctx.plan_id = nanoid::nanoid!(10, &NANOID_ALPHABET);
-        ctx.replan_counter = 0;
+        // ctx.replan_counter = 0;
 
         if plan_result.length > 0 {
             ctx.replanned = true;

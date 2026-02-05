@@ -288,7 +288,7 @@ pub async fn goal_runner(
 
         match GoalState::from_str(&current_goal_state.to_string()) {
             GoalState::Initial => {
-                if replan_for_same_goal {
+                if replan_for_same_goal {  // This should be Option(number of replans) for every goal
                     goal_runner_information = format!(
                         "Replan for same goal {}: \n       {}",
                         current_goal_id, current_goal_predicate

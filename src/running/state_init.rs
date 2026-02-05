@@ -352,15 +352,15 @@ pub fn generate_operation_state_variables(model: &Model, coverability_tracking: 
             sop_information,
             SPValue::String(StringOrUnknown::UNKNOWN)
         ));
-        state = add_operation_meta_tracking_variables(&ops_in_sop, &state, false); // remove later for unique on the fly
-        state = add_operation_state_tracking_variable(&ops_in_sop, &state); // remove later for unique on the fly
+        state = add_operation_meta_tracking_variables(&ops_in_sop.iter().map(|x| x.name.clone()).collect(), &state, false); // remove later for unique on the fly
+        state = add_operation_state_tracking_variable(&ops_in_sop.iter().map(|x| x.name.clone()).collect(), &state); // remove later for unique on the fly
     }
 
-    state = add_operation_state_tracking_variable(&model.operations, &state);  // remove later for unique on the fly
-    state = add_operation_meta_tracking_variables(&model.operations, &state, false); // remove later for unique on the fly
+    // state = add_operation_state_tracking_variable(&model.operations, &state);  // remove later for unique on the fly
+    // state = add_operation_meta_tracking_variables(&model.operations, &state, false); // remove later for unique on the fly
 
-    state = add_operation_state_tracking_variable(&model.auto_operations, &state);  // remove later for unique on the fly
-    state = add_operation_meta_tracking_variables(&model.auto_operations, &state, false);  // remove later for unique on the fly
+    state = add_operation_state_tracking_variable(&model.auto_operations.iter().map(|x| x.name.clone()).collect(), &state);  // remove later for unique on the fly
+    state = add_operation_meta_tracking_variables(&model.auto_operations.iter().map(|x| x.name.clone()).collect(), &state, false);  // remove later for unique on the fly
 
     for transition in &model.auto_transitions {
         if coverability_tracking {
@@ -479,18 +479,18 @@ mod tests {
 }
 
 
-pub fn add_operation_meta_tracking_variables(ops: &Vec<Operation>, state: &State, coverability_tracking: bool) -> State {
+pub fn add_operation_meta_tracking_variables(ops: &Vec<String>, state: &State, coverability_tracking: bool) -> State {
     let mut state = state.clone();
     for operation in ops {
-        let operation_information = v!(&&format!("{}_information", operation.name));
+        let operation_information = v!(&&format!("{}_information", operation));
         let operation_elapsed_executing_ms =
-            iv!(&&format!("{}_elapsed_executing_ms", operation.name)); // to timeout if it takes too long
+            iv!(&&format!("{}_elapsed_executing_ms", operation)); // to timeout if it takes too long
         let operation_elapsed_disabled_ms =
-            iv!(&&format!("{}_elapsed_disabled_ms", operation.name));
+            iv!(&&format!("{}_elapsed_disabled_ms", operation));
         let operation_failure_retry_counter =
-            iv!(&&format!("{}_failure_retry_counter", operation.name)); // without scrapping the current plan, how many times has an operation retried
+            iv!(&&format!("{}_failure_retry_counter", operation)); // without scrapping the current plan, how many times has an operation retried
         let operation_timeout_retry_counter =
-            iv!(&&format!("{}_timeout_retry_counter", operation.name));
+            iv!(&&format!("{}_timeout_retry_counter", operation));
         state = state.add(assign!(
             operation_information,
             SPValue::String(StringOrUnknown::UNKNOWN)
@@ -514,12 +514,12 @@ pub fn add_operation_meta_tracking_variables(ops: &Vec<Operation>, state: &State
 
         if coverability_tracking {
             // coverability tracking does nothing for now
-            let initial = iv!(&&format!("{}_visited_initial", operation.name));
-            let executing = iv!(&&format!("{}_visited_executing", operation.name));
-            let timedout = iv!(&&format!("{}_visited_timedout", operation.name)); // Operation should have optional deadline field
-            let disabled = iv!(&&format!("{}_visited_disabled", operation.name));
-            let failed = iv!(&&format!("{}_visited_failed", operation.name));
-            let completed = iv!(&&format!("{}_visited_completed", operation.name));
+            let initial = iv!(&&format!("{}_visited_initial", operation));
+            let executing = iv!(&&format!("{}_visited_executing", operation));
+            let timedout = iv!(&&format!("{}_visited_timedout", operation)); // Operation should have optional deadline field
+            let disabled = iv!(&&format!("{}_visited_disabled", operation));
+            let failed = iv!(&&format!("{}_visited_failed", operation));
+            let completed = iv!(&&format!("{}_visited_completed", operation));
 
             for cov in vec![initial, executing, timedout, disabled, failed, completed] {
                 state = state.add(assign!(cov, 0.to_spvalue()));
@@ -529,10 +529,10 @@ pub fn add_operation_meta_tracking_variables(ops: &Vec<Operation>, state: &State
     state
 }
 
-pub fn add_operation_state_tracking_variable(ops: &Vec<Operation>, state: &State) -> State {
+pub fn add_operation_state_tracking_variable(ops: &Vec<String>, state: &State) -> State {
     let mut state = state.clone();
     for operation in ops {
-        let operation_state = v!(&&format!("{}", operation.name)); // Initial, Executing, Failed, Completed, Unknown
+        let operation_state = v!(&&format!("{}", operation)); // Initial, Executing, Failed, Completed, Unknown
         state = state.add(assign!(operation_state, "initial".to_spvalue()));
     }
     state

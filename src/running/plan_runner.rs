@@ -1,7 +1,4 @@
-use crate::{
-    running::process_operation::OperationProcessingType,
-    *,
-};
+use crate::{running::process_operation::OperationProcessingType, *};
 use std::sync::Arc;
 use tokio::{
     sync::mpsc,
@@ -86,8 +83,8 @@ async fn process_plan_tick(
     let planner_state =
         state.get_string_or_default_to_unknown(&format!("{}_planner_state", sp_id), &log_target);
 
-    let goal_state =
-        state.get_string_or_default_to_unknown(&format!("{}_current_goal_state", sp_id), &log_target);
+    let goal_state = state
+        .get_string_or_default_to_unknown(&format!("{}_current_goal_state", sp_id), &log_target);
 
     let mut plan_state_str =
         state.get_string_or_default_to_unknown(&format!("{}_plan_state", sp_id), &log_target);
@@ -105,18 +102,29 @@ async fn process_plan_tick(
     match PlanState::from_str(&plan_state_str) {
         PlanState::Initial => {
             if planner_state == PlannerState::Found.to_string() {
+                // push unique operation and meta operation values here to state
+                let mut unique_operation_state = State::new();
+                unique_operation_state =
+                    add_operation_state_tracking_variable(&plan, &unique_operation_state);
+                unique_operation_state =
+                    add_operation_meta_tracking_variables(&plan, &unique_operation_state, false);
+
+                state.extend(unique_operation_state, false);
+
                 plan_state_str = PlanState::Executing.to_string();
                 plan_current_step = 0;
             }
         }
         PlanState::Executing => {
             if let Some(op_name) = plan.get(plan_current_step as usize) {
-                match model.operations.iter().find(|op| op.name == *op_name) {
+                match model.operations.iter().find(|op| op_name.starts_with(&op.name)) {
                     Some(operation) => {
+                        let mut uq_operation = operation.clone();
+                        uq_operation.name = op_name.to_owned();
                         new_state = running::process_operation::process_operation(
                             &sp_id,
                             new_state,
-                            operation,
+                            &uq_operation,
                             OperationProcessingType::Planned,
                             Some(&mut plan_current_step),
                             Some(&mut plan_state_str),
@@ -153,7 +161,7 @@ async fn process_plan_tick(
             // plan = vec![];
             // plan_state_str = PlanState::Initial.to_string();
             // planner_state = PlannerState::Ready.to_string();
-        },
+        }
         PlanState::Cancelled => {
             // goal_state = GoalState::Cancelled.to_string();
             // plan_current_step = 0;
@@ -161,7 +169,7 @@ async fn process_plan_tick(
             // plan = vec![];
             // plan_state_str = PlanState::Initial.to_string();
             // planner_state = PlannerState::Ready.to_string();
-        },
+        }
         PlanState::UNKNOWN => {
             // goal_state = GoalState::UNKNOWN.to_string();
             // plan_current_step = 0;
@@ -169,7 +177,7 @@ async fn process_plan_tick(
             // plan = vec![];
             // plan_state_str = PlanState::Initial.to_string();
             // planner_state = PlannerState::Ready.to_string();
-        },
+        }
     }
 
     new_state = new_state
@@ -181,7 +189,8 @@ async fn process_plan_tick(
         .update(
             &format!("{}_planner_state", sp_id),
             planner_state.to_spvalue(),
-        ).update(
+        )
+        .update(
             &format!("{}_current_goal_state", sp_id),
             goal_state.to_spvalue(),
         )
