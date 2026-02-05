@@ -217,7 +217,7 @@ fn handle_replan_request(
         if plan_result.length > 0 {
             ctx.replanned = true;
             ctx.plan_counter += 1;
-            ctx.plan = plan_result.plan;
+            ctx.plan = plan_result.plan.iter().map(|x| format!("{}_{}", x, nanoid::nanoid!(10, &NANOID_ALPHABET))).collect();
             ctx.planner_information = format!(
                 "Got a new plan {}:\n{}",
                 ctx.plan_id,
