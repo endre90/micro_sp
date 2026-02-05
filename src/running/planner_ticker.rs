@@ -219,8 +219,8 @@ fn handle_replan_request(
             ctx.replanned = true;
             ctx.plan_counter += 1;
             ctx.plan = plan_result.plan.iter().map(|x| format!("{}_{}", x, nanoid::nanoid!(10, &NANOID_ALPHABET))).collect();
-            *new_state = add_operation_state_tracking_variable(&ctx.plan, &state);
-            *new_state = add_operation_meta_tracking_variables(&ctx.plan, &state, false);
+            *new_state = add_operation_state_tracking_variable(&ctx.plan, &new_state);
+            *new_state = add_operation_meta_tracking_variables(&ctx.plan, &new_state, false);
             ctx.planner_information = format!(
                 "Got a new plan {}:\n{}",
                 ctx.plan_id,
