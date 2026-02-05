@@ -77,9 +77,6 @@ pub async fn planner_ticker(
         if !modified_state.state.is_empty() {
             StateManager::set_state(&mut con, &modified_state).await;
         }
-        // let modified_state = state.get_diff_partial_state(&new_state);
-        // StateManager::set_state(con, &modified_state).await;
-        // StateManager::set_state(&mut con, &new_state).await;
     }
 }
 
