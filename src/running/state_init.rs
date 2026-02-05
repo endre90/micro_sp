@@ -352,16 +352,15 @@ pub fn generate_operation_state_variables(model: &Model, coverability_tracking: 
             sop_information,
             SPValue::String(StringOrUnknown::UNKNOWN)
         ));
-        // probably not needed anymore since we are doing this now live when the time comes to execute the operation
-        // state = add_operation_meta_tracking_variables(&ops_in_sop, &state, false);
-        state = add_operation_state_tracking_variable(&ops_in_sop, &state);
+        state = add_operation_meta_tracking_variables(&ops_in_sop, &state, false); // remove later for unique on the fly
+        state = add_operation_state_tracking_variable(&ops_in_sop, &state); // remove later for unique on the fly
     }
 
-    // probably not needed anymore since we are doing this now live when the time comes to execute the operation
-    // state = add_operation_meta_tracking_variables(&model.operations, &state, false);
-    state = add_operation_state_tracking_variable(&model.operations, &state);
-    // state = add_operation_meta_tracking_variables(&model.auto_operations, &state, false);
-    state = add_operation_state_tracking_variable(&model.auto_operations, &state);
+    state = add_operation_state_tracking_variable(&model.operations, &state);  // remove later for unique on the fly
+    state = add_operation_meta_tracking_variables(&model.operations, &state, false); // remove later for unique on the fly
+
+    state = add_operation_state_tracking_variable(&model.auto_operations, &state);  // remove later for unique on the fly
+    state = add_operation_meta_tracking_variables(&model.auto_operations, &state, false);  // remove later for unique on the fly
 
     for transition in &model.auto_transitions {
         if coverability_tracking {
