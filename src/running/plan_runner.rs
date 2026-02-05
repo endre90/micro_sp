@@ -109,7 +109,7 @@ async fn process_plan_tick(
                 unique_operation_state =
                     add_operation_meta_tracking_variables(&plan, &unique_operation_state, false);
 
-                state.extend(unique_operation_state, false);
+                new_state = new_state.extend(unique_operation_state, false);
 
                 plan_state_str = PlanState::Executing.to_string();
                 plan_current_step = 0;
