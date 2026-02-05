@@ -38,13 +38,14 @@ pub async fn planner_ticker(
     ]);
 
     // And the operation names
-    keys.extend(
-        model
-            .operations
-            .iter()
-            .flat_map(|op| vec![format!("{}", op.name)])
-            .collect::<Vec<String>>(),
-    );
+    // Maybe we don't even need this if we are not resetting all operations when planning
+    // keys.extend(
+    //     model
+    //         .operations
+    //         .iter()
+    //         .flat_map(|op| vec![format!("{}", op.name)])
+    //         .collect::<Vec<String>>(),
+    // );
 
     loop {
         interval.tick().await;
@@ -169,12 +170,12 @@ fn process_planner_tick(sp_id: &str, model: &Model, state: &State, log_target: &
 fn handle_replan_request(
     sp_id: &str,
     ctx: &mut PlannerContext,
-    new_state: &mut State,
+    _new_state: &mut State,
     model: &Model,
     state: &State,
     log_target: &str
 ) {
-    *new_state = reset_all_operations(&new_state, &model);
+    // *new_state = reset_all_operations(&new_state, &model);
     ctx.plan = vec![];
 
     let planner_state = PlannerState::from_str(&ctx.planner_state);
