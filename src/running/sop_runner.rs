@@ -208,6 +208,9 @@ async fn process_sop_node_tick(
 ) -> State {
     match sop {
         SOP::Operation(operation) => {
+
+            // Here is where I need to add uuid for operation. Actually no, it will regenerate it every time it ticks...
+
             state = running::process_operation::process_operation(
                 &sp_id,
                 state,
