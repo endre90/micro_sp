@@ -73,7 +73,7 @@ pub async fn planner_ticker(
             log::info!(target: log_target, "{}", new_info);
         }
 
-        let modified_state = state.get_diff_partial_state(&new_state);
+        let modified_state = state.get_diff_partial_state_and_add_missing(&new_state);
         if !modified_state.state.is_empty() {
             StateManager::set_state(&mut con, &modified_state).await;
         }
@@ -123,6 +123,7 @@ fn process_planner_tick(sp_id: &str, model: &Model, state: &State, log_target: &
     };
 
     let mut new_state = state.clone();
+    // let mut state_to_add = State::new();
 
     if !ctx.replan_trigger {
         // ctx.planner_information = "Planner is not triggered".to_string();
@@ -168,6 +169,7 @@ fn process_planner_tick(sp_id: &str, model: &Model, state: &State, log_target: &
         )
 }
 
+// Returns a new state to add containing unique operations ad unique operation meta
 fn handle_replan_request(
     sp_id: &str,
     ctx: &mut PlannerContext,
@@ -176,7 +178,7 @@ fn handle_replan_request(
     state: &State,
     log_target: &str
 ) {
-    // *new_state = reset_all_operations(&new_state, &model);
+    // *new_state = reset_all_operations(&new_state, &model); // Do we need this?
     ctx.plan = vec![];
 
     let planner_state = PlannerState::from_str(&ctx.planner_state);
@@ -210,6 +212,7 @@ fn handle_replan_request(
             // ctx.replan_counter, MAX_REPLAN_RETRIES
         );
         ctx.planner_state = PlannerState::NotFound.to_string();
+        // State::new()
     } else {
         ctx.planner_state = PlannerState::Found.to_string();
         ctx.plan_id = nanoid::nanoid!(10, &NANOID_ALPHABET);
@@ -219,6 +222,7 @@ fn handle_replan_request(
             ctx.replanned = true;
             ctx.plan_counter += 1;
             ctx.plan = plan_result.plan.iter().map(|x| format!("{}_{}", x, nanoid::nanoid!(10, &NANOID_ALPHABET))).collect();
+            // let mut state_to_add = State::new();
             *new_state = add_operation_state_tracking_variable(&ctx.plan, &new_state);
             *new_state = add_operation_meta_tracking_variables(&ctx.plan, &new_state, false);
             ctx.planner_information = format!(
@@ -231,8 +235,10 @@ fn handle_replan_request(
                     .collect::<Vec<String>>()
                     .join("\n")
             );
+            // state_to_add
         } else {
             ctx.planner_information = "We are already in the goal. No action needed.".to_string();
+            // State::new()
         }
     }
 }

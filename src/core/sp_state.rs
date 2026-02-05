@@ -108,6 +108,26 @@ impl State {
         }
     }
 
+    // Make a new partial state that only consists of updates.
+    pub fn get_diff_partial_state_and_add_missing(&self, new_state: &State) -> State {
+        // let mut updated_assignments = HashMap::new();
+        let mut updated_state = State::new();
+        for (key, new_assignment) in &new_state.state {
+            if let Some(old_assignment) = self.state.get(key) {
+                if old_assignment.val != new_assignment.val {
+                    updated_state.state.insert(key.clone(), new_assignment.clone());
+                }
+            } else {
+                updated_state.state.insert(new_assignment.var.name.to_string(), new_assignment.clone());
+            }
+        }
+
+        updated_state
+        // State {
+        //     state: updated_assignments,
+        // }
+    }
+
     pub fn add(&self, assignment: SPAssignment) -> State {
         match self.state.clone().get(&assignment.var.name) {
             Some(_) => {
