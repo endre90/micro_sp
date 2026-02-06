@@ -115,10 +115,14 @@ impl State {
         for (key, new_assignment) in &new_state.state {
             if let Some(old_assignment) = self.state.get(key) {
                 if old_assignment.val != new_assignment.val {
-                    updated_state.state.insert(key.clone(), new_assignment.clone());
+                    updated_state
+                        .state
+                        .insert(key.clone(), new_assignment.clone());
                 }
             } else {
-                updated_state.state.insert(new_assignment.var.name.to_string(), new_assignment.clone());
+                updated_state
+                    .state
+                    .insert(new_assignment.var.name.to_string(), new_assignment.clone());
             }
         }
 
@@ -146,9 +150,9 @@ impl State {
     pub fn remove(&self, var: &str, log_target: &str) -> State {
         let mut new_state_map = self.state.clone();
         match new_state_map.remove(var) {
-            Some(_) => {
-                State { state: new_state_map }
-            }
+            Some(_) => State {
+                state: new_state_map,
+            },
             None => {
                 log::error!(target: &log_target, "Variable '{}' not in state, can't be removed.", var);
                 self.clone()

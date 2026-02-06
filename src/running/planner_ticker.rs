@@ -194,7 +194,6 @@ fn handle_replan_request(
     // ctx.replan_counter_total += 1;
 
     let goal = state.extract_goal(&sp_id);
-    println!("Start planning...");
     let plan_result = bfs_operation_planner(
         state.clone(),
         goal,
