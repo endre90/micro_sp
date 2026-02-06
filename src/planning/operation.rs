@@ -14,6 +14,7 @@ pub fn bfs_operation_planner(
     let mut visited: HashSet<State> = HashSet::new();
     let mut stack: Vec<(State, Vec<String>)> = vec![(state, vec![])];
     loop {
+        println!("{:?}", stack);
         match stack.len() {
             0 => {
                 break PlanningResult {
