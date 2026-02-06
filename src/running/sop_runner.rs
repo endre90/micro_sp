@@ -80,6 +80,8 @@ pub async fn sop_runner(
             log::info!(target: log_target, "Initializing new Unique SOP Instance: {}", unique_sop_id);
 
             new_state = new_state.update(&format!("{}_sop_id", sp_id), unique_sop_id.to_spvalue());
+            new_state = add_operation_state_tracking_variable(&vec!(unique_sop_id.clone()), &new_state);
+            new_state = add_operation_meta_tracking_variables(&vec!(unique_sop_id.clone()), &new_state, false);
 
             active_sop = Some(unique_sop_struct);
             old_sop_id = unique_sop_id;
@@ -163,7 +165,7 @@ pub async fn sop_runner(
             new_sop_info.to_spvalue(),
         );
 
-        let modified_state = state.get_diff_partial_state(&new_state);
+        let modified_state = state.get_diff_partial_state_and_add_missing(&new_state);
         if !modified_state.state.is_empty() {
             StateManager::set_state(&mut con, &modified_state).await;
         }
