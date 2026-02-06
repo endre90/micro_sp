@@ -40,14 +40,14 @@ impl Model {
                     state: o.state.clone(),
                 })
                 .collect(),
-            // sops,
-            sops: sops
-                .iter()
-                .map(|sop| SOPStruct {
-                    id: sop.id.clone(),
-                    sop: uniquify_sop_operations(sop.sop.clone()),
-                })
-                .collect(),
+            sops,
+            // sops: sops
+            //     .iter()
+            //     .map(|sop| SOPStruct {
+            //         id: sop.id.clone(),
+            //         sop: uniquify_sop_operations(sop.sop.clone()),
+            //     })
+            //     .collect(),
             operations: operations
                 .iter()
                 .map(|o| Operation {

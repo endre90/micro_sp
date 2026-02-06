@@ -112,13 +112,13 @@ async fn process_plan_tick(
         PlanState::Initial => {
             if planner_state == PlannerState::Found.to_string() {
                 // push unique operation and meta operation values here to state
-                let mut unique_operation_state = State::new();
-                unique_operation_state =
-                    add_operation_state_tracking_variable(&plan, &unique_operation_state);
-                unique_operation_state =
-                    add_operation_meta_tracking_variables(&plan, &unique_operation_state, false);
+                // let mut unique_operation_state = State::new();
+                // unique_operation_state =
+                    // add_operation_state_tracking_variable(&plan, &unique_operation_state);
+                // unique_operation_state =
+                    // add_operation_meta_tracking_variables(&plan, &unique_operation_state, false);
 
-                new_state = new_state.extend(unique_operation_state, false);
+                // new_state = new_state.extend(unique_operation_state, false);
 
                 plan_state_str = PlanState::Executing.to_string();
                 plan_current_step = 0;
