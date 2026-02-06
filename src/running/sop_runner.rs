@@ -49,7 +49,7 @@ pub async fn sop_runner(
         let matched_template = model
             .sops
             .iter()
-            .find(|s| raw_sop_id == s.id || raw_sop_id.starts_with(&format!("{}::", s.id)));
+            .find(|s| raw_sop_id == s.id || raw_sop_id.starts_with(&format!("{}", s.id)));
 
         let Some(root_sop_template) = matched_template else {
             // only log if we have an ID but can't find it
@@ -63,14 +63,14 @@ pub async fn sop_runner(
 
         // Check if the old ID belonged to the same template
         let old_was_same_template =
-            old_sop_id == *template_id || old_sop_id.starts_with(&format!("{}::", template_id));
+            old_sop_id == *template_id || old_sop_id.starts_with(&format!("{}", template_id));
 
         let needs_initialization = (!old_was_same_template && !template_id.is_empty())
             || (current_sop_state == SOPState::Initial && sop_enabled);
 
         if needs_initialization {
-            let unique_id_suffix = nanoid::nanoid!(18);
-            let unique_sop_id = format!("{}::{}", template_id, unique_id_suffix);
+            let unique_id_suffix = nanoid::nanoid!(10);
+            let unique_sop_id = format!("{}_{}", template_id, unique_id_suffix);
 
             let mut unique_sop_struct = root_sop_template.clone();
             unique_sop_struct.id = unique_sop_id.clone();
