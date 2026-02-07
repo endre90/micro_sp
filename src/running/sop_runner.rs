@@ -1,5 +1,6 @@
 use crate::*;
 use std::sync::Arc;
+use log::Level;
 use tokio::{
     sync::mpsc,
     time::{Duration, interval},
@@ -19,9 +20,16 @@ pub async fn sop_runner(
 
     log::info!(target: log_target, "Online.");
 
-    let mut old_sop_id = String::new();
-    
-    let mut active_sop_instance: Option<SOP> = None;
+    // let mut old_sop_id = String::new();
+    // This is a stack because SOPs are nested.
+    // Always execute firts on the tops of the stack and when done, remove from the stack
+    // Well actually maybe it is not, the SOP is a tree but I only define a name for the whole (main) tree
+    // let mut active_sops: Vec<String> = vec![];
+
+    // So maybe there is only one SOP executing at a time
+    let mut active_unique_sop_id: Option<String> = None; // the unique sop. This has to be generated on the fly based on the template
+    let mut active_unique_sop_state: SOPState = SOPState::Initial;
+    let mut active_sop_container: Option<SOP> = None;
 
     loop {
         interval.tick().await;
@@ -35,8 +43,8 @@ pub async fn sop_runner(
         };
 
         let mut new_state = state.clone();
-        let sop_state_str =
-            state.get_string_or_default_to_unknown(&format!("{}_sop_state", sp_id), &log_target);
+        // let sop_state =
+            // state.get_string_or_default_to_unknown(&format!("{}_sop_state", sp_id), &log_target);
 
         let sop_enabled =
             state.get_bool_or_default_to_false(&format!("{}_sop_enabled", sp_id), &log_target);
@@ -44,132 +52,130 @@ pub async fn sop_runner(
         let sop_id =
             state.get_string_or_default_to_unknown(&format!("{}_sop_id", sp_id), &log_target);
 
-        // Find the template in the model
-        let Some(root_sop_container) = model.sops.iter().find(|s| s.id == sop_id) else {
-            if !sop_id.is_empty() {
-                log::debug!(target: &log_target, "SOP Template '{}' not found...", sop_id);
-            }
+        let Some(sop_template) = model.sops.iter().find(|s| s.id == sop_id) else {
+            log::debug!(target: &log_target, "SOP with id '{}' not found in model. Skipping evaluation.", sop_id);
             continue;
         };
 
-        if old_sop_id != sop_id {
-            active_sop_instance = None;
-            old_sop_id = sop_id.clone();
-             
-            let info_msg = format!("Selected SOP Template: {}", sop_id);
-            new_state = new_state.update(
-                &format!("{}_sop_information", sop_id),
-                info_msg.to_spvalue(),
-            );
-        }
+        let old_sop_information = new_state
+            .get_string_or_default_to_unknown(&format!("{}_sop_information", sop_id), &log_target);
 
-        let mut new_sop_info = String::new();
+        let mut new_sop_info: String; //= old_sop_information.clone();
+        let mut sop_info_level: Level; // = log::Level::Info;
 
-        match SOPState::from_str(&sop_state_str) {
-            SOPState::Initial => {
+        // Check first if there is an active unique SOP already running
+        match active_unique_sop_id {
+            None => {
                 if sop_enabled {
-                    new_sop_info = format!("Instantiating unique SOP from template '{sop_id}'.");
-                    
-                    let unique_sop = uniquify_sop_operations(root_sop_container.sop.clone());
-                    active_sop_instance = Some(unique_sop);
+                    let unique_sop_id = nanoid::nanoid!(10, &NANOID_ALPHABET);
+                    active_unique_sop_id = Some(format!("{}_{}", sop_template.id, unique_sop_id));
 
-                    new_state = new_state
-                        .update(&format!("{}_sop_enabled", sp_id), false.to_spvalue())
-                        .update(
-                            &format!("{}_sop_state", sp_id),
-                            SOPState::Executing.to_string().to_spvalue(),
-                        );
+                    let unique_sop = uniquify_sop_operations(sop_template.sop.clone());
+                    active_sop_container = Some(unique_sop.clone());
+                    let ops_in_sop = get_all_operations_from_sop(&unique_sop);
+                    new_state = add_operation_meta_tracking_variables(
+                        &ops_in_sop.iter().map(|x| x.name.clone()).collect(),
+                        &new_state,
+                        false,
+                    );
+                    new_state = add_operation_state_tracking_variable(
+                        &ops_in_sop.iter().map(|x| x.name.clone()).collect(),
+                        &new_state,
+                    );
+                    new_sop_info = format!("SOP '{sop_id}' is enabled, starting execution.");
+                    sop_info_level = log::Level::Info;
+                    new_state =
+                        new_state.update(&format!("{}_sop_enabled", sp_id), false.to_spvalue());
+                    // .update(
+                    // &format!("{}_sop_state", sp_id),
+                    // SOPState::Executing.to_string().to_spvalue(),
+                    // );
+                } else {
+                    continue;
                 }
             }
-            SOPState::Executing => {
-                let sop_to_run = active_sop_instance.as_ref().unwrap_or(&root_sop_container.sop);
-                
-                let con_clone = con.clone();
-                new_state = process_sop_node_tick(
-                    sp_id,
-                    state.clone(),
-                    sop_to_run,
-                    con_clone,
-                    logging_tx.clone(),
-                    &log_target,
-                )
-                .await;
+            Some(ref active_sop) => match active_unique_sop_state {
+                SOPState::Initial => todo!(),
+                SOPState::Executing => {
+                    let con_clone = con.clone();
+                    new_sop_info = format!("Executing SOP '{active_sop}'.");
+                    sop_info_level = log::Level::Info;
+                    new_state = process_sop_node_tick(
+                        sp_id,
+                        state.clone(),
+                        &active_sop_container.clone().unwrap(),
+                        con_clone,
+                        logging_tx.clone(),
+                        &log_target,
+                    )
+                    .await;
 
-                let calculated_root_state = sop_to_run.get_state(&new_state, &log_target);
+                    let calculated_root_state = active_sop_container
+                        .clone()
+                        .unwrap()
+                        .get_state(&new_state, &log_target);
 
-                if calculated_root_state != SOPState::Executing {
-                    new_state = new_state.update(
-                        &format!("{}_sop_state", sp_id),
-                        calculated_root_state.to_string().to_spvalue(),
-                    );
-                    
-                    if calculated_root_state == SOPState::Completed {
-                         active_sop_instance = None; 
+                    if calculated_root_state != SOPState::Executing {
+                        new_sop_info = format!("Completing SOP '{active_sop}'.");
+                        sop_info_level = log::Level::Info;
+
+                        active_unique_sop_state = calculated_root_state;
                     }
                 }
+                SOPState::Fatal => {
+                    new_sop_info = format!("Fataled SOP '{active_sop}'.");
+                    sop_info_level = log::Level::Error;
+                    active_unique_sop_state = SOPState::Initial;
+                    active_sop_container = None;
+                    active_unique_sop_id = None;
+                }
+                SOPState::Completed => {
+                    new_sop_info = format!("Completed SOP '{active_sop}'.");
+                    sop_info_level = log::Level::Info;
+                    active_unique_sop_state = SOPState::Initial;
+                    active_sop_container = None;
+                    active_unique_sop_id = None;
+                }
+                SOPState::Cancelled => {
+                    new_sop_info = format!("Cancelled SOP '{active_sop}'.");
+                    sop_info_level = log::Level::Warn;
+                    active_unique_sop_state = SOPState::Initial;
+                    active_sop_container = None;
+                    active_unique_sop_id = None;
+                }
+                SOPState::UNKNOWN => {
+                    new_sop_info = format!("SOP '{active_sop}' state id UNKNOWN.");
+                    sop_info_level = log::Level::Info;
+                    active_unique_sop_state = SOPState::Initial;
+                    active_sop_container = None;
+                    active_unique_sop_id = None;
+                }
+            },
+        }
+
+        if new_sop_info != old_sop_information {
+            match sop_info_level {
+                log::Level::Info => log::info!(target: &log_target, "{}", new_sop_info),
+                log::Level::Warn => log::warn!(target: &log_target, "{}", new_sop_info),
+                log::Level::Error => log::error!(target: &log_target, "{}", new_sop_info),
+                _ => (),
             }
-            SOPState::Fatal => {
-                new_sop_info = format!("Fataled SOP '{sop_id}'.");
-                 new_state = new_state
-                        .update(
-                            &format!("{}_sop_state", sp_id),
-                            SOPState::Initial.to_string().to_spvalue(),
-                        );
-                // sop_info_level = log::Level::Error;
-            }
-            SOPState::Completed => {
-                new_sop_info = format!("Completed SOP '{sop_id}'.");
-                new_state = new_state
-                        .update(
-                            &format!("{}_sop_state", sp_id),
-                            SOPState::Initial.to_string().to_spvalue(),
-                        );
-                // sop_info_level = log::Level::Info;
-            }
-            SOPState::Cancelled => {
-                new_sop_info = format!("Cancelled SOP '{sop_id}'.");
-                 new_state = new_state
-                        .update(
-                            &format!("{}_sop_state", sp_id),
-                            SOPState::Initial.to_string().to_spvalue(),
-                        );
-                // sop_info_level = log::Level::Warn;
-            }
-            SOPState::UNKNOWN => {
-                new_sop_info = format!("SOP '{sop_id}' state id UNKNOWN.");
-                // sop_info_level = log::Level::Info;
-            }
-            _ => {}
         }
 
         new_state = new_state.update(
             &format!("{}_sop_information", sop_id),
             new_sop_info.to_spvalue(),
         );
-        
-        let modified_state = state.get_diff_partial_state(&new_state);
+
+        let modified_state = state.get_diff_partial_state_and_add_missing(&new_state);
+
         if !modified_state.state.is_empty() {
             StateManager::set_state(&mut con, &modified_state).await;
         }
     }
 }
 
-
-
-
-
-
-
-// Below is the old but working SOP runner for non-unique sops (templates)
-// use crate::*;
-// use std::sync::Arc;
-// use tokio::{
-//     sync::mpsc,
-//     time::{Duration, interval},
-// };
-
-// static TICK_INTERVAL: u64 = 100; // millis
-
+// old working for non unique sops
 // pub async fn sop_runner(
 //     sp_id: &str,
 //     model: &Model,
@@ -371,8 +377,6 @@ async fn process_sop_node_tick(
 ) -> State {
     match sop {
         SOP::Operation(operation) => {
-            // Here is where I need to add uuid for operation. Actually no, it will regenerate it every time it ticks...
-
             state = running::process_operation::process_operation(
                 &sp_id,
                 state,

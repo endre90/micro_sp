@@ -322,34 +322,34 @@ pub fn all_values_to_unknown(state: &State) -> State {
     new_state
 }
 
+pub fn get_all_operations_from_sop(sop: &SOP) -> Vec<Operation> {
+    let mut operations = Vec::new();
+    get_all_operations_recursive(sop, &mut operations);
+    operations
+}
+
+fn get_all_operations_recursive(sop: &SOP, operations: &mut Vec<Operation>) {
+    match sop {
+        // Base case: We found an operation. Clone it and add it to our list.
+        SOP::Operation(op) => {
+            operations.push(*op.clone());
+        }
+        // Recursive step: This is a container. Iterate through its children
+        // and call this function on each of them.
+        SOP::Sequence(sops) | SOP::Parallel(sops) | SOP::Alternative(sops) => {
+            for child_sop in sops {
+                get_all_operations_recursive(child_sop, operations);
+            }
+        }
+    }
+}
+
 pub fn generate_operation_state_variables(model: &Model, coverability_tracking: bool) -> State {
     let mut state = State::new();
     // operations should be put in the initial state once they are part of the plan
 
-    fn get_all_operations(sop: &SOP) -> Vec<Operation> {
-        let mut operations = Vec::new();
-        get_all_operations_recursive(sop, &mut operations);
-        operations
-    }
-
-    fn get_all_operations_recursive(sop: &SOP, operations: &mut Vec<Operation>) {
-        match sop {
-            // Base case: We found an operation. Clone it and add it to our list.
-            SOP::Operation(op) => {
-                operations.push(*op.clone());
-            }
-            // Recursive step: This is a container. Iterate through its children
-            // and call this function on each of them.
-            SOP::Sequence(sops) | SOP::Parallel(sops) | SOP::Alternative(sops) => {
-                for child_sop in sops {
-                    get_all_operations_recursive(child_sop, operations);
-                }
-            }
-        }
-    }
-
     for sop in &model.sops {
-        let ops_in_sop = get_all_operations(&sop.sop);
+        let ops_in_sop = get_all_operations_from_sop(&sop.sop);
         let sop_information = v!(&&format!("{}_sop_information", sop.id));
         state = state.add(assign!(
             sop_information,
@@ -366,11 +366,17 @@ pub fn generate_operation_state_variables(model: &Model, coverability_tracking: 
         ); // remove later for unique on the fly
     }
 
-
     // Not ideal, maybe there is a way to remove this dependancy
     // Still need this for the BFS planning level because the BFS needs the state, and the template has to exist in the state
-    state = add_operation_state_tracking_variable(&model.operations.iter().map(|x| x.name.clone()).collect(), &state);  // remove later for unique on the fly
-    state = add_operation_meta_tracking_variables(&model.operations.iter().map(|x| x.name.clone()).collect(), &state, false); // remove later for unique on the fly
+    state = add_operation_state_tracking_variable(
+        &model.operations.iter().map(|x| x.name.clone()).collect(),
+        &state,
+    ); // remove later for unique on the fly
+    state = add_operation_meta_tracking_variables(
+        &model.operations.iter().map(|x| x.name.clone()).collect(),
+        &state,
+        false,
+    ); // remove later for unique on the fly
 
     state = add_operation_state_tracking_variable(
         &model
