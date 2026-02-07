@@ -60,8 +60,8 @@ pub async fn sop_runner(
         let old_sop_information = new_state
             .get_string_or_default_to_unknown(&format!("{}_sop_information", sop_id), &log_target);
 
-        let mut new_sop_info: String; //= old_sop_information.clone();
-        let mut sop_info_level: Level; // = log::Level::Info;
+        let mut new_sop_info: String = old_sop_information.clone();
+        let mut sop_info_level: Level = log::Level::Info;
 
         // Check first if there is an active unique SOP already running
         match active_unique_sop_id {
@@ -95,7 +95,9 @@ pub async fn sop_runner(
                 }
             }
             Some(ref active_sop) => match active_unique_sop_state {
-                SOPState::Initial => todo!(),
+                SOPState::Initial => {
+                    active_unique_sop_state = SOPState::Initial;
+                },
                 SOPState::Executing => {
                     let con_clone = con.clone();
                     new_sop_info = format!("Executing SOP '{active_sop}'.");
