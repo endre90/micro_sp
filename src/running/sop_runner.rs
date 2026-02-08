@@ -1,6 +1,6 @@
 use crate::*;
-use std::sync::Arc;
 use log::Level;
+use std::sync::Arc;
 use tokio::{
     sync::mpsc,
     time::{Duration, interval},
@@ -43,8 +43,8 @@ pub async fn sop_runner(
         };
 
         let mut new_state = state.clone();
-        // let sop_state =
-            // state.get_string_or_default_to_unknown(&format!("{}_sop_state", sp_id), &log_target);
+        let mut sop_state =
+            state.get_string_or_default_to_unknown(&format!("{}_sop_state", sp_id), &log_target);
 
         let sop_enabled =
             state.get_bool_or_default_to_false(&format!("{}_sop_enabled", sp_id), &log_target);
@@ -97,7 +97,7 @@ pub async fn sop_runner(
             Some(ref active_sop) => match active_unique_sop_state {
                 SOPState::Initial => {
                     active_unique_sop_state = SOPState::Executing;
-                },
+                }
                 SOPState::Executing => {
                     let con_clone = con.clone();
                     new_sop_info = format!("Executing SOP '{active_sop}'.");
@@ -135,6 +135,8 @@ pub async fn sop_runner(
                     new_sop_info = format!("Completed SOP '{active_sop}'.");
                     sop_info_level = log::Level::Info;
                     active_unique_sop_state = SOPState::Initial;
+                    // Inform the operation that the sop has completed:
+                    sop_state = SOPState::Completed.to_string();
                     active_sop_container = None;
                     active_unique_sop_id = None;
                 }
@@ -164,10 +166,12 @@ pub async fn sop_runner(
             }
         }
 
-        new_state = new_state.update(
-            &format!("{}_sop_information", sop_id),
-            new_sop_info.to_spvalue(),
-        );
+        new_state = new_state
+            .update(
+                &format!("{}_sop_information", sop_id),
+                new_sop_info.to_spvalue(),
+            )
+            .update(&format!("{}_sop_state", sop_id), sop_state.to_spvalue());
 
         let modified_state = state.get_diff_partial_state_and_add_missing(&new_state);
 
