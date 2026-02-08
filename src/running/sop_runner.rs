@@ -86,10 +86,6 @@ pub async fn sop_runner(
                     sop_info_level = log::Level::Info;
                     new_state =
                         new_state.update(&format!("{}_sop_enabled", sp_id), false.to_spvalue());
-                    // .update(
-                    // &format!("{}_sop_state", sp_id),
-                    // SOPState::Executing.to_string().to_spvalue(),
-                    // );
                 } else {
                     continue;
                 }
@@ -99,6 +95,8 @@ pub async fn sop_runner(
                     active_unique_sop_state = SOPState::Executing;
                 }
                 SOPState::Executing => {
+                    // Inform the operation that the sop is executing
+                    sop_state = SOPState::Executing.to_string();
                     let con_clone = con.clone();
                     new_sop_info = format!("Executing SOP '{active_sop}'.");
                     sop_info_level = log::Level::Info;
