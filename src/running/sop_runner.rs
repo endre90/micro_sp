@@ -6,7 +6,7 @@ use tokio::{
     time::{Duration, interval},
 };
 
-static TICK_INTERVAL: u64 = 100; // millis
+static TICK_INTERVAL: u64 = 1000; // millis
 
 pub async fn sop_runner(
     sp_id: &str,
@@ -32,6 +32,10 @@ pub async fn sop_runner(
     let mut active_sop_container: Option<SOP> = None;
 
     loop {
+        println!("ID: {:?}", active_unique_sop_id);
+        println!("ID: {:?}", active_unique_sop_state);
+        println!("ID: {:?}", active_sop_container);
+
         interval.tick().await;
         if let Err(_) = connection_manager.check_redis_health(&log_target).await {
             continue;
