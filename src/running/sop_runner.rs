@@ -171,7 +171,7 @@ pub async fn sop_runner(
                 &format!("{}_sop_information", sop_id),
                 new_sop_info.to_spvalue(),
             )
-            .update(&format!("{}_sop_state", sop_id), sop_state.to_spvalue());
+            .update(&format!("{}_sop_state", sp_id), sop_state.to_spvalue());
 
         let modified_state = state.get_diff_partial_state_and_add_missing(&new_state);
 
