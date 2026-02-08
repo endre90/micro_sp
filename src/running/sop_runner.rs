@@ -100,7 +100,7 @@ pub async fn sop_runner(
             }
             Some(ref active_sop) => match active_unique_sop_state {
                 SOPState::Initial => {
-                    active_unique_sop_state = SOPState::Initial;
+                    active_unique_sop_state = SOPState::Executing;
                 },
                 SOPState::Executing => {
                     let con_clone = con.clone();
