@@ -332,8 +332,11 @@ pub async fn auto_operation_runner(
                     enabled_operations.choose(&mut rng).cloned()
                 };
                 if let Some(op) = maybe_random_op {
-                    active_unique_op_id = Some(op.name.clone());
-                    active_op_container = Some(op.clone());
+                    let unique_id = nanoid::nanoid!(10, &NANOID_ALPHABET);
+                    active_unique_op_id = Some(format!("{}_{}", op.name.clone(), unique_id));
+                    let mut op_mut = op.clone();
+                    op_mut.name = active_unique_op_id.clone().unwrap();
+                    active_op_container = Some(op_mut.clone());
                     // active_unique_op_state = OperationState::Initial;
                     new_state = add_operation_meta_tracking_variables(
                         &vec!(op.name.clone()),
