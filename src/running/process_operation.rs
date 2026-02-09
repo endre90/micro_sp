@@ -20,7 +20,7 @@ pub(super) async fn process_operation(
     plan_state: Option<&mut String>,
     // sop_state: Option<&mut String>,
     logging_tx: mpsc::Sender<LogMsg>,
-    // mut con: redis::aio::MultiplexedConnection,
+    mut con: redis::aio::MultiplexedConnection,
     log_target: &str,
 ) -> State {
     let operation_state =
@@ -320,35 +320,47 @@ pub(super) async fn process_operation(
                 // }
                 _ => (),
             }
-            new_state =
-                        operation.terminate(&new_state, TerminationReason::Cancelled, &log_target);
+            new_state = operation.terminate(&new_state, TerminationReason::Cancelled, &log_target);
         }
         OperationState::UNKNOWN => {
             new_state = operation.initialize(&new_state, &log_target);
         }
-        OperationState::Terminated(termination_reason) => match termination_reason {
-            TerminationReason::Bypassed => {
-                new_op_info = format!(
-                    "Operation '{}' terminated. Reason: Bypassed.",
-                    operation.name
-                )
+        OperationState::Terminated(termination_reason) => {
+            let mut terminated_operations_meta = vec![];
+            // for op in &terminated_operations {
+                terminated_operations_meta.push(format!("{}_information", operation.name));
+                terminated_operations_meta.push(format!("{}_failure_retry_counter", operation.name));
+                terminated_operations_meta.push(format!("{}_timeout_retry_counter", operation.name));
+                terminated_operations_meta.push(format!("{}_elapsed_executing_ms", operation.name));
+                terminated_operations_meta.push(format!("{}_elapsed_disabled_ms", operation.name));
+            // }
+            StateManager::remove_sp_values(&mut con, &vec!(operation.name.clone())).await;
+            StateManager::remove_sp_values(&mut con, &terminated_operations_meta).await;
+            match termination_reason {
+                TerminationReason::Bypassed => {
+                    new_op_info = format!(
+                        "Operation '{}' terminated. Reason: Bypassed.",
+                        operation.name
+                    )
+                }
+                TerminationReason::Completed => {
+                    new_op_info = format!(
+                        "Operation '{}' terminated. Reason: Completed.",
+                        operation.name
+                    )
+                }
+                TerminationReason::Fatal => {
+                    new_op_info =
+                        format!("Operation '{}' terminated. Reason: Fatal.", operation.name)
+                }
+                TerminationReason::Cancelled => {
+                    new_op_info = format!(
+                        "Operation '{}' terminated. Reason: Cancelled.",
+                        operation.name
+                    )
+                }
             }
-            TerminationReason::Completed => {
-                new_op_info = format!(
-                    "Operation '{}' terminated. Reason: Completed.",
-                    operation.name
-                )
-            }
-            TerminationReason::Fatal => {
-                new_op_info = format!("Operation '{}' terminated. Reason: Fatal.", operation.name)
-            }
-            TerminationReason::Cancelled => {
-                new_op_info = format!(
-                    "Operation '{}' terminated. Reason: Cancelled.",
-                    operation.name
-                )
-            }
-        },
+        }
     }
 
     if new_op_info != old_operation_information {

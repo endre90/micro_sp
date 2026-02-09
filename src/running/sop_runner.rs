@@ -195,6 +195,7 @@ async fn process_sop_node_tick(
                 None,
                 None,
                 logging_tx,
+                con,
                 log_target,
             )
             .await;

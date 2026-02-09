@@ -71,9 +71,9 @@ pub async fn planned_operation_runner(
         //     Some(s) => s,
         //     None => continue,
         // };
-        // let con_clone = con.clone();
+        let con_clone = con.clone();
         let new_state =
-            process_plan_tick(sp_id, &model, &state, logging_tx.clone(), &log_target).await;
+            process_plan_tick(sp_id, con_clone, &model, &state, logging_tx.clone(), &log_target).await;
         let modified_state = state.get_diff_partial_state(&new_state);
         // StateManager::set_state(con, &modified_state).await;
         StateManager::set_state(&mut con, &modified_state).await;
@@ -82,7 +82,7 @@ pub async fn planned_operation_runner(
 
 async fn process_plan_tick(
     sp_id: &str,
-    // con: redis::aio::MultiplexedConnection,
+    con: redis::aio::MultiplexedConnection,
     model: &Model,
     state: &State,
     logging_tx: mpsc::Sender<LogMsg>,
@@ -139,6 +139,7 @@ async fn process_plan_tick(
                             Some(&mut plan_state_str),
                             // None,
                             logging_tx,
+                            con.clone(),
                             log_target,
                         )
                         .await;
