@@ -173,7 +173,7 @@ pub async fn auto_operation_runner(
         }
 
         let terminated_operations_sp_value = state.get_array_or_default_to_empty(
-            &format!("{}_terminated_automatic_operations", sp_id),
+            &format!("{}_terminated_operations", sp_id),
             &log_target,
         );
 

@@ -129,7 +129,7 @@ async fn process_plan_tick(
 
     // Operations ready to be removed from the state
     let terminated_operations_sp_value = new_state
-        .get_array_or_default_to_empty(&format!("{}_terminated_planned_operations", sp_id), &log_target);
+        .get_array_or_default_to_empty(&format!("{}_terminated_operations", sp_id), &log_target);
 
     let terminated_operations: Vec<String> = terminated_operations_sp_value
         .iter()
