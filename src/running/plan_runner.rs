@@ -1,5 +1,6 @@
 use crate::{running::process_operation::OperationProcessingType, *};
 use std::sync::Arc;
+use redis::aio::MultiplexedConnection;
 // use redis::aio::MultiplexedConnection;
 use tokio::{
     sync::mpsc,
@@ -32,9 +33,9 @@ pub async fn planned_operation_runner(
             None => continue,
         };
 
-        // let con_clone = con.clone();
+        let con_clone = con.clone();
         let new_state =
-            process_plan_tick(sp_id, &model, &state, logging_tx.clone(), &log_target).await;
+            process_plan_tick(sp_id, con_clone, &model, &state, logging_tx.clone(), &log_target).await;
         let modified_state = state.get_diff_partial_state(&new_state);
         StateManager::set_state(&mut con, &modified_state).await;
     }
@@ -42,7 +43,7 @@ pub async fn planned_operation_runner(
 
 async fn process_plan_tick(
     sp_id: &str,
-    // mut con: MultiplexedConnection,
+    mut con: MultiplexedConnection,
     model: &Model,
     state: &State,
     logging_tx: mpsc::Sender<LogMsg>,
@@ -123,17 +124,17 @@ async fn process_plan_tick(
         }
         // Maybe I also have to reset all operation here...?
         _ => {
-            new_state = reset_all_operations(&new_state, model);
-            // let mut terminated_operations_meta = vec![];
-            // for op in &terminated_operations {
-            //     terminated_operations_meta.push(format!("{}_information", op));
-            //     terminated_operations_meta.push(format!("{}_failure_retry_counter", op));
-            //     terminated_operations_meta.push(format!("{}_timeout_retry_counter", op));
-            //     terminated_operations_meta.push(format!("{}_elapsed_executing_ms", op));
-            //     terminated_operations_meta.push(format!("{}_elapsed_disabled_ms", op));
-            // }
-            // StateManager::remove_sp_values(&mut con, &terminated_operations).await;
-            // StateManager::remove_sp_values(&mut con, &terminated_operations_meta).await;
+            // new_state = reset_all_operations(&new_state, model);
+            let mut terminated_operations_meta = vec![];
+            for op in &terminated_operations {
+                terminated_operations_meta.push(format!("{}_information", op));
+                terminated_operations_meta.push(format!("{}_failure_retry_counter", op));
+                terminated_operations_meta.push(format!("{}_timeout_retry_counter", op));
+                terminated_operations_meta.push(format!("{}_elapsed_executing_ms", op));
+                terminated_operations_meta.push(format!("{}_elapsed_disabled_ms", op));
+            }
+            StateManager::remove_sp_values(&mut con, &terminated_operations).await;
+            StateManager::remove_sp_values(&mut con, &terminated_operations_meta).await;
         }
     }
 
