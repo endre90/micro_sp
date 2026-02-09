@@ -167,8 +167,9 @@ pub async fn auto_operation_runner(
 
                 let modified_state = state.get_diff_partial_state_and_add_missing(&new_state);
                 StateManager::set_state(&mut con, &modified_state).await;
-                StateManager::remove_sp_values(&mut con, &terminated_operations).await;
+                
             }
         }
+        StateManager::remove_sp_values(&mut con, &terminated_operations).await;
     }
 }
