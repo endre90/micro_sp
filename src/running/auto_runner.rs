@@ -339,12 +339,12 @@ pub async fn auto_operation_runner(
                     active_op_container = Some(op_mut.clone());
                     // active_unique_op_state = OperationState::Initial;
                     new_state = add_operation_meta_tracking_variables(
-                        &vec!(op.name.clone()),
+                        &vec!(op_mut.name.clone()),
                         &new_state,
                         false,
                     );
                     new_state = add_operation_state_tracking_variable(
-                        &vec!(op.name.clone()),
+                        &vec!(op_mut.name.clone()),
                         &new_state,
                     );
                 }
