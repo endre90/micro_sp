@@ -20,14 +20,7 @@ pub async fn sop_runner(
 
     log::info!(target: log_target, "Online.");
 
-    // let mut old_sop_id = String::new();
-    // This is a stack because SOPs are nested.
-    // Always execute firts on the tops of the stack and when done, remove from the stack
-    // Well actually maybe it is not, the SOP is a tree but I only define a name for the whole (main) tree
-    // let mut active_sops: Vec<String> = vec![];
-
-    // So maybe there is only one SOP executing at a time
-    let mut active_unique_sop_id: Option<String> = None; // the unique sop. This has to be generated on the fly based on the template
+    let mut active_unique_sop_id: Option<String> = None;
     let mut active_unique_sop_state: SOPState = SOPState::Initial;
     let mut active_sop_container: Option<SOP> = None;
 
@@ -126,6 +119,8 @@ pub async fn sop_runner(
                     new_sop_info = format!("Fataled SOP '{active_sop}'.");
                     sop_info_level = log::Level::Error;
                     active_unique_sop_state = SOPState::Initial;
+                    // Inform the operation that the sop has failed:
+                    sop_state = SOPState::Fatal.to_string();
                     active_sop_container = None;
                     active_unique_sop_id = None;
                 }
@@ -142,6 +137,8 @@ pub async fn sop_runner(
                     new_sop_info = format!("Cancelled SOP '{active_sop}'.");
                     sop_info_level = log::Level::Warn;
                     active_unique_sop_state = SOPState::Initial;
+                    // Inform the operation that the sop has ben cancelled:
+                    sop_state = SOPState::Cancelled.to_string();
                     active_sop_container = None;
                     active_unique_sop_id = None;
                 }
