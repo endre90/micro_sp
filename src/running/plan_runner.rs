@@ -107,7 +107,7 @@ async fn process_plan_tick(
                         );
 
                         match OperationState::from_str(&operation_state) {
-                            OperationState::Terminated(_) => {
+                            OperationState::Completed | OperationState::Bypassed | OperationState::Cancelled => {
                                 terminated_operations.push(uq_operation.name.clone());
                             }
                             _ => (),
