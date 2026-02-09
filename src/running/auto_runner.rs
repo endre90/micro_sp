@@ -357,6 +357,17 @@ pub async fn auto_operation_runner(
             }
             Some(current_id) => {
                 let mut new_state = state.clone();
+                let operation_state = new_state
+                    .get_string_or_default_to_unknown(&format!("{}", current_id), &log_target);
+                match OperationState::from_str(&operation_state) {
+                    OperationState::Terminated(_) => {
+                        active_unique_op_id = None;
+                        // active_unique_op_state = OperationState::Initial;
+                        active_op_container = None;
+                    }
+
+                    _ => (),
+                };
                 new_state = process_operation(
                     &name,
                     new_state,
@@ -368,17 +379,7 @@ pub async fn auto_operation_runner(
                     &log_target,
                 )
                 .await;
-                let operation_state = new_state
-                    .get_string_or_default_to_unknown(&format!("{}", current_id), &log_target);
-                match OperationState::from_str(&operation_state) {
-                    OperationState::Terminated(_) => {
-                        active_unique_op_id = None;
-                        // active_unique_op_state = OperationState::Initial;
-                        active_op_container = None;
-                    }
-
-                    _ => (),
-                }
+                
                 let modified_state = state.get_diff_partial_state_and_add_missing(&new_state);
                 StateManager::set_state(&mut con, &modified_state).await;
             }
