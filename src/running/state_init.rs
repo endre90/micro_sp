@@ -55,6 +55,12 @@ pub fn generate_runner_state_variables(name: &str) -> State {
     let time_duration_ms = iv!(&&format!("{}_time_duration_ms", name));
     let time_elapsed_ms = iv!(&&format!("{}_time_elapsed_ms", name));
 
+    let terminated_operations = av!(&&format!("{}_terminated_operations", name));
+    state = state.add(assign!(
+        terminated_operations,
+        SPValue::Array(ArrayOrUnknown::UNKNOWN)
+    ));
+
     let active_auto_operations = av!(&&format!("{}_active_auto_operations", name));
     state = state.add(assign!(
         active_auto_operations,
