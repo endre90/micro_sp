@@ -164,12 +164,15 @@ pub(super) async fn process_operation(
             new_op_info = format!("Operation '{}' completed.", operation.name);
             logging_log = format!("Completed");
             op_info_level = log::Level::Info;
-            // match operation_processing_type {
-            // OperationProcessingType::SOP | OperationProcessingType::Automatic => {
-            new_state = operation.terminate(&new_state, TerminationReason::Completed, &log_target);
-            // }
-            // _ => (),
-            // }
+
+            // commentout
+            match operation_processing_type {
+                OperationProcessingType::SOP | OperationProcessingType::Automatic => {
+                    new_state =
+                        operation.terminate(&new_state, TerminationReason::Completed, &log_target);
+                }
+                _ => (),
+            }
         }
         OperationState::Bypassed => {
             if operation.can_be_cancelled(&sp_id, &new_state, &log_target) {
@@ -320,8 +323,7 @@ pub(super) async fn process_operation(
                 // }
                 _ => (),
             }
-            new_state =
-                        operation.terminate(&new_state, TerminationReason::Cancelled, &log_target);
+            new_state = operation.terminate(&new_state, TerminationReason::Cancelled, &log_target);
         }
         OperationState::UNKNOWN => {
             new_state = operation.initialize(&new_state, &log_target);
@@ -359,9 +361,9 @@ pub(super) async fn process_operation(
             _ => (),
         }
         // No need to log terminated
-        if OperationState::from_str(&operation_state)
-            != OperationState::Terminated(TerminationReason::Completed)
-        {
+        // if OperationState::from_str(&operation_state)
+        //     != OperationState::Terminated(TerminationReason::Completed)
+        // {
             let operation_msg = OperationMsg {
                 operation_name: operation.name.clone(),
                 operation_processing_type: operation_processing_type,
@@ -377,7 +379,7 @@ pub(super) async fn process_operation(
                     log::error!(target: &log_target, "Failed to send logging with: {e}.")
                 }
             }
-        }
+        // }
     }
 
     new_state
