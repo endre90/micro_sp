@@ -165,7 +165,7 @@ pub(super) async fn process_operation(
             logging_log = format!("Completed");
             op_info_level = log::Level::Info;
             match operation_processing_type {
-                OperationProcessingType::SOP | OperationProcessingType::Automatic => {
+                OperationProcessingType::SOP => {
                     new_state =
                         operation.terminate(&new_state, TerminationReason::Completed, &log_target);
                 }

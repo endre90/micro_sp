@@ -360,7 +360,7 @@ pub async fn auto_operation_runner(
                 let operation_state = new_state
                     .get_string_or_default_to_unknown(&format!("{}", current_id), &log_target);
                 match OperationState::from_str(&operation_state) {
-                    OperationState::Terminated(_) => {
+                    OperationState::Completed => {
                         active_unique_op_id = None;
                         // active_unique_op_state = OperationState::Initial;
                         active_op_container = None;
