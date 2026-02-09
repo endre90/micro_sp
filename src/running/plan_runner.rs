@@ -123,6 +123,7 @@ async fn process_plan_tick(
         }
         // Maybe I also have to reset all operation here...?
         _ => {
+            new_state = reset_all_operations(&new_state, model);
             let mut terminated_operations_meta = vec![];
             for op in &terminated_operations {
                 terminated_operations_meta.push(format!("{}_information", op));
