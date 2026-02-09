@@ -164,13 +164,12 @@ pub(super) async fn process_operation(
             new_op_info = format!("Operation '{}' completed.", operation.name);
             logging_log = format!("Completed");
             op_info_level = log::Level::Info;
-            match operation_processing_type {
-                OperationProcessingType::SOP | OperationProcessingType::Automatic => {
-                    new_state =
-                        operation.terminate(&new_state, TerminationReason::Completed, &log_target);
-                }
-                _ => (),
-            }
+            // match operation_processing_type {
+            // OperationProcessingType::SOP | OperationProcessingType::Automatic => {
+            new_state = operation.terminate(&new_state, TerminationReason::Completed, &log_target);
+            // }
+            // _ => (),
+            // }
         }
         OperationState::Bypassed => {
             if operation.can_be_cancelled(&sp_id, &new_state, &log_target) {
@@ -190,13 +189,12 @@ pub(super) async fn process_operation(
                 }
             }
             op_info_level = log::Level::Warn;
-            match operation_processing_type {
-                OperationProcessingType::SOP => {
-                    new_state =
-                        operation.terminate(&new_state, TerminationReason::Bypassed, &log_target);
-                }
-                _ => (),
-            }
+            // match operation_processing_type {
+            // OperationProcessingType::SOP => {
+            new_state = operation.terminate(&new_state, TerminationReason::Bypassed, &log_target);
+            // }
+            // _ => (),
+            // }
         }
         OperationState::Timedout => {
             if operation.can_be_cancelled(&sp_id, &new_state, &log_target) {
@@ -294,12 +292,14 @@ pub(super) async fn process_operation(
                     }
                 }
 
-                OperationProcessingType::SOP => {
-                    new_state =
-                        operation.terminate(&new_state, TerminationReason::Fatal, &log_target);
-                }
+                // OperationProcessingType::SOP => {
+                //     new_state =
+                //         operation.terminate(&new_state, TerminationReason::Fatal, &log_target);
+                // }
                 _ => (),
             }
+            // newly added
+            new_state = operation.terminate(&new_state, TerminationReason::Fatal, &log_target);
         }
         OperationState::Cancelled => {
             new_op_info = format!(
@@ -314,12 +314,14 @@ pub(super) async fn process_operation(
                         *plan_state = PlanState::Cancelled.to_string();
                     }
                 }
-                OperationProcessingType::SOP => {
-                    new_state =
-                        operation.terminate(&new_state, TerminationReason::Cancelled, &log_target);
-                }
+                // OperationProcessingType::SOP => {
+                //     new_state =
+                //         operation.terminate(&new_state, TerminationReason::Cancelled, &log_target);
+                // }
                 _ => (),
             }
+            new_state =
+                        operation.terminate(&new_state, TerminationReason::Cancelled, &log_target);
         }
         OperationState::UNKNOWN => {
             new_state = operation.initialize(&new_state, &log_target);
