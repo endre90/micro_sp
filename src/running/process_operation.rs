@@ -51,6 +51,9 @@ pub(super) async fn process_operation(
         &log_target,
     );
 
+    let mut terminated_operations = new_state
+        .get_array_or_default_to_empty(&format!("{}_terminated_operations", sp_id), &log_target);
+
     let mut logging_log = "".to_string();
     let mut op_info_level = log::Level::Info;
     match OperationState::from_str(&operation_state) {
@@ -167,11 +170,10 @@ pub(super) async fn process_operation(
 
             // commentout
             // match operation_processing_type {
-                // OperationProcessingType::SOP | OperationProcessingType::Automatic => {
-                    new_state =
-                        operation.terminate(&new_state, TerminationReason::Completed, &log_target);
-                // }
-                // _ => (),
+            // OperationProcessingType::SOP | OperationProcessingType::Automatic => {
+            new_state = operation.terminate(&new_state, TerminationReason::Completed, &log_target);
+            // }
+            // _ => (),
             // }
         }
         OperationState::Bypassed => {
@@ -328,29 +330,33 @@ pub(super) async fn process_operation(
         OperationState::UNKNOWN => {
             new_state = operation.initialize(&new_state, &log_target);
         }
-        OperationState::Terminated(termination_reason) => match termination_reason {
-            TerminationReason::Bypassed => {
-                new_op_info = format!(
-                    "Operation '{}' terminated. Reason: Bypassed.",
-                    operation.name
-                )
+        OperationState::Terminated(termination_reason) => {
+            terminated_operations.push(operation.name.to_spvalue());
+            match termination_reason {
+                TerminationReason::Bypassed => {
+                    new_op_info = format!(
+                        "Operation '{}' terminated. Reason: Bypassed.",
+                        operation.name
+                    )
+                }
+                TerminationReason::Completed => {
+                    new_op_info = format!(
+                        "Operation '{}' terminated. Reason: Completed.",
+                        operation.name
+                    )
+                }
+                TerminationReason::Fatal => {
+                    new_op_info =
+                        format!("Operation '{}' terminated. Reason: Fatal.", operation.name)
+                }
+                TerminationReason::Cancelled => {
+                    new_op_info = format!(
+                        "Operation '{}' terminated. Reason: Cancelled.",
+                        operation.name
+                    )
+                }
             }
-            TerminationReason::Completed => {
-                new_op_info = format!(
-                    "Operation '{}' terminated. Reason: Completed.",
-                    operation.name
-                )
-            }
-            TerminationReason::Fatal => {
-                new_op_info = format!("Operation '{}' terminated. Reason: Fatal.", operation.name)
-            }
-            TerminationReason::Cancelled => {
-                new_op_info = format!(
-                    "Operation '{}' terminated. Reason: Cancelled.",
-                    operation.name
-                )
-            }
-        },
+        }
     }
 
     if new_op_info != old_operation_information {
@@ -364,21 +370,21 @@ pub(super) async fn process_operation(
         // if OperationState::from_str(&operation_state)
         //     != OperationState::Terminated(TerminationReason::Completed)
         // {
-            let operation_msg = OperationMsg {
-                operation_name: operation.name.clone(),
-                operation_processing_type: operation_processing_type,
-                timestamp: Utc::now(),
-                severity: op_info_level,
-                state: OperationState::from_str(&operation_state),
-                log: logging_log.to_string(),
-            };
-            let log_msg = LogMsg::OperationMsg(operation_msg);
-            match logging_tx.send(log_msg).await {
-                Ok(()) => (),
-                Err(e) => {
-                    log::error!(target: &log_target, "Failed to send logging with: {e}.")
-                }
+        let operation_msg = OperationMsg {
+            operation_name: operation.name.clone(),
+            operation_processing_type: operation_processing_type,
+            timestamp: Utc::now(),
+            severity: op_info_level,
+            state: OperationState::from_str(&operation_state),
+            log: logging_log.to_string(),
+        };
+        let log_msg = LogMsg::OperationMsg(operation_msg);
+        match logging_tx.send(log_msg).await {
+            Ok(()) => (),
+            Err(e) => {
+                log::error!(target: &log_target, "Failed to send logging with: {e}.")
             }
+        }
         // }
     }
 
@@ -394,5 +400,9 @@ pub(super) async fn process_operation(
         .update(
             &format!("{}_elapsed_disabled_ms", operation.name),
             elapased_disabled_ms.to_spvalue(),
+        )
+        .update(
+            &format!("{}_terminated_operations", sp_id),
+            terminated_operations.to_spvalue(),
         )
 }

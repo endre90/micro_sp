@@ -77,7 +77,25 @@ async fn process_plan_tick(
         .collect();
 
     // Operations ready to be removed from the state
-    let mut terminated_operations = vec![];
+    let terminated_operations_sp_value = new_state
+        .get_array_or_default_to_empty(&format!("{}_terminated_operations", sp_id), &log_target);
+
+    let terminated_operations: Vec<String> = terminated_operations_sp_value
+        .iter()
+        .filter(|val| val.is_string())
+        .map(|y| y.to_string())
+        .collect();
+
+    let mut terminated_operations_meta = vec![];
+    for op in &terminated_operations {
+        terminated_operations_meta.push(format!("{}_information", op));
+        terminated_operations_meta.push(format!("{}_failure_retry_counter", op));
+        terminated_operations_meta.push(format!("{}_timeout_retry_counter", op));
+        terminated_operations_meta.push(format!("{}_elapsed_executing_ms", op));
+        terminated_operations_meta.push(format!("{}_elapsed_disabled_ms", op));
+    }
+    StateManager::remove_sp_values(&mut con, &terminated_operations).await;
+    StateManager::remove_sp_values(&mut con, &terminated_operations_meta).await;
 
     match PlanState::from_str(&plan_state_str) {
         PlanState::Initial => {
@@ -108,37 +126,10 @@ async fn process_plan_tick(
                         )
                         .await;
 
-                        let operation_state = new_state.get_string_or_default_to_unknown(
-                            &format!("{}", uq_operation.name),
-                            &log_target,
-                        );
-
-                        let op = uq_operation.clone();
-                        match OperationState::from_str(&operation_state) {
-                            OperationState::Terminated(_) => {
-                                let mut terminated_operations_meta = vec![];
-                                // for op in &terminated_operations {
-                                    terminated_operations_meta.push(format!("{}_information", op.name));
-                                    terminated_operations_meta
-                                        .push(format!("{}_failure_retry_counter", op.name));
-                                    terminated_operations_meta
-                                        .push(format!("{}_timeout_retry_counter", op.name));
-                                    terminated_operations_meta
-                                        .push(format!("{}_elapsed_executing_ms", op.name));
-                                    terminated_operations_meta
-                                        .push(format!("{}_elapsed_disabled_ms", op.name));
-                                // }
-                                StateManager::remove_sp_values(&mut con, &terminated_operations)
-                                    .await;
-                                StateManager::remove_sp_values(
-                                    &mut con,
-                                    &terminated_operations_meta,
-                                )
-                                .await;
-                                // terminated_operations.push(uq_operation.name.clone());
-                            }
-                            _ => (),
-                        };
+                        // let operation_state = new_state.get_string_or_default_to_unknown(
+                        //     &format!("{}", uq_operation.name),
+                        //     &log_target,
+                        // );
                     }
                     None => {
                         log::error!("Operation '{}' not found in model!", op_name);
@@ -152,16 +143,6 @@ async fn process_plan_tick(
         // Maybe I also have to reset all operation here...?
         _ => {
             // new_state = reset_all_operations(&new_state, model);
-            let mut terminated_operations_meta = vec![];
-            for op in &terminated_operations {
-                terminated_operations_meta.push(format!("{}_information", op));
-                terminated_operations_meta.push(format!("{}_failure_retry_counter", op));
-                terminated_operations_meta.push(format!("{}_timeout_retry_counter", op));
-                terminated_operations_meta.push(format!("{}_elapsed_executing_ms", op));
-                terminated_operations_meta.push(format!("{}_elapsed_disabled_ms", op));
-            }
-            StateManager::remove_sp_values(&mut con, &terminated_operations).await;
-            StateManager::remove_sp_values(&mut con, &terminated_operations_meta).await;
         }
     }
 
