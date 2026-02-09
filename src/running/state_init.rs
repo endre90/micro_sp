@@ -76,7 +76,7 @@ pub fn generate_runner_state_variables(name: &str) -> State {
 
     // Logging:
     let empty_log: Vec<Vec<OperationLog>> = vec![vec![]];
-    let empty_log_agg: Vec<Vec<Vec<OperationLog>>> = vec![vec![vec![]]];
+    // let empty_log_agg: Vec<Vec<Vec<OperationLog>>> = vec![vec![vec![]]];
     let logger_planned_operations = v!(&&format!("{}_logger_planned_operations", name));
     state = state.add(assign!(
         logger_planned_operations,
@@ -117,13 +117,13 @@ pub fn generate_runner_state_variables(name: &str) -> State {
         ))
     ));
 
-    let logger_sop_operations_agg = v!(&&format!("{}_logger_sop_operations_agg", name));
-    state = state.add(assign!(
-        logger_sop_operations_agg,
-        SPValue::String(StringOrUnknown::String(
-            serde_json::to_string(&empty_log_agg).unwrap()
-        ))
-    ));
+    // let logger_sop_operations_agg = v!(&&format!("{}_logger_sop_operations_agg", name));
+    // state = state.add(assign!(
+    //     logger_sop_operations_agg,
+    //     SPValue::String(StringOrUnknown::String(
+    //         serde_json::to_string(&empty_log_agg).unwrap()
+    //     ))
+    // ));
 
     // Initialize values
     state = state.add(assign!(
