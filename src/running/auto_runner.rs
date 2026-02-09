@@ -323,8 +323,6 @@ pub async fn auto_operation_runner(
             }
         }
 
-        let mut new_state = state.clone();
-
         match active_unique_op_id.clone() {
             None => {
                 let maybe_random_op = {
@@ -332,6 +330,7 @@ pub async fn auto_operation_runner(
                     enabled_operations.choose(&mut rng).cloned()
                 };
                 if let Some(op) = maybe_random_op {
+                    let mut new_state = state.clone();
                     let unique_id = nanoid::nanoid!(10, &NANOID_ALPHABET);
                     active_unique_op_id = Some(format!("{}_{}", op.name.clone(), unique_id));
                     let mut op_mut = op.clone();
@@ -339,17 +338,20 @@ pub async fn auto_operation_runner(
                     active_op_container = Some(op_mut.clone());
                     // active_unique_op_state = OperationState::Initial;
                     new_state = add_operation_meta_tracking_variables(
-                        &vec!(op_mut.name.clone()),
+                        &vec![op_mut.name.clone()],
                         &new_state,
                         false,
                     );
                     new_state = add_operation_state_tracking_variable(
-                        &vec!(op_mut.name.clone()),
+                        &vec![op_mut.name.clone()],
                         &new_state,
                     );
+                    let modified_state = state.get_diff_partial_state_and_add_missing(&new_state);
+                    StateManager::set_state(&mut con, &modified_state).await;
                 }
             }
             Some(current_id) => {
+                let mut new_state = state.clone();
                 new_state = process_operation(
                     &name,
                     new_state,
@@ -361,8 +363,8 @@ pub async fn auto_operation_runner(
                     &log_target,
                 )
                 .await;
-                let operation_state =
-                    new_state.get_string_or_default_to_unknown(&format!("{}", current_id), &log_target);
+                let operation_state = new_state
+                    .get_string_or_default_to_unknown(&format!("{}", current_id), &log_target);
                 match OperationState::from_str(&operation_state) {
                     OperationState::Initial => (),
                     OperationState::Disabled => (),
@@ -376,12 +378,10 @@ pub async fn auto_operation_runner(
                         active_op_container = None;
                     }
                 }
+                let modified_state = state.get_diff_partial_state_and_add_missing(&new_state);
+                StateManager::set_state(&mut con, &modified_state).await;
             }
-
         }
-
-        let modified_state = state.get_diff_partial_state_and_add_missing(&new_state);
-        StateManager::set_state(&mut con, &modified_state).await;
 
         // for operation in &active_operations {
         //     new_state = process_operation(
