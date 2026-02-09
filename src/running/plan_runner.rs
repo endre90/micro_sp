@@ -1,6 +1,167 @@
+// use crate::{running::process_operation::OperationProcessingType, *};
+// use std::sync::Arc;
+// // use redis::aio::MultiplexedConnection;
+// use tokio::{
+//     sync::mpsc,
+//     time::{Duration, interval},
+// };
+
+// pub static OPERAION_RUNNER_TICK_INTERVAL_MS: u64 = 200;
+
+// pub async fn planned_operation_runner(
+//     model: &Model,
+//     logging_tx: mpsc::Sender<LogMsg>,
+//     connection_manager: &Arc<ConnectionManager>,
+// ) -> Result<(), Box<dyn std::error::Error>> {
+//     let sp_id = &model.name;
+//     let log_target = format!("{}_op_runner", sp_id);
+//     let mut interval = interval(Duration::from_millis(OPERAION_RUNNER_TICK_INTERVAL_MS));
+
+//     // Get only the relevant keys from the state
+//     log::info!(target: &log_target, "Online.");
+
+//     loop {
+//         interval.tick().await;
+//         if let Err(_) = connection_manager.check_redis_health(&log_target).await {
+//             continue;
+//         }
+//         let mut con = connection_manager.get_connection().await;
+
+//         let state = match StateManager::get_full_state(&mut con).await {
+//             Some(s) => s,
+//             None => continue,
+//         };
+
+//         // let con_clone = con.clone();
+//         let new_state =
+//             process_plan_tick(sp_id, &model, &state, logging_tx.clone(), &log_target).await;
+//         let modified_state = state.get_diff_partial_state(&new_state);
+//         StateManager::set_state(&mut con, &modified_state).await;
+//     }
+// }
+
+// async fn process_plan_tick(
+//     sp_id: &str,
+//     // mut con: MultiplexedConnection,
+//     model: &Model,
+//     state: &State,
+//     logging_tx: mpsc::Sender<LogMsg>,
+//     log_target: &str,
+// ) -> State {
+//     let mut new_state = state.clone();
+//     let planner_state =
+//         state.get_string_or_default_to_unknown(&format!("{}_planner_state", sp_id), &log_target);
+
+//     let goal_state = state
+//         .get_string_or_default_to_unknown(&format!("{}_current_goal_state", sp_id), &log_target);
+
+//     let mut plan_state_str =
+//         state.get_string_or_default_to_unknown(&format!("{}_plan_state", sp_id), &log_target);
+//     let mut plan_current_step =
+//         state.get_int_or_default_to_zero(&format!("{}_plan_current_step", sp_id), &log_target);
+//     let plan_of_sp_values =
+//         state.get_array_or_default_to_empty(&format!("{}_plan", sp_id), &log_target);
+
+//     let plan: Vec<String> = plan_of_sp_values
+//         .iter()
+//         .filter(|val| val.is_string())
+//         .map(|y| y.to_string())
+//         .collect();
+
+//     // Operations ready to be removed from the state
+//     let mut terminated_operations = vec![];
+
+//     match PlanState::from_str(&plan_state_str) {
+//         PlanState::Initial => {
+//             if planner_state == PlannerState::Found.to_string() {
+//                 plan_state_str = PlanState::Executing.to_string();
+//                 plan_current_step = 0;
+//             }
+//         }
+//         PlanState::Executing => {
+//             if let Some(op_name) = plan.get(plan_current_step as usize) {
+//                 match model
+//                     .operations
+//                     .iter()
+//                     .find(|op| op_name.starts_with(&op.name))
+//                 {
+//                     Some(operation) => {
+//                         let mut uq_operation = operation.clone();
+//                         uq_operation.name = op_name.to_owned();
+//                         new_state = running::process_operation::process_operation(
+//                             &sp_id,
+//                             new_state,
+//                             &uq_operation,
+//                             OperationProcessingType::Planned,
+//                             Some(&mut plan_current_step),
+//                             Some(&mut plan_state_str),
+//                             logging_tx,
+//                             log_target,
+//                         )
+//                         .await;
+
+//                         let operation_state = new_state.get_string_or_default_to_unknown(
+//                             &format!("{}", uq_operation.name),
+//                             &log_target,
+//                         );
+
+//                         match OperationState::from_str(&operation_state) {
+//                             OperationState::Terminated(_) => {
+//                                 terminated_operations.push(uq_operation.name.clone());
+//                             }
+//                             _ => (),
+//                         };
+//                     }
+//                     None => {
+//                         log::error!("Operation '{}' not found in model!", op_name);
+//                         plan_state_str = PlanState::Failed.to_string();
+//                     }
+//                 }
+//             } else {
+//                 plan_state_str = PlanState::Completed.to_string();
+//             }
+//         }
+//         // Maybe I also have to reset all operation here...?
+//         _ => {
+//             // new_state = reset_all_operations(&new_state, model);
+//             // let mut terminated_operations_meta = vec![];
+//             // for op in &terminated_operations {
+//             //     terminated_operations_meta.push(format!("{}_information", op));
+//             //     terminated_operations_meta.push(format!("{}_failure_retry_counter", op));
+//             //     terminated_operations_meta.push(format!("{}_timeout_retry_counter", op));
+//             //     terminated_operations_meta.push(format!("{}_elapsed_executing_ms", op));
+//             //     terminated_operations_meta.push(format!("{}_elapsed_disabled_ms", op));
+//             // }
+//             // StateManager::remove_sp_values(&mut con, &terminated_operations).await;
+//             // StateManager::remove_sp_values(&mut con, &terminated_operations_meta).await;
+//         }
+//     }
+
+//     new_state = new_state
+//         .update(
+//             &format!("{}_plan_state", sp_id),
+//             plan_state_str.to_spvalue(),
+//         )
+//         .update(&format!("{}_plan", sp_id), plan.to_spvalue())
+//         .update(
+//             &format!("{}_planner_state", sp_id),
+//             planner_state.to_spvalue(),
+//         )
+//         .update(
+//             &format!("{}_current_goal_state", sp_id),
+//             goal_state.to_spvalue(),
+//         )
+//         .update(
+//             &format!("{}_plan_current_step", sp_id),
+//             plan_current_step.to_spvalue(),
+//         );
+
+//     new_state
+// }
+
+
 use crate::{running::process_operation::OperationProcessingType, *};
 use std::sync::Arc;
-// use redis::aio::MultiplexedConnection;
 use tokio::{
     sync::mpsc,
     time::{Duration, interval},
@@ -19,6 +180,42 @@ pub async fn planned_operation_runner(
 
     // Get only the relevant keys from the state
     log::info!(target: &log_target, "Online.");
+    // let mut keys: Vec<String> = model
+    //     .operations
+    //     .iter()
+    //     .flat_map(|t| t.get_all_var_keys())
+    //     .collect();
+
+    // // We also need some of the planner vars and dashboard
+    // keys.extend(vec![
+    //     format!("{}_planner_state", sp_id),
+    //     format!("{}_plan_state", sp_id),
+    //     format!("{}_plan_current_step", sp_id),
+    //     format!("{}_current_goal_state", sp_id),
+    //     format!("{}_plan", sp_id),
+    //     format!("{}_dashboard_command", sp_id),
+    // ]);
+
+    // And the vars to keep trask of operation states
+    // Ok this is not enough now because we have unique operations... Now we have to get all that start with "op_"
+    // keys.extend(
+    //     model
+    //         .operations
+    //         .iter()
+    //         .flat_map(|op| {
+    //             vec![
+    //                 format!("{}", op.name),
+    //                 format!("{}_information", op.name),
+    //                 format!("{}_failure_retry_counter", op.name),
+    //                 format!("{}_timeout_retry_counter", op.name),
+    //                 format!("{}_elapsed_executing_ms", op.name),
+    //                 format!("{}_elapsed_disabled_ms", op.name),
+    //             ]
+    //         })
+    //         .collect::<Vec<String>>(),
+    // );
+
+
 
     loop {
         interval.tick().await;
@@ -32,17 +229,22 @@ pub async fn planned_operation_runner(
             None => continue,
         };
 
-        // let con_clone = con.clone();
+        // let state = match StateManager::get_state_for_keys(&mut con, &keys, &log_target).await {
+        //     Some(s) => s,
+        //     None => continue,
+        // };
+        let con_clone = con.clone();
         let new_state =
-            process_plan_tick(sp_id, &model, &state, logging_tx.clone(), &log_target).await;
+            process_plan_tick(sp_id, con_clone, &model, &state, logging_tx.clone(), &log_target).await;
         let modified_state = state.get_diff_partial_state(&new_state);
+        // StateManager::set_state(con, &modified_state).await;
         StateManager::set_state(&mut con, &modified_state).await;
     }
 }
 
 async fn process_plan_tick(
     sp_id: &str,
-    // mut con: MultiplexedConnection,
+    con: redis::aio::MultiplexedConnection,
     model: &Model,
     state: &State,
     logging_tx: mpsc::Sender<LogMsg>,
@@ -68,23 +270,25 @@ async fn process_plan_tick(
         .map(|y| y.to_string())
         .collect();
 
-    // Operations ready to be removed from the state
-    let mut terminated_operations = vec![];
-
     match PlanState::from_str(&plan_state_str) {
         PlanState::Initial => {
             if planner_state == PlannerState::Found.to_string() {
+                // push unique operation and meta operation values here to state
+                // let mut unique_operation_state = State::new();
+                // unique_operation_state =
+                    // add_operation_state_tracking_variable(&plan, &unique_operation_state);
+                // unique_operation_state =
+                    // add_operation_meta_tracking_variables(&plan, &unique_operation_state, false);
+
+                // new_state = new_state.extend(unique_operation_state, false);
+
                 plan_state_str = PlanState::Executing.to_string();
                 plan_current_step = 0;
             }
         }
         PlanState::Executing => {
             if let Some(op_name) = plan.get(plan_current_step as usize) {
-                match model
-                    .operations
-                    .iter()
-                    .find(|op| op_name.starts_with(&op.name))
-                {
+                match model.operations.iter().find(|op| op_name.starts_with(&op.name)) {
                     Some(operation) => {
                         let mut uq_operation = operation.clone();
                         uq_operation.name = op_name.to_owned();
@@ -95,22 +299,11 @@ async fn process_plan_tick(
                             OperationProcessingType::Planned,
                             Some(&mut plan_current_step),
                             Some(&mut plan_state_str),
+                            // None,
                             logging_tx,
                             log_target,
                         )
                         .await;
-
-                        let operation_state = new_state.get_string_or_default_to_unknown(
-                            &format!("{}", uq_operation.name),
-                            &log_target,
-                        );
-
-                        match OperationState::from_str(&operation_state) {
-                            OperationState::Terminated(_) => {
-                                terminated_operations.push(uq_operation.name.clone());
-                            }
-                            _ => (),
-                        };
                     }
                     None => {
                         log::error!("Operation '{}' not found in model!", op_name);
@@ -121,19 +314,40 @@ async fn process_plan_tick(
                 plan_state_str = PlanState::Completed.to_string();
             }
         }
-        // Maybe I also have to reset all operation here...?
-        _ => {
-            // new_state = reset_all_operations(&new_state, model);
-            // let mut terminated_operations_meta = vec![];
-            // for op in &terminated_operations {
-            //     terminated_operations_meta.push(format!("{}_information", op));
-            //     terminated_operations_meta.push(format!("{}_failure_retry_counter", op));
-            //     terminated_operations_meta.push(format!("{}_timeout_retry_counter", op));
-            //     terminated_operations_meta.push(format!("{}_elapsed_executing_ms", op));
-            //     terminated_operations_meta.push(format!("{}_elapsed_disabled_ms", op));
-            // }
-            // StateManager::remove_sp_values(&mut con, &terminated_operations).await;
-            // StateManager::remove_sp_values(&mut con, &terminated_operations_meta).await;
+        // _ => (),
+        // TODO: Later, a goal might not be failed only if a plan fails, we can replan towards the same goal...
+        PlanState::Failed => {
+            // goal_state = GoalState::Failed.to_string();
+            // plan_current_step = 0;
+            new_state = reset_all_operations(&new_state, &model);
+            // plan = vec![];
+            // // Maybe move these to the goal runner
+            // plan_state_str = PlanState::Initial.to_string();
+            // planner_state = PlannerState::Ready.to_string();
+        }
+        PlanState::Completed => {
+            // goal_state = GoalState::Completed.to_string();
+            // plan_current_step = 0;
+            new_state = reset_all_operations(&new_state, &model);
+            // plan = vec![];
+            // plan_state_str = PlanState::Initial.to_string();
+            // planner_state = PlannerState::Ready.to_string();
+        }
+        PlanState::Cancelled => {
+            // goal_state = GoalState::Cancelled.to_string();
+            // plan_current_step = 0;
+            new_state = reset_all_operations(&new_state, &model);
+            // plan = vec![];
+            // plan_state_str = PlanState::Initial.to_string();
+            // planner_state = PlannerState::Ready.to_string();
+        }
+        PlanState::UNKNOWN => {
+            // goal_state = GoalState::UNKNOWN.to_string();
+            // plan_current_step = 0;
+            new_state = reset_all_operations(&new_state, &model);
+            // plan = vec![];
+            // plan_state_str = PlanState::Initial.to_string();
+            // planner_state = PlannerState::Ready.to_string();
         }
     }
 
