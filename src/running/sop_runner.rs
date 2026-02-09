@@ -176,6 +176,8 @@ pub async fn sop_runner(
     }
 }
 
+
+
 async fn process_sop_node_tick(
     sp_id: &str,
     mut state: State,
@@ -195,7 +197,6 @@ async fn process_sop_node_tick(
                 None,
                 None,
                 logging_tx,
-                con,
                 log_target,
             )
             .await;
