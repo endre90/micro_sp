@@ -65,7 +65,7 @@ pub async fn operation_log_receiver_task(
                     OperationProcessingType::SOP => format!("{}_logger_sop_operations", sp_id),
                 };
 
-                let agg_key = format!("{}_agg", which_op_type_logger);
+                // let agg_key = format!("{}_agg", which_op_type_logger);
 
                 if let Some(log_spvalue) =
                     StateManager::get_sp_value(&mut con, &which_op_type_logger).await
@@ -149,31 +149,31 @@ pub async fn operation_log_receiver_task(
                                 .await;
                             }
                             // Aggregate log => has purpose for testing, but it might aggregate a lot and slow down redis?
-                            let mut agg_log: Vec<Vec<Vec<OperationLog>>> =
-                                if let Some(log_spvalue) =
-                                    StateManager::get_sp_value(&mut con, &agg_key).await
-                                {
-                                    if let SPValue::String(StringOrUnknown::String(string_log)) =
-                                        log_spvalue
-                                    {
-                                        serde_json::from_str(&string_log).unwrap_or_default()
-                                    } else {
-                                        Vec::new()
-                                    }
-                                } else {
-                                    Vec::new()
-                                };
+                            // let mut agg_log: Vec<Vec<Vec<OperationLog>>> =
+                            //     if let Some(log_spvalue) =
+                            //         StateManager::get_sp_value(&mut con, &agg_key).await
+                            //     {
+                            //         if let SPValue::String(StringOrUnknown::String(string_log)) =
+                            //             log_spvalue
+                            //         {
+                            //             serde_json::from_str(&string_log).unwrap_or_default()
+                            //         } else {
+                            //             Vec::new()
+                            //         }
+                            //     } else {
+                            //         Vec::new()
+                            //     };
 
-                            agg_log.push(log);
+                            // agg_log.push(log);
 
-                            if let Ok(serialized) = serde_json::to_string(&agg_log) {
-                                StateManager::set_sp_value(
-                                    &mut con,
-                                    &agg_key,
-                                    &serialized.to_spvalue(),
-                                )
-                                .await;
-                            }
+                            // if let Ok(serialized) = serde_json::to_string(&agg_log) {
+                            //     StateManager::set_sp_value(
+                            //         &mut con,
+                            //         &agg_key,
+                            //         &serialized.to_spvalue(),
+                            //     )
+                            //     .await;
+                            // }
                         }
                     };
                 }
