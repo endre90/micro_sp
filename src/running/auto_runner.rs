@@ -169,15 +169,15 @@ pub async fn auto_operation_runner(
                 StateManager::set_state(&mut con, &modified_state).await;
             }
         }
-        let mut terminated_operations_meta = vec![];
-        for op in &terminated_operations {
-            terminated_operations_meta.push(format!("{}_information", op));
-            terminated_operations_meta.push(format!("{}_failure_retry_counter", op));
-            terminated_operations_meta.push(format!("{}_timeout_retry_counter", op));
-            terminated_operations_meta.push(format!("{}_elapsed_executing_ms", op));
-            terminated_operations_meta.push(format!("{}_elapsed_disabled_ms", op));
-        }
-        StateManager::remove_sp_values(&mut con, &terminated_operations).await;
-        StateManager::remove_sp_values(&mut con, &terminated_operations_meta).await;
+        // let mut terminated_operations_meta = vec![];
+        // for op in &terminated_operations {
+        //     terminated_operations_meta.push(format!("{}_information", op));
+        //     terminated_operations_meta.push(format!("{}_failure_retry_counter", op));
+        //     terminated_operations_meta.push(format!("{}_timeout_retry_counter", op));
+        //     terminated_operations_meta.push(format!("{}_elapsed_executing_ms", op));
+        //     terminated_operations_meta.push(format!("{}_elapsed_disabled_ms", op));
+        // }
+        // StateManager::remove_sp_values(&mut con, &terminated_operations).await;
+        // StateManager::remove_sp_values(&mut con, &terminated_operations_meta).await;
     }
 }
