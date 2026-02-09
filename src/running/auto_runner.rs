@@ -320,7 +320,6 @@ pub async fn auto_operation_runner(
             Some(s) => s,
             None => continue,
         };
-        
 
         let mut enabled_operations = vec![];
         for o in &model.auto_operations {
@@ -372,17 +371,13 @@ pub async fn auto_operation_runner(
                 let operation_state = new_state
                     .get_string_or_default_to_unknown(&format!("{}", current_id), &log_target);
                 match OperationState::from_str(&operation_state) {
-                    OperationState::Initial => (),
-                    OperationState::Disabled => (),
-                    OperationState::Executing => (),
-                    OperationState::Timedout => (),
-                    OperationState::Failed => (),
-                    OperationState::UNKNOWN => (),
-                    _ => {
+                    OperationState::Terminated(_) => {
                         active_unique_op_id = None;
                         // active_unique_op_state = OperationState::Initial;
                         active_op_container = None;
                     }
+
+                    _ => (),
                 }
                 let modified_state = state.get_diff_partial_state_and_add_missing(&new_state);
                 StateManager::set_state(&mut con, &modified_state).await;
