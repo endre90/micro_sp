@@ -360,26 +360,29 @@ pub async fn auto_operation_runner(
                 let operation_state = new_state
                     .get_string_or_default_to_unknown(&format!("{}", current_id), &log_target);
                 match OperationState::from_str(&operation_state) {
-                    OperationState::Completed => {
+                    OperationState::Completed
+                    | OperationState::Bypassed
+                    | OperationState::Fatal => {
                         active_unique_op_id = None;
                         // active_unique_op_state = OperationState::Initial;
                         active_op_container = None;
                     }
 
-                    _ => (),
+                    _ => {
+                        new_state = process_operation(
+                            &name,
+                            new_state,
+                            &active_op_container.clone().unwrap(),
+                            OperationProcessingType::Automatic,
+                            None,
+                            None,
+                            logging_tx.clone(),
+                            &log_target,
+                        )
+                        .await;
+                    }
                 };
-                new_state = process_operation(
-                    &name,
-                    new_state,
-                    &active_op_container.clone().unwrap(),
-                    OperationProcessingType::Automatic,
-                    None,
-                    None,
-                    logging_tx.clone(),
-                    &log_target,
-                )
-                .await;
-                
+
                 let modified_state = state.get_diff_partial_state_and_add_missing(&new_state);
                 StateManager::set_state(&mut con, &modified_state).await;
             }
