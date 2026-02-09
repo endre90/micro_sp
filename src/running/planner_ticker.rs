@@ -221,13 +221,6 @@ fn handle_replan_request(
             ctx.plan = plan_result.plan.iter().map(|x| format!("{}_{}", x, nanoid::nanoid!(10, &NANOID_ALPHABET))).collect();
             *new_state = add_operation_state_tracking_variable(&ctx.plan, &new_state);
             *new_state = add_operation_meta_tracking_variables(&ctx.plan, &new_state, false);
-
-            // let (model, state) = crate::model::sop_sequence::model(&sp_id, &state);
-
-            // let op_vars = generate_operation_state_variables(&model, coverability_tracking);
-            // TODO: LOAD THE MODEL HERE AND GENERATE uniquw IDS for operations and sops.
-
-
             ctx.planner_information = format!(
                 "Got a new plan {}:\n{}",
                 ctx.plan_id,

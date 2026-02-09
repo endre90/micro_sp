@@ -54,7 +54,7 @@ pub async fn auto_transition_runner(
     initialize_env_logger();
     let mut interval = interval(Duration::from_millis(TRANSITION_RUNNER_TICK_INTERVAL_MS));
     let model = model.clone();
-    let log_target = format!("{}_auto_trans_runner", name);
+    let log_target = format!("{}_auto_transition_runner", name);
     let keys: Vec<String> = model
         .auto_transitions
         .iter()
@@ -89,7 +89,7 @@ pub async fn auto_operation_runner(
     initialize_env_logger();
     let mut interval = interval(Duration::from_millis(OPERAION_RUNNER_TICK_INTERVAL_MS));
     let model = model.clone();
-    let log_target = format!("{}_auto_op_runner", name);
+    let log_target = format!("{}_auto_operation_runner", name);
 
     let mut active_op: Option<Operation> = None;
 
@@ -110,6 +110,9 @@ pub async fn auto_operation_runner(
                 enabled_operations.push(o);
             }
         }
+
+        // Operations ready to be removed from the state
+        let mut terminated_operations = vec!();
 
         match active_op.clone() {
             None => {
@@ -156,6 +159,7 @@ pub async fn auto_operation_runner(
 
                 match OperationState::from_str(&operation_state) {
                     OperationState::Terminated(_) => {
+                        terminated_operations.push(current_active_op.name.clone());
                         active_op = None;
                     },
                     _ => () 
@@ -163,6 +167,7 @@ pub async fn auto_operation_runner(
 
                 let modified_state = state.get_diff_partial_state_and_add_missing(&new_state);
                 StateManager::set_state(&mut con, &modified_state).await;
+                StateManager::remove_sp_values(&mut con, &terminated_operations).await;
             }
         }
     }
