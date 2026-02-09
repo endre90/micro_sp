@@ -191,7 +191,7 @@ pub(super) async fn process_operation(
             }
             op_info_level = log::Level::Warn;
             match operation_processing_type {
-                OperationProcessingType::SOP => {
+                OperationProcessingType::SOP | OperationProcessingType::Automatic=> {
                     new_state =
                         operation.terminate(&new_state, TerminationReason::Bypassed, &log_target);
                 }
@@ -294,7 +294,7 @@ pub(super) async fn process_operation(
                     }
                 }
 
-                OperationProcessingType::SOP => {
+                OperationProcessingType::SOP | OperationProcessingType::Automatic => {
                     new_state =
                         operation.terminate(&new_state, TerminationReason::Fatal, &log_target);
                 }
@@ -314,7 +314,7 @@ pub(super) async fn process_operation(
                         *plan_state = PlanState::Cancelled.to_string();
                     }
                 }
-                OperationProcessingType::SOP => {
+                OperationProcessingType::SOP | OperationProcessingType::Automatic => {
                     new_state =
                         operation.terminate(&new_state, TerminationReason::Cancelled, &log_target);
                 }
