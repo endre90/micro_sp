@@ -166,13 +166,13 @@ pub(super) async fn process_operation(
             op_info_level = log::Level::Info;
 
             // commentout
-            match operation_processing_type {
-                OperationProcessingType::SOP | OperationProcessingType::Automatic => {
+            // match operation_processing_type {
+                // OperationProcessingType::SOP | OperationProcessingType::Automatic => {
                     new_state =
                         operation.terminate(&new_state, TerminationReason::Completed, &log_target);
-                }
-                _ => (),
-            }
+                // }
+                // _ => (),
+            // }
         }
         OperationState::Bypassed => {
             if operation.can_be_cancelled(&sp_id, &new_state, &log_target) {
