@@ -262,137 +262,7 @@ pub async fn auto_transition_runner(
 //     }
 // }
 
-
 // Another filaed try
-// pub async fn auto_operation_runner(
-//     name: &str,
-//     model: &Model,
-//     logging_tx: mpsc::Sender<LogMsg>,
-//     connection_manager: &Arc<ConnectionManager>,
-// ) -> Result<(), Box<dyn std::error::Error>> {
-//     initialize_env_logger();
-//     let mut interval = interval(Duration::from_millis(OPERAION_RUNNER_TICK_INTERVAL_MS));
-//     let model = model.clone();
-//     let log_target = format!("{}_auto_op_runner", name);
-
-//     // Ah crap now I need to get the shole state because I am adding new operations...
-//     // let mut keys: Vec<String> = model
-//     //     .auto_operations
-//     //     .iter()
-//     //     .flat_map(|o| o.get_all_var_keys())
-//     //     .collect();
-
-//     // keys.extend(vec![format!("{}_dashboard_command", name)]);
-
-//     // keys.extend(
-//     //     model
-//     //         .auto_operations
-//     //         .iter()
-//     //         .flat_map(|op| {
-//     //             vec![
-//     //                 format!("{}", op.name),
-//     //                 format!("{}_information", op.name),
-//     //                 format!("{}_failure_retry_counter", op.name),
-//     //                 format!("{}_timeout_retry_counter", op.name),
-//     //                 format!("{}_elapsed_executing_ms", op.name),
-//     //                 format!("{}_elapsed_disabled_ms", op.name),
-//     //             ]
-//     //         })
-//     //         .collect::<Vec<String>>(),
-//     // );
-
-//     // For now only one automatic operation at a time
-//     // Later, add nonconflicting check / prestart
-//     let mut active_unique_op_id: Option<String> = None;
-//     // let mut active_unique_op_state: OperationState = OperationState::Initial;
-//     let mut active_op_container: Option<Operation> = None;
-
-//     loop {
-//         interval.tick().await;
-//         if let Err(_) = connection_manager.check_redis_health(&log_target).await {
-//             continue;
-//         }
-//         let mut con = connection_manager.get_connection().await;
-//         // let state =
-//         //     match StateManager::get_state_for_keys(&mut con.clone(), &keys, &log_target).await {
-//         //         Some(s) => s,
-//         //         None => continue,
-//         //     };
-//         let state = match StateManager::get_full_state(&mut con).await {
-//             Some(s) => s,
-//             None => continue,
-//         };
-
-//         let mut enabled_operations = vec![];
-//         for o in &model.auto_operations {
-//             if o.eval(&state, &log_target) {
-//                 enabled_operations.push(o);
-//             }
-//         }
-
-//         match active_unique_op_id.clone() {
-//             None => {
-//                 let maybe_random_op = {
-//                     let mut rng = rand::rng();
-//                     enabled_operations.choose(&mut rng).cloned()
-//                 };
-//                 if let Some(op) = maybe_random_op {
-//                     let mut new_state = state.clone();
-//                     let unique_id = nanoid::nanoid!(10, &NANOID_ALPHABET);
-//                     active_unique_op_id = Some(format!("{}_{}", op.name.clone(), unique_id));
-//                     let mut op_mut = op.clone();
-//                     op_mut.name = active_unique_op_id.clone().unwrap();
-//                     active_op_container = Some(op_mut.clone());
-//                     // active_unique_op_state = OperationState::Initial;
-//                     new_state = add_operation_meta_tracking_variables(
-//                         &vec![op_mut.name.clone()],
-//                         &new_state,
-//                         false,
-//                     );
-//                     new_state = add_operation_state_tracking_variable(
-//                         &vec![op_mut.name.clone()],
-//                         &new_state,
-//                     );
-//                     let modified_state = state.get_diff_partial_state_and_add_missing(&new_state);
-//                     StateManager::set_state(&mut con, &modified_state).await;
-//                 }
-//             }
-//             Some(current_id) => {
-//                 let mut new_state = state.clone();
-//                 let operation_state = new_state
-//                     .get_string_or_default_to_unknown(&format!("{}", current_id), &log_target);
-//                 match OperationState::from_str(&operation_state) {
-//                     OperationState::Completed
-//                     | OperationState::Bypassed
-//                     | OperationState::Fatal => {
-//                         active_unique_op_id = None;
-//                         // active_unique_op_state = OperationState::Initial;
-//                         active_op_container = None;
-//                     }
-
-//                     _ => {
-//                         new_state = process_operation(
-//                             &name,
-//                             new_state,
-//                             &active_op_container.clone().unwrap(),
-//                             OperationProcessingType::Automatic,
-//                             None,
-//                             None,
-//                             logging_tx.clone(),
-//                             &log_target,
-//                         )
-//                         .await;
-//                     }
-//                 };
-
-//                 let modified_state = state.get_diff_partial_state_and_add_missing(&new_state);
-//                 StateManager::set_state(&mut con, &modified_state).await;
-//             }
-//         }
-//     }
-// }
-
-// Old but working, no unique instance during runtime, only once started
 pub async fn auto_operation_runner(
     name: &str,
     model: &Model,
@@ -404,30 +274,11 @@ pub async fn auto_operation_runner(
     let model = model.clone();
     let log_target = format!("{}_auto_op_runner", name);
 
-    let mut keys: Vec<String> = model
-        .auto_operations
-        .iter()
-        .flat_map(|o| o.get_all_var_keys())
-        .collect();
-
-    keys.extend(vec![format!("{}_dashboard_command", name)]);
-
-    keys.extend(
-        model
-            .auto_operations
-            .iter()
-            .flat_map(|op| {
-                vec![
-                    format!("{}", op.name),
-                    format!("{}_information", op.name),
-                    format!("{}_failure_retry_counter", op.name),
-                    format!("{}_timeout_retry_counter", op.name),
-                    format!("{}_elapsed_executing_ms", op.name),
-                    format!("{}_elapsed_disabled_ms", op.name),
-                ]
-            })
-            .collect::<Vec<String>>(),
-    );
+    // For now only one automatic operation at a time
+    // Later, add nonconflicting check / prestart
+    // let mut active_unique_op_id: Option<String> = None;
+    // let mut active_unique_op_state: OperationState = OperationState::Initial;
+    let mut active_op: Option<Operation> = None;
 
     loop {
         interval.tick().await;
@@ -435,11 +286,10 @@ pub async fn auto_operation_runner(
             continue;
         }
         let mut con = connection_manager.get_connection().await;
-        let state =
-            match StateManager::get_state_for_keys(&mut con.clone(), &keys, &log_target).await {
-                Some(s) => s,
-                None => continue,
-            };
+        let state = match StateManager::get_full_state(&mut con).await {
+            Some(s) => s,
+            None => continue,
+        };
 
         let mut enabled_operations = vec![];
         for o in &model.auto_operations {
@@ -448,64 +298,37 @@ pub async fn auto_operation_runner(
             }
         }
 
-        let mut new_state = state.clone();
+        match active_op.clone() {
+            None => {
+                let maybe_random_op = {
+                    let mut rng = rand::rng();
+                    enabled_operations.choose(&mut rng).cloned()
+                };
+                if let Some(op) = maybe_random_op {
+                    let mut new_state = state.clone();
+                    let unique_id = nanoid::nanoid!(10, &NANOID_ALPHABET);
+                    let unique_op_id = format!("{}_{}", op.name.clone(), unique_id);
+                    let mut op_mut = op.clone();
+                    op_mut.name = unique_op_id.clone();
+                    active_op = Some(op_mut.clone());
 
-        let mut active_operations = Vec::new();
-        let mut pending_operations = Vec::new();
-        let mut terminated_operations = Vec::new();
-
-        for operation in &model.auto_operations {
-            let operation_state_str = new_state
-                .get_string_or_default_to_unknown(&format!("{}", operation.name), &log_target);
-            match OperationState::from_str(&operation_state_str) {
-                OperationState::Initial | OperationState::UNKNOWN => {
-                    pending_operations.push(operation);
-                }
-                OperationState::Executing
-                | OperationState::Failed
-                | OperationState::Timedout
-                | OperationState::Disabled
-                | OperationState::Completed => {
-                    active_operations.push(operation);
-                }
-                _ => {
-                    terminated_operations.push(operation);
-                }
-            }
-        }
-
-        for operation in &active_operations {
-            new_state = process_operation(
-                &name,
-                new_state,
-                operation,
-                OperationProcessingType::Automatic,
-                None,
-                None,
-                logging_tx.clone(),
-                &log_target,
-            )
-            .await;
-        }
-
-        if active_operations.len() == 0 {
-            let mut enabled_pending_ops = Vec::new();
-            for op in pending_operations {
-                if op.eval(&new_state, &log_target) {
-                    enabled_pending_ops.push(op);
+                    new_state = add_operation_meta_tracking_variables(
+                        &vec![unique_op_id.clone()],
+                        &new_state,
+                        false,
+                    );
+                    new_state =
+                        add_operation_state_tracking_variable(&vec![unique_op_id], &new_state);
+                    let modified_state = state.get_diff_partial_state_and_add_missing(&new_state);
+                    StateManager::set_state(&mut con, &modified_state).await;
                 }
             }
-
-            let maybe_random_op = {
-                let mut rng = rand::rng();
-                enabled_pending_ops.choose(&mut rng).cloned()
-            };
-
-            if let Some(random_operation) = maybe_random_op {
+            Some(current_active_op) => {
+                let mut new_state = state.clone();
                 new_state = process_operation(
                     &name,
                     new_state,
-                    random_operation,
+                    &current_active_op,
                     OperationProcessingType::Automatic,
                     None,
                     None,
@@ -513,10 +336,150 @@ pub async fn auto_operation_runner(
                     &log_target,
                 )
                 .await;
+                let operation_state = new_state.get_string_or_default_to_unknown(
+                    &format!("{}", current_active_op.name),
+                    &log_target,
+                );
+
+                match OperationState::from_str(&operation_state) {
+                    OperationState::Terminated(_) => {
+                        active_op = None;
+                    },
+                    _ => () 
+                };
+
+                let modified_state = state.get_diff_partial_state_and_add_missing(&new_state);
+                StateManager::set_state(&mut con, &modified_state).await;
             }
         }
-
-        let modified_state = state.get_diff_partial_state(&new_state);
-        StateManager::set_state(&mut con, &modified_state).await;
     }
 }
+
+// Old but working, no unique instance during runtime, only once started
+// pub async fn auto_operation_runner(
+//     name: &str,
+//     model: &Model,
+//     logging_tx: mpsc::Sender<LogMsg>,
+//     connection_manager: &Arc<ConnectionManager>,
+// ) -> Result<(), Box<dyn std::error::Error>> {
+//     initialize_env_logger();
+//     let mut interval = interval(Duration::from_millis(OPERAION_RUNNER_TICK_INTERVAL_MS));
+//     let model = model.clone();
+//     let log_target = format!("{}_auto_op_runner", name);
+
+//     let mut keys: Vec<String> = model
+//         .auto_operations
+//         .iter()
+//         .flat_map(|o| o.get_all_var_keys())
+//         .collect();
+
+//     keys.extend(vec![format!("{}_dashboard_command", name)]);
+
+//     keys.extend(
+//         model
+//             .auto_operations
+//             .iter()
+//             .flat_map(|op| {
+//                 vec![
+//                     format!("{}", op.name),
+//                     format!("{}_information", op.name),
+//                     format!("{}_failure_retry_counter", op.name),
+//                     format!("{}_timeout_retry_counter", op.name),
+//                     format!("{}_elapsed_executing_ms", op.name),
+//                     format!("{}_elapsed_disabled_ms", op.name),
+//                 ]
+//             })
+//             .collect::<Vec<String>>(),
+//     );
+
+//     loop {
+//         interval.tick().await;
+//         if let Err(_) = connection_manager.check_redis_health(&log_target).await {
+//             continue;
+//         }
+//         let mut con = connection_manager.get_connection().await;
+//         let state =
+//             match StateManager::get_state_for_keys(&mut con.clone(), &keys, &log_target).await {
+//                 Some(s) => s,
+//                 None => continue,
+//             };
+
+//         let mut enabled_operations = vec![];
+//         for o in &model.auto_operations {
+//             if o.eval(&state, &log_target) {
+//                 enabled_operations.push(o);
+//             }
+//         }
+
+//         let mut new_state = state.clone();
+
+//         let mut active_operations = Vec::new();
+//         let mut pending_operations = Vec::new();
+//         let mut terminated_operations = Vec::new();
+
+//         for operation in &model.auto_operations {
+//             let operation_state_str = new_state
+//                 .get_string_or_default_to_unknown(&format!("{}", operation.name), &log_target);
+//             match OperationState::from_str(&operation_state_str) {
+//                 OperationState::Initial | OperationState::UNKNOWN => {
+//                     pending_operations.push(operation);
+//                 }
+//                 OperationState::Executing
+//                 | OperationState::Failed
+//                 | OperationState::Timedout
+//                 | OperationState::Disabled
+//                 | OperationState::Completed => {
+//                     active_operations.push(operation);
+//                 }
+//                 _ => {
+//                     terminated_operations.push(operation);
+//                 }
+//             }
+//         }
+
+//         for operation in &active_operations {
+//             new_state = process_operation(
+//                 &name,
+//                 new_state,
+//                 operation,
+//                 OperationProcessingType::Automatic,
+//                 None,
+//                 None,
+//                 logging_tx.clone(),
+//                 &log_target,
+//             )
+//             .await;
+//         }
+
+//         if active_operations.len() == 0 {
+//             let mut enabled_pending_ops = Vec::new();
+//             for op in pending_operations {
+//                 if op.eval(&new_state, &log_target) {
+//                     enabled_pending_ops.push(op);
+//                 }
+//             }
+
+//             let maybe_random_op = {
+//                 let mut rng = rand::rng();
+//                 enabled_pending_ops.choose(&mut rng).cloned()
+//             };
+
+//             if let Some(random_operation) = maybe_random_op {
+//                 new_state = process_operation(
+//                     &name,
+//                     new_state,
+//                     random_operation,
+//                     OperationProcessingType::Automatic,
+//                     None,
+//                     None,
+//                     logging_tx.clone(),
+//                     &log_target,
+//                 )
+//                 .await;
+//             }
+//         }
+
+//         let modified_state = state.get_diff_partial_state(&new_state);
+//         StateManager::set_state(&mut con, &modified_state).await;
+//     }
+// }

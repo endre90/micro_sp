@@ -158,14 +158,14 @@ pub(super) async fn process_operation(
                     *plan_current_step += 1;
                 }
             }
-            if let OperationProcessingType::Automatic = operation_processing_type {
-                new_state = operation.initialize(&new_state, &log_target);
-            }
+            // if let OperationProcessingType::Automatic = operation_processing_type {
+            //     new_state = operation.initialize(&new_state, &log_target);
+            // }
             new_op_info = format!("Operation '{}' completed.", operation.name);
             logging_log = format!("Completed");
             op_info_level = log::Level::Info;
             match operation_processing_type {
-                OperationProcessingType::SOP => {
+                OperationProcessingType::SOP | OperationProcessingType::Automatic => {
                     new_state =
                         operation.terminate(&new_state, TerminationReason::Completed, &log_target);
                 }
