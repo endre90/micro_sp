@@ -112,9 +112,7 @@ pub async fn auto_operation_runner(
         }
 
         // Operations ready to be removed from the state
-        // let mut terminated_operations = vec![];
-
-        
+        let mut terminated_operations = vec![];        
 
         match active_op.clone() {
             None => {
@@ -154,47 +152,35 @@ pub async fn auto_operation_runner(
                     &log_target,
                 )
                 .await;
-                // let operation_state = new_state.get_string_or_default_to_unknown(
-                //     &format!("{}", current_active_op.name),
-                //     &log_target,
-                // );
+                let operation_state = new_state.get_string_or_default_to_unknown(
+                    &format!("{}", current_active_op.name),
+                    &log_target,
+                );
 
-                // match OperationState::from_str(&operation_state) {
-                //     OperationState::Terminated(_) => {
-                //         terminated_operations.push(current_active_op.name.clone());
-                //         active_op = None;
-                //     }
-                //     _ => (),
-                // };
+                match OperationState::from_str(&operation_state) {
+                    OperationState::Terminated(_) => {
+                        terminated_operations.push(current_active_op.name.clone());
+                        active_op = None;
+                    }
+                    _ => (),
+                };
 
                 let modified_state = state.get_diff_partial_state_and_add_missing(&new_state);
                 StateManager::set_state(&mut con, &modified_state).await;
             }
         }
 
-        let terminated_operations_sp_value = state.get_array_or_default_to_empty(
-            &format!("{}_terminated_operations", sp_id),
-            &log_target,
-        );
+        // let terminated_operations_sp_value = state.get_array_or_default_to_empty(
+        //     &format!("{}_terminated_operations", sp_id),
+        //     &log_target,
+        // );
 
-        let terminated_operations: Vec<String> = terminated_operations_sp_value
-            .iter()
-            .filter(|val| val.is_string())
-            .map(|y| y.to_string())
-            .collect();
+        // let terminated_operations: Vec<String> = terminated_operations_sp_value
+        //     .iter()
+        //     .filter(|val| val.is_string())
+        //     .map(|y| y.to_string())
+        //     .collect();
 
-        let mut terminated_operations_meta = vec![];
-        for op in &terminated_operations {
-            terminated_operations_meta.push(format!("{}_information", op));
-            terminated_operations_meta.push(format!("{}_failure_retry_counter", op));
-            terminated_operations_meta.push(format!("{}_timeout_retry_counter", op));
-            terminated_operations_meta.push(format!("{}_elapsed_executing_ms", op));
-            terminated_operations_meta.push(format!("{}_elapsed_disabled_ms", op));
-        }
-        StateManager::remove_sp_values(&mut con, &terminated_operations).await;
-        StateManager::remove_sp_values(&mut con, &terminated_operations_meta).await;
-      
-      
         // let mut terminated_operations_meta = vec![];
         // for op in &terminated_operations {
         //     terminated_operations_meta.push(format!("{}_information", op));
@@ -205,5 +191,17 @@ pub async fn auto_operation_runner(
         // }
         // StateManager::remove_sp_values(&mut con, &terminated_operations).await;
         // StateManager::remove_sp_values(&mut con, &terminated_operations_meta).await;
+      
+      
+        let mut terminated_operations_meta = vec![];
+        for op in &terminated_operations {
+            terminated_operations_meta.push(format!("{}_information", op));
+            terminated_operations_meta.push(format!("{}_failure_retry_counter", op));
+            terminated_operations_meta.push(format!("{}_timeout_retry_counter", op));
+            terminated_operations_meta.push(format!("{}_elapsed_executing_ms", op));
+            terminated_operations_meta.push(format!("{}_elapsed_disabled_ms", op));
+        }
+        StateManager::remove_sp_values(&mut con, &terminated_operations).await;
+        StateManager::remove_sp_values(&mut con, &terminated_operations_meta).await;
     }
 }
