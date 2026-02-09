@@ -273,30 +273,31 @@ pub async fn auto_operation_runner(
     let model = model.clone();
     let log_target = format!("{}_auto_op_runner", name);
 
-    let mut keys: Vec<String> = model
-        .auto_operations
-        .iter()
-        .flat_map(|o| o.get_all_var_keys())
-        .collect();
+    // Ah crap now I need to get the shole state because I am adding new operations...
+    // let mut keys: Vec<String> = model
+    //     .auto_operations
+    //     .iter()
+    //     .flat_map(|o| o.get_all_var_keys())
+    //     .collect();
 
-    keys.extend(vec![format!("{}_dashboard_command", name)]);
+    // keys.extend(vec![format!("{}_dashboard_command", name)]);
 
-    keys.extend(
-        model
-            .auto_operations
-            .iter()
-            .flat_map(|op| {
-                vec![
-                    format!("{}", op.name),
-                    format!("{}_information", op.name),
-                    format!("{}_failure_retry_counter", op.name),
-                    format!("{}_timeout_retry_counter", op.name),
-                    format!("{}_elapsed_executing_ms", op.name),
-                    format!("{}_elapsed_disabled_ms", op.name),
-                ]
-            })
-            .collect::<Vec<String>>(),
-    );
+    // keys.extend(
+    //     model
+    //         .auto_operations
+    //         .iter()
+    //         .flat_map(|op| {
+    //             vec![
+    //                 format!("{}", op.name),
+    //                 format!("{}_information", op.name),
+    //                 format!("{}_failure_retry_counter", op.name),
+    //                 format!("{}_timeout_retry_counter", op.name),
+    //                 format!("{}_elapsed_executing_ms", op.name),
+    //                 format!("{}_elapsed_disabled_ms", op.name),
+    //             ]
+    //         })
+    //         .collect::<Vec<String>>(),
+    // );
 
     // For now only one automatic operation at a time
     // Later, add nonconflicting check / prestart
@@ -310,11 +311,16 @@ pub async fn auto_operation_runner(
             continue;
         }
         let mut con = connection_manager.get_connection().await;
-        let state =
-            match StateManager::get_state_for_keys(&mut con.clone(), &keys, &log_target).await {
-                Some(s) => s,
-                None => continue,
-            };
+        // let state =
+        //     match StateManager::get_state_for_keys(&mut con.clone(), &keys, &log_target).await {
+        //         Some(s) => s,
+        //         None => continue,
+        //     };
+        let state = match StateManager::get_full_state(&mut con).await {
+            Some(s) => s,
+            None => continue,
+        };
+        
 
         let mut enabled_operations = vec![];
         for o in &model.auto_operations {
@@ -382,20 +388,6 @@ pub async fn auto_operation_runner(
                 StateManager::set_state(&mut con, &modified_state).await;
             }
         }
-
-        // for operation in &active_operations {
-        //     new_state = process_operation(
-        //         &name,
-        //         new_state,
-        //         operation,
-        //         OperationProcessingType::Automatic,
-        //         None,
-        //         None,
-        //         logging_tx.clone(),
-        //         &log_target,
-        //     )
-        //     .await;
-        // }
     }
 }
 
