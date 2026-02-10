@@ -150,13 +150,18 @@ impl SOP {
 /// # Arguments
 /// * `root_sop`: The root of the SOP structure you want to visualize.
 /// * `title`: A title to print above the tree.
-pub fn visualize_sop(root_sop: &SOP) {
+pub fn visualize_sop(root_sop: &SOP) -> String {
     let tree = build_sop_tree(root_sop);
+    let mut output = String::new();
+
     for line in tree.to_string().lines() {
-        // Print the indent string before printing the line from the tree
-        println!("       {}", line);
+        // Instead of printing, we format the string and append it to our variable
+        // using the same 7-space indentation you had before.
+        use std::fmt::Write; // Allows using write! macro on String
+        let _ = writeln!(output, "       {}", line);
     }
-    // println!("{}", tree);
+    
+    output // Return the accumulated string
 }
 
 fn build_sop_tree(sop: &SOP) -> Tree<String> {
