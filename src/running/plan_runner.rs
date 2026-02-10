@@ -76,7 +76,14 @@ async fn process_plan_tick(
         .map(|y| y.to_string())
         .collect();
 
-    
+    let terminated_operations_sp_value = state
+        .get_array_or_default_to_empty(&format!("{}_terminated_operations", sp_id), &log_target);
+
+    let terminated_operations: Vec<String> = terminated_operations_sp_value
+        .iter()
+        .filter(|val| val.is_string())
+        .map(|y| y.to_string())
+        .collect();
 
     match PlanState::from_str(&plan_state_str) {
         PlanState::Initial => {
@@ -127,16 +134,6 @@ async fn process_plan_tick(
         }
     }
 
-    // Operations ready to be removed from the state
-    let terminated_operations_sp_value = new_state
-        .get_array_or_default_to_empty(&format!("{}_terminated_operations", sp_id), &log_target);
-
-    let terminated_operations: Vec<String> = terminated_operations_sp_value
-        .iter()
-        .filter(|val| val.is_string())
-        .map(|y| y.to_string())
-        .collect();
-
     let mut terminated_operations_meta = vec![];
     for op in &terminated_operations {
         terminated_operations_meta.push(format!("{}_information", op));
@@ -147,6 +144,13 @@ async fn process_plan_tick(
     }
     StateManager::remove_sp_values(&mut con, &terminated_operations).await;
     StateManager::remove_sp_values(&mut con, &terminated_operations_meta).await;
+    // terminated_operations.clear();
+    StateManager::set_sp_value(
+        &mut con,
+        &format!("{}_terminated_operations", sp_id),
+        &Vec::<SPValue>::new().to_spvalue(),
+    )
+    .await;
 
     new_state = new_state
         .update(

@@ -22,6 +22,7 @@ pub(super) async fn process_operation(
     logging_tx: mpsc::Sender<LogMsg>,
     // mut con: redis::aio::MultiplexedConnection,
     log_target: &str,
+    // terminated_operations: &mut Vec<String>
 ) -> State {
     let operation_state =
         new_state.get_string_or_default_to_unknown(&format!("{}", operation.name), &log_target);
@@ -51,8 +52,27 @@ pub(super) async fn process_operation(
         &log_target,
     );
 
-    // let mut terminated_operations = new_state
-    //     .get_array_or_default_to_empty(&format!("{}_terminated_operations", sp_id), &log_target);
+
+    // Test if this can be done, removing ops once they are terminated
+    let mut terminated_operations = new_state
+        .get_array_or_default_to_empty(&format!("{}_terminated_operations", sp_id), &log_target);
+
+    // let terminated_operations: Vec<String> = terminated_operations_sp_value
+    //     .iter()
+    //     .filter(|val| val.is_string())
+    //     .map(|y| y.to_string())
+    //     .collect();
+
+    // let mut terminated_operations_meta = vec![];
+    // for op in &terminated_operations {
+    //     terminated_operations_meta.push(format!("{}_information", op));
+    //     terminated_operations_meta.push(format!("{}_failure_retry_counter", op));
+    //     terminated_operations_meta.push(format!("{}_timeout_retry_counter", op));
+    //     terminated_operations_meta.push(format!("{}_elapsed_executing_ms", op));
+    //     terminated_operations_meta.push(format!("{}_elapsed_disabled_ms", op));
+    // }
+    // StateManager::remove_sp_values(&mut con, &terminated_operations).await;
+    // StateManager::remove_sp_values(&mut con, &terminated_operations_meta).await;
 
     let mut logging_log = "".to_string();
     let mut op_info_level = log::Level::Info;
@@ -330,8 +350,9 @@ pub(super) async fn process_operation(
         OperationState::UNKNOWN => {
             new_state = operation.initialize(&new_state, &log_target);
         }
+        
         OperationState::Terminated(termination_reason) => {
-            // terminated_operations.push(operation.name.to_spvalue());
+            terminated_operations.push(operation.name.to_spvalue());
             match termination_reason {
                 TerminationReason::Bypassed => {
                     logging_log = format!("Bypassed");
@@ -405,8 +426,8 @@ pub(super) async fn process_operation(
             &format!("{}_elapsed_disabled_ms", operation.name),
             elapased_disabled_ms.to_spvalue(),
         )
-        // .update(
-        //     &format!("{}_terminated_operations", sp_id),
-        //     terminated_operations.to_spvalue(),
-        // )
+        .update(
+            &format!("{}_terminated_operations", sp_id),
+            terminated_operations.to_spvalue(),
+        )
 }
