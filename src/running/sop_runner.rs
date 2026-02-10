@@ -100,7 +100,7 @@ pub async fn sop_runner(
                     sop_info_level = log::Level::Info;
                     new_state = process_sop_node_tick(
                         sp_id,
-                        state.clone(),
+                        new_state.clone(),
                         &active_sop_container.clone().unwrap(),
                         con_clone,
                         logging_tx.clone(),

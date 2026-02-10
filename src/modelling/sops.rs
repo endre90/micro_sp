@@ -138,7 +138,7 @@ impl SOP {
                 }
 
                 SOPState::UNKNOWN
-            },
+            }
         }
     }
 }
@@ -158,9 +158,11 @@ pub fn visualize_sop(root_sop: &SOP) -> String {
         // Instead of printing, we format the string and append it to our variable
         // using the same 7-space indentation you had before.
         use std::fmt::Write; // Allows using write! macro on String
-        let _ = writeln!(output, "       {}", line);
+        if !line.is_empty() {
+            let _ = writeln!(output, "       {}", line);
+        }
     }
-    
+
     output // Return the accumulated string
 }
 
