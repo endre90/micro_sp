@@ -53,9 +53,7 @@ pub async fn sop_runner(
         let old_sop_information = new_state
             .get_string_or_default_to_unknown(&format!("{}_sop_information", sop_id), &log_target);
 
-        
-
-        let mut new_sop_info: String = old_sop_information.clone();
+        let mut new_sop_info: String; // = old_sop_information.clone();
         let mut sop_info_level: Level = log::Level::Info;
 
         // Check first if there is an active unique SOP already running
@@ -88,6 +86,11 @@ pub async fn sop_runner(
             Some(ref active_sop) => match active_unique_sop_state {
                 SOPState::Initial => {
                     active_unique_sop_state = SOPState::Executing;
+                    new_sop_info = format!(
+                        "Initializing a new SOP '{}':\n{:?}",
+                        active_sop,
+                        visualize_sop(&active_sop_container.clone().unwrap())
+                    );
                 }
                 SOPState::Executing => {
                     // Inform the operation that the sop is executing
@@ -197,11 +200,8 @@ pub async fn sop_runner(
         // }
         // StateManager::remove_sp_values(&mut con, &terminated_operations).await;
         // StateManager::remove_sp_values(&mut con, &terminated_operations_meta).await;
-
     }
 }
-
-
 
 async fn process_sop_node_tick(
     sp_id: &str,
