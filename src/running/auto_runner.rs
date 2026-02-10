@@ -111,16 +111,16 @@ pub async fn auto_operation_runner(
             }
         }
 
-        let terminated_operations_sp_value = state.get_array_or_default_to_empty(
-            &format!("{}_terminated_operations", sp_id),
-            &log_target,
-        );
+        // let terminated_operations_sp_value = state.get_array_or_default_to_empty(
+        //     &format!("{}_terminated_operations", sp_id),
+        //     &log_target,
+        // );
 
-        let mut terminated_operations: Vec<String> = terminated_operations_sp_value
-            .iter()
-            .filter(|val| val.is_string())
-            .map(|y| y.to_string())
-            .collect();
+        // let mut terminated_operations: Vec<String> = terminated_operations_sp_value
+        //     .iter()
+        //     .filter(|val| val.is_string())
+        //     .map(|y| y.to_string())
+        //     .collect();
 
         match active_op.clone() {
             None => {
@@ -179,22 +179,22 @@ pub async fn auto_operation_runner(
             }
         }
 
-        let mut terminated_operations_meta = vec![];
-        for op in &terminated_operations {
-            terminated_operations_meta.push(format!("{}_information", op));
-            terminated_operations_meta.push(format!("{}_failure_retry_counter", op));
-            terminated_operations_meta.push(format!("{}_timeout_retry_counter", op));
-            terminated_operations_meta.push(format!("{}_elapsed_executing_ms", op));
-            terminated_operations_meta.push(format!("{}_elapsed_disabled_ms", op));
-        }
-        StateManager::remove_sp_values(&mut con, &terminated_operations).await;
-        StateManager::remove_sp_values(&mut con, &terminated_operations_meta).await;
-        terminated_operations.clear();
-        StateManager::set_sp_value(
-            &mut con,
-            &format!("{}_terminated_operations", sp_id),
-            &Vec::<SPValue>::new().to_spvalue(),
-        )
-        .await;
+        // let mut terminated_operations_meta = vec![];
+        // for op in &terminated_operations {
+        //     terminated_operations_meta.push(format!("{}_information", op));
+        //     terminated_operations_meta.push(format!("{}_failure_retry_counter", op));
+        //     terminated_operations_meta.push(format!("{}_timeout_retry_counter", op));
+        //     terminated_operations_meta.push(format!("{}_elapsed_executing_ms", op));
+        //     terminated_operations_meta.push(format!("{}_elapsed_disabled_ms", op));
+        // }
+        // StateManager::remove_sp_values(&mut con, &terminated_operations).await;
+        // StateManager::remove_sp_values(&mut con, &terminated_operations_meta).await;
+        // // terminated_operations.clear();
+        // StateManager::set_sp_value(
+        //     &mut con,
+        //     &format!("{}_terminated_operations", sp_id),
+        //     &Vec::<SPValue>::new().to_spvalue(),
+        // )
+        // .await;
     }
 }
