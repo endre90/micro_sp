@@ -87,7 +87,7 @@ pub async fn sop_runner(
                 SOPState::Initial => {
                     active_unique_sop_state = SOPState::Executing;
                     new_sop_info = format!(
-                        "Initializing a new SOP '{}':\n{:?}",
+                        "Initializing a new SOP '{}':\n{}",
                         active_sop,
                         visualize_sop(&active_sop_container.clone().unwrap())
                     );
