@@ -51,8 +51,8 @@ pub(super) async fn process_operation(
         &log_target,
     );
 
-    let mut terminated_operations = new_state
-        .get_array_or_default_to_empty(&format!("{}_terminated_operations", sp_id), &log_target);
+    // let mut terminated_operations = new_state
+    //     .get_array_or_default_to_empty(&format!("{}_terminated_operations", sp_id), &log_target);
 
     let mut logging_log = "".to_string();
     let mut op_info_level = log::Level::Info;
@@ -331,7 +331,7 @@ pub(super) async fn process_operation(
             new_state = operation.initialize(&new_state, &log_target);
         }
         OperationState::Terminated(termination_reason) => {
-            terminated_operations.push(operation.name.to_spvalue());
+            // terminated_operations.push(operation.name.to_spvalue());
             match termination_reason {
                 TerminationReason::Bypassed => {
                     new_op_info = format!(
@@ -401,8 +401,8 @@ pub(super) async fn process_operation(
             &format!("{}_elapsed_disabled_ms", operation.name),
             elapased_disabled_ms.to_spvalue(),
         )
-        .update(
-            &format!("{}_terminated_operations", sp_id),
-            terminated_operations.to_spvalue(),
-        )
+        // .update(
+        //     &format!("{}_terminated_operations", sp_id),
+        //     terminated_operations.to_spvalue(),
+        // )
 }
