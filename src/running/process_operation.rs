@@ -334,22 +334,26 @@ pub(super) async fn process_operation(
             // terminated_operations.push(operation.name.to_spvalue());
             match termination_reason {
                 TerminationReason::Bypassed => {
+                    logging_log = format!("Bypassed");
                     new_op_info = format!(
                         "Operation '{}' terminated. Reason: Bypassed.",
                         operation.name
                     )
                 }
                 TerminationReason::Completed => {
+                    logging_log = format!("Completed");
                     new_op_info = format!(
                         "Operation '{}' terminated. Reason: Completed.",
                         operation.name
                     )
                 }
                 TerminationReason::Fatal => {
+                    logging_log = format!("Fatal");
                     new_op_info =
                         format!("Operation '{}' terminated. Reason: Fatal.", operation.name)
                 }
                 TerminationReason::Cancelled => {
+                    logging_log = format!("Cancelled");
                     new_op_info = format!(
                         "Operation '{}' terminated. Reason: Cancelled.",
                         operation.name
