@@ -167,6 +167,7 @@ pub(super) async fn process_operation(
             // if let OperationProcessingType::Automatic = operation_processing_type {
             //     new_state = operation.initialize(&new_state, &log_target);
             // }
+            
             new_op_info = format!("Operation '{}' completed.", operation.name);
             logging_log = format!("Completed");
             op_info_level = log::Level::Info;
