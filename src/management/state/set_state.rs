@@ -1,4 +1,4 @@
-use crate::{FloatOrUnknown, SPValue, State};
+use crate::State;
 use redis::{AsyncCommands, Value, aio::MultiplexedConnection};
 
 pub(super) async fn set_state(con: &mut MultiplexedConnection, state: &State) {
@@ -6,39 +6,16 @@ pub(super) async fn set_state(con: &mut MultiplexedConnection, state: &State) {
         .state
         .clone()
         .into_iter()
-        .filter_map(|(key, assignment)| {
-            let value_str_result = match &assignment.val {
-                SPValue::Float64(FloatOrUnknown::Float64(val)) => {
-                    let f = val.0;
-                    if f.fract() == 0.0 {
-                        Ok(format!("{:.1}", f))
-                    } else {
-                        Ok(format!("{}", f))
-                    }
-                }
-                _ => serde_json::to_string(&assignment.val),
-            };
-
-            match value_str_result {
-                Ok(s) => Some((key, s)),
+        .filter_map(
+            |(key, assignment)| match serde_json::to_string(&assignment.val) {
+                Ok(value_str) => Some((key, value_str)),
                 Err(e) => {
                     log::error!("Failed to serialize value for key '{key}': {e}");
                     None
                 }
-            }
-        })
+            },
+        )
         .collect();
-
-    // .filter_map(
-    //     |(key, assignment)| match serde_json::to_string(&assignment.val) {
-    //         Ok(value_str) => Some((key, value_str)),
-    //         Err(e) => {
-    //             log::error!("Failed to serialize value for key '{key}': {e}");
-    //             None
-    //         }
-    //     },
-    // )
-    // .collect();
 
     if !items_to_set.is_empty() {
         match con.mset::<_, String, Value>(&items_to_set).await {
