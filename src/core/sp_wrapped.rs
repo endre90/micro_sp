@@ -107,7 +107,7 @@ impl fmt::Display for SPWrapped {
                     BoolOrUnknown::UNKNOWN => write!(fmtr, "UNKNOWN"),
                 },
                 SPValue::Float64(f) => match f {
-                    FloatOrUnknown::Float64(f_val) => write!(fmtr, "{}", f_val.0),
+                    FloatOrUnknown::Float64(f_val) => write!(fmtr, "{}", f_val.into_inner() as f64),
                     FloatOrUnknown::UNKNOWN => write!(fmtr, "UNKNOWN"),
                 },
                 SPValue::Int64(i) => match i {
