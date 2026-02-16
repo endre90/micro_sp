@@ -9,8 +9,6 @@ pub enum ActionType {
     Assign,
     Increment,
     Decrement,
-    // Addition,
-    // Subtraction
 }
 
 /// Actions update the assignments of the state variables.

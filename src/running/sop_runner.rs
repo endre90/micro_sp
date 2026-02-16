@@ -82,10 +82,12 @@ pub async fn sop_runner(
                         &ops_in_sop.iter().map(|x| x.name.clone()).collect(),
                         &new_state,
                         false,
+                        &log_target
                     );
                     new_state = add_operation_state_tracking_variable(
                         &ops_in_sop.iter().map(|x| x.name.clone()).collect(),
                         &new_state,
+                        &log_target
                     );
                     new_sop_info = format!("SOP '{sop_id}' is enabled, starting execution.");
                     sop_info_level = log::Level::Info;

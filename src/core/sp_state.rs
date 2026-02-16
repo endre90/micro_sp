@@ -132,10 +132,10 @@ impl State {
         // }
     }
 
-    pub fn add(&self, assignment: SPAssignment) -> State {
+    pub fn add(&self, assignment: SPAssignment, log_target: &str) -> State {
         match self.state.clone().get(&assignment.var.name) {
             Some(_) => {
-                log::error!(target: &&format!("sp_state"), 
+                log::error!(target: &log_target, 
                     "Variable {} already in state! Skipped add.", assignment.var.name.to_string());
                 self.clone()
             }
@@ -583,9 +583,9 @@ mod tests {
         let state = State::new();
         let var = SPVariable::new("v", SPValueType::Bool);
         let assignment = SPAssignment::new(var, true.to_spvalue());
-        let new_state = state.add(assignment.clone());
+        let new_state = state.add(assignment.clone(), "test");
         assert_eq!(new_state.state.len(), 1);
-        let same_state = new_state.add(assignment);
+        let same_state = new_state.add(assignment, "test");
         assert_eq!(same_state.state.len(), 1);
     }
 
@@ -884,7 +884,7 @@ mod tests {
         let state_with_bad_goal = state_no_goal.add(SPAssignment::new(
             SPVariable::new("g_current_goal_predicate", SPValueType::Int64),
             1.to_spvalue(),
-        ));
+        ), "test");
         assert_eq!(state_with_bad_goal.extract_goal("g"), Predicate::TRUE);
     }
 }

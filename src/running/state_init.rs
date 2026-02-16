@@ -4,7 +4,7 @@ use crate::*;
 
 // If coverability_tracking is true, generate variables to track how many
 // times an operation has entered its different running states
-pub fn generate_runner_state_variables(name: &str) -> State {
+pub fn generate_runner_state_variables(name: &str, log_target: &str) -> State {
     let mut state = State::new();
 
     // Define variables
@@ -56,34 +56,46 @@ pub fn generate_runner_state_variables(name: &str) -> State {
     let time_elapsed_ms = iv!(&&format!("{}_time_elapsed_ms", name));
 
     let terminated_operations = av!(&&format!("{}_terminated_operations", name));
-    state = state.add(assign!(
-        terminated_operations,
-        SPValue::Array(ArrayOrUnknown::UNKNOWN)
-    ));
+    state = state.add(
+        assign!(
+            terminated_operations,
+            SPValue::Array(ArrayOrUnknown::UNKNOWN)
+        ),
+        &log_target,
+    );
 
     let active_auto_operations = av!(&&format!("{}_active_auto_operations", name));
-    state = state.add(assign!(
-        active_auto_operations,
-        SPValue::Array(ArrayOrUnknown::UNKNOWN)
-    ));
+    state = state.add(
+        assign!(
+            active_auto_operations,
+            SPValue::Array(ArrayOrUnknown::UNKNOWN)
+        ),
+        &log_target,
+    );
 
     // Pause, Stop, Run/Play/Continue
     let sp_dashboard_command = v!(&&format!("{}_dashboard_command", name));
-    state = state.add(assign!(
-        sp_dashboard_command,
-        SPValue::String(StringOrUnknown::UNKNOWN)
-    ));
+    state = state.add(
+        assign!(
+            sp_dashboard_command,
+            SPValue::String(StringOrUnknown::UNKNOWN)
+        ),
+        &log_target,
+    );
 
     // Logging:
     let empty_log: Vec<Vec<OperationLog>> = vec![vec![]];
     // let empty_log_agg: Vec<Vec<Vec<OperationLog>>> = vec![vec![vec![]]];
     let logger_planned_operations = v!(&&format!("{}_logger_planned_operations", name));
-    state = state.add(assign!(
-        logger_planned_operations,
-        SPValue::String(StringOrUnknown::String(
-            serde_json::to_string(&empty_log).unwrap()
-        ))
-    ));
+    state = state.add(
+        assign!(
+            logger_planned_operations,
+            SPValue::String(StringOrUnknown::String(
+                serde_json::to_string(&empty_log).unwrap()
+            ))
+        ),
+        &log_target,
+    );
 
     // let logger_planned_operations_agg = v!(&&format!("{}_logger_planned_operations_agg", name));
     // state = state.add(assign!(
@@ -94,12 +106,15 @@ pub fn generate_runner_state_variables(name: &str) -> State {
     // ));
 
     let logger_automatic_operations = v!(&&format!("{}_logger_automatic_operations", name));
-    state = state.add(assign!(
-        logger_automatic_operations,
-        SPValue::String(StringOrUnknown::String(
-            serde_json::to_string(&empty_log).unwrap()
-        ))
-    ));
+    state = state.add(
+        assign!(
+            logger_automatic_operations,
+            SPValue::String(StringOrUnknown::String(
+                serde_json::to_string(&empty_log).unwrap()
+            ))
+        ),
+        &log_target,
+    );
 
     // let logger_automatic_operations_agg = v!(&&format!("{}_logger_automatic_operations_agg", name));
     // state = state.add(assign!(
@@ -110,12 +125,15 @@ pub fn generate_runner_state_variables(name: &str) -> State {
     // ));
 
     let logger_sop_operations = v!(&&format!("{}_logger_sop_operations", name));
-    state = state.add(assign!(
-        logger_sop_operations,
-        SPValue::String(StringOrUnknown::String(
-            serde_json::to_string(&empty_log).unwrap()
-        ))
-    ));
+    state = state.add(
+        assign!(
+            logger_sop_operations,
+            SPValue::String(StringOrUnknown::String(
+                serde_json::to_string(&empty_log).unwrap()
+            ))
+        ),
+        &log_target,
+    );
 
     // let logger_sop_operations_agg = v!(&&format!("{}_logger_sop_operations_agg", name));
     // state = state.add(assign!(
@@ -126,159 +144,225 @@ pub fn generate_runner_state_variables(name: &str) -> State {
     // ));
 
     // Initialize values
-    state = state.add(assign!(
-        runner_state,
-        SPValue::String(StringOrUnknown::UNKNOWN)
-    ));
-    state = state.add(assign!(
-        current_goal_predicate,
-        SPValue::String(StringOrUnknown::UNKNOWN)
-    ));
-    state = state.add(assign!(
-        current_goal_id,
-        SPValue::String(StringOrUnknown::UNKNOWN)
-    ));
-    state = state.add(assign!(
-        current_goal_state,
-        SPValue::String(StringOrUnknown::UNKNOWN)
-    ));
-    state = state.add(assign!(plan, SPValue::Array(ArrayOrUnknown::UNKNOWN)));
-    state = state.add(assign!(plan_exists, SPValue::Bool(BoolOrUnknown::UNKNOWN)));
-    state = state.add(assign!(
-        plan_name,
-        SPValue::String(StringOrUnknown::UNKNOWN)
-    ));
-    state = state.add(assign!(plan_id, SPValue::String(StringOrUnknown::UNKNOWN)));
-    state = state.add(assign!(
-        plan_state,
-        SPValue::String(StringOrUnknown::UNKNOWN)
-    ));
-    state = state.add(assign!(
-        planner_state,
-        SPValue::String(StringOrUnknown::UNKNOWN)
-    ));
-    state = state.add(assign!(
-        plan_duration,
-        SPValue::Float64(FloatOrUnknown::UNKNOWN)
-    ));
-    state = state.add(assign!(
-        plan_current_step,
-        SPValue::Int64(IntOrUnknown::UNKNOWN)
-    ));
-    state = state.add(assign!(
-        planner_information,
-        SPValue::String(StringOrUnknown::UNKNOWN)
-    ));
-    state = state.add(assign!(
-        plan_runner_information,
-        SPValue::String(StringOrUnknown::UNKNOWN)
-    ));
-    state = state.add(assign!(
-        goal_runner_information,
-        SPValue::String(StringOrUnknown::UNKNOWN)
-    ));
-    state = state.add(assign!(
-        sop_runner_information,
-        SPValue::String(StringOrUnknown::UNKNOWN)
-    ));
-    state = state.add(assign!(
-        main_runner_information,
-        SPValue::String(StringOrUnknown::UNKNOWN)
-    ));
-    state = state.add(assign!(
-        goal_scheduler_information,
-        SPValue::String(StringOrUnknown::UNKNOWN)
-    ));
-    state = state.add(assign!(replanned, SPValue::Bool(BoolOrUnknown::UNKNOWN)));
-    state = state.add(assign!(
-        replan_for_same_goal,
-        SPValue::Bool(BoolOrUnknown::UNKNOWN)
-    ));
-    state = state.add(assign!(
-        replan_counter,
-        SPValue::Int64(IntOrUnknown::UNKNOWN)
-    ));
-    state = state.add(assign!(
-        replan_counter_total,
-        SPValue::Int64(IntOrUnknown::UNKNOWN)
-    ));
-    state = state.add(assign!(plan_counter, SPValue::Int64(IntOrUnknown::UNKNOWN)));
-    state = state.add(assign!(
-        replan_fail_counter,
-        SPValue::Int64(IntOrUnknown::UNKNOWN)
-    ));
-    state = state.add(assign!(
-        replan_trigger,
-        SPValue::Bool(BoolOrUnknown::UNKNOWN)
-    ));
-    state = state.add(assign!(
-        incoming_goals,
-        SPValue::Array(ArrayOrUnknown::UNKNOWN)
-    ));
-    state = state.add(assign!(
-        scheduled_goals,
-        SPValue::Array(ArrayOrUnknown::UNKNOWN)
-    ));
-    state = state.add(assign!(sop_id, SPValue::String(StringOrUnknown::UNKNOWN)));
-    state = state.add(assign!(
-        sop_state,
-        SPValue::String(StringOrUnknown::UNKNOWN)
-    ));
-    state = state.add(assign!(
-        sop_stack,
-        SPValue::String(StringOrUnknown::UNKNOWN)
-    ));
-    state = state.add(assign!(sop_enabled, SPValue::Bool(BoolOrUnknown::UNKNOWN)));
-    state = state.add(assign!(start_time, SPValue::Int64(IntOrUnknown::UNKNOWN)));
-    state = state.add(assign!(
-        sop_current_step,
-        SPValue::Int64(IntOrUnknown::Int64(0))
-    ));
-    state = state.add(assign!(
-        tf_request_trigger,
-        SPValue::Bool(BoolOrUnknown::Bool(false))
-    ));
-    state = state.add(assign!(
-        tf_request_state,
-        SPValue::String(StringOrUnknown::String("initial".to_string()))
-    ));
-    state = state.add(assign!(
-        tf_command,
-        SPValue::String(StringOrUnknown::UNKNOWN)
-    ));
-    state = state.add(assign!(
-        tf_parent,
-        SPValue::String(StringOrUnknown::UNKNOWN)
-    ));
-    state = state.add(assign!(tf_child, SPValue::String(StringOrUnknown::UNKNOWN)));
-    state = state.add(assign!(
-        tf_lookup_result,
-        SPValue::Transform(TransformOrUnknown::UNKNOWN)
-    ));
-    state = state.add(assign!(
-        tf_insert_transforms,
-        SPValue::Array(ArrayOrUnknown::UNKNOWN)
-    ));
-    state = state.add(assign!(
-        time_request_trigger,
-        SPValue::Bool(BoolOrUnknown::UNKNOWN)
-    ));
-    state = state.add(assign!(
-        time_request_state,
-        SPValue::String(StringOrUnknown::String("initial".to_string()))
-    ));
-    state = state.add(assign!(
-        time_command,
-        SPValue::String(StringOrUnknown::UNKNOWN)
-    ));
-    state = state.add(assign!(
-        time_duration_ms,
-        SPValue::Int64(IntOrUnknown::UNKNOWN)
-    ));
-    state = state.add(assign!(
-        time_elapsed_ms,
-        SPValue::Int64(IntOrUnknown::UNKNOWN)
-    ));
+    state = state.add(
+        assign!(runner_state, SPValue::String(StringOrUnknown::UNKNOWN)),
+        &log_target,
+    );
+    state = state.add(
+        assign!(
+            current_goal_predicate,
+            SPValue::String(StringOrUnknown::UNKNOWN)
+        ),
+        &log_target,
+    );
+    state = state.add(
+        assign!(current_goal_id, SPValue::String(StringOrUnknown::UNKNOWN)),
+        &log_target,
+    );
+    state = state.add(
+        assign!(
+            current_goal_state,
+            SPValue::String(StringOrUnknown::UNKNOWN)
+        ),
+        &log_target,
+    );
+    state = state.add(
+        assign!(plan, SPValue::Array(ArrayOrUnknown::UNKNOWN)),
+        &log_target,
+    );
+    state = state.add(
+        assign!(plan_exists, SPValue::Bool(BoolOrUnknown::UNKNOWN)),
+        &log_target,
+    );
+    state = state.add(
+        assign!(plan_name, SPValue::String(StringOrUnknown::UNKNOWN)),
+        &log_target,
+    );
+    state = state.add(
+        assign!(plan_id, SPValue::String(StringOrUnknown::UNKNOWN)),
+        &log_target,
+    );
+    state = state.add(
+        assign!(plan_state, SPValue::String(StringOrUnknown::UNKNOWN)),
+        &log_target,
+    );
+    state = state.add(
+        assign!(planner_state, SPValue::String(StringOrUnknown::UNKNOWN)),
+        &log_target,
+    );
+    state = state.add(
+        assign!(plan_duration, SPValue::Float64(FloatOrUnknown::UNKNOWN)),
+        &log_target,
+    );
+    state = state.add(
+        assign!(plan_current_step, SPValue::Int64(IntOrUnknown::UNKNOWN)),
+        &log_target,
+    );
+    state = state.add(
+        assign!(
+            planner_information,
+            SPValue::String(StringOrUnknown::UNKNOWN)
+        ),
+        &log_target,
+    );
+    state = state.add(
+        assign!(
+            plan_runner_information,
+            SPValue::String(StringOrUnknown::UNKNOWN)
+        ),
+        &log_target,
+    );
+    state = state.add(
+        assign!(
+            goal_runner_information,
+            SPValue::String(StringOrUnknown::UNKNOWN)
+        ),
+        &log_target,
+    );
+    state = state.add(
+        assign!(
+            sop_runner_information,
+            SPValue::String(StringOrUnknown::UNKNOWN)
+        ),
+        &log_target,
+    );
+    state = state.add(
+        assign!(
+            main_runner_information,
+            SPValue::String(StringOrUnknown::UNKNOWN)
+        ),
+        &log_target,
+    );
+    state = state.add(
+        assign!(
+            goal_scheduler_information,
+            SPValue::String(StringOrUnknown::UNKNOWN)
+        ),
+        &log_target,
+    );
+    state = state.add(
+        assign!(replanned, SPValue::Bool(BoolOrUnknown::UNKNOWN)),
+        &log_target,
+    );
+    state = state.add(
+        assign!(replan_for_same_goal, SPValue::Bool(BoolOrUnknown::UNKNOWN)),
+        &log_target,
+    );
+    state = state.add(
+        assign!(replan_counter, SPValue::Int64(IntOrUnknown::UNKNOWN)),
+        &log_target,
+    );
+    state = state.add(
+        assign!(replan_counter_total, SPValue::Int64(IntOrUnknown::UNKNOWN)),
+        &log_target,
+    );
+    state = state.add(
+        assign!(plan_counter, SPValue::Int64(IntOrUnknown::UNKNOWN)),
+        &log_target,
+    );
+    state = state.add(
+        assign!(replan_fail_counter, SPValue::Int64(IntOrUnknown::UNKNOWN)),
+        &log_target,
+    );
+    state = state.add(
+        assign!(replan_trigger, SPValue::Bool(BoolOrUnknown::UNKNOWN)),
+        &log_target,
+    );
+    state = state.add(
+        assign!(incoming_goals, SPValue::Array(ArrayOrUnknown::UNKNOWN)),
+        &log_target,
+    );
+    state = state.add(
+        assign!(scheduled_goals, SPValue::Array(ArrayOrUnknown::UNKNOWN)),
+        &log_target,
+    );
+    state = state.add(
+        assign!(sop_id, SPValue::String(StringOrUnknown::UNKNOWN)),
+        &log_target,
+    );
+    state = state.add(
+        assign!(sop_state, SPValue::String(StringOrUnknown::UNKNOWN)),
+        &log_target,
+    );
+    state = state.add(
+        assign!(sop_stack, SPValue::String(StringOrUnknown::UNKNOWN)),
+        &log_target,
+    );
+    state = state.add(
+        assign!(sop_enabled, SPValue::Bool(BoolOrUnknown::UNKNOWN)),
+        &log_target,
+    );
+    state = state.add(
+        assign!(start_time, SPValue::Int64(IntOrUnknown::UNKNOWN)),
+        &log_target,
+    );
+    state = state.add(
+        assign!(sop_current_step, SPValue::Int64(IntOrUnknown::Int64(0))),
+        &log_target,
+    );
+    state = state.add(
+        assign!(
+            tf_request_trigger,
+            SPValue::Bool(BoolOrUnknown::Bool(false))
+        ),
+        &log_target,
+    );
+    state = state.add(
+        assign!(
+            tf_request_state,
+            SPValue::String(StringOrUnknown::String("initial".to_string()))
+        ),
+        &log_target,
+    );
+    state = state.add(
+        assign!(tf_command, SPValue::String(StringOrUnknown::UNKNOWN)),
+        &log_target,
+    );
+    state = state.add(
+        assign!(tf_parent, SPValue::String(StringOrUnknown::UNKNOWN)),
+        &log_target,
+    );
+    state = state.add(
+        assign!(tf_child, SPValue::String(StringOrUnknown::UNKNOWN)),
+        &log_target,
+    );
+    state = state.add(
+        assign!(
+            tf_lookup_result,
+            SPValue::Transform(TransformOrUnknown::UNKNOWN)
+        ),
+        &log_target,
+    );
+    state = state.add(
+        assign!(
+            tf_insert_transforms,
+            SPValue::Array(ArrayOrUnknown::UNKNOWN)
+        ),
+        &log_target,
+    );
+    state = state.add(
+        assign!(time_request_trigger, SPValue::Bool(BoolOrUnknown::UNKNOWN)),
+        &log_target,
+    );
+    state = state.add(
+        assign!(
+            time_request_state,
+            SPValue::String(StringOrUnknown::String("initial".to_string()))
+        ),
+        &log_target,
+    );
+    state = state.add(
+        assign!(time_command, SPValue::String(StringOrUnknown::UNKNOWN)),
+        &log_target,
+    );
+    state = state.add(
+        assign!(time_duration_ms, SPValue::Int64(IntOrUnknown::UNKNOWN)),
+        &log_target,
+    );
+    state = state.add(
+        assign!(time_elapsed_ms, SPValue::Int64(IntOrUnknown::UNKNOWN)),
+        &log_target,
+    );
 
     // Define variables to keep track of the processes
     let state_manager_online = bv!(&&format!("state_manager_online"));
@@ -286,26 +370,35 @@ pub fn generate_runner_state_variables(name: &str) -> State {
     let planner_ticker_online = bv!(&&format!("{}_planner_ticker_online", name));
     let operation_planner_online = bv!(&&format!("{}_operation_planner_online", name));
     let operation_runner_online = bv!(&&format!("{}_operation_runner_online", name));
-    state = state.add(assign!(
-        state_manager_online,
-        SPValue::Bool(BoolOrUnknown::UNKNOWN)
-    ));
-    state = state.add(assign!(
-        auto_transition_runner_online,
-        SPValue::Bool(BoolOrUnknown::UNKNOWN)
-    ));
-    state = state.add(assign!(
-        planner_ticker_online,
-        SPValue::Bool(BoolOrUnknown::UNKNOWN)
-    ));
-    state = state.add(assign!(
-        operation_planner_online,
-        SPValue::Bool(BoolOrUnknown::UNKNOWN)
-    ));
-    state = state.add(assign!(
-        operation_runner_online,
-        SPValue::Bool(BoolOrUnknown::UNKNOWN)
-    ));
+    state = state.add(
+        assign!(state_manager_online, SPValue::Bool(BoolOrUnknown::UNKNOWN)),
+        &log_target,
+    );
+    state = state.add(
+        assign!(
+            auto_transition_runner_online,
+            SPValue::Bool(BoolOrUnknown::UNKNOWN)
+        ),
+        &log_target,
+    );
+    state = state.add(
+        assign!(planner_ticker_online, SPValue::Bool(BoolOrUnknown::UNKNOWN)),
+        &log_target,
+    );
+    state = state.add(
+        assign!(
+            operation_planner_online,
+            SPValue::Bool(BoolOrUnknown::UNKNOWN)
+        ),
+        &log_target,
+    );
+    state = state.add(
+        assign!(
+            operation_runner_online,
+            SPValue::Bool(BoolOrUnknown::UNKNOWN)
+        ),
+        &log_target,
+    );
 
     state
 }
@@ -350,25 +443,31 @@ fn get_all_operations_recursive(sop: &SOP, operations: &mut Vec<Operation>) {
     }
 }
 
-pub fn generate_operation_state_variables(model: &Model, coverability_tracking: bool) -> State {
+pub fn generate_operation_state_variables(
+    model: &Model,
+    coverability_tracking: bool,
+    log_target: &str,
+) -> State {
     let mut state = State::new();
     // operations should be put in the initial state once they are part of the plan
 
     for sop in &model.sops {
         let ops_in_sop = get_all_operations_from_sop(&sop.sop);
         let sop_information = v!(&&format!("{}_sop_information", sop.id));
-        state = state.add(assign!(
-            sop_information,
-            SPValue::String(StringOrUnknown::UNKNOWN)
-        ));
+        state = state.add(
+            assign!(sop_information, SPValue::String(StringOrUnknown::UNKNOWN)),
+            &log_target,
+        );
         state = add_operation_meta_tracking_variables(
             &ops_in_sop.iter().map(|x| x.name.clone()).collect(),
             &state,
             false,
+            &log_target,
         ); // remove later for unique on the fly
         state = add_operation_state_tracking_variable(
             &ops_in_sop.iter().map(|x| x.name.clone()).collect(),
             &state,
+            &log_target,
         ); // remove later for unique on the fly
     }
 
@@ -377,11 +476,13 @@ pub fn generate_operation_state_variables(model: &Model, coverability_tracking: 
     state = add_operation_state_tracking_variable(
         &model.operations.iter().map(|x| x.name.clone()).collect(),
         &state,
+        &log_target,
     ); // remove later for unique on the fly
     state = add_operation_meta_tracking_variables(
         &model.operations.iter().map(|x| x.name.clone()).collect(),
         &state,
         false,
+        &log_target,
     ); // remove later for unique on the fly
 
     state = add_operation_state_tracking_variable(
@@ -391,6 +492,7 @@ pub fn generate_operation_state_variables(model: &Model, coverability_tracking: 
             .map(|x| x.name.clone())
             .collect(),
         &state,
+        &log_target,
     ); // remove later for unique on the fly
     state = add_operation_meta_tracking_variables(
         &model
@@ -400,12 +502,13 @@ pub fn generate_operation_state_variables(model: &Model, coverability_tracking: 
             .collect(),
         &state,
         false,
+        &log_target,
     ); // remove later for unique on the fly
 
     for transition in &model.auto_transitions {
         if coverability_tracking {
             let taken = iv!(&&format!("transition_{}_taken", transition.name));
-            state = state.add(assign!(taken, 0.to_spvalue()))
+            state = state.add(assign!(taken, 0.to_spvalue()), &log_target)
         }
     }
 
@@ -514,7 +617,7 @@ mod tests {
     #[test]
     fn test_model() {
         // let model = Model::new("ASDF", vec![], vec![]);
-        let _ = generate_runner_state_variables("asdf");
+        let _ = generate_runner_state_variables("asdf", "test");
     }
 }
 
@@ -522,6 +625,7 @@ pub fn add_operation_meta_tracking_variables(
     ops: &Vec<String>,
     state: &State,
     coverability_tracking: bool,
+    log_target: &str,
 ) -> State {
     let mut state = state.clone();
     for operation in ops {
@@ -530,26 +634,41 @@ pub fn add_operation_meta_tracking_variables(
         let operation_elapsed_disabled_ms = iv!(&&format!("{}_elapsed_disabled_ms", operation));
         let operation_failure_retry_counter = iv!(&&format!("{}_failure_retry_counter", operation)); // without scrapping the current plan, how many times has an operation retried
         let operation_timeout_retry_counter = iv!(&&format!("{}_timeout_retry_counter", operation));
-        state = state.add(assign!(
-            operation_information,
-            SPValue::String(StringOrUnknown::UNKNOWN)
-        ));
-        state = state.add(assign!(
-            operation_elapsed_executing_ms,
-            SPValue::Int64(IntOrUnknown::UNKNOWN)
-        ));
-        state = state.add(assign!(
-            operation_elapsed_disabled_ms,
-            SPValue::Int64(IntOrUnknown::UNKNOWN)
-        ));
-        state = state.add(assign!(
-            operation_failure_retry_counter,
-            SPValue::Int64(IntOrUnknown::UNKNOWN)
-        ));
-        state = state.add(assign!(
-            operation_timeout_retry_counter,
-            SPValue::Int64(IntOrUnknown::UNKNOWN)
-        ));
+        state = state.add(
+            assign!(
+                operation_information,
+                SPValue::String(StringOrUnknown::UNKNOWN)
+            ),
+            &log_target,
+        );
+        state = state.add(
+            assign!(
+                operation_elapsed_executing_ms,
+                SPValue::Int64(IntOrUnknown::UNKNOWN)
+            ),
+            &log_target,
+        );
+        state = state.add(
+            assign!(
+                operation_elapsed_disabled_ms,
+                SPValue::Int64(IntOrUnknown::UNKNOWN)
+            ),
+            &log_target,
+        );
+        state = state.add(
+            assign!(
+                operation_failure_retry_counter,
+                SPValue::Int64(IntOrUnknown::UNKNOWN)
+            ),
+            &log_target,
+        );
+        state = state.add(
+            assign!(
+                operation_timeout_retry_counter,
+                SPValue::Int64(IntOrUnknown::UNKNOWN)
+            ),
+            &log_target,
+        );
 
         if coverability_tracking {
             // coverability tracking does nothing for now
@@ -561,18 +680,25 @@ pub fn add_operation_meta_tracking_variables(
             let completed = iv!(&&format!("{}_visited_completed", operation));
 
             for cov in vec![initial, executing, timedout, disabled, failed, completed] {
-                state = state.add(assign!(cov, 0.to_spvalue()));
+                state = state.add(assign!(cov, 0.to_spvalue()), &log_target);
             }
         }
     }
     state
 }
 
-pub fn add_operation_state_tracking_variable(ops: &Vec<String>, state: &State) -> State {
+pub fn add_operation_state_tracking_variable(
+    ops: &Vec<String>,
+    state: &State,
+    log_target: &str,
+) -> State {
     let mut state = state.clone();
     for operation in ops {
         let operation_state = v!(&&format!("{}", operation)); // Initial, Executing, Failed, Completed, Unknown
-        state = state.add(assign!(operation_state, "initial".to_spvalue()));
+        state = state.add(
+            assign!(operation_state, "initial".to_spvalue()),
+            &log_target,
+        );
     }
     state
 }

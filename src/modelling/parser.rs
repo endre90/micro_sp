@@ -47,7 +47,7 @@ peg::parser!(pub grammar pred_parser() for str {
             let f: f64 = n.parse().expect("Failed to parse float");
             SPWrapped::SPValue(f.to_spvalue())
         }
-        / _ n:$("-"? ['0'..='9']+) !(['a'..='z' | 'A'..='Z' | '0'..='9' | '_']) _ { // Integer
+        / _ n:$("-"? ['0'..='9']+) !(['a'..='z' | 'A'..='Z' | '0'..='9' | '_' | '.']) _ { // Integer
             let i: i64 = n.parse().expect("Failed to parse integer");
             SPWrapped::SPValue(i.to_spvalue())
         }
@@ -312,7 +312,7 @@ mod tests {
         let s = State::from_vec(&john_doe());
         let weight = fv!("weight");
         let weight_2 = fv!("weight_2");
-        let s_new = s.add(SPAssignment::new(weight_2, 85.0.to_spvalue()));
+        let s_new = s.add(SPAssignment::new(weight_2, 85.0.to_spvalue()), "test");
         let a1 = a!(weight.clone(), 82.5.wrap());
         let _a2 = a!(weight.clone(), 85.0.wrap());
         assert_eq!(pred_parser::action("var:weight <- 82.5", &s), Ok(a1));

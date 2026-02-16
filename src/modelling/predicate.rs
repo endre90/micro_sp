@@ -652,33 +652,33 @@ mod tests {
         let state = state.add(SPAssignment::new(
             v!("runner_goal"),
             "var:ur_current_pose == c".to_spvalue(),
-        ));
+        ), "test");
         let state = state.add(SPAssignment::new(
             av!("runner_plan"),
             Vec::<String>::new().to_spvalue(),
-        ));
-        let state = state.add(SPAssignment::new(bv!("runner_replan"), true.to_spvalue()));
+        ),"test");
+        let state = state.add(SPAssignment::new(bv!("runner_replan"), true.to_spvalue()),"test");
         let state = state.add(SPAssignment::new(
             bv!("runner_replanned"),
             false.to_spvalue(),
-        ));
+        ),"test");
         let state = state.add(SPAssignment::new(
             bv!("ur_action_trigger"),
             false.to_spvalue(),
-        ));
+        ),"test");
         let state = state.add(SPAssignment::new(
             v!("ur_action_state"),
             "initial".to_spvalue(),
-        ));
-        let state = state.add(SPAssignment::new(v!("ur_current_pose"), "a".to_spvalue()));
-        let state = state.add(SPAssignment::new(v!("ur_command"), "movej".to_spvalue()));
-        let state = state.add(SPAssignment::new(fv!("ur_velocity"), 0.2.to_spvalue()));
-        let state = state.add(SPAssignment::new(fv!("ur_acceleration"), 0.4.to_spvalue()));
+        ),"test");
+        let state = state.add(SPAssignment::new(v!("ur_current_pose"), "a".to_spvalue()),"test");
+        let state = state.add(SPAssignment::new(v!("ur_command"), "movej".to_spvalue()),"test");
+        let state = state.add(SPAssignment::new(fv!("ur_velocity"), 0.2.to_spvalue()),"test");
+        let state = state.add(SPAssignment::new(fv!("ur_acceleration"), 0.4.to_spvalue()),"test");
         let state = state.add(SPAssignment::new(
             v!("ur_goal_feature_id"),
             "a".to_spvalue(),
-        ));
-        let state = state.add(SPAssignment::new(v!("ur_tcp_id"), "svt_tcp".to_spvalue()));
+        ),"test");
+        let state = state.add(SPAssignment::new(v!("ur_tcp_id"), "svt_tcp".to_spvalue()),"test");
         state
     }
 

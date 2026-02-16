@@ -141,9 +141,10 @@ pub async fn auto_operation_runner(
                         &vec![unique_op_id.clone()],
                         &new_state,
                         false,
+                        &log_target
                     );
                     new_state =
-                        add_operation_state_tracking_variable(&vec![unique_op_id], &new_state);
+                        add_operation_state_tracking_variable(&vec![unique_op_id], &new_state, &log_target);
                     let modified_state = state.get_diff_partial_state_and_add_missing(&new_state);
                     StateManager::set_state(&mut con, &modified_state).await;
                 }
