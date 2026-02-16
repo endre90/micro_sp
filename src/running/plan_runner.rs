@@ -91,6 +91,10 @@ async fn process_plan_tick(
                 plan_state_str = PlanState::Executing.to_string();
                 plan_current_step = 0;
             }
+            if planner_state == PlannerState::NotFound.to_string() {
+                plan_state_str = PlanState::Failed.to_string();
+                plan_current_step = 0;
+            }
         }
         PlanState::Executing => {
             if let Some(op_name) = plan.get(plan_current_step as usize) {
