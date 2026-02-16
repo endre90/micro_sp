@@ -268,7 +268,7 @@ mod tests {
         );
 
         let goal = pred_parser::pred("var:ur_current_pose == d", &state).unwrap();
-        let result = bfs_operation_planner(state, goal, m.operations, 30, "t");
+        let result = bfs_operation_planner(state, goal, m.operations, 30, "t", 5000);
         assert_eq!(
             vec!(
                 "op_move_to_b",

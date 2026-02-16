@@ -200,6 +200,7 @@ fn handle_replan_request(
         model.operations.clone(),
         20,
         &log_target,
+        5000
     );
 
     if !plan_result.found {
