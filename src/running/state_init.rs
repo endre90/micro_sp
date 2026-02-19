@@ -49,11 +49,11 @@ pub fn generate_runner_state_variables(name: &str, log_target: &str) -> State {
     let tf_child = v!(&&format!("{}_tf_child", name));
     let tf_lookup_result = tfv!(&&format!("{}_tf_lookup_result", name));
     let tf_insert_transforms = av!(&&format!("{}_tf_insert_transforms", name));
-    let time_request_trigger = bv!(&&format!("{}_time_request_trigger", name));
-    let time_request_state = v!(&&format!("{}_time_request_state", name));
-    let time_command = v!(&&format!("{}_time_command", name));
-    let time_duration_ms = iv!(&&format!("{}_time_duration_ms", name));
-    let time_elapsed_ms = iv!(&&format!("{}_time_elapsed_ms", name));
+    // let time_request_trigger = bv!(&&format!("{}_time_request_trigger", name));
+    // let time_request_state = v!(&&format!("{}_time_request_state", name));
+    // let time_command = v!(&&format!("{}_time_command", name));
+    // let time_duration_ms = iv!(&&format!("{}_time_duration_ms", name));
+    // let time_elapsed_ms = iv!(&&format!("{}_time_elapsed_ms", name));
 
     let terminated_operations = av!(&&format!("{}_terminated_operations", name));
     state = state.add(
@@ -340,29 +340,29 @@ pub fn generate_runner_state_variables(name: &str, log_target: &str) -> State {
         ),
         &log_target,
     );
-    state = state.add(
-        assign!(time_request_trigger, SPValue::Bool(BoolOrUnknown::UNKNOWN)),
-        &log_target,
-    );
-    state = state.add(
-        assign!(
-            time_request_state,
-            SPValue::String(StringOrUnknown::String("initial".to_string()))
-        ),
-        &log_target,
-    );
-    state = state.add(
-        assign!(time_command, SPValue::String(StringOrUnknown::UNKNOWN)),
-        &log_target,
-    );
-    state = state.add(
-        assign!(time_duration_ms, SPValue::Int64(IntOrUnknown::UNKNOWN)),
-        &log_target,
-    );
-    state = state.add(
-        assign!(time_elapsed_ms, SPValue::Int64(IntOrUnknown::UNKNOWN)),
-        &log_target,
-    );
+    // state = state.add(
+    //     assign!(time_request_trigger, SPValue::Bool(BoolOrUnknown::UNKNOWN)),
+    //     &log_target,
+    // );
+    // state = state.add(
+    //     assign!(
+    //         time_request_state,
+    //         SPValue::String(StringOrUnknown::String("initial".to_string()))
+    //     ),
+    //     &log_target,
+    // );
+    // state = state.add(
+    //     assign!(time_command, SPValue::String(StringOrUnknown::UNKNOWN)),
+    //     &log_target,
+    // );
+    // state = state.add(
+    //     assign!(time_duration_ms, SPValue::Int64(IntOrUnknown::UNKNOWN)),
+    //     &log_target,
+    // );
+    // state = state.add(
+    //     assign!(time_elapsed_ms, SPValue::Int64(IntOrUnknown::UNKNOWN)),
+    //     &log_target,
+    // );
 
     // Define variables to keep track of the processes
     let state_manager_online = bv!(&&format!("state_manager_online"));
