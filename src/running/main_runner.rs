@@ -7,6 +7,7 @@ use std::sync::Arc;
 pub async fn main_runner(
     sp_id: &String,
     model: Model,
+    number_of_timers: u64,
     connection_manager: &Arc<ConnectionManager>,
 ) {
     // Logs from extern crates to stdout
@@ -94,7 +95,7 @@ pub async fn main_runner(
     let con_clone = connection_manager.clone();
     let sp_id_clone = sp_id.clone();
     tokio::task::spawn(async move {
-        time_interface_runner(&sp_id_clone, &con_clone)
+        time_interface_runner(&sp_id_clone, &con_clone, number_of_timers)
             .await
             .unwrap()
     });
