@@ -7,6 +7,7 @@ static TICK_INTERVAL: u64 = 100; // millis
 
 #[derive(Debug, PartialEq, Copy, Clone, Hash, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum GoalPriority {
+    Top, // Useful to schedule housekeeping for example every 5 minutes
     High,
     Normal,
     Low,
@@ -92,6 +93,7 @@ pub enum GoalState {
 impl GoalPriority {
     pub fn from_int(x: &i64) -> GoalPriority {
         match x {
+            0 => GoalPriority::Top,
             1 => GoalPriority::High,
             2 => GoalPriority::Normal,
             3 => GoalPriority::Low,
@@ -105,6 +107,7 @@ impl GoalPriority {
 
     pub fn to_int(&self) -> i64 {
         match self {
+            GoalPriority::Top => 0,
             GoalPriority::High => 1,
             GoalPriority::Normal => 2,
             GoalPriority::Low => 3,
@@ -113,6 +116,7 @@ impl GoalPriority {
 
     pub fn from_str(x: &str) -> GoalPriority {
         match x {
+            "top" => GoalPriority::Top,
             "high" => GoalPriority::High,
             "normal" => GoalPriority::Normal,
             "low" => GoalPriority::Low,
@@ -128,6 +132,7 @@ impl GoalPriority {
 impl fmt::Display for GoalPriority {
     fn fmt(&self, fmtr: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            GoalPriority::Top => write!(fmtr, "top"),
             GoalPriority::High => write!(fmtr, "high"),
             GoalPriority::Normal => write!(fmtr, "normal"),
             GoalPriority::Low => write!(fmtr, "low"),
