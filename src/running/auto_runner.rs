@@ -214,7 +214,9 @@ pub async fn auto_operation_runner(
 
         println!("ACTIVE: {:?}", active_ops.iter().map(|x| x.name.clone()).collect::<Vec<String>>());
         for op in &model.auto_operations {
+            println!("For in...{:?}", op.name);
             if op.eval(&state, &log_target) {
+                println!("Eval passed: {:?}", op.name);
                 let prefix = format!("{}_", op.name);
                 if !active_ops.iter().any(|a| a.name.starts_with(&prefix)) {
                     println!("A: {}", op.name);
