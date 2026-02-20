@@ -3,7 +3,7 @@ use crate::{
     *,
 };
 use chrono::Utc;
-use rand::seq::IndexedRandom;
+// use rand::seq::IndexedRandom;
 use redis::aio::MultiplexedConnection;
 use std::{sync::Arc, time::Duration};
 use tokio::{sync::mpsc, time::interval};
@@ -284,5 +284,7 @@ pub async fn auto_operation_runner(
         }
         StateManager::remove_sp_values(&mut con, &terminated_operations).await;
         StateManager::remove_sp_values(&mut con, &terminated_operations_meta).await;
+
+        terminated_operations.clear();
     }
 }
