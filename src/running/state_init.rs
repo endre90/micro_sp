@@ -60,7 +60,7 @@ pub fn generate_runner_state_variables(
     // let time_elapsed_ms = iv!(&&format!("{}_time_elapsed_ms", name));
 
     // add the timer variables to the state
-    for timer_id in 0..number_of_timers {
+    for timer_id in 1..=number_of_timers {
         let timer_request_trigger = bv!(&&format!("{}_timer_{}_request_trigger", name, timer_id));
         let timer_request_state = v!(&&format!("{}_timer_{}_request_state", name, timer_id));
         let timer_command = v!(&&format!("{}_timer_{}_command", name, timer_id));
