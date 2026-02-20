@@ -11,12 +11,10 @@ pub async fn time_interface_runner(
     number_of_timers: u64,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let mut interval = interval(Duration::from_millis(TICK_INTERVAL_MS));
-    let log_target = format!("{}_time_interface", sp_id);
+    let log_target = format!("{}_timer_interface", sp_id);
 
     log::info!(target: &log_target,  "Online.");
 
-    // TODO: add more sleepers and other timer related commands, don't have jut one sleeper
-    // 5 timers for now, if needed we can add more later. Think about how to add them dynamically
     let mut keys: Vec<String> = vec![];
     for timer_id in 1..=number_of_timers {
         keys.push(format!("{}_timer_{}_request_trigger", sp_id, timer_id));
@@ -103,11 +101,11 @@ pub async fn time_interface_runner(
                     request_trigger.to_spvalue(),
                 )
                 .update(
-                    &format!("{}_time_{}_request_state", sp_id, timer_id),
+                    &format!("{}_timer_{}_request_state", sp_id, timer_id),
                     request_state.to_spvalue(),
                 )
                 .update(
-                    &format!("{}_time_{}_elapsed_ms", sp_id, timer_id),
+                    &format!("{}_timer_{}_elapsed_ms", sp_id, timer_id),
                     elapsed_ms.to_spvalue(),
                 );
         }
