@@ -80,110 +80,6 @@ pub async fn auto_transition_runner(
     }
 }
 
-// pub async fn auto_operation_runner(
-//     sp_id: &str,
-//     model: &Model,
-//     logging_tx: mpsc::Sender<LogMsg>,
-//     connection_manager: &Arc<ConnectionManager>,
-// ) -> Result<(), Box<dyn std::error::Error>> {
-//     initialize_env_logger();
-//     let mut interval = interval(Duration::from_millis(OPERAION_RUNNER_TICK_INTERVAL_MS));
-//     let model = model.clone();
-//     let log_target = format!("{}_auto_operation_runner", sp_id);
-
-//     let mut active_op: Option<Operation> = None;
-//     let mut terminated_operations: Vec<String> = vec!();
-
-//     loop {
-//         interval.tick().await;
-//         if let Err(_) = connection_manager.check_redis_health(&log_target).await {
-//             continue;
-//         }
-//         let mut con = connection_manager.get_connection().await;
-//         let state = match StateManager::get_full_state(&mut con).await {
-//             Some(s) => s,
-//             None => continue,
-//         };
-
-//         let mut enabled_operations = vec![];
-//         for o in &model.auto_operations {
-//             if o.eval(&state, &log_target) {
-//                 enabled_operations.push(o);
-//             }
-//         }
-
-//         match active_op.clone() {
-//             None => {
-//                 let maybe_random_op = {
-//                     let mut rng = rand::rng();
-//                     enabled_operations.choose(&mut rng).cloned()
-//                 };
-//                 if let Some(op) = maybe_random_op {
-//                     let mut new_state = state.clone();
-//                     let unique_id = nanoid::nanoid!(10, &NANOID_ALPHABET);
-//                     let unique_op_id = format!("{}_{}", op.name.clone(), unique_id);
-//                     let mut op_mut = op.clone();
-//                     op_mut.name = unique_op_id.clone();
-//                     active_op = Some(op_mut.clone());
-
-//                     new_state = add_operation_meta_tracking_variables(
-//                         &vec![unique_op_id.clone()],
-//                         &new_state,
-//                         false,
-//                         &log_target
-//                     );
-//                     new_state =
-//                         add_operation_state_tracking_variable(&vec![unique_op_id], &new_state, &log_target);
-//                     let modified_state = state.get_diff_partial_state_and_add_missing(&new_state);
-//                     StateManager::set_state(&mut con, &modified_state).await;
-//                 }
-//             }
-//             Some(current_active_op) => {
-//                 let mut new_state = state.clone();
-//                 new_state = process_operation(
-//                     &sp_id,
-//                     new_state,
-//                     &current_active_op,
-//                     OperationProcessingType::Automatic,
-//                     None,
-//                     None,
-//                     logging_tx.clone(),
-//                     &log_target,
-//                     // &mut terminated_operations
-//                 )
-//                 .await;
-//                 let operation_state = new_state.get_string_or_default_to_unknown(
-//                     &format!("{}", current_active_op.name),
-//                     &log_target,
-//                 );
-
-//                 match OperationState::from_str(&operation_state) {
-//                     OperationState::Terminated(_) => {
-//                         terminated_operations.push(current_active_op.name.clone());
-//                         active_op = None;
-//                     }
-//                     _ => (),
-//                 };
-
-//                 let modified_state = state.get_diff_partial_state_and_add_missing(&new_state);
-//                 StateManager::set_state(&mut con, &modified_state).await;
-//             }
-//         }
-
-//         let mut terminated_operations_meta = vec![];
-//         for op in &terminated_operations {
-//             terminated_operations_meta.push(format!("{}_information", op));
-//             terminated_operations_meta.push(format!("{}_failure_retry_counter", op));
-//             terminated_operations_meta.push(format!("{}_timeout_retry_counter", op));
-//             terminated_operations_meta.push(format!("{}_elapsed_executing_ms", op));
-//             terminated_operations_meta.push(format!("{}_elapsed_disabled_ms", op));
-//         }
-//         StateManager::remove_sp_values(&mut con, &terminated_operations).await;
-//         StateManager::remove_sp_values(&mut con, &terminated_operations_meta).await;
-//     }
-// }
-
-
 pub async fn auto_operation_runner(
     sp_id: &str,
     model: &Model,
@@ -196,7 +92,7 @@ pub async fn auto_operation_runner(
     let log_target = format!("{}_auto_operation_runner", sp_id);
 
     let mut active_ops: Vec<Operation> = vec![];
-    let mut terminated_operations: Vec<String> = vec!();
+    let mut terminated_operations: Vec<String> = vec![];
 
     loop {
         interval.tick().await;
@@ -212,33 +108,23 @@ pub async fn auto_operation_runner(
         let mut new_state = state.clone();
         let mut new_op_ids = vec![];
 
-        println!("ACTIVE: {:?}", active_ops.iter().map(|x| x.name.clone()).collect::<Vec<String>>());
         for op in &model.auto_operations {
-            println!("For in...{:?}", op.name);
             if op.eval(&state, &log_target) {
-                println!("Eval passed: {:?}", op.name);
                 let prefix = format!("{}_", op.name);
                 if !active_ops.iter().any(|a| a.name.starts_with(&prefix)) {
-                    println!("A: {}", op.name);
                     let unique_id = nanoid::nanoid!(10, &NANOID_ALPHABET);
                     let unique_op_id = format!("{}{}", prefix, unique_id);
                     let mut op_mut = op.clone();
                     op_mut.name = unique_op_id.clone();
                     active_ops.push(op_mut);
                     new_op_ids.push(unique_op_id);
-                } else {
-                    println!("B: {}", op.name);
                 }
             }
         }
 
         if !new_op_ids.is_empty() {
-            new_state = add_operation_meta_tracking_variables(
-                &new_op_ids,
-                &new_state,
-                false,
-                &log_target,
-            );
+            new_state =
+                add_operation_meta_tracking_variables(&new_op_ids, &new_state, false, &log_target);
             new_state = add_operation_state_tracking_variable(&new_op_ids, &new_state, &log_target);
         }
 
