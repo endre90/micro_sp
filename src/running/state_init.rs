@@ -4,7 +4,11 @@ use crate::*;
 
 // If coverability_tracking is true, generate variables to track how many
 // times an operation has entered its different running states
-pub fn generate_runner_state_variables(name: &str, log_target: &str) -> State {
+pub fn generate_runner_state_variables(
+    name: &str,
+    number_of_timers: u64,
+    log_target: &str,
+) -> State {
     let mut state = State::new();
 
     // Define variables
@@ -54,6 +58,39 @@ pub fn generate_runner_state_variables(name: &str, log_target: &str) -> State {
     // let time_command = v!(&&format!("{}_time_command", name));
     // let time_duration_ms = iv!(&&format!("{}_time_duration_ms", name));
     // let time_elapsed_ms = iv!(&&format!("{}_time_elapsed_ms", name));
+
+    // add the timer variables to the state
+    for timer_id in 0..number_of_timers {
+        let timer_request_trigger = bv!(&&format!("{}_timer_{}_request_trigger", name, timer_id));
+        let timer_request_state = v!(&&format!("{}_timer_{}_request_state", name, timer_id));
+        let timer_command = v!(&&format!("{}_timer_{}_command", name, timer_id));
+        let timer_duration_ms = iv!(&&format!("{}_timer_{}_duration_ms", name, timer_id));
+        let timer_elapsed_ms = iv!(&&format!("{}_timer_{}_elapsed_ms", name, timer_id));
+
+        state = state.add(
+            assign!(timer_request_trigger, SPValue::Bool(BoolOrUnknown::UNKNOWN)),
+            &log_target,
+        );
+        state = state.add(
+            assign!(
+                timer_request_state,
+                SPValue::String(StringOrUnknown::String("initial".to_string()))
+            ),
+            &log_target,
+        );
+        state = state.add(
+            assign!(timer_command, SPValue::String(StringOrUnknown::UNKNOWN)),
+            &log_target,
+        );
+        state = state.add(
+            assign!(timer_duration_ms, SPValue::Int64(IntOrUnknown::UNKNOWN)),
+            &log_target,
+        );
+        state = state.add(
+            assign!(timer_elapsed_ms, SPValue::Int64(IntOrUnknown::UNKNOWN)),
+            &log_target,
+        );
+    }
 
     let terminated_operations = av!(&&format!("{}_terminated_operations", name));
     state = state.add(
@@ -617,7 +654,7 @@ mod tests {
     #[test]
     fn test_model() {
         // let model = Model::new("ASDF", vec![], vec![]);
-        let _ = generate_runner_state_variables("asdf", "test");
+        let _ = generate_runner_state_variables("asdf", 1, "test");
     }
 }
 

@@ -13,44 +13,6 @@ pub async fn time_interface_runner(
     let mut interval = interval(Duration::from_millis(TICK_INTERVAL_MS));
     let log_target = format!("{}_time_interface", sp_id);
 
-    let mut state = State::new();
-
-    // add the timer variables to the state
-    for timer_id in 0..number_of_timers {
-        let timer_request_trigger = bv!(&&format!("{}_timer_{}_request_trigger", sp_id, timer_id));
-        let timer_request_state = v!(&&format!("{}_timer_{}_request_state", sp_id, timer_id));
-        let timer_command = v!(&&format!("{}_timer_{}_command", sp_id, timer_id));
-        let timer_duration_ms = iv!(&&format!("{}_timer_{}_duration_ms", sp_id, timer_id));
-        let timer_elapsed_ms = iv!(&&format!("{}_timer_{}_elapsed_ms", sp_id, timer_id));
-
-        state = state.add(
-            assign!(timer_request_trigger, SPValue::Bool(BoolOrUnknown::UNKNOWN)),
-            &log_target,
-        );
-        state = state.add(
-            assign!(
-                timer_request_state,
-                SPValue::String(StringOrUnknown::String("initial".to_string()))
-            ),
-            &log_target,
-        );
-        state = state.add(
-            assign!(timer_command, SPValue::String(StringOrUnknown::UNKNOWN)),
-            &log_target,
-        );
-        state = state.add(
-            assign!(timer_duration_ms, SPValue::Int64(IntOrUnknown::UNKNOWN)),
-            &log_target,
-        );
-        state = state.add(
-            assign!(timer_elapsed_ms, SPValue::Int64(IntOrUnknown::UNKNOWN)),
-            &log_target,
-        );
-    }
-
-    let mut con = connection_manager.get_connection().await;
-    StateManager::set_state(&mut con, &state).await;
-
     log::info!(target: &log_target,  "Online.");
 
     // TODO: add more sleepers and other timer related commands, don't have jut one sleeper
