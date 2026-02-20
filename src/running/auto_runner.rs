@@ -212,16 +212,20 @@ pub async fn auto_operation_runner(
         let mut new_state = state.clone();
         let mut new_op_ids = vec![];
 
+        println!("ACTIVE: {:?}", active_ops.iter().map(|x| x.name.clone()).collect::<Vec<String>>());
         for op in &model.auto_operations {
             if op.eval(&state, &log_target) {
                 let prefix = format!("{}_", op.name);
                 if !active_ops.iter().any(|a| a.name.starts_with(&prefix)) {
+                    println!("A: {}", op.name);
                     let unique_id = nanoid::nanoid!(10, &NANOID_ALPHABET);
                     let unique_op_id = format!("{}{}", prefix, unique_id);
                     let mut op_mut = op.clone();
                     op_mut.name = unique_op_id.clone();
                     active_ops.push(op_mut);
                     new_op_ids.push(unique_op_id);
+                } else {
+                    println!("B: {}", op.name);
                 }
             }
         }
