@@ -56,7 +56,7 @@ pub async fn time_interface_runner(
     // TODO: add more sleepers and other timer related commands, don't have jut one sleeper
     // 5 timers for now, if needed we can add more later. Think about how to add them dynamically
     let mut keys: Vec<String> = vec![];
-    for timer_id in 0..number_of_timers {
+    for timer_id in 1..=number_of_timers {
         keys.push(format!("{}_timer_{}_request_trigger", sp_id, timer_id));
         keys.push(format!("{}_timer_{}_request_state", sp_id, timer_id));
         keys.push(format!("{}_timer_{}_command", sp_id, timer_id));
@@ -77,7 +77,7 @@ pub async fn time_interface_runner(
 
         let mut new_state = state.clone();
 
-        for timer_id in 0..number_of_timers {
+        for timer_id in 1..=number_of_timers {
             let mut request_trigger = state.get_bool_or_default_to_false(
                 &format!("{}_timer_{}_request_trigger", sp_id, timer_id),
                 &log_target,
