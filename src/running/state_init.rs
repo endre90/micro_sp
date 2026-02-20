@@ -68,7 +68,7 @@ pub fn generate_runner_state_variables(
         let timer_elapsed_ms = iv!(&&format!("{}_timer_{}_elapsed_ms", name, timer_id));
 
         state = state.add(
-            assign!(timer_request_trigger, SPValue::Bool(BoolOrUnknown::UNKNOWN)),
+            assign!(timer_request_trigger, SPValue::Bool(BoolOrUnknown::Bool(false))),
             &log_target,
         );
         state = state.add(

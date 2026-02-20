@@ -35,7 +35,7 @@ pub async fn time_interface_runner(
             None => continue,
         };
 
-        let mut new_state = state.clone();
+        let mut new_state: State;
 
         for timer_id in 1..=number_of_timers {
             let mut request_trigger = state.get_bool_or_default_to_false(
@@ -69,7 +69,7 @@ pub async fn time_interface_runner(
                     match command.as_str() {
                         "sleep" => {
                             if duration_ms > 0 {
-                                log::info!(target: &log_target, "Starting sleep timer for {} ms.", duration_ms);
+                                log::info!(target: &log_target, "Starting sleep timer {} for {} ms.", timer_id, duration_ms);
                                 request_state = ActionRequestState::Executing.to_string();
                                 elapsed_ms = 0;
                             } else {
@@ -108,9 +108,8 @@ pub async fn time_interface_runner(
                     &format!("{}_timer_{}_elapsed_ms", sp_id, timer_id),
                     elapsed_ms.to_spvalue(),
                 );
+            let modified_state = state.get_diff_partial_state(&new_state);
+            StateManager::set_state(&mut con, &modified_state).await;
         }
-
-        let modified_state = state.get_diff_partial_state(&new_state);
-        StateManager::set_state(&mut con, &modified_state).await;
     }
 }
