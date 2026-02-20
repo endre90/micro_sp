@@ -91,7 +91,7 @@ pub async fn time_interface_runner(
                 if elapsed_ms >= duration_ms {
                     elapsed_ms = duration_ms;
                     request_state = ActionRequestState::Succeeded.to_string();
-                    log::info!(target: &log_target, "Sleep timer finished.");
+                    log::info!(target: &log_target, "Sleep timer {} finished.", timer_id);
                 }
             }
 
