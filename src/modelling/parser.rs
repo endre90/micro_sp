@@ -15,7 +15,7 @@ peg::parser!(pub grammar pred_parser() for str {
             v:value(state) {
                 match v {
                     SPWrapped::SPValue(val) => val,
-                    SPWrapped::SPVariable(sp_var) => panic!("ASDFASDF")
+                    SPWrapped::SPVariable(sp_var) => todo!()
                     }
                 }
 

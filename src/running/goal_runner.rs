@@ -32,9 +32,8 @@ pub fn goal_to_sp_value(goal: &Goal) -> SPValue {
     ]))
 }
 
-pub fn goal_string_to_sp_value(goal: &String, priority: GoalPriority) -> SPValue {
-    let unique_id = nanoid::nanoid!(10, &NANOID_ALPHABET); // 64^10 unique ids
-    let id_val = SPValue::String(StringOrUnknown::String(unique_id));
+pub fn goal_string_to_sp_value(unique_id: &str, goal: &String, priority: GoalPriority) -> SPValue {
+    let id_val = SPValue::String(StringOrUnknown::String(unique_id.to_string()));
     let priority_val = SPValue::Int64(IntOrUnknown::Int64(priority.to_int()));
     let predicate_val = SPValue::String(StringOrUnknown::String(goal.clone()));
 
@@ -277,6 +276,14 @@ pub async fn goal_runner(
         // Handle incoming goals first
         scheduled_goals.extend(incoming_goals);
         scheduled_goals.sort_by_key(|g| g.priority);
+
+        // Assign unique IDs
+        let scheduled_goals = scheduled_goals.iter().map(|x| Goal { 
+            id: nanoid::nanoid!(10, &NANOID_ALPHABET), 
+            priority: x.priority, 
+            predicate: x.predicate.clone() 
+        }).collect::<Vec<Goal>>();
+
         let scheduled_goals_sp_values: Vec<SPValue> = scheduled_goals
             .iter()
             .map(|x| goal_to_sp_value(x))
