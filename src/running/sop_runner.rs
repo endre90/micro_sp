@@ -219,6 +219,7 @@ async fn remove_operations_from_state(sop_id: &str, unique_sop: &SOP, mut con: M
     let ops_in_sop = get_all_operations_from_sop(&unique_sop);
     let mut op_ids_meta = vec![];
     let sop_id = sop_id.to_string();
+    println!("REMOVING: {}", sop_id);
     let mut op_ids = ops_in_sop
         .iter()
         .map(|x| x.name.to_string())
