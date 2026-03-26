@@ -218,7 +218,7 @@ pub async fn sop_runner(
 async fn remove_operations_from_state(sop_id: &str, unique_sop: &SOP, mut con: MultiplexedConnection) {
     let ops_in_sop = get_all_operations_from_sop(&unique_sop);
     let mut op_ids_meta = vec![];
-    let sop_id = sop_id.to_string();
+    let sop_id = format!("op_{}", sop_id);
     println!("REMOVING: {}", sop_id);
     let mut op_ids = ops_in_sop
         .iter()
