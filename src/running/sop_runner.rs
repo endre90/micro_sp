@@ -1,5 +1,6 @@
 use crate::*;
 use log::Level;
+use redis::aio::MultiplexedConnection;
 use std::sync::Arc;
 use tokio::{
     sync::mpsc,
@@ -82,12 +83,12 @@ pub async fn sop_runner(
                         &ops_in_sop.iter().map(|x| x.name.clone()).collect(),
                         &new_state,
                         false,
-                        &log_target
+                        &log_target,
                     );
                     new_state = add_operation_state_tracking_variable(
                         &ops_in_sop.iter().map(|x| x.name.clone()).collect(),
                         &new_state,
-                        &log_target
+                        &log_target,
                     );
                     new_sop_info = format!("SOP '{sop_id}' is enabled, starting execution.");
                     sop_info_level = log::Level::Info;
@@ -140,6 +141,12 @@ pub async fn sop_runner(
                     active_unique_sop_state = SOPState::Initial;
                     // Inform the operation that the sop has failed:
                     sop_state = SOPState::Fatal.to_string();
+
+                    if let Some(unique_sop) = active_sop_container {
+                        let con_clone = con.clone();
+                        remove_operations_from_state(active_sop, &unique_sop, con_clone).await;
+                    }
+
                     active_sop_container = None;
                     active_unique_sop_id = None;
                 }
@@ -149,6 +156,12 @@ pub async fn sop_runner(
                     active_unique_sop_state = SOPState::Initial;
                     // Inform the operation that the sop has completed:
                     sop_state = SOPState::Completed.to_string();
+
+                    if let Some(unique_sop) = active_sop_container {
+                        let con_clone = con.clone();
+                        remove_operations_from_state(active_sop, &unique_sop, con_clone).await;
+                    }
+
                     active_sop_container = None;
                     active_unique_sop_id = None;
                 }
@@ -158,6 +171,12 @@ pub async fn sop_runner(
                     active_unique_sop_state = SOPState::Initial;
                     // Inform the operation that the sop has ben cancelled:
                     sop_state = SOPState::Cancelled.to_string();
+
+                    if let Some(unique_sop) = active_sop_container {
+                        let con_clone = con.clone();
+                        remove_operations_from_state(active_sop, &unique_sop, con_clone).await;
+                    }
+
                     active_sop_container = None;
                     active_unique_sop_id = None;
                 }
@@ -193,24 +212,29 @@ pub async fn sop_runner(
             StateManager::set_state(&mut con, &modified_state).await;
         }
 
-        // let mut terminated_operations_meta = vec![];
-        // for op in &terminated_operations {
-        //     terminated_operations_meta.push(format!("{}_information", op));
-        //     terminated_operations_meta.push(format!("{}_failure_retry_counter", op));
-        //     terminated_operations_meta.push(format!("{}_timeout_retry_counter", op));
-        //     terminated_operations_meta.push(format!("{}_elapsed_executing_ms", op));
-        //     terminated_operations_meta.push(format!("{}_elapsed_disabled_ms", op));
-        // }
-        // StateManager::remove_sp_values(&mut con, &terminated_operations).await;
-        // StateManager::remove_sp_values(&mut con, &terminated_operations_meta).await;
-        // // terminated_operations.clear();
-        // StateManager::set_sp_value(
-        //     &mut con,
-        //     &format!("{}_terminated_operations", sp_id),
-        //     &Vec::<SPValue>::new().to_spvalue(),
-        // )
-        // .await;
     }
+}
+
+async fn remove_operations_from_state(sop_id: &str, unique_sop: &SOP, mut con: MultiplexedConnection) {
+    let ops_in_sop = get_all_operations_from_sop(&unique_sop);
+    let mut op_ids_meta = vec![];
+    let sop_id = sop_id.to_string();
+    let mut op_ids = ops_in_sop
+        .iter()
+        .map(|x| x.name.to_string())
+        .collect::<Vec<String>>();
+    op_ids.push(sop_id.clone());
+    for op in &op_ids {
+        op_ids_meta.push(format!("{}_information", op));
+        op_ids_meta.push(format!("{}_failure_retry_counter", op));
+        op_ids_meta.push(format!("{}_timeout_retry_counter", op));
+        op_ids_meta.push(format!("{}_elapsed_executing_ms", op));
+        op_ids_meta.push(format!("{}_elapsed_disabled_ms", op));
+    }
+
+    StateManager::remove_sp_values(&mut con, &op_ids).await;
+    StateManager::remove_sp_values(&mut con, &op_ids_meta).await;
+    StateManager::remove_sp_value(&mut con, &sop_id).await;
 }
 
 async fn process_sop_node_tick(
