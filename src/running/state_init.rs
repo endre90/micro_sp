@@ -486,6 +486,7 @@ pub fn generate_operation_state_variables(
     log_target: &str,
 ) -> State {
     let mut state = State::new();
+    let mut operation_trackers: Vec<String> = vec!();
     // operations should be put in the initial state once they are part of the plan
 
     for sop in &model.sops {
@@ -501,20 +502,22 @@ pub fn generate_operation_state_variables(
         //     false,
         //     &log_target,
         // ); // remove later for unique on the fly
-        state = add_operation_state_tracking_variable(
-            &ops_in_sop.iter().map(|x| x.name.clone()).collect(),
-            &state,
-            &log_target,
-        ); // remove later for unique on the fly
+        // state = add_operation_state_tracking_variable(
+        //     &ops_in_sop.iter().map(|x| x.name.clone()).collect(),
+        //     &state,
+        //     &log_target,
+        // ); // remove later for unique on the fly
+        ops_in_sop.iter().for_each(|x| operation_trackers.push(x.name.clone()));
     }
 
     // Not ideal, maybe there is a way to remove this dependancy
     // Still need this for the BFS planning level because the BFS needs the state, and the template has to exist in the state
-    state = add_operation_state_tracking_variable(
-        &model.operations.iter().map(|x| x.name.clone()).collect(),
-        &state,
-        &log_target,
-    ); // remove later for unique on the fly
+    model.operations.iter().for_each(|x| operation_trackers.push(x.name.clone()));
+    // state = add_operation_state_tracking_variable(
+    //     &model.operations.iter().map(|x| x.name.clone()).collect(),
+    //     &state,
+    //     &log_target,
+    // ); // remove later for unique on the fly
     // state = add_operation_meta_tracking_variables(
     //     &model.operations.iter().map(|x| x.name.clone()).collect(),
     //     &state,
@@ -522,15 +525,16 @@ pub fn generate_operation_state_variables(
     //     &log_target,
     // ); // remove later for unique on the fly
 
-    state = add_operation_state_tracking_variable(
-        &model
-            .auto_operations
-            .iter()
-            .map(|x| x.name.clone())
-            .collect(),
-        &state,
-        &log_target,
-    ); // remove later for unique on the fly
+    model.auto_operations.iter().for_each(|x| operation_trackers.push(x.name.clone()));
+    // state = add_operation_state_tracking_variable(
+    //     &model
+    //         .auto_operations
+    //         .iter()
+    //         .map(|x| x.name.clone())
+    //         .collect(),
+    //     &state,
+    //     &log_target,
+    // ); // remove later for unique on the fly
     // state = add_operation_meta_tracking_variables(
     //     &model
     //         .auto_operations
@@ -541,6 +545,16 @@ pub fn generate_operation_state_variables(
     //     false,
     //     &log_target,
     // ); // remove later for unique on the fly
+
+    operation_trackers.sort(); 
+    operation_trackers.dedup();
+    state = add_operation_state_tracking_variable(
+        &operation_trackers,
+        &state,
+        &log_target,
+    ); // remove later for unique on the fly
+
+
 
     for transition in &model.auto_transitions {
         if coverability_tracking {
