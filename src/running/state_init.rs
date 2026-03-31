@@ -522,15 +522,15 @@ pub fn generate_operation_state_variables(
     //     &log_target,
     // ); // remove later for unique on the fly
 
-    // state = add_operation_state_tracking_variable(
-    //     &model
-    //         .auto_operations
-    //         .iter()
-    //         .map(|x| x.name.clone())
-    //         .collect(),
-    //     &state,
-    //     &log_target,
-    // ); // remove later for unique on the fly
+    state = add_operation_state_tracking_variable(
+        &model
+            .auto_operations
+            .iter()
+            .map(|x| x.name.clone())
+            .collect(),
+        &state,
+        &log_target,
+    ); // remove later for unique on the fly
     // state = add_operation_meta_tracking_variables(
     //     &model
     //         .auto_operations
