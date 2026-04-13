@@ -1,9 +1,6 @@
 use serde_json::Value;
 use std::{
-    collections::HashMap,
-    fs::{self, File},
-    io::BufReader,
-    time::SystemTime,
+    collections::HashMap, fs::{self, File}, io::BufReader, path::Path, time::SystemTime
 };
 
 use crate::*;
@@ -119,11 +116,33 @@ fn convert_metadata_value(metadata_val: &Value) -> MapOrUnknown {
     }
 }
 
+
+fn collect_json_files(path: &Path, file_paths: &mut Vec<String>) {
+    if path.is_file() {
+        if let Some(path_str) = path.to_str() {
+            if path_str.ends_with(".json") {
+                file_paths.push(path_str.to_string());
+            }
+        }
+    } else if path.is_dir() {
+        if let Ok(entries) = fs::read_dir(path) {
+            for entry in entries.filter_map(Result::ok) {
+                collect_json_files(&entry.path(), file_paths);
+            }
+        }
+    }
+}
+
 pub fn load_new_scenario(scenario: &Vec<String>) -> HashMap<String, SPTransformStamped> {
     let mut transforms_stamped = HashMap::new();
+    let mut all_paths = Vec::new();
 
-    for path in scenario {
-        let json = match load_json_from_file(path) {
+    for item in scenario {
+        collect_json_files(Path::new(item), &mut all_paths);
+    }
+
+    for path in all_paths {
+        let json = match load_json_from_file(&path) {
             Some(json) => json,
             None => continue,
         };

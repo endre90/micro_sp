@@ -496,56 +496,11 @@ pub fn generate_operation_state_variables(
             assign!(sop_information, SPValue::String(StringOrUnknown::UNKNOWN)),
             &log_target,
         );
-        // state = add_operation_meta_tracking_variables(
-        //     &ops_in_sop.iter().map(|x| x.name.clone()).collect(),
-        //     &state,
-        //     false,
-        //     &log_target,
-        // ); // remove later for unique on the fly
-        // state = add_operation_state_tracking_variable(
-        //     &ops_in_sop.iter().map(|x| x.name.clone()).collect(),
-        //     &state,
-        //     &log_target,
-        // ); // remove later for unique on the fly
         ops_in_sop.iter().for_each(|x| operation_trackers.push(x.name.clone()));
     }
 
-    // Not ideal, maybe there is a way to remove this dependancy
-    // Still need this for the BFS planning level because the BFS needs the state, and the template has to exist in the state
     model.operations.iter().for_each(|x| operation_trackers.push(x.name.clone()));
-    // state = add_operation_state_tracking_variable(
-    //     &model.operations.iter().map(|x| x.name.clone()).collect(),
-    //     &state,
-    //     &log_target,
-    // ); // remove later for unique on the fly
-    // state = add_operation_meta_tracking_variables(
-    //     &model.operations.iter().map(|x| x.name.clone()).collect(),
-    //     &state,
-    //     false,
-    //     &log_target,
-    // ); // remove later for unique on the fly
-
     model.auto_operations.iter().for_each(|x| operation_trackers.push(x.name.clone()));
-    // state = add_operation_state_tracking_variable(
-    //     &model
-    //         .auto_operations
-    //         .iter()
-    //         .map(|x| x.name.clone())
-    //         .collect(),
-    //     &state,
-    //     &log_target,
-    // ); // remove later for unique on the fly
-    // state = add_operation_meta_tracking_variables(
-    //     &model
-    //         .auto_operations
-    //         .iter()
-    //         .map(|x| x.name.clone())
-    //         .collect(),
-    //     &state,
-    //     false,
-    //     &log_target,
-    // ); // remove later for unique on the fly
-
     operation_trackers.sort(); 
     operation_trackers.dedup();
     state = add_operation_state_tracking_variable(
