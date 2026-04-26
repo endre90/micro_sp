@@ -59,6 +59,15 @@ pub fn generate_runner_state_variables(
     // let time_duration_ms = iv!(&&format!("{}_time_duration_ms", name));
     // let time_elapsed_ms = iv!(&&format!("{}_time_elapsed_ms", name));
 
+    let empty = bv!(&&format!("empty"));
+    state = state.add(
+        assign!(
+            empty,
+            SPValue::Bool(BoolOrUnknown::UNKNOWN)
+        ),
+        &log_target,
+    );
+
     // add the timer variables to the state
     for timer_id in 1..=number_of_timers {
         let timer_request_trigger = bv!(&&format!("{}_timer_{}_request_trigger", name, timer_id));
