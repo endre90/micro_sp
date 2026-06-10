@@ -12,6 +12,7 @@ pub struct PotentialTransformMetadata {
     pub visualize_zone: bool,
     pub zone: f64,      // when are you "at" the frame, threshold, in meters
     pub mesh_type: i32, // 1 - cube, 2 - sphere, 3 - cylinder or 10 - mesh (provide path)
+    pub override_meshes_dir: Option<String>, // To privide custom meshes dir for more publishers
     pub mesh_file: Option<String>,
     pub mesh_scale: f32,
     pub mesh_r: f32,
@@ -30,6 +31,7 @@ impl Default for PotentialTransformMetadata {
             visualize_zone: false,
             zone: 0.0,
             mesh_type: 10,
+            override_meshes_dir: None,
             mesh_file: None,
             mesh_scale: 0.001,
             mesh_r: 1.0,
@@ -204,6 +206,16 @@ pub fn decode_metadata(map_value: &MapOrUnknown) -> PotentialTransformMetadata {
             "mesh_file" => {
                 if let SPValue::String(StringOrUnknown::String(s)) = sp_value {
                     metadata.mesh_file = Some(s.clone());
+                }
+            }
+            "override_meshes_dir" => {
+                if let SPValue::String(string_or_unknown) = sp_value {
+                    match string_or_unknown {
+                        StringOrUnknown::UNKNOWN => metadata.override_meshes_dir = None,
+                        StringOrUnknown::String(s) => {
+                            metadata.override_meshes_dir = Some(s.clone())
+                        }
+                    }
                 }
             }
             "mesh_scale" => {
