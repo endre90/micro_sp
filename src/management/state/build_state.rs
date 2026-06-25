@@ -34,10 +34,7 @@ pub(super) fn build_state(keys: Vec<String>, values: Vec<Option<String>>) -> Sta
         }
     }
 
-    State { 
-        state: state_map,
-        history_limit: 5, 
-    }
+    State { state: state_map }
 }
 
 #[cfg(test)]

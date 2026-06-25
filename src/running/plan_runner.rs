@@ -149,12 +149,6 @@ async fn process_plan_tick(
     StateManager::remove_sp_values(&mut con, &terminated_operations).await;
     StateManager::remove_sp_values(&mut con, &terminated_operations_meta).await;
     // terminated_operations.clear();
-    StateManager::set_sp_value(
-        &mut con,
-        &format!("{}_terminated_operations", sp_id),
-        &Vec::<SPValue>::new().to_spvalue(),
-    )
-    .await;
 
     new_state = new_state
         .update(
@@ -173,6 +167,9 @@ async fn process_plan_tick(
         .update(
             &format!("{}_plan_current_step", sp_id),
             plan_current_step.to_spvalue(),
+        ).update(
+            &format!("{}_terminated_operations", sp_id),
+            Vec::<SPValue>::new().to_spvalue(),
         );
 
     new_state
