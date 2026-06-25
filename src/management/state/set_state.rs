@@ -57,7 +57,10 @@ mod tests_for_set_state {
         let mut state_map = HashMap::new();
         state_map.insert(key1.clone(), assignment1);
         state_map.insert(key2.clone(), assignment2);
-        let state_to_set = State { state: state_map };
+        let state_to_set = State {
+            state: state_map,
+            history_limit: 5,
+        };
 
         set_state(&mut con, &state_to_set).await;
 
@@ -113,7 +116,10 @@ mod tests_for_set_state {
         let mut state_map = HashMap::new();
         state_map.insert(key1.clone(), assignment1);
         state_map.insert(key2.clone(), assignment2);
-        let state_to_set = State { state: state_map };
+        let state_to_set = State {
+            state: state_map,
+            history_limit: 5,
+        };
 
         set_state(&mut con, &state_to_set).await;
 
@@ -150,7 +156,10 @@ mod tests_for_set_state {
         let mut state_map = HashMap::new();
         state_map.insert(key_b.clone(), assignment_b);
         state_map.insert(key_d.clone(), assignment_d);
-        let state_to_set = State { state: state_map };
+        let state_to_set = State {
+            state: state_map,
+            history_limit: 5,
+        };
 
         set_state(&mut con, &state_to_set).await;
 

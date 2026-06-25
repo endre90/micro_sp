@@ -1,5 +1,6 @@
 use crate::*;
 use serde::{Deserialize, Serialize};
+use std::collections::VecDeque;
 use std::hash::{Hash, Hasher};
 use std::time::SystemTime;
 use std::{collections::HashMap, fmt};
@@ -8,37 +9,65 @@ use std::{collections::HashMap, fmt};
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub struct State {
     pub state: HashMap<String, SPAssignment>,
+    // pub history: HashMap<String, VecDeque<SPValue>>,
+    pub history_limit: usize,
 }
 
-/// The Hash trait is implemented on State in order to enable the comparison
-/// of different State instances using a hashing function.
+// /// The Hash trait is implemented on State in order to enable the comparison
+// /// of different State instances using a hashing function.
+// impl Hash for State {
+//     fn hash<H: Hasher>(&self, s: &mut H) {
+//         self.state
+//             .keys()
+//             .into_iter()
+//             .map(|x| x.to_owned())
+//             .collect::<Vec<String>>()
+//             .hash(s);
+//         self.state
+//             .values()
+//             .into_iter()
+//             .map(|x| x.var.to_owned())
+//             .collect::<Vec<SPVariable>>()
+//             .hash(s);
+//         self.state
+//             .values()
+//             .into_iter()
+//             .map(|x| x.val.to_owned())
+//             .collect::<Vec<SPValue>>()
+//             .hash(s);
+//     }
+// }
+
 impl Hash for State {
     fn hash<H: Hasher>(&self, s: &mut H) {
-        self.state
-            .keys()
-            .into_iter()
-            .map(|x| x.to_owned())
-            .collect::<Vec<String>>()
-            .hash(s);
-        self.state
-            .values()
-            .into_iter()
-            .map(|x| x.var.to_owned())
-            .collect::<Vec<SPVariable>>()
-            .hash(s);
-        self.state
-            .values()
-            .into_iter()
-            .map(|x| x.val.to_owned())
-            .collect::<Vec<SPValue>>()
-            .hash(s);
+        let mut keys: Vec<&String> = self.state.keys().collect();
+        keys.sort(); 
+
+        for key in keys {
+            key.hash(s);
+            
+            if let Some(assignment) = self.state.get(key) {
+                assignment.var.hash(s);
+                assignment.val.hash(s);
+            }
+        }
+        
+        self.history_limit.hash(s);
     }
 }
 
 impl State {
     pub fn new() -> State {
-        let state = HashMap::new();
-        State { state }
+        State { 
+            state: HashMap::new(),
+            // history: HashMap::new(),
+            history_limit: 5,
+        }
+    }
+
+    pub fn with_history_limit(mut self, limit: usize) -> Self {
+        self.history_limit = limit;
+        self
     }
 
     pub fn from_vec(vec: &Vec<(SPVariable, SPValue)>) -> State {
@@ -49,10 +78,15 @@ impl State {
                 SPAssignment {
                     var: var.clone(),
                     val: val.clone(),
+                    history: VecDeque::new(),
                 },
             );
         });
-        State { state }
+        State { 
+            state,
+            // history: HashMap::new(),
+            history_limit: 5,
+        }
     }
 
     /// Get the updated values between two states.
@@ -92,44 +126,95 @@ impl State {
         uncommon_vars
     }
 
-    // Make a new partial state that only consists of updates.
+    // // Make a new partial state that only consists of updates.
+    // pub fn get_diff_partial_state(&self, new_state: &State) -> State {
+    //     let mut updated_assignments = HashMap::new();
+    //     for (key, new_assignment) in &new_state.state {
+    //         if let Some(old_assignment) = self.state.get(key) {
+    //             if old_assignment.val != new_assignment.val {
+    //                 updated_assignments.insert(key.clone(), new_assignment.clone());
+    //             }
+    //         }
+    //     }
+
+    //     State {
+    //         state: updated_assignments,
+    //     }
+    // }
+
+    // // Make a new partial state that only consists of updates.
+    // pub fn get_diff_partial_state_and_add_missing(&self, new_state: &State) -> State {
+    //     // let mut updated_assignments = HashMap::new();
+    //     let mut updated_state = State::new();
+    //     for (key, new_assignment) in &new_state.state {
+    //         if let Some(old_assignment) = self.state.get(key) {
+    //             if old_assignment.val != new_assignment.val {
+    //                 updated_state
+    //                     .state
+    //                     .insert(key.clone(), new_assignment.clone());
+    //             }
+    //         } else {
+    //             updated_state
+    //                 .state
+    //                 .insert(new_assignment.var.name.to_string(), new_assignment.clone());
+    //         }
+    //     }
+
+    //     updated_state
+    //     // State {
+    //     //     state: updated_assignments,
+    //     // }
+    // }
+
     pub fn get_diff_partial_state(&self, new_state: &State) -> State {
         let mut updated_assignments = HashMap::new();
         for (key, new_assignment) in &new_state.state {
             if let Some(old_assignment) = self.state.get(key) {
                 if old_assignment.val != new_assignment.val {
-                    updated_assignments.insert(key.clone(), new_assignment.clone());
+                    let mut final_assignment = new_assignment.clone();
+                    
+                    if self.history_limit > 0 {
+                        // Inherit old history and push the old value
+                        final_assignment.history = old_assignment.history.clone();
+                        final_assignment.history.push_back(old_assignment.val.clone());
+                        while final_assignment.history.len() > self.history_limit {
+                            final_assignment.history.pop_front();
+                        }
+                    }
+                    updated_assignments.insert(key.clone(), final_assignment);
                 }
             }
         }
 
         State {
             state: updated_assignments,
+            history_limit: self.history_limit,
         }
     }
 
-    // Make a new partial state that only consists of updates.
     pub fn get_diff_partial_state_and_add_missing(&self, new_state: &State) -> State {
-        // let mut updated_assignments = HashMap::new();
-        let mut updated_state = State::new();
+        let mut updated_state = State::new().with_history_limit(self.history_limit);
+        
         for (key, new_assignment) in &new_state.state {
             if let Some(old_assignment) = self.state.get(key) {
                 if old_assignment.val != new_assignment.val {
-                    updated_state
-                        .state
-                        .insert(key.clone(), new_assignment.clone());
+                    let mut final_assignment = new_assignment.clone();
+                    
+                    if self.history_limit > 0 {
+                        final_assignment.history = old_assignment.history.clone();
+                        final_assignment.history.push_back(old_assignment.val.clone());
+                        while final_assignment.history.len() > self.history_limit {
+                            final_assignment.history.pop_front();
+                        }
+                    }
+                    updated_state.state.insert(key.clone(), final_assignment);
                 }
             } else {
-                updated_state
-                    .state
-                    .insert(new_assignment.var.name.to_string(), new_assignment.clone());
+                updated_state.state.insert(key.clone(), new_assignment.clone());
             }
         }
 
         updated_state
-        // State {
-        //     state: updated_assignments,
-        // }
     }
 
     pub fn add(&self, assignment: SPAssignment, log_target: &str) -> State {
@@ -141,17 +226,36 @@ impl State {
             }
             None => {
                 let mut state = self.state.clone();
+
                 state.insert(assignment.var.name.to_string(), assignment.clone());
-                State { state }
+
+                State { 
+                    state, 
+                    history_limit: self.history_limit 
+                }
             }
         }
     }
+
+    // pub fn remove(&self, var: &str, log_target: &str) -> State {
+    //     let mut new_state_map = self.state.clone();
+    //     match new_state_map.remove(var) {
+    //         Some(_) => State {
+    //             state: new_state_map,
+    //         },
+    //         None => {
+    //             log::error!(target: &log_target, "Variable '{}' not in state, can't be removed.", var);
+    //             self.clone()
+    //         }
+    //     }
+    // }
 
     pub fn remove(&self, var: &str, log_target: &str) -> State {
         let mut new_state_map = self.state.clone();
         match new_state_map.remove(var) {
             Some(_) => State {
                 state: new_state_map,
+                history_limit: self.history_limit,
             },
             None => {
                 log::error!(target: &log_target, "Variable '{}' not in state, can't be removed.", var);
@@ -406,6 +510,13 @@ impl State {
         }
     }
 
+    pub fn get_history(&self, name: &str) -> Vec<SPValue> {
+        self.state
+            .get(name)
+            .map(|assign| assign.history.iter().cloned().collect())
+            .unwrap_or_default()
+    }
+
     pub fn get_all_vars(&self) -> Vec<SPVariable> {
         self.state
             .iter()
@@ -421,39 +532,79 @@ impl State {
         match self.state.get(name) {
             Some(assignment) => {
                 let mut state = self.state.clone();
-                state.insert(
-                    name.to_string(),
-                    SPAssignment {
-                        var: assignment.var.clone(),
-                        val: val.clone(),
-                    },
-                );
-                State { state }
+                let mut new_assignment = assignment.clone();
+
+                if self.history_limit > 0 {
+                    new_assignment.history.push_back(assignment.val.clone());
+                    while new_assignment.history.len() > self.history_limit {
+                        new_assignment.history.pop_front();
+                    }
+                }
+
+                new_assignment.val = val;
+                state.insert(name.to_string(), new_assignment);
+
+                State { 
+                    state, 
+                    history_limit: self.history_limit 
+                }
             }
             None => panic!("Variable {} not in state.", name),
         }
     }
 
+    // pub fn extend(&self, other: State, overwrite_existing: bool) -> State {
+    //     let existing = self.state.clone();
+    //     let extension = other.state;
+    //     let mut state = HashMap::<String, SPAssignment>::new();
+    //     if overwrite_existing {
+    //         existing.iter().for_each(|(k, v)| {
+    //             state.insert(k.clone(), v.clone());
+    //         });
+    //         extension.iter().for_each(|(k, v)| {
+    //             state.insert(k.clone(), v.clone());
+    //         });
+    //         State { state }
+    //     } else {
+    //         extension.iter().for_each(|(k, v)| {
+    //             state.insert(k.clone(), v.clone());
+    //         });
+    //         existing.iter().for_each(|(k, v)| {
+    //             state.insert(k.clone(), v.clone());
+    //         });
+    //         State { state }
+    //     }
+    // }
+
     pub fn extend(&self, other: State, overwrite_existing: bool) -> State {
-        let existing = self.state.clone();
-        let extension = other.state;
-        let mut state = HashMap::<String, SPAssignment>::new();
-        if overwrite_existing {
-            existing.iter().for_each(|(k, v)| {
-                state.insert(k.clone(), v.clone());
-            });
-            extension.iter().for_each(|(k, v)| {
-                state.insert(k.clone(), v.clone());
-            });
-            State { state }
-        } else {
-            extension.iter().for_each(|(k, v)| {
-                state.insert(k.clone(), v.clone());
-            });
-            existing.iter().for_each(|(k, v)| {
-                state.insert(k.clone(), v.clone());
-            });
-            State { state }
+        let mut state = self.state.clone();
+
+        for (key, new_assignment) in other.state {
+            match state.get(&key) {
+                Some(old_assignment) => {
+                    if overwrite_existing && old_assignment.val != new_assignment.val {
+                        let mut final_assignment = new_assignment.clone();
+                        
+                        if self.history_limit > 0 {
+                            final_assignment.history = old_assignment.history.clone();
+                            final_assignment.history.push_back(old_assignment.val.clone());
+                            while final_assignment.history.len() > self.history_limit {
+                                final_assignment.history.pop_front();
+                            }
+                        }
+                        state.insert(key, final_assignment);
+                    }
+                }
+                None => {
+                    // Because history is inside the assignment, it automatically imports!
+                    state.insert(key, new_assignment);
+                }
+            }
+        }
+
+        State {
+            state,
+            history_limit: self.history_limit,
         }
     }
 
@@ -479,7 +630,15 @@ impl fmt::Display for State {
             let mut children: Vec<_> = self
                 .state
                 .iter()
-                .map(|(k, v)| match &v.val {
+                .map(|(k, v)| {
+
+                    let history_str = if !v.history.is_empty() {
+                        let hist: Vec<String> = v.history.iter().map(|val| val.to_string()).collect();
+                        format!(" (History: [{}])", hist.join(" -> "))
+                        } else {
+                            String::new()
+                        };
+                    match &v.val {
                     SPValue::Array(arr) => match arr {
                         ArrayOrUnknown::UNKNOWN => format!("    {}: {}", k, v.val),
                         ArrayOrUnknown::Array(some_array) => {
@@ -493,7 +652,8 @@ impl fmt::Display for State {
                             format!("{}", sub_children.join("\n"))
                         }
                     },
-                    _ => format!("    {}: {}", k, v.val),
+                    _ => format!("    {}: {}{}", k, v.val, history_str),
+                }
                 })
                 .collect();
             children.sort();
@@ -887,4 +1047,132 @@ mod tests {
         ), "test");
         assert_eq!(state_with_bad_goal.extract_goal("g"), Predicate::TRUE);
     }
+
+    #[test]
+    fn test_history_limit_and_update() {
+        let var_a = SPVariable::new("a", SPValueType::Int64);
+        
+        // Initialize state with a strict history limit of 2
+        let s0 = State::from_vec(&vec![(var_a.clone(), 1.to_spvalue())]).with_history_limit(2);
+        assert!(s0.get_history("a").is_empty(), "History should initially be empty");
+
+        // First update
+        let s1 = s0.update("a", 2.to_spvalue());
+        assert_eq!(s1.get_history("a"), vec![1.to_spvalue()]);
+
+        // Second update
+        let s2 = s1.update("a", 3.to_spvalue());
+        assert_eq!(s2.get_history("a"), vec![1.to_spvalue(), 2.to_spvalue()]);
+
+        // Third update - should trigger the sliding window (drop 1, keep 2 and 3)
+        let s3 = s2.update("a", 4.to_spvalue());
+        assert_eq!(s3.get_value("a", "t"), Some(4.to_spvalue()));
+        assert_eq!(s3.get_history("a"), vec![2.to_spvalue(), 3.to_spvalue()]);
+    }
+
+    #[test]
+    fn test_history_get_diff_partial_state() {
+        let var_a = SPVariable::new("a", SPValueType::Int64);
+        let var_b = SPVariable::new("b", SPValueType::Int64);
+
+        let state1 = State::from_vec(&vec![
+            (var_a.clone(), 1.to_spvalue()),
+            (var_b.clone(), 10.to_spvalue()),
+        ]).with_history_limit(5);
+
+        let state2 = State::from_vec(&vec![
+            (var_a.clone(), 2.to_spvalue()),     // Changed
+            (var_b.clone(), 10.to_spvalue()),    // Unchanged
+        ]);
+
+        let diff_state = state1.get_diff_partial_state(&state2);
+
+        // 'a' should be in the partial state with updated history
+        assert!(diff_state.contains("a"));
+        assert_eq!(diff_state.get_value("a", "t"), Some(2.to_spvalue()));
+        assert_eq!(diff_state.get_history("a"), vec![1.to_spvalue()]);
+
+        // 'b' should NOT be in the partial state, and have no history there
+        assert!(!diff_state.contains("b"));
+        assert!(diff_state.get_history("b").is_empty());
+    }
+
+    #[test]
+    fn test_history_get_diff_partial_state_and_add_missing() {
+        let var_a = SPVariable::new("a", SPValueType::Int64);
+        let var_b = SPVariable::new("b", SPValueType::Int64);
+
+        let state1 = State::from_vec(&vec![
+            (var_a.clone(), 1.to_spvalue()),
+        ]).with_history_limit(5);
+
+        let state2 = State::from_vec(&vec![
+            (var_a.clone(), 2.to_spvalue()),    // Changed
+            (var_b.clone(), 10.to_spvalue()),   // Missing in state1
+        ]);
+
+        let diff_state = state1.get_diff_partial_state_and_add_missing(&state2);
+
+        // 'a' gets updated with history
+        assert_eq!(diff_state.get_value("a", "t"), Some(2.to_spvalue()));
+        assert_eq!(diff_state.get_history("a"), vec![1.to_spvalue()]);
+
+        // 'b' is added, but has no history yet
+        assert_eq!(diff_state.get_value("b", "t"), Some(10.to_spvalue()));
+        assert!(diff_state.get_history("b").is_empty());
+    }
+
+    #[test]
+    fn test_history_cleanup_on_remove() {
+        let var_a = SPVariable::new("a", SPValueType::Int64);
+        
+        let s0 = State::from_vec(&vec![(var_a.clone(), 1.to_spvalue())]).with_history_limit(5);
+        let s1 = s0.update("a", 2.to_spvalue());
+        
+        // Verify history exists
+        assert_eq!(s1.get_history("a"), vec![1.to_spvalue()]);
+
+        // Remove the variable
+        let s2 = s1.remove("a", "t");
+
+        // Verify variable and its history are completely gone
+        assert!(!s2.contains("a"));
+        assert!(s2.get_history("a").is_empty());
+    }
+
+    #[test]
+    fn test_history_extend() {
+        let var_a = SPVariable::new("a", SPValueType::Int64);
+        let var_b = SPVariable::new("b", SPValueType::Int64);
+
+        // Base state has 'a' = 1, then updated to 2
+        let s1_base = State::from_vec(&vec![(var_a.clone(), 1.to_spvalue())]).with_history_limit(5);
+        let s1 = s1_base.update("a", 2.to_spvalue());
+
+        // Other state has a new variable 'b' with its own history, and an update for 'a'
+        let s2_base = State::from_vec(&vec![
+            (var_a.clone(), 3.to_spvalue()),
+            (var_b.clone(), 10.to_spvalue())
+        ]).with_history_limit(5);
+        let s2 = s2_base.update("b", 20.to_spvalue());
+
+        // Test with overwrite = true
+        let ext_overwrite = s1.extend(s2.clone(), true);
+        
+        // 'a' should be overwritten to 3, and 2 pushed to its existing history
+        assert_eq!(ext_overwrite.get_value("a", "t"), Some(3.to_spvalue()));
+        assert_eq!(ext_overwrite.get_history("a"), vec![1.to_spvalue(), 2.to_spvalue()]);
+
+        // 'b' should be imported, along with its history
+        assert_eq!(ext_overwrite.get_value("b", "t"), Some(20.to_spvalue()));
+        assert_eq!(ext_overwrite.get_history("b"), vec![10.to_spvalue()]);
+
+        // Test with overwrite = false
+        let ext_no_overwrite = s1.extend(s2, false);
+        
+        // 'a' should remain 2, and history unchanged
+        assert_eq!(ext_no_overwrite.get_value("a", "t"), Some(2.to_spvalue()));
+        assert_eq!(ext_no_overwrite.get_history("a"), vec![1.to_spvalue()]);
+    }
+
 }

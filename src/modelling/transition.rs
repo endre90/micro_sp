@@ -428,7 +428,9 @@ mod tests {
         );
         let s_next_1 = t1.take_planning(&s, "t");
         let s_next_2 = t2.take_planning(&s_next_1, "t");
-        let new_state = s.clone().update("weight", 85.0.to_spvalue());
+        let new_state = s.clone()
+            .update("weight", 82.5.to_spvalue()) // Pushes 80.0 to history
+            .update("weight", 85.0.to_spvalue()); // Pushes 82.5 to history
         assert_eq!(s_next_2, new_state);
     }
 

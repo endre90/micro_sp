@@ -1,23 +1,44 @@
+use std::collections::VecDeque;
+
 use crate::*;
 use serde::{Deserialize, Serialize};
 
 /// Represents assigning a value to a variable.
-#[derive(Debug, PartialEq, Clone, Hash, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[derive(Debug, Clone, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct SPAssignment {
     pub var: SPVariable,
     pub val: SPValue,
+    #[serde(default)]
+    pub history: VecDeque<SPValue>,
+}
+
+// IGNORE history when comparing assignments
+impl PartialEq for SPAssignment {
+    fn eq(&self, other: &Self) -> bool {
+        // We only care if the variable and current value are the same.
+        // History does not dictate current equality.
+        self.var == other.var && self.val == other.val
+    }
 }
 
 impl SPAssignment {
     pub fn new(var: SPVariable, val: SPValue) -> SPAssignment {
         match var.has_type() == val.has_type() {
-            true => SPAssignment { var, val },
+            true => SPAssignment { var, val, history: VecDeque::new() },
             false => panic!(
                 "Wrong value type '{}' can't be assigned to a variable with type '{}'.",
                 var.has_type(),
                 val.has_type()
             ),
         }
+    }
+}
+
+// Hash ignores history to keep State hashing deterministic
+impl std::hash::Hash for SPAssignment {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.var.hash(state);
+        self.val.hash(state);
     }
 }
 
