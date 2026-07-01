@@ -177,6 +177,7 @@ pub fn root_to_child(
                 }
                 None => {
                     log::error!(target: "transform_lookup", "No frames in the stack.");
+                    log::error!(target: "transform_lookup", "Couldn't find transform to '{}'.", child_frame_id);
                     break None
                 }
             }
