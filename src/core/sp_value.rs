@@ -174,10 +174,11 @@ impl fmt::Display for SPValue {
                 MapOrUnknown::Map(m_val) => {
                     let items_str = m_val
                         .iter()
-                        .map(|(k, v)| format!("({}, {})", k.is_string(), v.is_string()))
+                        .map(|(k, v)| format!("({}, {})", k, v))
                         .collect::<Vec<_>>()
                         .join(", ");
-                    write!(fmtr, "[{}]", items_str)
+                    // write!(fmtr, "[{}]", items_str)
+                    write!(fmtr, "{{{}}}", items_str)
                 }
                 MapOrUnknown::UNKNOWN => write!(fmtr, "UNKNOWN"),
             },
@@ -354,10 +355,11 @@ impl SPValue {
                 MapOrUnknown::Map(m_val) => {
                     let items_str = m_val
                         .iter()
-                        .map(|(k, v)| format!("({}, {})", k.is_string(), v.is_string()))
+                        .map(|(k, v)| format!("({}, {})", k.to_string(), v.to_string()))
                         .collect::<Vec<_>>()
                         .join(", ");
-                    format!("[{}]", items_str)
+                    // format!("[{}]", items_str)
+                    format!("{{{}}}", items_str)
                 }
                 MapOrUnknown::UNKNOWN => "UNKNOWN".to_string(),
             },
