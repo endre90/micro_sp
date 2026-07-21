@@ -3,11 +3,65 @@ use ordered_float::OrderedFloat;
 use serde::{Deserialize, Serialize};
 use std::fmt;
 
-#[derive(Debug, PartialEq, Eq, Clone, Hash, Serialize, Deserialize)]
-// SPWrapped can either be a SPVariable or a SPValue.
+// #[derive(Debug, PartialEq, PartialOrd, Ord, Eq, Clone, Hash, Serialize, Deserialize)]
+// // SPWrapped can either be a SPVariable or a SPValue.
+// pub enum SPWrapped {
+//     SPVariable(SPVariable),
+//     SPValue(SPValue),
+// }
+
+// experimental
+#[derive(Debug, PartialEq, PartialOrd, Ord, Eq, Clone, Hash, Serialize, Deserialize)]
 pub enum SPWrapped {
     SPVariable(SPVariable),
     SPValue(SPValue),
+    Array(Vec<SPWrapped>),
+    Map(Vec<(SPWrapped, SPWrapped)>),
+}
+
+// experimantal
+impl SPWrapped {
+    pub fn evaluate(&self, state: &State, log_target: &str) -> SPValue {
+        match self {
+            SPWrapped::SPVariable(var) => state
+                .get_value(&var.name, log_target)
+                .unwrap_or_else(|| panic!("Variable '{}' not in state.", var.name)),
+            
+            SPWrapped::SPValue(val) => val.clone(),
+            
+            SPWrapped::Array(arr) => {
+                let evaluated_items: Vec<SPValue> = arr
+                    .iter()
+                    .map(|item| item.evaluate(state, log_target))
+                    .collect();
+                SPValue::Array(ArrayOrUnknown::Array(evaluated_items))
+            }
+            
+            SPWrapped::Map(map) => {
+                let evaluated_pairs: Vec<(SPValue, SPValue)> = map
+                    .iter()
+                    .map(|(k, v)| (k.evaluate(state, log_target), v.evaluate(state, log_target)))
+                    .collect();
+                SPValue::Map(MapOrUnknown::Map(evaluated_pairs))
+            }
+        }
+    }
+
+    pub fn get_variables(&self) -> Vec<SPVariable> {
+        match self {
+            SPWrapped::SPVariable(v) => vec![v.clone()],
+            SPWrapped::SPValue(_) => vec![],
+            SPWrapped::Array(arr) => arr.iter().flat_map(|x| x.get_variables()).collect(),
+            SPWrapped::Map(map) => map
+                .iter()
+                .flat_map(|(k, v)| {
+                    let mut vars = k.get_variables();
+                    vars.extend(v.get_variables());
+                    vars
+                })
+                .collect(),
+        }
+    }
 }
 
 pub trait ToSPWrapped {
@@ -189,6 +243,7 @@ impl fmt::Display for SPWrapped {
                 },
             },
             SPWrapped::SPVariable(var) => write!(fmtr, "{}", var.name.to_owned()),
+            _ => write!(fmtr, "TODO!"),
         }
     }
 }

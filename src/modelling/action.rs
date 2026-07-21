@@ -61,15 +61,129 @@ impl Action {
     //     }
     // }
 
+    // pub fn assign(self, state: &State, log_target: &str) -> State {
+    //     match self.action_type {
+    //         ActionType::Assign => {
+    //             let value_to_assign = match self.var_or_val {
+    //                 SPWrapped::SPVariable(x) => state
+    //                     .get_value(&x.name, log_target)
+    //                     .unwrap_or_else(|| panic!("Source variable '{}' not in state.", x.name)),
+    //                 SPWrapped::SPValue(x) => x,
+    //             };
+    //             state.update(&self.var.name, value_to_assign)
+    //         }
+
+    //         ActionType::Increment => {
+    //             let current_val = state
+    //                 .get_value(&self.var.name, log_target)
+    //                 .unwrap_or_else(|| panic!("Variable '{}' not in state.", self.var.name));
+
+    //             let increment_val = match self.var_or_val {
+    //                 SPWrapped::SPVariable(x) => state
+    //                     .get_value(&x.name, log_target)
+    //                     .unwrap_or_else(|| panic!("Source variable '{}' not in state.", x.name)),
+    //                 SPWrapped::SPValue(x) => x,
+    //             };
+
+    //             let new_val = match (current_val, increment_val) {
+    //                 (
+    //                     SPValue::Int64(IntOrUnknown::Int64(x)),
+    //                     SPValue::Int64(IntOrUnknown::Int64(y)),
+    //                 ) => SPValue::Int64(IntOrUnknown::Int64(x + y)),
+    //                 (
+    //                     SPValue::Float64(FloatOrUnknown::Float64(ordered_float::OrderedFloat(x))),
+    //                     SPValue::Float64(FloatOrUnknown::Float64(ordered_float::OrderedFloat(y))),
+    //                 ) => SPValue::Float64(FloatOrUnknown::Float64(ordered_float::OrderedFloat(
+    //                     x + y,
+    //                 ))),
+    //                 (
+    //                     SPValue::Int64(IntOrUnknown::Int64(_)),
+    //                     SPValue::Float64(FloatOrUnknown::Float64(ordered_float::OrderedFloat(y))),
+    //                 ) => {
+    //                     panic!(
+    //                         "Cannot increment integer variable {} with a float value {}.",
+    //                         self.var.name, y
+    //                     );
+    //                 }
+    //                 (
+    //                     SPValue::Float64(FloatOrUnknown::Float64(ordered_float::OrderedFloat(_))),
+    //                     SPValue::Int64(IntOrUnknown::Int64(y)),
+    //                 ) => {
+    //                     panic!(
+    //                         "Cannot increment float variable {} with an integer value {}.",
+    //                         self.var.name, y
+    //                     );
+    //                 }
+    //                 other => {
+    //                     panic!(
+    //                         "Variable '{}' holds non-numeric value '{:?}' and cannot be incremented.",
+    //                         self.var.name, other
+    //                     );
+    //                 }
+    //             };
+
+    //             state.update(&self.var.name, new_val)
+    //         }
+
+    //         ActionType::Decrement => {
+    //             let current_val = state
+    //                 .get_value(&self.var.name, log_target)
+    //                 .unwrap_or_else(|| panic!("Variable '{}' not in state.", self.var.name));
+
+    //             let increment_val = match self.var_or_val {
+    //                 SPWrapped::SPVariable(x) => state
+    //                     .get_value(&x.name, log_target)
+    //                     .unwrap_or_else(|| panic!("Source variable '{}' not in state.", x.name)),
+    //                 SPWrapped::SPValue(x) => x,
+    //             };
+
+    //             let new_val = match (current_val, increment_val) {
+    //                 (
+    //                     SPValue::Int64(IntOrUnknown::Int64(x)),
+    //                     SPValue::Int64(IntOrUnknown::Int64(y)),
+    //                 ) => SPValue::Int64(IntOrUnknown::Int64(x - y)),
+    //                 (
+    //                     SPValue::Float64(FloatOrUnknown::Float64(ordered_float::OrderedFloat(x))),
+    //                     SPValue::Float64(FloatOrUnknown::Float64(ordered_float::OrderedFloat(y))),
+    //                 ) => SPValue::Float64(FloatOrUnknown::Float64(ordered_float::OrderedFloat(
+    //                     x - y,
+    //                 ))),
+    //                 (
+    //                     SPValue::Int64(IntOrUnknown::Int64(_)),
+    //                     SPValue::Float64(FloatOrUnknown::Float64(ordered_float::OrderedFloat(y))),
+    //                 ) => {
+    //                     panic!(
+    //                         "Cannot increment integer variable {} with a float value {}.",
+    //                         self.var.name, y
+    //                     );
+    //                 }
+    //                 (
+    //                     SPValue::Float64(FloatOrUnknown::Float64(ordered_float::OrderedFloat(_))),
+    //                     SPValue::Int64(IntOrUnknown::Int64(y)),
+    //                 ) => {
+    //                     panic!(
+    //                         "Cannot increment float variable {} with an integer value {}.",
+    //                         self.var.name, y
+    //                     );
+    //                 }
+    //                 other => {
+    //                     panic!(
+    //                         "Variable '{}' holds non-numeric value '{:?}' and cannot be incremented.",
+    //                         self.var.name, other
+    //                     );
+    //                 }
+    //             };
+
+    //             state.update(&self.var.name, new_val)
+    //         }
+    //     }
+    // }
+
+    // experimental
     pub fn assign(self, state: &State, log_target: &str) -> State {
         match self.action_type {
             ActionType::Assign => {
-                let value_to_assign = match self.var_or_val {
-                    SPWrapped::SPVariable(x) => state
-                        .get_value(&x.name, log_target)
-                        .unwrap_or_else(|| panic!("Source variable '{}' not in state.", x.name)),
-                    SPWrapped::SPValue(x) => x,
-                };
+                let value_to_assign = self.var_or_val.evaluate(state, log_target);
                 state.update(&self.var.name, value_to_assign)
             }
 
@@ -78,12 +192,14 @@ impl Action {
                     .get_value(&self.var.name, log_target)
                     .unwrap_or_else(|| panic!("Variable '{}' not in state.", self.var.name));
 
-                let increment_val = match self.var_or_val {
-                    SPWrapped::SPVariable(x) => state
-                        .get_value(&x.name, log_target)
-                        .unwrap_or_else(|| panic!("Source variable '{}' not in state.", x.name)),
-                    SPWrapped::SPValue(x) => x,
-                };
+                let increment_val = self.var_or_val.evaluate(state, log_target);
+
+                // let increment_val = match self.var_or_val {
+                //         SPWrapped::SPVariable(x) => state
+                //             .get_value(&x.name, log_target)
+                //             .unwrap_or_else(|| panic!("Source variable '{}' not in state.", x.name)),
+                //         SPWrapped::SPValue(x) => x,
+                //     };
 
                 let new_val = match (current_val, increment_val) {
                     (
@@ -130,14 +246,9 @@ impl Action {
                     .get_value(&self.var.name, log_target)
                     .unwrap_or_else(|| panic!("Variable '{}' not in state.", self.var.name));
 
-                let increment_val = match self.var_or_val {
-                    SPWrapped::SPVariable(x) => state
-                        .get_value(&x.name, log_target)
-                        .unwrap_or_else(|| panic!("Source variable '{}' not in state.", x.name)),
-                    SPWrapped::SPValue(x) => x,
-                };
+                let decrement_val = self.var_or_val.evaluate(state, log_target);
 
-                let new_val = match (current_val, increment_val) {
+                let new_val = match (current_val, decrement_val) {
                     (
                         SPValue::Int64(IntOrUnknown::Int64(x)),
                         SPValue::Int64(IntOrUnknown::Int64(y)),

@@ -11,13 +11,26 @@ peg::parser!(pub grammar pred_parser() for str {
         state.get_assignment(n, "parser").var
     }
 
-    pub rule array_element(state: &State) -> SPValue =
-            v:value(state) {
-                match v {
-                    SPWrapped::SPValue(val) => val,
-                    SPWrapped::SPVariable(sp_var) => todo!()
-                    }
-                }
+    // pub rule array_element(state: &State) -> SPValue =
+    //         v:value(state) {
+    //             match v {
+    //                 SPWrapped::SPValue(val) => val,
+    //                 SPWrapped::SPVariable(sp_var) => todo!()
+    //                 }
+    //             }
+
+    // experimental
+    pub rule array_element(state: &State) -> SPWrapped =
+    v:value(state) { v }
+
+// pub rule value(state: &State) -> SPWrapped
+//     = _ var:variable(&state) _ { SPWrapped::SPVariable(var) }
+//     // ... all the simple SPValue matchers remain the same ...
+//     / _ "[" _ items:(array_element(state) ** (_ "," _))? _ "]" _ {
+//         // Return SPWrapped::Array instead of SPValue::Array
+//         SPWrapped::Array(items.unwrap_or_else(Vec::new))
+//     }
+//     // ... string, float, int rules ...
 
 
     pub rule value(state: &State) -> SPWrapped
@@ -33,9 +46,11 @@ peg::parser!(pub grammar pred_parser() for str {
         / _ "false" _ { SPWrapped::SPValue(false.to_spvalue()) }
         / _ "FALSE" _ { SPWrapped::SPValue(false.to_spvalue()) }
         / _ "[" _ items:(array_element(state) ** (_ "," _))? _ "]" _ {
-            SPWrapped::SPValue(SPValue::Array(ArrayOrUnknown::Array(
-                items.unwrap_or_else(Vec::new)
-            )))
+            // experimental
+            SPWrapped::Array(items.unwrap_or_else(Vec::new))
+            // SPWrapped::SPValue(SPValue::Array(ArrayOrUnknown::Array(
+            //     items.unwrap_or_else(Vec::new)
+            // )))
         }
         / _ "\"" n:$(!['"'] [_])* "\"" _ { // Quoted string
             SPWrapped::SPValue(n.into_iter().collect::<Vec<_>>().join("").to_spvalue())
@@ -159,7 +174,18 @@ mod tests {
 
         assert_eq!(
             pred_parser::value("[0.3, 0.7, -12.67]", &s),
-            Ok(SPWrapped::SPValue(vec![0.3, 0.7, -12.67].to_spvalue()))
+            Ok(SPWrapped::Array(vec![
+                SPWrapped::SPValue(0.3.to_spvalue()),
+                SPWrapped::SPValue(0.7.to_spvalue()),
+                SPWrapped::SPValue((-12.67).to_spvalue()),
+            ]))
+        );
+
+        let parsed = pred_parser::value("[0.3, 0.7, -12.67]", &s).unwrap();
+
+        assert_eq!(
+            parsed.evaluate(&s, "test"),
+            vec![0.3, 0.7, -12.67].to_spvalue()
         );
 
         assert_eq!(

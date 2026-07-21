@@ -26,165 +26,179 @@ pub enum Predicate {
 
 impl Predicate {
     /// Evaluate a predicate based on the given state.
+    // pub fn eval(self, state: &State, log_target: &str) -> bool {
+    //     match self {
+    //         Predicate::TRUE => true,
+    //         Predicate::FALSE => false,
+    //         Predicate::NOT(p) => !p.eval(&state.clone(), &log_target),
+    //         Predicate::AND(p) => p.iter().all(|pp| pp.clone().eval(&state, &log_target)),
+    //         Predicate::OR(p) => p.iter().any(|pp| pp.clone().eval(&state, &log_target)),
+    //         Predicate::EQ(x, y) => match (x, y) {
+    //             (SPWrapped::SPVariable(vx), SPWrapped::SPVariable(vy)) => {
+    //                 state.get_value(&vx.name, &log_target) == state.get_value(&vy.name, &log_target)
+    //             }
+    //             (SPWrapped::SPVariable(vx), SPWrapped::SPValue(vy)) => {
+    //                 if let Some(value) = state.get_value(&vx.name, &log_target) {
+    //                     value == vy
+    //                 } else {
+    //                     false
+    //                 }
+    //             }
+    //             (SPWrapped::SPValue(vx), SPWrapped::SPVariable(vy)) => {
+    //                 if let Some(value) = state.get_value(&vy.name, &log_target) {
+    //                     vx == value
+    //                 } else {
+    //                     false
+    //                 }
+    //             }
+    //             (SPWrapped::SPValue(vx), SPWrapped::SPValue(vy)) => vx == vy,
+    //         },
+    //         Predicate::NEQ(x, y) => match (x, y) {
+    //             (SPWrapped::SPVariable(vx), SPWrapped::SPVariable(vy)) => {
+    //                 state.get_value(&vx.name, &log_target) != state.get_value(&vy.name, &log_target)
+    //             }
+    //             (SPWrapped::SPVariable(vx), SPWrapped::SPValue(vy)) => {
+    //                 if let Some(value) = state.get_value(&vx.name, &log_target) {
+    //                     value != vy
+    //                 } else {
+    //                     false
+    //                 }
+    //             }
+    //             (SPWrapped::SPValue(vx), SPWrapped::SPVariable(vy)) => {
+    //                 if let Some(value) = state.get_value(&vy.name, &log_target) {
+    //                     vx != value
+    //                 } else {
+    //                     false
+    //                 }
+    //             }
+    //             (SPWrapped::SPValue(vx), SPWrapped::SPValue(vy)) => vx != vy,
+    //         },
+    //         Predicate::LTEQ(x, y) => match (x, y) {
+    //             (SPWrapped::SPVariable(vx), SPWrapped::SPVariable(vy)) => {
+    //                 state.get_value(&vx.name, &log_target) <= state.get_value(&vy.name, &log_target)
+    //             }
+    //             (SPWrapped::SPVariable(vx), SPWrapped::SPValue(vy)) => {
+    //                 if let Some(value) = state.get_value(&vx.name, &log_target) {
+    //                     value <= vy
+    //                 } else {
+    //                     false
+    //                 }
+    //             }
+    //             (SPWrapped::SPValue(vx), SPWrapped::SPVariable(vy)) => {
+    //                 if let Some(value) = state.get_value(&vy.name, &log_target) {
+    //                     vx <= value
+    //                 } else {
+    //                     false
+    //                 }
+    //             }
+    //             (SPWrapped::SPValue(vx), SPWrapped::SPValue(vy)) => vx <= vy,
+    //         },
+    //         Predicate::GTEQ(x, y) => match (x, y) {
+    //             (SPWrapped::SPVariable(vx), SPWrapped::SPVariable(vy)) => {
+    //                 state.get_value(&vx.name, &log_target) >= state.get_value(&vy.name, &log_target)
+    //             }
+    //             (SPWrapped::SPVariable(vx), SPWrapped::SPValue(vy)) => {
+    //                 if let Some(value) = state.get_value(&vx.name, &log_target) {
+    //                     value >= vy
+    //                 } else {
+    //                     false
+    //                 }
+    //             }
+    //             (SPWrapped::SPValue(vx), SPWrapped::SPVariable(vy)) => {
+    //                 if let Some(value) = state.get_value(&vy.name, &log_target) {
+    //                     vx >= value
+    //                 } else {
+    //                     false
+    //                 }
+    //             }
+    //             (SPWrapped::SPValue(vx), SPWrapped::SPValue(vy)) => vx >= vy,
+    //         },
+    //         Predicate::LT(x, y) => match (x, y) {
+    //             (SPWrapped::SPVariable(vx), SPWrapped::SPVariable(vy)) => {
+    //                 state.get_value(&vx.name, &log_target) < state.get_value(&vy.name, &log_target)
+    //             }
+    //             (SPWrapped::SPVariable(vx), SPWrapped::SPValue(vy)) => {
+    //                 if let Some(value) = state.get_value(&vx.name, &log_target) {
+    //                     value < vy
+    //                 } else {
+    //                     false
+    //                 }
+    //             }
+    //             (SPWrapped::SPValue(vx), SPWrapped::SPVariable(vy)) => {
+    //                 if let Some(value) = state.get_value(&vy.name, &log_target) {
+    //                     vx < value
+    //                 } else {
+    //                     false
+    //                 }
+    //             }
+    //             (SPWrapped::SPValue(vx), SPWrapped::SPValue(vy)) => vx < vy,
+    //         },
+    //         Predicate::GT(x, y) => match (x, y) {
+    //             (SPWrapped::SPVariable(vx), SPWrapped::SPVariable(vy)) => {
+    //                 state.get_value(&vx.name, &log_target) > state.get_value(&vy.name, &log_target)
+    //             }
+    //             (SPWrapped::SPVariable(vx), SPWrapped::SPValue(vy)) => {
+    //                 if let Some(value) = state.get_value(&vx.name, &log_target) {
+    //                     value > vy
+    //                 } else {
+    //                     false
+    //                 }
+    //             }
+    //             (SPWrapped::SPValue(vx), SPWrapped::SPVariable(vy)) => {
+    //                 if let Some(value) = state.get_value(&vy.name, &log_target) {
+    //                     vx > value
+    //                 } else {
+    //                     false
+    //                 }
+    //             }
+    //             (SPWrapped::SPValue(vx), SPWrapped::SPValue(vy)) => vx > vy,
+    //         },
+    //     }
+    // }
+
+    // impl Predicate {
+    /// Experimental
     pub fn eval(self, state: &State, log_target: &str) -> bool {
         match self {
             Predicate::TRUE => true,
             Predicate::FALSE => false,
-            Predicate::NOT(p) => !p.eval(&state.clone(), &log_target),
-            Predicate::AND(p) => p.iter().all(|pp| pp.clone().eval(&state, &log_target)),
-            Predicate::OR(p) => p.iter().any(|pp| pp.clone().eval(&state, &log_target)),
-            Predicate::EQ(x, y) => match (x, y) {
-                (SPWrapped::SPVariable(vx), SPWrapped::SPVariable(vy)) => {
-                    state.get_value(&vx.name, &log_target) == state.get_value(&vy.name, &log_target)
-                }
-                (SPWrapped::SPVariable(vx), SPWrapped::SPValue(vy)) => {
-                    if let Some(value) = state.get_value(&vx.name, &log_target) {
-                        value == vy
-                    } else {
-                        false
-                    }
-                }
-                (SPWrapped::SPValue(vx), SPWrapped::SPVariable(vy)) => {
-                    if let Some(value) = state.get_value(&vy.name, &log_target) {
-                        vx == value
-                    } else {
-                        false
-                    }
-                }
-                (SPWrapped::SPValue(vx), SPWrapped::SPValue(vy)) => vx == vy,
-            },
-            Predicate::NEQ(x, y) => match (x, y) {
-                (SPWrapped::SPVariable(vx), SPWrapped::SPVariable(vy)) => {
-                    state.get_value(&vx.name, &log_target) != state.get_value(&vy.name, &log_target)
-                }
-                (SPWrapped::SPVariable(vx), SPWrapped::SPValue(vy)) => {
-                    if let Some(value) = state.get_value(&vx.name, &log_target) {
-                        value != vy
-                    } else {
-                        false
-                    }
-                }
-                (SPWrapped::SPValue(vx), SPWrapped::SPVariable(vy)) => {
-                    if let Some(value) = state.get_value(&vy.name, &log_target) {
-                        vx != value
-                    } else {
-                        false
-                    }
-                }
-                (SPWrapped::SPValue(vx), SPWrapped::SPValue(vy)) => vx != vy,
-            },
-            Predicate::LTEQ(x, y) => match (x, y) {
-                (SPWrapped::SPVariable(vx), SPWrapped::SPVariable(vy)) => {
-                    state.get_value(&vx.name, &log_target) <= state.get_value(&vy.name, &log_target)
-                }
-                (SPWrapped::SPVariable(vx), SPWrapped::SPValue(vy)) => {
-                    if let Some(value) = state.get_value(&vx.name, &log_target) {
-                        value <= vy
-                    } else {
-                        false
-                    }
-                }
-                (SPWrapped::SPValue(vx), SPWrapped::SPVariable(vy)) => {
-                    if let Some(value) = state.get_value(&vy.name, &log_target) {
-                        vx <= value
-                    } else {
-                        false
-                    }
-                }
-                (SPWrapped::SPValue(vx), SPWrapped::SPValue(vy)) => vx <= vy,
-            },
-            Predicate::GTEQ(x, y) => match (x, y) {
-                (SPWrapped::SPVariable(vx), SPWrapped::SPVariable(vy)) => {
-                    state.get_value(&vx.name, &log_target) >= state.get_value(&vy.name, &log_target)
-                }
-                (SPWrapped::SPVariable(vx), SPWrapped::SPValue(vy)) => {
-                    if let Some(value) = state.get_value(&vx.name, &log_target) {
-                        value >= vy
-                    } else {
-                        false
-                    }
-                }
-                (SPWrapped::SPValue(vx), SPWrapped::SPVariable(vy)) => {
-                    if let Some(value) = state.get_value(&vy.name, &log_target) {
-                        vx >= value
-                    } else {
-                        false
-                    }
-                }
-                (SPWrapped::SPValue(vx), SPWrapped::SPValue(vy)) => vx >= vy,
-            },
-            Predicate::LT(x, y) => match (x, y) {
-                (SPWrapped::SPVariable(vx), SPWrapped::SPVariable(vy)) => {
-                    state.get_value(&vx.name, &log_target) < state.get_value(&vy.name, &log_target)
-                }
-                (SPWrapped::SPVariable(vx), SPWrapped::SPValue(vy)) => {
-                    if let Some(value) = state.get_value(&vx.name, &log_target) {
-                        value < vy
-                    } else {
-                        false
-                    }
-                }
-                (SPWrapped::SPValue(vx), SPWrapped::SPVariable(vy)) => {
-                    if let Some(value) = state.get_value(&vy.name, &log_target) {
-                        vx < value
-                    } else {
-                        false
-                    }
-                }
-                (SPWrapped::SPValue(vx), SPWrapped::SPValue(vy)) => vx < vy,
-            },
-            Predicate::GT(x, y) => match (x, y) {
-                (SPWrapped::SPVariable(vx), SPWrapped::SPVariable(vy)) => {
-                    state.get_value(&vx.name, &log_target) > state.get_value(&vy.name, &log_target)
-                }
-                (SPWrapped::SPVariable(vx), SPWrapped::SPValue(vy)) => {
-                    if let Some(value) = state.get_value(&vx.name, &log_target) {
-                        value > vy
-                    } else {
-                        false
-                    }
-                }
-                (SPWrapped::SPValue(vx), SPWrapped::SPVariable(vy)) => {
-                    if let Some(value) = state.get_value(&vy.name, &log_target) {
-                        vx > value
-                    } else {
-                        false
-                    }
-                }
-                (SPWrapped::SPValue(vx), SPWrapped::SPValue(vy)) => vx > vy,
-            },
+            // Note: removed unnecessary clones and refs here for efficiency
+            Predicate::NOT(p) => !p.eval(state, log_target),
+            Predicate::AND(p) => p.into_iter().all(|pp| pp.eval(state, log_target)),
+            Predicate::OR(p) => p.into_iter().any(|pp| pp.eval(state, log_target)),
+            
+            // The evaluate() method handles variables and nested collections seamlessly
+            Predicate::EQ(x, y) => x.evaluate(state, log_target) == y.evaluate(state, log_target),
+            Predicate::NEQ(x, y) => x.evaluate(state, log_target) != y.evaluate(state, log_target),
+            Predicate::LTEQ(x, y) => x.evaluate(state, log_target) <= y.evaluate(state, log_target),
+            Predicate::GTEQ(x, y) => x.evaluate(state, log_target) >= y.evaluate(state, log_target),
+            Predicate::LT(x, y) => x.evaluate(state, log_target) < y.evaluate(state, log_target),
+            Predicate::GT(x, y) => x.evaluate(state, log_target) > y.evaluate(state, log_target),
         }
     }
 
-    /// Keep only the variables in the predicate from the `only` list.
+    // experimental
     pub fn keep_only(&self, only: &Vec<String>) -> Option<Predicate> {
         match self {
             Predicate::TRUE => Some(Predicate::TRUE),
             Predicate::FALSE => Some(Predicate::FALSE),
-            Predicate::NOT(x) => match x.keep_only(only) {
-                Some(x) => Some(Predicate::NOT(Box::new(x))),
-                None => None,
-            },
+            Predicate::NOT(x) => x.keep_only(only).map(|x| Predicate::NOT(Box::new(x))),
             Predicate::AND(x) => {
-                let mut new: Vec<_> = x.iter().flat_map(|p| p.clone().keep_only(only)).collect();
+                let mut new: Vec<_> = x.iter().flat_map(|p| p.keep_only(only)).collect();
                 new.dedup();
-                if new.len() == 0 {
-                    None
-                } else if new.len() == 1 {
-                    Some(new[0].clone())
-                } else {
-                    Some(Predicate::AND(new))
+                match new.len() {
+                    0 => None,
+                    1 => Some(new[0].clone()),
+                    _ => Some(Predicate::AND(new)),
                 }
             }
             Predicate::OR(x) => {
-                let mut new: Vec<_> = x.iter().flat_map(|p| p.clone().keep_only(only)).collect();
+                let mut new: Vec<_> = x.iter().flat_map(|p| p.keep_only(only)).collect();
                 new.dedup();
-                if new.len() == 0 {
-                    None
-                } else if new.len() == 1 {
-                    Some(new[0].clone())
-                } else {
-                    Some(Predicate::OR(new))
+                match new.len() {
+                    0 => None,
+                    1 => Some(new[0].clone()),
+                    _ => Some(Predicate::OR(new)),
                 }
             }
             Predicate::EQ(x, y)
@@ -193,14 +207,8 @@ impl Predicate {
             | Predicate::GTEQ(x, y)
             | Predicate::LT(x, y)
             | Predicate::GT(x, y) => {
-                let remove_x = match x {
-                    SPWrapped::SPValue(_) => false,
-                    SPWrapped::SPVariable(vx) => !only.contains(&vx.name),
-                };
-                let remove_y = match y {
-                    SPWrapped::SPValue(_) => false,
-                    SPWrapped::SPVariable(vy) => !only.contains(&vy.name),
-                };
+                let remove_x = x.get_variables().iter().any(|v| !only.contains(&v.name));
+                let remove_y = y.get_variables().iter().any(|v| !only.contains(&v.name));
 
                 if remove_x || remove_y {
                     None
@@ -210,36 +218,28 @@ impl Predicate {
             }
         }
     }
-
-    /// Remove the variables in the predicate from the `remove` list.
+    // experimental
     pub fn remove(&self, remove: &Vec<String>) -> Option<Predicate> {
         match self {
             Predicate::TRUE => Some(Predicate::TRUE),
             Predicate::FALSE => Some(Predicate::FALSE),
-            Predicate::NOT(x) => match x.remove(remove) {
-                Some(x) => Some(Predicate::NOT(Box::new(x))),
-                None => None,
-            },
+            Predicate::NOT(x) => x.remove(remove).map(|x| Predicate::NOT(Box::new(x))),
             Predicate::AND(x) => {
-                let mut new: Vec<_> = x.iter().flat_map(|p| p.clone().remove(remove)).collect();
+                let mut new: Vec<_> = x.iter().flat_map(|p| p.remove(remove)).collect();
                 new.dedup();
-                if new.len() == 0 {
-                    None
-                } else if new.len() == 1 {
-                    Some(new[0].clone())
-                } else {
-                    Some(Predicate::AND(new))
+                match new.len() {
+                    0 => None,
+                    1 => Some(new[0].clone()),
+                    _ => Some(Predicate::AND(new)),
                 }
             }
             Predicate::OR(x) => {
-                let mut new: Vec<_> = x.iter().flat_map(|p| p.clone().remove(remove)).collect();
+                let mut new: Vec<_> = x.iter().flat_map(|p| p.remove(remove)).collect();
                 new.dedup();
-                if new.len() == 0 {
-                    None
-                } else if new.len() == 1 {
-                    Some(new[0].clone())
-                } else {
-                    Some(Predicate::OR(new))
+                match new.len() {
+                    0 => None,
+                    1 => Some(new[0].clone()),
+                    _ => Some(Predicate::OR(new)),
                 }
             }
             Predicate::EQ(x, y)
@@ -248,14 +248,8 @@ impl Predicate {
             | Predicate::GTEQ(x, y)
             | Predicate::LT(x, y)
             | Predicate::GT(x, y) => {
-                let remove_x = match x {
-                    SPWrapped::SPValue(_) => false,
-                    SPWrapped::SPVariable(vx) => remove.contains(&vx.name),
-                };
-                let remove_y = match y {
-                    SPWrapped::SPValue(_) => false,
-                    SPWrapped::SPVariable(vy) => remove.contains(&vy.name),
-                };
+                let remove_x = x.get_variables().iter().any(|v| remove.contains(&v.name));
+                let remove_y = y.get_variables().iter().any(|v| remove.contains(&v.name));
 
                 if remove_x || remove_y {
                     None
@@ -265,7 +259,7 @@ impl Predicate {
             }
         }
     }
-
+    // experimental
     pub fn get_predicate_vars(&self) -> Vec<SPVariable> {
         let mut vars = match self {
             Predicate::AND(preds) | Predicate::OR(preds) => {
@@ -278,13 +272,8 @@ impl Predicate {
             | Predicate::GTEQ(lhs, rhs)
             | Predicate::LT(lhs, rhs)
             | Predicate::GT(lhs, rhs) => {
-                let mut found = Vec::new();
-                if let SPWrapped::SPVariable(v) = lhs {
-                    found.push(v.clone());
-                }
-                if let SPWrapped::SPVariable(v) = rhs {
-                    found.push(v.clone());
-                }
+                let mut found = lhs.get_variables();
+                found.extend(rhs.get_variables());
                 found
             }
             Predicate::TRUE | Predicate::FALSE => vec![],
@@ -294,6 +283,147 @@ impl Predicate {
         vars.dedup();
         vars
     }
+
+// }
+
+    // /// Keep only the variables in the predicate from the `only` list.
+    // pub fn keep_only(&self, only: &Vec<String>) -> Option<Predicate> {
+    //     match self {
+    //         Predicate::TRUE => Some(Predicate::TRUE),
+    //         Predicate::FALSE => Some(Predicate::FALSE),
+    //         Predicate::NOT(x) => match x.keep_only(only) {
+    //             Some(x) => Some(Predicate::NOT(Box::new(x))),
+    //             None => None,
+    //         },
+    //         Predicate::AND(x) => {
+    //             let mut new: Vec<_> = x.iter().flat_map(|p| p.clone().keep_only(only)).collect();
+    //             new.dedup();
+    //             if new.len() == 0 {
+    //                 None
+    //             } else if new.len() == 1 {
+    //                 Some(new[0].clone())
+    //             } else {
+    //                 Some(Predicate::AND(new))
+    //             }
+    //         }
+    //         Predicate::OR(x) => {
+    //             let mut new: Vec<_> = x.iter().flat_map(|p| p.clone().keep_only(only)).collect();
+    //             new.dedup();
+    //             if new.len() == 0 {
+    //                 None
+    //             } else if new.len() == 1 {
+    //                 Some(new[0].clone())
+    //             } else {
+    //                 Some(Predicate::OR(new))
+    //             }
+    //         }
+    //         Predicate::EQ(x, y)
+    //         | Predicate::NEQ(x, y)
+    //         | Predicate::LTEQ(x, y)
+    //         | Predicate::GTEQ(x, y)
+    //         | Predicate::LT(x, y)
+    //         | Predicate::GT(x, y) => {
+    //             let remove_x = match x {
+    //                 SPWrapped::SPValue(_) => false,
+    //                 SPWrapped::SPVariable(vx) => !only.contains(&vx.name),
+    //             };
+    //             let remove_y = match y {
+    //                 SPWrapped::SPValue(_) => false,
+    //                 SPWrapped::SPVariable(vy) => !only.contains(&vy.name),
+    //             };
+
+    //             if remove_x || remove_y {
+    //                 None
+    //             } else {
+    //                 Some(self.clone())
+    //             }
+    //         }
+    //     }
+    // }
+
+    // /// Remove the variables in the predicate from the `remove` list.
+    // pub fn remove(&self, remove: &Vec<String>) -> Option<Predicate> {
+    //     match self {
+    //         Predicate::TRUE => Some(Predicate::TRUE),
+    //         Predicate::FALSE => Some(Predicate::FALSE),
+    //         Predicate::NOT(x) => match x.remove(remove) {
+    //             Some(x) => Some(Predicate::NOT(Box::new(x))),
+    //             None => None,
+    //         },
+    //         Predicate::AND(x) => {
+    //             let mut new: Vec<_> = x.iter().flat_map(|p| p.clone().remove(remove)).collect();
+    //             new.dedup();
+    //             if new.len() == 0 {
+    //                 None
+    //             } else if new.len() == 1 {
+    //                 Some(new[0].clone())
+    //             } else {
+    //                 Some(Predicate::AND(new))
+    //             }
+    //         }
+    //         Predicate::OR(x) => {
+    //             let mut new: Vec<_> = x.iter().flat_map(|p| p.clone().remove(remove)).collect();
+    //             new.dedup();
+    //             if new.len() == 0 {
+    //                 None
+    //             } else if new.len() == 1 {
+    //                 Some(new[0].clone())
+    //             } else {
+    //                 Some(Predicate::OR(new))
+    //             }
+    //         }
+    //         Predicate::EQ(x, y)
+    //         | Predicate::NEQ(x, y)
+    //         | Predicate::LTEQ(x, y)
+    //         | Predicate::GTEQ(x, y)
+    //         | Predicate::LT(x, y)
+    //         | Predicate::GT(x, y) => {
+    //             let remove_x = match x {
+    //                 SPWrapped::SPValue(_) => false,
+    //                 SPWrapped::SPVariable(vx) => remove.contains(&vx.name),
+    //             };
+    //             let remove_y = match y {
+    //                 SPWrapped::SPValue(_) => false,
+    //                 SPWrapped::SPVariable(vy) => remove.contains(&vy.name),
+    //             };
+
+    //             if remove_x || remove_y {
+    //                 None
+    //             } else {
+    //                 Some(self.clone())
+    //             }
+    //         }
+    //     }
+    // }
+
+    // pub fn get_predicate_vars(&self) -> Vec<SPVariable> {
+    //     let mut vars = match self {
+    //         Predicate::AND(preds) | Predicate::OR(preds) => {
+    //             preds.iter().flat_map(|p| p.get_predicate_vars()).collect()
+    //         }
+    //         Predicate::NOT(p) => p.get_predicate_vars(),
+    //         Predicate::EQ(lhs, rhs)
+    //         | Predicate::NEQ(lhs, rhs)
+    //         | Predicate::LTEQ(lhs, rhs)
+    //         | Predicate::GTEQ(lhs, rhs)
+    //         | Predicate::LT(lhs, rhs)
+    //         | Predicate::GT(lhs, rhs) => {
+    //             let mut found = Vec::new();
+    //             if let SPWrapped::SPVariable(v) = lhs {
+    //                 found.push(v.clone());
+    //             }
+    //             if let SPWrapped::SPVariable(v) = rhs {
+    //                 found.push(v.clone());
+    //             }
+    //             found
+    //         }
+    //         Predicate::TRUE | Predicate::FALSE => vec![],
+    //     };
+
+    //     vars.sort();
+    //     vars.dedup();
+    //     vars
+    // }
 
     pub fn get_predicate_var_keys(&self) -> Vec<String> {
         self.get_predicate_vars()

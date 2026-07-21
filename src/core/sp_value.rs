@@ -1,6 +1,8 @@
 use ordered_float::OrderedFloat;
 use serde::{Deserialize, Serialize};
 use std::{fmt, time::SystemTime};
+
+// use crate::SPWrapped;
 // use serde::Serializer;
 
 // fn strictly_serialize_ordered_float<S>(
@@ -73,6 +75,12 @@ pub enum MapOrUnknown {
     Map(Vec<(SPValue, SPValue)>),
     UNKNOWN,
 }
+
+// #[derive(Debug, PartialEq, Clone, Hash, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+// pub enum MapOrUnknown {
+//     Map(Vec<(SPWrapped, SPWrapped)>),
+//     UNKNOWN,
+// }
 
 #[derive(Debug, PartialEq, Clone, Hash, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum TransformOrUnknown {
@@ -794,7 +802,7 @@ mod tests {
             ("key2".to_spvalue(), true.to_spvalue()),
         ]
         .to_spvalue();
-        assert_eq!(map_val.to_string(), "[(true, false), (true, false)]");
+        assert_eq!(map_val.to_string(), "{(key1, 1), (key2, true)}");
         assert_eq!(SPValue::Map(MapOrUnknown::UNKNOWN).to_string(), "UNKNOWN");
 
         let transform_val = create_dummy_transform().to_spvalue();
@@ -872,7 +880,7 @@ mod tests {
             "key".to_spvalue(),
             "value".to_spvalue(),
         )]));
-        assert_eq!(format!("{}", map_val), "[(true, true)]");
+        assert_eq!(format!("{}", map_val), "{(key, value)}");
         assert_eq!(
             format!("{}", SPValue::Map(MapOrUnknown::UNKNOWN)),
             "UNKNOWN"
