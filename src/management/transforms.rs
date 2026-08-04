@@ -8,6 +8,7 @@ mod insert_transform;
 mod insert_transforms;
 mod load_transforms_from_path;
 mod lookup_transform;
+mod get_transform;
 mod move_transform;
 mod remove_transform;
 mod reparent_transform;
@@ -81,6 +82,13 @@ impl TransformsManager {
         child_frame_id: &str,
     ) -> Result<SPTransformStamped, Box<dyn Error>> {
         lookup_transform::lookup_transform(con, parent_frame_id, child_frame_id).await
+    }
+
+    pub async fn get_transform(
+        con: &mut MultiplexedConnection,
+        frame_id: &str,
+    ) -> Result<SPTransformStamped, Box<dyn Error>> {
+        get_transform::get_transform(con, frame_id).await
     }
 
     pub async fn load_transforms_from_path(
