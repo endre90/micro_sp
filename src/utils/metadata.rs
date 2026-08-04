@@ -20,6 +20,7 @@ pub struct PotentialTransformMetadata {
     pub mesh_b: f32,
     pub mesh_a: f32,
     pub secondary_transforms: Vec<SPTransform>,
+    pub mesh_use_embedded_materials: bool
 }
 
 impl Default for PotentialTransformMetadata {
@@ -39,6 +40,7 @@ impl Default for PotentialTransformMetadata {
             mesh_b: 1.0,
             mesh_a: 1.0,
             secondary_transforms: vec![],
+            mesh_use_embedded_materials: false
         }
     }
 }
@@ -184,6 +186,11 @@ pub fn decode_metadata(map_value: &MapOrUnknown) -> PotentialTransformMetadata {
             "visualize_mesh" => {
                 if let SPValue::Bool(BoolOrUnknown::Bool(b)) = sp_value {
                     metadata.visualize_mesh = *b;
+                }
+            }
+            "mesh_use_embedded_materials" => {
+                if let SPValue::Bool(BoolOrUnknown::Bool(b)) = sp_value {
+                    metadata.mesh_use_embedded_materials = *b;
                 }
             }
             "visualize_zone" => {

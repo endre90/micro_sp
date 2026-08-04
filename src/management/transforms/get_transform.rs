@@ -59,7 +59,6 @@ mod tests_for_get_transform {
         let frame_id = "robot";
         let tf = create_dummy_transform("world", frame_id);
 
-        // Insert a valid transform into Redis
         let _: () = con
             .set(
                 tf_key(frame_id),
@@ -89,7 +88,6 @@ mod tests_for_get_transform {
 
         let frame_id = "non_existent";
 
-        // Try to fetch a transform that was never inserted
         let result = get_transform(&mut con, frame_id).await;
 
         assert!(result.is_err());
