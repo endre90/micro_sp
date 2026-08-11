@@ -259,6 +259,7 @@ mod tests {
             "asdf",
             vec![],
             vec![],
+            vec![],
             vec!(),
             vec![
                 op_move_to_b.clone(),
