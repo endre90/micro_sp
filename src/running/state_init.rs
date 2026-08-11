@@ -510,6 +510,7 @@ pub fn generate_operation_state_variables(
 
     model.operations.iter().for_each(|x| operation_trackers.push(x.name.clone()));
     model.auto_operations.iter().for_each(|x| operation_trackers.push(x.name.clone()));
+    model.mutexed_auto_operations.iter().for_each(|x| operation_trackers.push(x.name.clone()));
     operation_trackers.sort(); 
     operation_trackers.dedup();
     state = add_operation_state_tracking_variable(
