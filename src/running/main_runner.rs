@@ -91,22 +91,22 @@ pub async fn main_runner(
         .unwrap()
     });
 
-    log::info!(target: &format!("{sp_id}_micro_sp"), "Spawning mutexed auto operation runner");
-    let model_clone = model.clone();
-    let con_clone = connection_manager.clone();
-    let op_log_tx_clone = op_log_tx.clone();
-    // let sop_log_tx_clone = sop_op_log_tx.clone();
-    tokio::task::spawn(async move {
-        mutexed_auto_operation_runner(
-            &model_clone.name,
-            &model_clone,
-            op_log_tx_clone,
-            // sop_log_tx_clone,
-            &con_clone,
-        )
-        .await
-        .unwrap()
-    });
+    // log::info!(target: &format!("{sp_id}_micro_sp"), "Spawning mutexed auto operation runner");
+    // let model_clone = model.clone();
+    // let con_clone = connection_manager.clone();
+    // let op_log_tx_clone = op_log_tx.clone();
+    // // let sop_log_tx_clone = sop_op_log_tx.clone();
+    // tokio::task::spawn(async move {
+    //     mutexed_auto_operation_runner(
+    //         &model_clone.name,
+    //         &model_clone,
+    //         op_log_tx_clone,
+    //         // sop_log_tx_clone,
+    //         &con_clone,
+    //     )
+    //     .await
+    //     .unwrap()
+    // });
 
     log::info!(target: &format!("{sp_id}_micro_sp"), "Spawning time runner");
     let con_clone = connection_manager.clone();

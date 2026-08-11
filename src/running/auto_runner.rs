@@ -80,6 +80,205 @@ pub async fn auto_transition_runner(
     }
 }
 
+// pub async fn auto_operation_runner(
+//     sp_id: &str,
+//     model: &Model,
+//     logging_tx: mpsc::Sender<LogMsg>,
+//     connection_manager: &Arc<ConnectionManager>,
+// ) -> Result<(), Box<dyn std::error::Error>> {
+//     initialize_env_logger();
+//     let mut interval = interval(Duration::from_millis(OPERAION_RUNNER_TICK_INTERVAL_MS));
+//     let model = model.clone();
+//     let log_target = format!("{}_auto_operation_runner", sp_id);
+
+//     let mut active_ops: Vec<Operation> = vec![];
+//     let mut terminated_operations: Vec<String> = vec![];
+
+//     loop {
+//         interval.tick().await;
+//         if let Err(_) = connection_manager.check_redis_health(&log_target).await {
+//             continue;
+//         }
+//         let mut con = connection_manager.get_connection().await;
+//         let state = match StateManager::get_full_state(&mut con).await {
+//             Some(s) => s,
+//             None => continue,
+//         };
+
+//         let mut new_state = state.clone();
+//         let mut new_op_ids = vec![];
+
+//         for op in &model.auto_operations {
+//             if op.eval(&state, &log_target) {
+//                 let prefix = format!("{}_", op.name);
+//                 if !active_ops.iter().any(|a| a.name.starts_with(&prefix)) {
+//                     let unique_id = nanoid::nanoid!(10, &NANOID_ALPHABET);
+//                     let unique_op_id = format!("{}{}", prefix, unique_id);
+//                     let mut op_mut = op.clone();
+//                     op_mut.name = unique_op_id.clone();
+//                     active_ops.push(op_mut);
+//                     new_op_ids.push(unique_op_id);
+//                 }
+//             }
+//         }
+
+//         if !new_op_ids.is_empty() {
+//             new_state =
+//                 add_operation_meta_tracking_variables(&new_op_ids, &new_state, false, &log_target);
+//             new_state = add_operation_state_tracking_variable(&new_op_ids, &new_state, &log_target);
+//         }
+
+//         let mut next_active_ops = vec![];
+//         for current_active_op in active_ops {
+//             new_state = process_operation(
+//                 &sp_id,
+//                 new_state,
+//                 &current_active_op,
+//                 OperationProcessingType::Automatic,
+//                 None,
+//                 None,
+//                 logging_tx.clone(),
+//                 &log_target,
+//             )
+//             .await;
+
+//             let operation_state = new_state.get_string_or_default_to_unknown(
+//                 &format!("{}", current_active_op.name),
+//                 &log_target,
+//             );
+
+//             match OperationState::from_str(&operation_state) {
+//                 OperationState::Terminated(_) => {
+//                     terminated_operations.push(current_active_op.name.clone());
+//                 }
+//                 _ => next_active_ops.push(current_active_op),
+//             };
+//         }
+
+//         active_ops = next_active_ops;
+
+//         let modified_state = state.get_diff_partial_state_and_add_missing(&new_state);
+//         StateManager::set_state(&mut con, &modified_state).await;
+
+//         let mut terminated_operations_meta = vec![];
+//         for op in &terminated_operations {
+//             terminated_operations_meta.push(format!("{}_information", op));
+//             terminated_operations_meta.push(format!("{}_failure_retry_counter", op));
+//             terminated_operations_meta.push(format!("{}_timeout_retry_counter", op));
+//             terminated_operations_meta.push(format!("{}_elapsed_executing_ms", op));
+//             terminated_operations_meta.push(format!("{}_elapsed_disabled_ms", op));
+//         }
+//         StateManager::remove_sp_values(&mut con, &terminated_operations).await;
+//         StateManager::remove_sp_values(&mut con, &terminated_operations_meta).await;
+
+//         terminated_operations.clear();
+//     }
+// }
+
+
+// pub async fn mutexed_auto_operation_runner(
+//     sp_id: &str,
+//     model: &Model,
+//     logging_tx: mpsc::Sender<LogMsg>,
+//     connection_manager: &Arc<ConnectionManager>,
+// ) -> Result<(), Box<dyn std::error::Error>> {
+//     initialize_env_logger();
+//     let mut interval = interval(Duration::from_millis(OPERAION_RUNNER_TICK_INTERVAL_MS));
+//     let model = model.clone();
+//     let log_target = format!("{}_mutexed_auto_operation_runner", sp_id);
+
+//     let mut active_op: Option<Operation> = None;
+//     let mut terminated_operations: Vec<String> = vec![];
+
+//     loop {
+//         interval.tick().await;
+//         if let Err(_) = connection_manager.check_redis_health(&log_target).await {
+//             continue;
+//         }
+//         let mut con = connection_manager.get_connection().await;
+//         let state = match StateManager::get_full_state(&mut con).await {
+//             Some(s) => s,
+//             None => continue,
+//         };
+
+//         let mut new_state = state.clone();
+//         let mut new_op_ids = vec![];
+
+//         if active_op.is_none() {
+//             for op in &model.mutexed_auto_operations {
+//                 if op.eval(&state, &log_target) {
+//                     let prefix = format!("{}_", op.name);
+//                     let unique_id = nanoid::nanoid!(10, &NANOID_ALPHABET);
+//                     let unique_op_id = format!("{}{}", prefix, unique_id);
+//                     let mut op_mut = op.clone();
+//                     op_mut.name = unique_op_id.clone();
+                    
+//                     active_op = Some(op_mut);
+//                     new_op_ids.push(unique_op_id);
+                    
+//                     break; 
+//                 }
+//             }
+//         }
+
+//         if !new_op_ids.is_empty() {
+//             new_state =
+//                 add_operation_meta_tracking_variables(&new_op_ids, &new_state, false, &log_target);
+//             new_state = add_operation_state_tracking_variable(&new_op_ids, &new_state, &log_target);
+//         }
+
+//         let mut next_active_op = None;
+        
+//         if let Some(current_active_op) = active_op {
+//             new_state = process_operation(
+//                 &sp_id,
+//                 new_state,
+//                 &current_active_op,
+//                 OperationProcessingType::Automatic,
+//                 None,
+//                 None,
+//                 logging_tx.clone(),
+//                 &log_target,
+//             )
+//             .await;
+
+//             let operation_state = new_state.get_string_or_default_to_unknown(
+//                 &format!("{}", current_active_op.name),
+//                 &log_target,
+//             );
+
+//             match OperationState::from_str(&operation_state) {
+//                 OperationState::Terminated(_) => {
+//                     terminated_operations.push(current_active_op.name.clone());
+//                 }
+//                 _ => {
+//                     next_active_op = Some(current_active_op);
+//                 }
+//             };
+//         }
+
+//         active_op = next_active_op;
+
+//         let modified_state = state.get_diff_partial_state_and_add_missing(&new_state);
+//         StateManager::set_state(&mut con, &modified_state).await;
+
+//         if !terminated_operations.is_empty() {
+//             let mut terminated_operations_meta = vec![];
+//             for op in &terminated_operations {
+//                 terminated_operations_meta.push(format!("{}_information", op));
+//                 terminated_operations_meta.push(format!("{}_failure_retry_counter", op));
+//                 terminated_operations_meta.push(format!("{}_timeout_retry_counter", op));
+//                 terminated_operations_meta.push(format!("{}_elapsed_executing_ms", op));
+//                 terminated_operations_meta.push(format!("{}_elapsed_disabled_ms", op));
+//             }
+//             StateManager::remove_sp_values(&mut con, &terminated_operations).await;
+//             StateManager::remove_sp_values(&mut con, &terminated_operations_meta).await;
+
+//             terminated_operations.clear();
+//         }
+//     }
+// }
+
 pub async fn auto_operation_runner(
     sp_id: &str,
     model: &Model,
@@ -89,9 +288,10 @@ pub async fn auto_operation_runner(
     initialize_env_logger();
     let mut interval = interval(Duration::from_millis(OPERAION_RUNNER_TICK_INTERVAL_MS));
     let model = model.clone();
-    let log_target = format!("{}_auto_operation_runner", sp_id);
+    let log_target = format!("{}_operation_runner", sp_id);
 
-    let mut active_ops: Vec<Operation> = vec![];
+    let mut active_auto_ops: Vec<Operation> = vec![];
+    let mut active_mutexed_op: Option<Operation> = None;
     let mut terminated_operations: Vec<String> = vec![];
 
     loop {
@@ -111,13 +311,30 @@ pub async fn auto_operation_runner(
         for op in &model.auto_operations {
             if op.eval(&state, &log_target) {
                 let prefix = format!("{}_", op.name);
-                if !active_ops.iter().any(|a| a.name.starts_with(&prefix)) {
+                if !active_auto_ops.iter().any(|a| a.name.starts_with(&prefix)) {
                     let unique_id = nanoid::nanoid!(10, &NANOID_ALPHABET);
                     let unique_op_id = format!("{}{}", prefix, unique_id);
                     let mut op_mut = op.clone();
                     op_mut.name = unique_op_id.clone();
-                    active_ops.push(op_mut);
+                    active_auto_ops.push(op_mut);
                     new_op_ids.push(unique_op_id);
+                }
+            }
+        }
+
+        if active_mutexed_op.is_none() {
+            for op in &model.mutexed_auto_operations {
+                if op.eval(&state, &log_target) {
+                    let prefix = format!("{}_", op.name);
+                    let unique_id = nanoid::nanoid!(10, &NANOID_ALPHABET);
+                    let unique_op_id = format!("{}{}", prefix, unique_id);
+                    let mut op_mut = op.clone();
+                    op_mut.name = unique_op_id.clone();
+                    
+                    active_mutexed_op = Some(op_mut);
+                    new_op_ids.push(unique_op_id);
+                    
+                    break;
                 }
             }
         }
@@ -128,8 +345,8 @@ pub async fn auto_operation_runner(
             new_state = add_operation_state_tracking_variable(&new_op_ids, &new_state, &log_target);
         }
 
-        let mut next_active_ops = vec![];
-        for current_active_op in active_ops {
+        let mut next_active_auto_ops = vec![];
+        for current_active_op in active_auto_ops {
             new_state = process_operation(
                 &sp_id,
                 new_state,
@@ -151,85 +368,13 @@ pub async fn auto_operation_runner(
                 OperationState::Terminated(_) => {
                     terminated_operations.push(current_active_op.name.clone());
                 }
-                _ => next_active_ops.push(current_active_op),
+                _ => next_active_auto_ops.push(current_active_op),
             };
         }
+        active_auto_ops = next_active_auto_ops;
 
-        active_ops = next_active_ops;
-
-        let modified_state = state.get_diff_partial_state_and_add_missing(&new_state);
-        StateManager::set_state(&mut con, &modified_state).await;
-
-        let mut terminated_operations_meta = vec![];
-        for op in &terminated_operations {
-            terminated_operations_meta.push(format!("{}_information", op));
-            terminated_operations_meta.push(format!("{}_failure_retry_counter", op));
-            terminated_operations_meta.push(format!("{}_timeout_retry_counter", op));
-            terminated_operations_meta.push(format!("{}_elapsed_executing_ms", op));
-            terminated_operations_meta.push(format!("{}_elapsed_disabled_ms", op));
-        }
-        StateManager::remove_sp_values(&mut con, &terminated_operations).await;
-        StateManager::remove_sp_values(&mut con, &terminated_operations_meta).await;
-
-        terminated_operations.clear();
-    }
-}
-
-
-pub async fn mutexed_auto_operation_runner(
-    sp_id: &str,
-    model: &Model,
-    logging_tx: mpsc::Sender<LogMsg>,
-    connection_manager: &Arc<ConnectionManager>,
-) -> Result<(), Box<dyn std::error::Error>> {
-    initialize_env_logger();
-    let mut interval = interval(Duration::from_millis(OPERAION_RUNNER_TICK_INTERVAL_MS));
-    let model = model.clone();
-    let log_target = format!("{}_mutexed_auto_operation_runner", sp_id);
-
-    let mut active_op: Option<Operation> = None;
-    let mut terminated_operations: Vec<String> = vec![];
-
-    loop {
-        interval.tick().await;
-        if let Err(_) = connection_manager.check_redis_health(&log_target).await {
-            continue;
-        }
-        let mut con = connection_manager.get_connection().await;
-        let state = match StateManager::get_full_state(&mut con).await {
-            Some(s) => s,
-            None => continue,
-        };
-
-        let mut new_state = state.clone();
-        let mut new_op_ids = vec![];
-
-        if active_op.is_none() {
-            for op in &model.mutexed_auto_operations {
-                if op.eval(&state, &log_target) {
-                    let prefix = format!("{}_", op.name);
-                    let unique_id = nanoid::nanoid!(10, &NANOID_ALPHABET);
-                    let unique_op_id = format!("{}{}", prefix, unique_id);
-                    let mut op_mut = op.clone();
-                    op_mut.name = unique_op_id.clone();
-                    
-                    active_op = Some(op_mut);
-                    new_op_ids.push(unique_op_id);
-                    
-                    break; 
-                }
-            }
-        }
-
-        if !new_op_ids.is_empty() {
-            new_state =
-                add_operation_meta_tracking_variables(&new_op_ids, &new_state, false, &log_target);
-            new_state = add_operation_state_tracking_variable(&new_op_ids, &new_state, &log_target);
-        }
-
-        let mut next_active_op = None;
-        
-        if let Some(current_active_op) = active_op {
+        let mut next_active_mutexed_op = None;
+        if let Some(current_active_op) = active_mutexed_op {
             new_state = process_operation(
                 &sp_id,
                 new_state,
@@ -252,12 +397,11 @@ pub async fn mutexed_auto_operation_runner(
                     terminated_operations.push(current_active_op.name.clone());
                 }
                 _ => {
-                    next_active_op = Some(current_active_op);
+                    next_active_mutexed_op = Some(current_active_op);
                 }
             };
         }
-
-        active_op = next_active_op;
+        active_mutexed_op = next_active_mutexed_op;
 
         let modified_state = state.get_diff_partial_state_and_add_missing(&new_state);
         StateManager::set_state(&mut con, &modified_state).await;
