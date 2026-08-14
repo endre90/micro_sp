@@ -1,14 +1,32 @@
 use futures::StreamExt;
 use rayon::prelude::*;
 use redis::AsyncCommands;
-use redis::aio::MultiplexedConnection;
+use crate::SPConnection;
 use std::collections::HashMap;
 use std::error::Error;
 
 use crate::{SPTransformStamped, SPValue, TF_PREFIX, TransformOrUnknown};
 
+// PERF: `scan_match` is much better than `KEYS` (non-blocking, cursored) but it
+// still walks the whole keyspace, and it does so in many round trips - one per
+// SCAN batch, default COUNT 10. With a few thousand keys that is hundreds of
+// RTTs per lookup. Since `lookup_transform` calls this on *every* lookup, and
+// every lookup also `MGET`s and JSON-parses every transform in the system just
+// to resolve one parent/child pair, a chain of TF requests gets expensive fast.
+// Suggested:
+//   1. Store transforms in a single Redis HASH (`sp:tf`) and use `HGETALL` -
+//      one command, one round trip, no keyspace walk. The `TF_PREFIX` key
+//      naming already treats them as a namespace, so this is a small change.
+//   2. Cache the transform buffer in the `tf_interface` task and refresh it on
+//      change (keyspace notification on the hash, or a version counter bumped
+//      by `insert_transforms`), so repeated lookups do not re-read and re-parse
+//      the whole tree.
+//   3. `into_par_iter()` spins up rayon for what is usually a handful of small
+//      JSON parses; the thread hand-off typically costs more than the work and
+//      it competes with the tokio worker threads for cores. Worth measuring
+//      against a plain sequential iterator before keeping it.
 pub(super) async fn get_all_transforms(
-    con: &mut MultiplexedConnection,
+    con: &mut SPConnection,
 ) -> Result<HashMap<String, SPTransformStamped>, Box<dyn Error>> {
     let mut con_clone = con.clone();
 

@@ -1,9 +1,10 @@
 use crate::{SPTransformStamped, SPValue, TransformOrUnknown, tf_key};
-use redis::{AsyncCommands, aio::MultiplexedConnection};
+use crate::SPConnection;
+use redis::AsyncCommands;
 use std::error::Error;
 
 pub(super) async fn get_transform(
-    con: &mut MultiplexedConnection,
+    con: &mut SPConnection,
     frame_id: &str,
 ) -> Result<SPTransformStamped, Box<dyn Error>> {
     let redis_key = tf_key(frame_id);

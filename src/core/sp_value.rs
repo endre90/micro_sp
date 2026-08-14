@@ -2,19 +2,6 @@ use ordered_float::OrderedFloat;
 use serde::{Deserialize, Serialize};
 use std::{fmt, time::SystemTime};
 
-// use crate::SPWrapped;
-// use serde::Serializer;
-
-// fn strictly_serialize_ordered_float<S>(
-//     value: &OrderedFloat<f64>,
-//     serializer: S,
-// ) -> Result<S::Ok, S::Error>
-// where
-//     S: Serializer,
-// {
-//     serializer.serialize_f64(value.0)
-// }
-
 // Represents a value of a specific type.
 #[derive(Debug, PartialEq, Clone, Hash, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(tag = "type", content = "value")]

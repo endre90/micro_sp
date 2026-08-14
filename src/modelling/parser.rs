@@ -11,27 +11,8 @@ peg::parser!(pub grammar pred_parser() for str {
         state.get_assignment(n, "parser").var
     }
 
-    // pub rule array_element(state: &State) -> SPValue =
-    //         v:value(state) {
-    //             match v {
-    //                 SPWrapped::SPValue(val) => val,
-    //                 SPWrapped::SPVariable(sp_var) => todo!()
-    //                 }
-    //             }
-
-    // experimental
     pub rule array_element(state: &State) -> SPWrapped =
     v:value(state) { v }
-
-// pub rule value(state: &State) -> SPWrapped
-//     = _ var:variable(&state) _ { SPWrapped::SPVariable(var) }
-//     // ... all the simple SPValue matchers remain the same ...
-//     / _ "[" _ items:(array_element(state) ** (_ "," _))? _ "]" _ {
-//         // Return SPWrapped::Array instead of SPValue::Array
-//         SPWrapped::Array(items.unwrap_or_else(Vec::new))
-//     }
-//     // ... string, float, int rules ...
-
 
     pub rule value(state: &State) -> SPWrapped
         = _ var:variable(&state) _ { SPWrapped::SPVariable(var) }
@@ -46,11 +27,7 @@ peg::parser!(pub grammar pred_parser() for str {
         / _ "false" _ { SPWrapped::SPValue(false.to_spvalue()) }
         / _ "FALSE" _ { SPWrapped::SPValue(false.to_spvalue()) }
         / _ "[" _ items:(array_element(state) ** (_ "," _))? _ "]" _ {
-            // experimental
             SPWrapped::Array(items.unwrap_or_else(Vec::new))
-            // SPWrapped::SPValue(SPValue::Array(ArrayOrUnknown::Array(
-            //     items.unwrap_or_else(Vec::new)
-            // )))
         }
         / _ "\"" n:$(!['"'] [_])* "\"" _ { // Quoted string
             SPWrapped::SPValue(n.into_iter().collect::<Vec<_>>().join("").to_spvalue())

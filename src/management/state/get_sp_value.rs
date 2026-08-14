@@ -1,7 +1,8 @@
 use crate::SPValue;
-use redis::{AsyncCommands, aio::MultiplexedConnection};
+use crate::SPConnection;
+use redis::AsyncCommands;
 
-pub(super) async fn get_sp_value(con: &mut MultiplexedConnection, var: &str) -> Option<SPValue> {
+pub(super) async fn get_sp_value(con: &mut SPConnection, var: &str) -> Option<SPValue> {
     let redis_result: Option<String> = match con.get(var).await {
         Ok(value) => value,
         Err(e) => {
@@ -103,7 +104,7 @@ mod tests {
         let host_port = container.get_host_port_ipv4(6379).await.unwrap();
         let url = format!("redis://127.0.0.1:{host_port}");
         let client = Client::open(url).unwrap();
-        let mut con = client.get_multiplexed_async_connection().await.unwrap();
+        let mut con = redis::aio::ConnectionManager::new(client).await.unwrap();
 
         let key = "test_key_empty_string";
         let empty_string = "";

@@ -1,9 +1,10 @@
 use crate::{SPTransformStamped, ToSPValue, tf_key};
-use redis::{AsyncCommands, Value, aio::MultiplexedConnection};
+use crate::SPConnection;
+use redis::{AsyncCommands, Value};
 use std::error::Error;
 
 pub(super) async fn insert_transforms(
-    con: &mut MultiplexedConnection,
+    con: &mut SPConnection,
     transforms: &Vec<SPTransformStamped>,
 ) -> Result<(), Box<dyn Error>> {
     if transforms.is_empty() {

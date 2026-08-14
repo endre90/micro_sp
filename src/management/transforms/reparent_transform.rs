@@ -1,11 +1,12 @@
 use crate::{
     ToSPValue, TransformsManager, check_would_produce_cycle, lookup_transform_with_root, tf_key,
 };
-use redis::{AsyncCommands, aio::MultiplexedConnection};
+use crate::SPConnection;
+use redis::AsyncCommands;
 use std::error::Error;
 
 pub(super) async fn reparent_transform(
-    con: &mut MultiplexedConnection,
+    con: &mut SPConnection,
     new_parent_frame_id: &str,
     child_frame_id: &str,
 ) -> Result<(), Box<dyn Error>> {

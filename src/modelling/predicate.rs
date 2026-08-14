@@ -25,155 +25,43 @@ pub enum Predicate {
 }
 
 impl Predicate {
-    /// Evaluate a predicate based on the given state.
-    // pub fn eval(self, state: &State, log_target: &str) -> bool {
-    //     match self {
-    //         Predicate::TRUE => true,
-    //         Predicate::FALSE => false,
-    //         Predicate::NOT(p) => !p.eval(&state.clone(), &log_target),
-    //         Predicate::AND(p) => p.iter().all(|pp| pp.clone().eval(&state, &log_target)),
-    //         Predicate::OR(p) => p.iter().any(|pp| pp.clone().eval(&state, &log_target)),
-    //         Predicate::EQ(x, y) => match (x, y) {
-    //             (SPWrapped::SPVariable(vx), SPWrapped::SPVariable(vy)) => {
-    //                 state.get_value(&vx.name, &log_target) == state.get_value(&vy.name, &log_target)
-    //             }
-    //             (SPWrapped::SPVariable(vx), SPWrapped::SPValue(vy)) => {
-    //                 if let Some(value) = state.get_value(&vx.name, &log_target) {
-    //                     value == vy
-    //                 } else {
-    //                     false
-    //                 }
-    //             }
-    //             (SPWrapped::SPValue(vx), SPWrapped::SPVariable(vy)) => {
-    //                 if let Some(value) = state.get_value(&vy.name, &log_target) {
-    //                     vx == value
-    //                 } else {
-    //                     false
-    //                 }
-    //             }
-    //             (SPWrapped::SPValue(vx), SPWrapped::SPValue(vy)) => vx == vy,
-    //         },
-    //         Predicate::NEQ(x, y) => match (x, y) {
-    //             (SPWrapped::SPVariable(vx), SPWrapped::SPVariable(vy)) => {
-    //                 state.get_value(&vx.name, &log_target) != state.get_value(&vy.name, &log_target)
-    //             }
-    //             (SPWrapped::SPVariable(vx), SPWrapped::SPValue(vy)) => {
-    //                 if let Some(value) = state.get_value(&vx.name, &log_target) {
-    //                     value != vy
-    //                 } else {
-    //                     false
-    //                 }
-    //             }
-    //             (SPWrapped::SPValue(vx), SPWrapped::SPVariable(vy)) => {
-    //                 if let Some(value) = state.get_value(&vy.name, &log_target) {
-    //                     vx != value
-    //                 } else {
-    //                     false
-    //                 }
-    //             }
-    //             (SPWrapped::SPValue(vx), SPWrapped::SPValue(vy)) => vx != vy,
-    //         },
-    //         Predicate::LTEQ(x, y) => match (x, y) {
-    //             (SPWrapped::SPVariable(vx), SPWrapped::SPVariable(vy)) => {
-    //                 state.get_value(&vx.name, &log_target) <= state.get_value(&vy.name, &log_target)
-    //             }
-    //             (SPWrapped::SPVariable(vx), SPWrapped::SPValue(vy)) => {
-    //                 if let Some(value) = state.get_value(&vx.name, &log_target) {
-    //                     value <= vy
-    //                 } else {
-    //                     false
-    //                 }
-    //             }
-    //             (SPWrapped::SPValue(vx), SPWrapped::SPVariable(vy)) => {
-    //                 if let Some(value) = state.get_value(&vy.name, &log_target) {
-    //                     vx <= value
-    //                 } else {
-    //                     false
-    //                 }
-    //             }
-    //             (SPWrapped::SPValue(vx), SPWrapped::SPValue(vy)) => vx <= vy,
-    //         },
-    //         Predicate::GTEQ(x, y) => match (x, y) {
-    //             (SPWrapped::SPVariable(vx), SPWrapped::SPVariable(vy)) => {
-    //                 state.get_value(&vx.name, &log_target) >= state.get_value(&vy.name, &log_target)
-    //             }
-    //             (SPWrapped::SPVariable(vx), SPWrapped::SPValue(vy)) => {
-    //                 if let Some(value) = state.get_value(&vx.name, &log_target) {
-    //                     value >= vy
-    //                 } else {
-    //                     false
-    //                 }
-    //             }
-    //             (SPWrapped::SPValue(vx), SPWrapped::SPVariable(vy)) => {
-    //                 if let Some(value) = state.get_value(&vy.name, &log_target) {
-    //                     vx >= value
-    //                 } else {
-    //                     false
-    //                 }
-    //             }
-    //             (SPWrapped::SPValue(vx), SPWrapped::SPValue(vy)) => vx >= vy,
-    //         },
-    //         Predicate::LT(x, y) => match (x, y) {
-    //             (SPWrapped::SPVariable(vx), SPWrapped::SPVariable(vy)) => {
-    //                 state.get_value(&vx.name, &log_target) < state.get_value(&vy.name, &log_target)
-    //             }
-    //             (SPWrapped::SPVariable(vx), SPWrapped::SPValue(vy)) => {
-    //                 if let Some(value) = state.get_value(&vx.name, &log_target) {
-    //                     value < vy
-    //                 } else {
-    //                     false
-    //                 }
-    //             }
-    //             (SPWrapped::SPValue(vx), SPWrapped::SPVariable(vy)) => {
-    //                 if let Some(value) = state.get_value(&vy.name, &log_target) {
-    //                     vx < value
-    //                 } else {
-    //                     false
-    //                 }
-    //             }
-    //             (SPWrapped::SPValue(vx), SPWrapped::SPValue(vy)) => vx < vy,
-    //         },
-    //         Predicate::GT(x, y) => match (x, y) {
-    //             (SPWrapped::SPVariable(vx), SPWrapped::SPVariable(vy)) => {
-    //                 state.get_value(&vx.name, &log_target) > state.get_value(&vy.name, &log_target)
-    //             }
-    //             (SPWrapped::SPVariable(vx), SPWrapped::SPValue(vy)) => {
-    //                 if let Some(value) = state.get_value(&vx.name, &log_target) {
-    //                     value > vy
-    //                 } else {
-    //                     false
-    //                 }
-    //             }
-    //             (SPWrapped::SPValue(vx), SPWrapped::SPVariable(vy)) => {
-    //                 if let Some(value) = state.get_value(&vy.name, &log_target) {
-    //                     vx > value
-    //                 } else {
-    //                     false
-    //                 }
-    //             }
-    //             (SPWrapped::SPValue(vx), SPWrapped::SPValue(vy)) => vx > vy,
-    //         },
-    //     }
-    // }
+    // DONE: PERF: taking `self` by value is the root cause of a large fraction of the
+    // allocation traffic in this crate. Because `eval` consumes the predicate,
+    // every caller has to clone the whole tree first - `precondition.clone().eval(..)`
+    // appears in a loop in eight `Operation` methods, `transition.to_owned().eval(..)`
+    // in `process_transition`, `goal.clone().eval(..)` once per node in the BFS
+    // planner. Each clone deep-copies every `Predicate` node, every `SPWrapped`
+    // and every `SPValue` inside it, and is then dropped microseconds later.
+    // Suggested: change the signature to `pub fn eval(&self, state: &State,
+    // log_target: &str) -> bool` and switch `into_iter()` to `iter()` in the
+    // AND/OR arms. This is a mechanical change (the callers just drop their
+    // `.clone()`) and removes the cost from every guard evaluation on every
+    // tick and every planner node.
 
-    // impl Predicate {
-    /// Experimental
-    pub fn eval(self, state: &State, log_target: &str) -> bool {
+
+    // PERF: `AND`/`OR` already short-circuit via `all`/`any`, which is good.
+    // Ordering conjuncts cheapest-first (e.g. literal comparisons before
+    // variable lookups) would help further, and is easy to do once at model
+    // build time rather than per evaluation.
+
+    // PERF: the comparison arms call `x.evaluate(..)` and `y.evaluate(..)`,
+    // each of which clones an `SPValue` out of the state (and, today, clones
+    // the whole state map first - see `State::get_value`). For the common
+    // "variable vs literal" case a borrowing comparison would allocate nothing.
+    pub fn eval(&self, state: &State, log_target: &str) -> bool {
         match self {
             Predicate::TRUE => true,
             Predicate::FALSE => false,
-            // Note: removed unnecessary clones and refs here for efficiency
             Predicate::NOT(p) => !p.eval(state, log_target),
-            Predicate::AND(p) => p.into_iter().all(|pp| pp.eval(state, log_target)),
-            Predicate::OR(p) => p.into_iter().any(|pp| pp.eval(state, log_target)),
-            
-            // The evaluate() method handles variables and nested collections seamlessly
-            Predicate::EQ(x, y) => x.evaluate(state, log_target) == y.evaluate(state, log_target),
-            Predicate::NEQ(x, y) => x.evaluate(state, log_target) != y.evaluate(state, log_target),
-            Predicate::LTEQ(x, y) => x.evaluate(state, log_target) <= y.evaluate(state, log_target),
-            Predicate::GTEQ(x, y) => x.evaluate(state, log_target) >= y.evaluate(state, log_target),
-            Predicate::LT(x, y) => x.evaluate(state, log_target) < y.evaluate(state, log_target),
-            Predicate::GT(x, y) => x.evaluate(state, log_target) > y.evaluate(state, log_target),
+            Predicate::AND(p) => p.iter().all(|pp| pp.eval(state, log_target)),
+            Predicate::OR(p) => p.iter().any(|pp| pp.eval(state, log_target)),
+
+            Predicate::EQ(x, y) => x.evaluate(&state, log_target) == y.evaluate(&state, log_target),
+            Predicate::NEQ(x, y) => x.evaluate(&state, log_target) != y.evaluate(&state, log_target),
+            Predicate::LTEQ(x, y) => x.evaluate(&state, log_target) <= y.evaluate(&state, log_target),
+            Predicate::GTEQ(x, y) => x.evaluate(&state, log_target) >= y.evaluate(&state, log_target),
+            Predicate::LT(x, y) => x.evaluate(&state, log_target) < y.evaluate(&state, log_target),
+            Predicate::GT(x, y) => x.evaluate(&state, log_target) > y.evaluate(&state, log_target),
         }
     }
 
@@ -259,7 +147,15 @@ impl Predicate {
             }
         }
     }
-    // experimental
+
+    // PERF: allocates a `Vec` per node during the recursion, then sorts and
+    // dedups. Only called when building key sets at startup, so it is not on the
+    // hot path - but `Transition::get_all_var_keys` and
+    // `Operation::get_all_var_keys` are called per operation when key sets are
+    // rebuilt, and they in turn call this twice per transition. If key sets ever
+    // move to being recomputed per tick (e.g. when the active operation set
+    // changes), pass a `&mut Vec`/`&mut HashSet` accumulator down the recursion
+    // instead of returning a fresh `Vec` at every level.
     pub fn get_predicate_vars(&self) -> Vec<SPVariable> {
         let mut vars = match self {
             Predicate::AND(preds) | Predicate::OR(preds) => {
@@ -284,7 +180,7 @@ impl Predicate {
         vars
     }
 
-// }
+    // }
 
     // /// Keep only the variables in the predicate from the `only` list.
     // pub fn keep_only(&self, only: &Vec<String>) -> Option<Predicate> {
@@ -779,36 +675,54 @@ mod tests {
 
     fn make_robot_initial_state() -> State {
         let state = State::new();
-        let state = state.add(SPAssignment::new(
-            v!("runner_goal"),
-            "var:ur_current_pose == c".to_spvalue(),
-        ), "test");
-        let state = state.add(SPAssignment::new(
-            av!("runner_plan"),
-            Vec::<String>::new().to_spvalue(),
-        ),"test");
-        let state = state.add(SPAssignment::new(bv!("runner_replan"), true.to_spvalue()),"test");
-        let state = state.add(SPAssignment::new(
-            bv!("runner_replanned"),
-            false.to_spvalue(),
-        ),"test");
-        let state = state.add(SPAssignment::new(
-            bv!("ur_action_trigger"),
-            false.to_spvalue(),
-        ),"test");
-        let state = state.add(SPAssignment::new(
-            v!("ur_action_state"),
-            "initial".to_spvalue(),
-        ),"test");
-        let state = state.add(SPAssignment::new(v!("ur_current_pose"), "a".to_spvalue()),"test");
-        let state = state.add(SPAssignment::new(v!("ur_command"), "movej".to_spvalue()),"test");
-        let state = state.add(SPAssignment::new(fv!("ur_velocity"), 0.2.to_spvalue()),"test");
-        let state = state.add(SPAssignment::new(fv!("ur_acceleration"), 0.4.to_spvalue()),"test");
-        let state = state.add(SPAssignment::new(
-            v!("ur_goal_feature_id"),
-            "a".to_spvalue(),
-        ),"test");
-        let state = state.add(SPAssignment::new(v!("ur_tcp_id"), "svt_tcp".to_spvalue()),"test");
+        let state = state.add(
+            SPAssignment::new(v!("runner_goal"), "var:ur_current_pose == c".to_spvalue()),
+            "test",
+        );
+        let state = state.add(
+            SPAssignment::new(av!("runner_plan"), Vec::<String>::new().to_spvalue()),
+            "test",
+        );
+        let state = state.add(
+            SPAssignment::new(bv!("runner_replan"), true.to_spvalue()),
+            "test",
+        );
+        let state = state.add(
+            SPAssignment::new(bv!("runner_replanned"), false.to_spvalue()),
+            "test",
+        );
+        let state = state.add(
+            SPAssignment::new(bv!("ur_action_trigger"), false.to_spvalue()),
+            "test",
+        );
+        let state = state.add(
+            SPAssignment::new(v!("ur_action_state"), "initial".to_spvalue()),
+            "test",
+        );
+        let state = state.add(
+            SPAssignment::new(v!("ur_current_pose"), "a".to_spvalue()),
+            "test",
+        );
+        let state = state.add(
+            SPAssignment::new(v!("ur_command"), "movej".to_spvalue()),
+            "test",
+        );
+        let state = state.add(
+            SPAssignment::new(fv!("ur_velocity"), 0.2.to_spvalue()),
+            "test",
+        );
+        let state = state.add(
+            SPAssignment::new(fv!("ur_acceleration"), 0.4.to_spvalue()),
+            "test",
+        );
+        let state = state.add(
+            SPAssignment::new(v!("ur_goal_feature_id"), "a".to_spvalue()),
+            "test",
+        );
+        let state = state.add(
+            SPAssignment::new(v!("ur_tcp_id"), "svt_tcp".to_spvalue()),
+            "test",
+        );
         state
     }
 

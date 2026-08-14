@@ -11,6 +11,46 @@ pub enum OperationProcessingType {
     Automatic,
 }
 
+// PERF: called once per active operation per tick by three different runners,
+// so everything in here is multiplied by the number of running operations.
+//
+// 1. Key building: the function opens with six `format!("{}_...", operation.name)`
+//    calls and closes with three more, plus more inside the match arms - about
+//    a dozen heap allocations per operation per tick purely to name variables
+//    that never change. Suggested: build these once when the operation becomes
+//    active and carry them in a small struct alongside the `Operation`.
+// 2. Each of those getters goes through `State::get_value`, which currently
+//    clones the entire state map (see the note there). Six clones of the whole
+//    state before any real work happens, per operation, per tick.
+// 3. The `format!` for `new_op_info` runs on every arm every tick, but the
+//    result is only used if it differs from `old_operation_information`. The
+//    `Disabled` arm is the expensive one: it clones every precondition's guard
+//    and runner guard into two `Predicate::OR` trees and renders both via
+//    `Display` - a full predicate-tree walk with string building - *every
+//    200 ms for every disabled operation*, and a disabled operation is exactly
+//    the one that stays disabled for a long time. This is a very plausible
+//    cause of the CPU spikes during SOP execution. Suggested: compute a cheap
+//    discriminant (state + a small enum for the reason) and only build the
+//    string when that discriminant changed.
+// 4. `operation.clone().cancel(..)` / `.timeout(..)` / `.fail(..)` /
+//    `.retry(..)` deep-copy the whole `Operation` (all six transition vectors)
+//    just to call a `&self` method - the `.clone()` is not needed at all here,
+//    since those methods already take `&self`.
+// 5. `elapased_executing_ms += OPERAION_RUNNER_TICK_INTERVAL_MS` assumes this
+//    is called exactly on a 200 ms cadence, but `sop_runner` calls it at 100 ms
+//    and `auto_operation_runner` skips ticks whenever Redis is slow. Timeouts
+//    are therefore wrong in both directions. Suggested: store the start
+//    `SystemTime` in the state when the operation enters Executing/Disabled and
+//    compute elapsed time from the wall clock - more accurate, and it also
+//    removes two state writes per operation per tick.
+// 6. The three chained `.update(..)` calls at the end each clone the whole
+//    state map (see `State::update`), and `_elapsed_executing_ms` /
+//    `_elapsed_disabled_ms` are written every single tick for every operation,
+//    which means the delta is never empty and every tick produces Redis
+//    traffic even when the system is completely idle. Suggested: only write the
+//    elapsed counters when they are actually consulted (i.e. derive them from a
+//    stored start time, per point 5), which lets an idle system produce an
+//    empty diff and skip the MSET entirely.
 pub(super) async fn process_operation(
     sp_id: &str,
     mut new_state: State,
@@ -19,8 +59,8 @@ pub(super) async fn process_operation(
     plan_current_step: Option<&mut i64>,
     plan_state: Option<&mut String>,
     // sop_state: Option<&mut String>,
-    logging_tx: mpsc::Sender<LogMsg>,
-    // mut con: redis::aio::MultiplexedConnection,
+    // logging_tx: mpsc::Sender<LogMsg>,
+    // mut con: crate::SPConnection,
     log_target: &str,
     // terminated_operations: &mut Vec<String>
 ) -> State {
@@ -151,11 +191,11 @@ pub(super) async fn process_operation(
             }
         }
         OperationState::Completed => {
-            new_state = new_state.update(
+            new_state.update_mut(
                 &format!("{}_failure_retry_counter", operation.name),
                 0.to_spvalue(),
             );
-            new_state = new_state.update(
+            new_state.update_mut(
                 &format!("{}_timeout_retry_counter", operation.name),
                 0.to_spvalue(),
             );
@@ -223,7 +263,7 @@ pub(super) async fn process_operation(
                 );
                 op_info_level = log::Level::Warn;
                 new_state = operation.clone().retry(&new_state, &log_target);
-                new_state = new_state.update(
+                new_state.update_mut(
                     &format!("{}_timeout_retry_counter", operation.name),
                     operation_timeout_retry_counter.to_spvalue(),
                 );
@@ -257,7 +297,7 @@ pub(super) async fn process_operation(
                 );
                 op_info_level = log::Level::Warn;
                 new_state = operation.clone().retry(&new_state, &log_target);
-                new_state = new_state.update(
+                new_state.update_mut(
                     &format!("{}_failure_retry_counter", operation.name),
                     operation_failure_retry_counter.to_spvalue(),
                 );
@@ -277,11 +317,11 @@ pub(super) async fn process_operation(
                     logging_log = format!("Fatal failure");
                     op_info_level = log::Level::Warn;
                 }
-                new_state = new_state.update(
+                new_state.update_mut(
                     &format!("{}_failure_retry_counter", operation.name),
                     0.to_spvalue(),
                 );
-                new_state = new_state.update(
+                new_state.update_mut(
                     &format!("{}_timeout_retry_counter", operation.name),
                     0.to_spvalue(),
                 );
@@ -379,37 +419,41 @@ pub(super) async fn process_operation(
         // if OperationState::from_str(&operation_state)
         //     != OperationState::Terminated(TerminationReason::Completed)
         // {
-        let operation_msg = OperationMsg {
-            operation_name: operation.name.clone(),
-            operation_processing_type: operation_processing_type,
-            timestamp: Utc::now(),
-            severity: op_info_level,
-            state: OperationState::from_str(&operation_state),
-            log: logging_log.to_string(),
-        };
-        let log_msg = LogMsg::OperationMsg(operation_msg);
-        match logging_tx.send(log_msg).await {
-            Ok(()) => (),
-            Err(e) => {
-                log::error!(target: &log_target, "Failed to send logging with: {e}.")
-            }
-        }
+        // let operation_msg = OperationMsg {
+        //     operation_name: operation.name.clone(),
+        //     operation_processing_type: operation_processing_type,
+        //     timestamp: Utc::now(),
+        //     severity: op_info_level,
+        //     state: OperationState::from_str(&operation_state),
+        //     log: logging_log.to_string(),
+        // };
+        // let log_msg = LogMsg::OperationMsg(operation_msg);
+        // match logging_tx.send(log_msg).await {
+        //     Ok(()) => (),
+        //     Err(e) => {
+        //         log::error!(target: &log_target, "Failed to send logging with: {e}.")
+        //     }
+        // }
         // }
     }
 
+    // DONE: this used to be three chained `.update(..)` calls, each cloning the
+    // whole state map, for every active operation on every tick. Writing in
+    // place costs nothing beyond the three map lookups.
+    new_state.update_mut(
+        &format!("{}_information", operation.name),
+        new_op_info.to_spvalue(),
+    );
+    new_state.update_mut(
+        &format!("{}_elapsed_executing_ms", operation.name),
+        elapased_executing_ms.to_spvalue(),
+    );
+    new_state.update_mut(
+        &format!("{}_elapsed_disabled_ms", operation.name),
+        elapased_disabled_ms.to_spvalue(),
+    );
+
     new_state
-        .update(
-            &format!("{}_information", operation.name),
-            new_op_info.to_spvalue(),
-        )
-        .update(
-            &format!("{}_elapsed_executing_ms", operation.name),
-            elapased_executing_ms.to_spvalue(),
-        )
-        .update(
-            &format!("{}_elapsed_disabled_ms", operation.name),
-            elapased_disabled_ms.to_spvalue(),
-        )
         // .update(
         //     &format!("{}_terminated_operations", sp_id),
         //     terminated_operations.to_spvalue(),

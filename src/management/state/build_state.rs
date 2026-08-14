@@ -18,6 +18,19 @@ fn create_assignment(key: &str, value: SPValue) -> SPAssignment {
     SPAssignment::new(variable, value)
 }
 
+// PERF: runs a `serde_json::from_str` per variable per tick per runner - with
+// `get_full_state` feeding it that is the whole database parsed ~20 times a
+// second. Suggested: keep the previous tick's raw value strings alongside the
+// `State` and skip both the parse and the map insert when the string is
+// unchanged; in steady state that reduces this to a handful of parses per tick.
+// PERF: `HashMap::new()` then inserting n entries rehashes several times.
+// `HashMap::with_capacity(keys.len())` avoids that.
+// PERF: takes `keys: Vec<String>` by value, which forces `get_state_for_keys`
+// to clone its key list on every call. `&[String]` would do.
+// PERF: `create_assignment` reconstructs an `SPVariable` (two `String`
+// allocations) for every variable on every tick, even though the variable's
+// name and type never change. Suggested: build the variable table once at
+// startup and look up `&SPVariable`/`Arc<SPVariable>` by key here.
 pub(super) fn build_state(keys: Vec<String>, values: Vec<Option<String>>) -> State {
     let mut state_map = HashMap::new();
 

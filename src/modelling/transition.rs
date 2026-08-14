@@ -127,30 +127,68 @@ impl Transition {
         )
     }
 
-    pub fn eval_planning(self, state: &State, log_target: &str) -> bool {
+    // DONE: PERF: takes `self` by value, so every caller clones the whole transition
+    // (name, two predicate trees, two action vectors) just to read a boolean.
+    // `Operation::eval_planning` does this per precondition per BFS node.
+    // Change to `&self` once `Predicate::eval` takes `&self`.
+    pub fn eval_planning(&self, state: &State, log_target: &str) -> bool {
         self.guard.eval(state, &log_target)
     }
 
-    pub fn eval(self, state: &State, log_target: &str) -> bool {
+    // PERF: same by-value problem, and this one is on the hottest path in the
+    // system - `Operation::eval` / `can_be_completed` / `can_be_failed` /
+    // `start` / `complete` / `fail` / `timeout` / `bypass` all call
+    // `transition.clone().eval(..)` inside a loop, for every active operation,
+    // on every tick of three different runners. Changing this and
+    // `Predicate::eval` to `&self` removes a deep clone of the entire guard
+    // structure from each of those calls.
+    pub fn eval(&self, state: &State, log_target: &str) -> bool {
         self.guard.eval(state, &log_target) && self.runner_guard.eval(state, &log_target)
     }
 
+    /// Apply this transition's planning actions to `state` in place.
+    ///
+    /// DONE: this used to `state.clone()` up front and then clone the whole
+    /// state again for every action, so a 4-action transition copied the
+    /// system state 5 times. Actions now write through `Action::assign_mut`,
+    /// so applying a transition is O(actions) map writes and no copying at all.
+    pub fn take_planning_mut(&self, state: &mut State, log_target: &str) {
+        for a in &self.actions {
+            a.assign_mut(state, &log_target);
+        }
+    }
+
+    /// Owned form of [`Transition::take_planning_mut`] - clones the state once.
     pub fn take_planning(self, state: &State, log_target: &str) -> State {
         let mut new_state = state.clone();
-        for a in self.actions {
-            new_state = a.assign(&new_state, &log_target)
-        }
+        self.take_planning_mut(&mut new_state, &log_target);
         new_state
     }
 
+    /// Apply this transition's planning *and* runner actions to `state` in
+    /// place.
+    ///
+    /// DONE: same fix as `take_planning_mut` - previously one full-state clone
+    /// here plus one per action and per runner action.
+    ///
+    /// PERF (still open): `Operation::start` / `complete` / `fail` / `timeout`
+    /// / `bypass` call `precondition.clone().take(state, ..)` and then apply
+    /// the status write with a second `Action::assign`, which is still two
+    /// clones per operation step. Switching those to `take_mut` + `assign_mut`
+    /// on a single owned `State` removes both.
+    pub fn take_mut(&self, state: &mut State, log_target: &str) {
+        for a in &self.actions {
+            a.assign_mut(state, &log_target);
+        }
+        for a in &self.runner_actions {
+            a.assign_mut(state, &log_target);
+        }
+    }
+
+    /// Owned form of [`Transition::take_mut`] - clones the state once.
     pub fn take(self, state: &State, log_target: &str) -> State {
         let mut new_state = state.clone();
-        for a in self.actions {
-            new_state = a.assign(&new_state, &log_target)
-        }
-        for a in self.runner_actions {
-            new_state = a.assign(&new_state, &log_target)
-        }
+        self.take_mut(&mut new_state, &log_target);
         new_state
     }
 

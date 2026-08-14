@@ -3,6 +3,12 @@ use std::sync::Arc;
 use crate::*;
 use tokio::time::{Duration, interval};
 
+// PERF: polls every 250 ms (PING + MGET of 7 keys) purely to check a single
+// boolean trigger. Reading just `{sp_id}_tf_request_trigger` with one `GET` and
+// only fetching the rest when it is set would cut the steady-state cost of this
+// task by most of its current value; a keyspace notification on that one key
+// would remove it entirely and also drop the request latency from "up to 250 ms"
+// to "one round trip".
 pub async fn tf_interface(
     sp_id: &str,
     connection_manager: &Arc<ConnectionManager>,
@@ -22,12 +28,15 @@ pub async fn tf_interface(
         format!("{}_tf_insert_transforms", sp_id),
     ];
 
+    // PERF: one long-lived connection handle for the whole runner instead of
+    // re-fetching one every tick, and no pre-flight PING before the real work.
+    // `SPConnection` is cheap to clone, multiplexed and self-healing, so this
+    // handle stays valid across reconnects; a dropped socket now surfaces as an
+    // error on the command itself, which the callee already logs and skips.
+    let mut con = connection_manager.get_connection().await;
+
     loop {
         interval.tick().await;
-        if let Err(_) = connection_manager.check_redis_health(&log_target).await {
-            continue;
-        }
-        let mut con = connection_manager.get_connection().await;
         let state = match StateManager::get_state_for_keys(&mut con, &keys, &log_target).await {
             Some(s) => s,
             None => continue,

@@ -1,9 +1,20 @@
-use redis::{AsyncCommands, aio::MultiplexedConnection};
+use crate::SPConnection;
+use redis::AsyncCommands;
 
 use crate::{State, StateManager};
 
+// PERF: this is the good path - one `MGET` for a fixed key set, no keyspace
+// scan - and the runners that still call `get_full_state` should be moved onto
+// it (see the note there).
+// PERF: `keys.clone()` on the way into `build_state` copies every key `String`
+// on every tick. `build_state` only needs `&[String]` (it clones the key into
+// the map anyway); changing its signature removes one allocation per variable
+// per tick.
+// PERF: for very large key sets, `MGET` sends the whole key list on every tick.
+// With a HASH layout this becomes `HMGET` on one key, and with keyspace
+// notifications you only need to fetch the keys that actually changed.
 pub(super) async fn get_state_for_keys(
-    con: &mut MultiplexedConnection,
+    con: &mut SPConnection,
     keys: &Vec<String>,
     log_target: &str
 ) -> Option<State> {

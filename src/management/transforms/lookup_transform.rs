@@ -1,9 +1,16 @@
 use crate::{SPTransformStamped, TransformsManager, get_tree_root, lookup_transform_with_root};
-use redis::aio::MultiplexedConnection;
+use crate::SPConnection;
 use std::error::Error;
 
+// PERF: reads and deserialises *every* transform in Redis
+// (`get_all_transforms`), then recomputes the tree root, on every single
+// lookup. For a scene with many frames this is the dominant cost of a TF
+// request. Suggested: keep the buffer and the computed root cached in the
+// caller (`tf_interface`), invalidated by a version counter that
+// `insert_transforms` / `remove_transform` / `reparent_transform` bump - then a
+// lookup is pure in-memory tree walking with no Redis traffic at all.
 pub(super) async fn lookup_transform(
-    con: &mut MultiplexedConnection,
+    con: &mut SPConnection,
     parent_frame_id: &str,
     child_frame_id: &str,
 ) -> Result<SPTransformStamped, Box<dyn Error>> {

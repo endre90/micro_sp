@@ -41,6 +41,20 @@ impl SOP {
         operations
     }
 
+    // PERF: `sop_runner` calls this repeatedly per tick - once for the root and
+    // once per child while searching for the active branch of each Sequence /
+    // Alternative - and each call re-walks the entire subtree below it, so the
+    // work is O(n^2) in the number of operations per tick. Suggested: evaluate
+    // the whole tree once per tick in a single bottom-up pass into a
+    // `Vec<SOPState>` (or return it alongside the walk) and have the runner read
+    // from that.
+    // PERF: the leaf arm builds `format!("{}", op.name)` - an allocating copy of
+    // an existing `String` - and then `get_string_or_default_to_unknown` clones
+    // the value out of the state (on top of `get_value`'s full-map clone).
+    // Passing `&op.name` and comparing `&str` removes both.
+    // PERF: the branch arms collect a `Vec<SOPState>` and then run five separate
+    // `iter().any()/all()` passes over it. A single fold that accumulates the
+    // four flags avoids the allocation and four of the five passes.
     pub fn get_state(&self, state: &State, log_target: &str) -> SOPState {
         match self {
             SOP::Operation(op) => {

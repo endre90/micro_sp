@@ -1,7 +1,12 @@
 use redis::AsyncCommands;
-use redis::aio::MultiplexedConnection;
+use crate::SPConnection;
 
-pub(super) async fn remove_sp_values(con: &mut MultiplexedConnection, keys: &[String]) {
+// PERF: correct as a single `DEL` of many keys, but the call sites invoke it
+// two or three times in a row (`op_ids`, then `op_ids_meta`, then a separate
+// `remove_sp_value`), each a separate round trip. Suggested: concatenate the
+// key lists at the call site, or pipeline the DELs together with the preceding
+// MSET so operation cleanup costs one round trip instead of three.
+pub(super) async fn remove_sp_values(con: &mut SPConnection, keys: &[String]) {
     if keys.is_empty() {
         return;
     }

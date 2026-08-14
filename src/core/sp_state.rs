@@ -5,36 +5,53 @@ use std::time::SystemTime;
 use std::{collections::HashMap, fmt};
 
 /// Represents the current state of the system.
+///
+/// PERF (biggest single win in the crate): `State` is treated as an immutable
+/// persistent value (every mutation returns a brand new `State`), but it is
+/// backed by a plain `std::collections::HashMap`, which has *no* structural
+/// sharing. Every `update()` / `add()` / `remove()` therefore deep-copies the
+/// entire map plus every `SPAssignment` (which itself owns a `String` name, an
+/// `SPVariable` with another `String`, and an `SPValue` that may be a whole
+/// `Vec` or `SPTransformStamped`). A single transition with 4 actions clones
+/// the full system state 4 times; a SOP tick with 20 operations clones it
+/// hundreds of times. Suggested fixes, in increasing order of effort:
+///   1. Add `&mut self` variants (`update_mut`, `add_mut`, `remove_mut`) and use
+///      them inside the runners / `Transition::take` / `Action::assign`, keeping
+///      the current by-value API only where a fresh copy is genuinely wanted.
+///   2. Swap `HashMap<String, SPAssignment>` for a persistent map with
+///      structural sharing (`im::HashMap` / `rpds::HashTrieMap`). Then `update`
+///      becomes O(log n) with no bulk copying and the current "return a new
+///      State" style becomes cheap and correct.
+///   3. Store values as `Arc<SPValue>` (and names as `Arc<str>`) so cloning an
+///      assignment is a refcount bump instead of a heap copy. This alone kills
+///      most of the cost for `Transform`/`Array`/`Map` valued variables.
+/// PERF: the key type is `String` and *every* accessor in the runners is called
+/// as `state.get_x(&format!("{}_information", op.name), ..)`. That is a fresh
+/// heap allocation per variable per tick, and there are dozens per operation
+/// per tick. Suggested: precompute the key strings once when an operation
+/// becomes active (a small `OperationKeys { state, information, elapsed_exec,
+/// .. }` struct held next to the `Operation` in `active_auto_ops`) and pass
+/// `&str` slices in, or intern names as `Arc<str>` and key the map on those.
+/// PERF: consider `HashMap<..., ..., ahash::RandomState>` (or `FxHashMap`).
+/// The default SipHash hasher is DoS-resistant but ~2-3x slower than needed for
+/// an internal, non-adversarial keyspace that is hashed on every lookup.
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub struct State {
     pub state: HashMap<String, SPAssignment>,
 }
 
-// /// The Hash trait is implemented on State in order to enable the comparison
-// /// of different State instances using a hashing function.
-// impl Hash for State {
-//     fn hash<H: Hasher>(&self, s: &mut H) {
-//         self.state
-//             .keys()
-//             .into_iter()
-//             .map(|x| x.to_owned())
-//             .collect::<Vec<String>>()
-//             .hash(s);
-//         self.state
-//             .values()
-//             .into_iter()
-//             .map(|x| x.var.to_owned())
-//             .collect::<Vec<SPVariable>>()
-//             .hash(s);
-//         self.state
-//             .values()
-//             .into_iter()
-//             .map(|x| x.val.to_owned())
-//             .collect::<Vec<SPValue>>()
-//             .hash(s);
-//     }
-// }
-
+/// PERF: this hash allocates a `Vec` of every key and sorts it on *every* hash
+/// call. `bfs_operation_planner` keeps a `HashSet<State>` and hashes a full
+/// state per expanded node, so planning is O(nodes * n log n) in hashing alone
+/// - a large part of the CPU spike when a plan is requested. Suggested: use an
+/// order-independent commutative combiner instead of sorting, e.g. XOR/wrapping
+/// -add the per-entry hashes: `self.state.iter().fold(0u64, |acc, (k, v)| acc ^
+/// hash_one((k, &v.val)))`, which is O(n) with no allocation. Better still, let
+/// the planner hash only the *planning-relevant* variables (the union of
+/// `get_all_var_keys()` over the operation model) rather than the whole state -
+/// runner bookkeeping like `*_elapsed_executing_ms` changes constantly and
+/// makes otherwise-identical planning states hash differently, which both slows
+/// the search and defeats the `visited` set.
 impl Hash for State {
     fn hash<H: Hasher>(&self, s: &mut H) {
         let mut keys: Vec<&String> = self.state.keys().collect();
@@ -109,6 +126,19 @@ impl State {
     }
 
     // Make a new partial state that only consists of updates.
+    //
+    // PERF: this is the right idea (only ship deltas to Redis) but it iterates
+    // `new_state` in full and hashes every key against `self` on every tick of
+    // every runner. With `get_full_state` feeding it, that is O(all variables)
+    // per runner per tick even when nothing changed. Suggested: have the runners
+    // record which keys they actually touched (a `Vec<String>`/`SmallVec` of
+    // dirty keys appended by `update_mut`) and build the delta from that list
+    // instead of diffing the whole state. That turns a full-state scan into a
+    // handful of lookups and is the change that most directly reduces the idle
+    // CPU floor of the runner tasks.
+    // PERF: `new_assignment.clone()` copies the `SPVariable` as well as the
+    // value; only the value is ever written to Redis (see `set_state`), so a
+    // `Vec<(&str, &SPValue)>` return type would avoid the copy entirely.
     pub fn get_diff_partial_state(&self, new_state: &State) -> State {
         let mut updated_assignments = HashMap::new();
         for (key, new_assignment) in &new_state.state {
@@ -125,6 +155,11 @@ impl State {
     }
 
     // Make a new partial state that only consists of updates.
+    //
+    // PERF: same full-scan-per-tick cost as `get_diff_partial_state`; see the
+    // dirty-key suggestion there. Note the two functions differ only in the
+    // `else` branch, so a single `fn diff(&self, new: &State, include_new: bool)`
+    // would halve the code without changing behaviour.
     pub fn get_diff_partial_state_and_add_missing(&self, new_state: &State) -> State {
         // let mut updated_assignments = HashMap::new();
         let mut updated_state = State::new();
@@ -148,37 +183,109 @@ impl State {
         // }
     }
 
-    pub fn add(&self, assignment: SPAssignment, log_target: &str) -> State {
-        match self.state.clone().get(&assignment.var.name) {
-            Some(_) => {
-                log::error!(target: &log_target, 
-                    "Variable {} already in state! Skipped add.", assignment.var.name.to_string());
-                self.clone()
+    // ------------------------------------------------------------------
+    // In-place mutation API.
+    //
+    // `State` is written as a persistent value - `add`/`remove`/`update`/
+    // `extend` each return a brand new `State` - but it is backed by a plain
+    // `HashMap`, which has no structural sharing. Every one of those calls
+    // therefore deep-copies the whole map. Chaining them (which the runners do
+    // constantly: `process_operation` ends with three chained `update`s, the
+    // goal runner with nine, `add_operation_meta_tracking_variables` calls
+    // `add` five times per operation in a loop) multiplies that cost by the
+    // length of the chain.
+    //
+    // The `*_mut` methods below do the same work against `&mut self` with zero
+    // copying. The owned methods are kept - the API and all existing call sites
+    // are unchanged - but are now thin wrappers that clone exactly once and
+    // then delegate, so even code that has not been migrated got cheaper.
+    //
+    // Prefer the `*_mut` form anywhere a `State` is being built up or is
+    // already owned locally; use the owned form only when a genuinely separate
+    // copy is wanted (e.g. keeping the pre-tick snapshot to diff against).
+    // ------------------------------------------------------------------
+
+    /// Insert a new assignment. Logs and does nothing if the variable already
+    /// exists, matching [`State::add`].
+    pub fn add_mut(&mut self, assignment: SPAssignment, log_target: &str) {
+        if self.state.contains_key(&assignment.var.name) {
+            log::error!(target: &log_target,
+                "Variable {} already in state! Skipped add.", assignment.var.name);
+            return;
+        }
+        self.state
+            .insert(assignment.var.name.clone(), assignment);
+    }
+
+    /// Remove a variable. Logs and does nothing if it is not present, matching
+    /// [`State::remove`].
+    pub fn remove_mut(&mut self, var: &str, log_target: &str) {
+        if self.state.remove(var).is_none() {
+            log::error!(target: &log_target, "Variable '{}' not in state, can't be removed.", var);
+        }
+    }
+
+    /// Overwrite the value of an existing variable, keeping its `SPVariable`.
+    ///
+    /// Panics if the variable is not in the state, matching [`State::update`].
+    pub fn update_mut(&mut self, name: &str, val: SPValue) {
+        match self.state.get_mut(name) {
+            Some(assignment) => assignment.val = val,
+            None => panic!("Variable {} not in state.", name),
+        }
+    }
+
+    /// Merge `other` into `self`, matching [`State::extend`]: when
+    /// `overwrite_existing` is true the values from `other` win, otherwise the
+    /// values already in `self` are kept.
+    pub fn extend_mut(&mut self, other: State, overwrite_existing: bool) {
+        if overwrite_existing {
+            for (key, assignment) in other.state {
+                self.state.insert(key, assignment);
             }
-            None => {
-                let mut state = self.state.clone();
-                state.insert(assignment.var.name.to_string(), assignment.clone());
-                State { state }
+        } else {
+            for (key, assignment) in other.state {
+                self.state.entry(key).or_insert(assignment);
             }
         }
+    }
+
+    pub fn add(&self, assignment: SPAssignment, log_target: &str) -> State {
+        let mut new_state = self.clone();
+        new_state.add_mut(assignment, log_target);
+        new_state
     }
 
     pub fn remove(&self, var: &str, log_target: &str) -> State {
-        let mut new_state_map = self.state.clone();
-        match new_state_map.remove(var) {
-            Some(_) => State {
-                state: new_state_map,
-            },
-            None => {
-                log::error!(target: &log_target, "Variable '{}' not in state, can't be removed.", var);
-                self.clone()
-            }
-        }
+        let mut new_state = self.clone();
+        new_state.remove_mut(var, log_target);
+        new_state
     }
 
     // Panics if the variable is not in the state. Should remain panicking.
+    //
+    // DONE: PERF (highest-impact one-line fix in the crate): `self.state.clone()`
+    // deep-copies the *entire* state map just to read one variable, and then
+    // throws the copy away. This is the hot path - `SPWrapped::evaluate` calls
+    // it for every variable in every predicate, so evaluating one operation
+    // guard with 5 variables copies the whole system state 5 times, and the
+    // auto/SOP runners do that for every operation on every 50-200 ms tick.
+    // With a few hundred state variables this alone can account for most of the
+    // CPU you see while a SOP runs. Fix: `self.state.get(name)` - the clone
+    // serves no purpose, the borrow is immediate and the value is cloned out
+    // anyway. Same bug in `get_assignment`, `contains` and `add` below.
+
+    // PERF: returning `Option<SPValue>` forces a clone of the value on every
+    // read. Consider an additional `get_value_ref(&self, name) -> Option<&SPValue>`
+    // and have predicate evaluation compare references, so scalar comparisons
+    // (`==`, `<`) never allocate. `SPWrapped::evaluate` returning `Cow<SPValue>`
+    // would let the common "variable vs literal" comparison stay allocation-free.
+
+    // PERF/correctness: the `log::error!` + `panic!` pair formats the message
+    // twice; also note this function can never return `None` (it panics first),
+    // so every `unwrap_or_else(|| panic!(..))` at the call sites is dead code.
     pub fn get_value(&self, name: &str, log_target: &str) -> Option<SPValue> {
-        match self.state.clone().get(name) {
+        match self.state.get(name) {
             None => {
                 log::error!(target: &log_target, "Variable {} not in state!", name);
                 panic!("Variable {} not in state!", name)
@@ -187,6 +294,18 @@ impl State {
         }
     }
 
+    // PERF (applies to this and every `get_*_or_*` accessor below): each of
+    // these funnels through `get_value`, which currently clones the whole state
+    // map (see the note there) and then clones the value out of it, only for
+    // the caller to immediately match one variant out of it. Once `get_value`
+    // stops cloning the map, the remaining cost is the value clone - for
+    // `get_string_or_*`, `get_array_or_*`, `get_map_or_*` and
+    // `get_transform_or_*` that is a full heap copy of a `String`/`Vec`/transform
+    // on every read, every tick. Suggested: add borrowing variants that match on
+    // `&SPValue` and only clone when the caller actually keeps the value; the
+    // runners mostly compare the result against a constant (e.g.
+    // `request_state == ActionRequestState::Executing.to_string()`) and could
+    // compare `&str` against `&str` with no allocation at all.
     pub fn get_bool_or_unknown(&self, name: &str, log_target: &str) -> BoolOrUnknown {
         match self.get_value(name, &log_target) {
             Some(value) => match value {
@@ -412,8 +531,17 @@ impl State {
         }
     }
 
+    // DONE: PERF: same `self.state.clone()` problem as `get_value` - clones the whole
+    // map to fetch one entry. Use `self.state.get(name)`. `Operation::start` /
+    // `complete` / `fail` / `timeout` / `bypass` / `retry` / `terminate` each
+    // call this once per tick per operation, so it is on the hot path too.
+
+    // PERF: returning an owned `SPAssignment` clones the `SPVariable` (two
+    // `String`s) even though every caller only needs it to build an `Action`
+    // that targets `assignment.var`. Returning `Option<&SPAssignment>` and
+    // letting `Action` borrow (or hold an `Arc<SPVariable>`) removes that.
     pub fn get_assignment(&self, name: &str, log_target: &str) -> SPAssignment {
-        match self.state.clone().get(name) {
+        match self.state.get(name) {
             None => {
                 log::error!(target: &log_target, "Variable {} not in state!", name);
                 panic!("Variable {} not in state!", name)
@@ -429,50 +557,40 @@ impl State {
             .collect()
     }
 
+    // DONE: PERF: clones the entire map to answer a boolean. Use
+    // `self.state.contains_key(name)`.
     pub fn contains(&self, name: &str) -> bool {
-        self.state.clone().contains_key(name)
+        self.state.contains_key(name)
     }
 
+    // DONE: one full-map clone per single-variable write, and it used to clone
+    // the target `SPVariable` and the incoming value on top of that. It now
+    // clones the map once and mutates the value in place via `update_mut`.
+    // Chained `.update(..).update(..)` still costs one clone per link, so
+    // prefer `update_mut` on a `&mut State` in loops and runner ticks.
     pub fn update(&self, name: &str, val: SPValue) -> State {
-        match self.state.get(name) {
-            Some(assignment) => {
-                let mut state = self.state.clone();
-                state.insert(
-                    name.to_string(),
-                    SPAssignment {
-                        var: assignment.var.clone(),
-                        val: val.clone(),
-                    },
-                );
-                State { state }
-            }
-            None => panic!("Variable {} not in state.", name),
-        }
+        let mut new_state = self.clone();
+        new_state.update_mut(name, val);
+        new_state
     }
 
+    // DONE: used to build a third map and clone every key and value of *both*
+    // inputs - two full copies of `self` plus a full copy of `other`, even
+    // though `other` is taken by value and can simply be consumed. It now
+    // clones `self` once and moves `other`'s entries in. Behaviour is
+    // unchanged: `overwrite_existing` still decides which side wins.
     pub fn extend(&self, other: State, overwrite_existing: bool) -> State {
-        let existing = self.state.clone();
-        let extension = other.state;
-        let mut state = HashMap::<String, SPAssignment>::new();
-        if overwrite_existing {
-            existing.iter().for_each(|(k, v)| {
-                state.insert(k.clone(), v.clone());
-            });
-            extension.iter().for_each(|(k, v)| {
-                state.insert(k.clone(), v.clone());
-            });
-            State { state }
-        } else {
-            extension.iter().for_each(|(k, v)| {
-                state.insert(k.clone(), v.clone());
-            });
-            existing.iter().for_each(|(k, v)| {
-                state.insert(k.clone(), v.clone());
-            });
-            State { state }
-        }
+        let mut new_state = self.clone();
+        new_state.extend_mut(other, overwrite_existing);
+        new_state
     }
 
+    // PERF: re-parses the goal predicate from its string form on every call.
+    // `planner_ticker` calls it on each replan request, and the parse walks a
+    // PEG grammar and allocates the whole `Predicate` tree. Suggested: cache the
+    // parsed predicate keyed by the goal string (the goal only changes when the
+    // goal runner swaps it, and `*_current_goal_id` already tells you when that
+    // happened), so a replan for the same goal reuses the parsed tree.
     pub fn extract_goal(&self, name: &str) -> Predicate {
         match self.state.get(&format!("{}_current_goal_predicate", name)) {
             Some(g_spvalue) => match &g_spvalue.val {

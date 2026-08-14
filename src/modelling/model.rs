@@ -13,6 +13,16 @@ pub struct Model {
 }
 
 impl Model {
+    // PERF: rebuilds every operation field by field purely to prefix the name
+    // with "op_", deep-cloning all six transition vectors of every operation in
+    // the process - and it does this for `auto_operations`,
+    // `mutexed_auto_operations` and `operations`. Since the inputs are taken by
+    // value, this is avoidable: `operations.into_iter().map(|mut o| { o.name =
+    // format!("op_{}", o.name); o }).collect()` moves instead of copying, and
+    // will not silently drop a field if `Operation` gains one later.
+    // PERF: this only runs at startup, but the resulting `Model` is then cloned
+    // once per spawned runner in `main_runner` and again inside two of them -
+    // see the `Arc<Model>` note there.
     pub fn new(
         name: &str,
         auto_transitions: Vec<Transition>,
@@ -61,13 +71,6 @@ impl Model {
                 })
                 .collect(),
             sops,
-            // sops: sops
-            //     .iter()
-            //     .map(|sop| SOPStruct {
-            //         id: sop.id.clone(),
-            //         sop: uniquify_sop_operations(sop.sop.clone()),
-            //     })
-            //     .collect(),
             operations: operations
                 .iter()
                 .map(|o| Operation {
@@ -89,33 +92,4 @@ impl Model {
         }
     }
 
-    // TODO: test relax function
-    // pub fn relax(self, vars: &Vec<String>) -> Model {
-    //     let r_operations = self
-    //         .operations
-    //         .iter()
-    //         .map(|op| op.clone().relax(vars))
-    //         .collect();
-    //     let r_auto_transitions = self
-    //         .auto_transitions
-    //         .iter()
-    //         .map(|t| t.clone().relax(vars))
-    //         .collect();
-    //     let mut r_state = HashMap::new();
-    //     self.state
-    //         .state
-    //         .iter()
-    //         .for_each(|(k, v)| match vars.contains(&k) {
-    //             false => {
-    //                 r_state.insert(k.clone(), v.clone());
-    //             }
-    //             true => (),
-    //         });
-    //     Model {
-    //         name: self.name,
-    //         state: State { state: r_state },
-    //         auto_transitions: r_auto_transitions,
-    //         operations: r_operations
-    //     }
-    // }
 }

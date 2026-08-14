@@ -177,6 +177,19 @@ impl fmt::Display for GoalState {
     }
 }
 
+// PERF: reads a small fixed key set (good), but writes on every single tick:
+// the `_scheduled_goals` / `_incoming_goals` update below is unconditional, and
+// because the goal IDs are regenerated with `nanoid!` on every tick the
+// serialised value is *always different*, so `get_diff_partial_state` never
+// returns empty and an MSET goes out 10 times a second forever, even with no
+// goals at all. That is pure background load on Redis and on this task.
+// Suggested: only re-id goals when they are actually admitted from
+// `_incoming_goals`, and skip the write when `modified_state` is empty (the
+// other runners already guard with `if !modified_state.state.is_empty()`).
+// PERF: `state.clone()` per tick plus a chain of up to nine `.update(..)` calls
+// in the `Initial` arm, each cloning the whole state map - see `State::update`.
+// PERF: `current_goal_state.to_string()` on a value that is already a `String`
+// allocates a copy for nothing; `GoalState::from_str(&current_goal_state)`.
 pub async fn goal_runner(
     sp_id: &str,
     connection_manager: &Arc<ConnectionManager>,
@@ -206,12 +219,15 @@ pub async fn goal_runner(
         format!("{}_replan_for_same_goal", sp_id),
     ];
 
+    // PERF: one long-lived connection handle for the whole runner instead of
+    // re-fetching one every tick, and no pre-flight PING before the real work.
+    // `SPConnection` is cheap to clone, multiplexed and self-healing, so this
+    // handle stays valid across reconnects; a dropped socket now surfaces as an
+    // error on the command itself, which the callee already logs and skips.
+    let mut con = connection_manager.get_connection().await;
+
     loop {
         interval.tick().await;
-        if let Err(_) = connection_manager.check_redis_health(&log_target).await {
-            continue;
-        }
-        let mut con = connection_manager.get_connection().await;
         let state = match StateManager::get_state_for_keys(&mut con, &keys, &log_target).await {
             Some(s) => s,
             None => continue,

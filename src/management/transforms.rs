@@ -1,5 +1,5 @@
 use crate::*;
-use redis::aio::MultiplexedConnection;
+use crate::SPConnection;
 use std::collections::HashMap;
 use std::error::Error;
 
@@ -24,35 +24,35 @@ pub struct TransformsManager {}
 
 impl TransformsManager {
     pub async fn insert_transform(
-        con: &mut MultiplexedConnection,
+        con: &mut SPConnection,
         transform: &SPTransformStamped,
     ) -> Result<(), Box<dyn Error>> {
         insert_transform::insert_transform(con, &transform).await
     }
 
     pub async fn insert_transforms(
-        con: &mut MultiplexedConnection,
+        con: &mut SPConnection,
         transforms: &Vec<SPTransformStamped>,
     ) -> Result<(), Box<dyn Error>> {
         insert_transforms::insert_transforms(con, &transforms).await
     }
 
     pub async fn remove_transform(
-        con: &mut MultiplexedConnection,
+        con: &mut SPConnection,
         key: &str,
     ) -> Result<(), Box<dyn Error>> {
         remove_transform::remove_transform(con, &key).await
     }
 
     pub async fn get_all_transforms(
-        con: &mut MultiplexedConnection,
+        con: &mut SPConnection,
     ) -> Result<HashMap<String, SPTransformStamped>, Box<dyn Error>> {
         get_all_transforms::get_all_transforms(con).await
     }
 
     // TODO: return success or fail
     pub async fn move_transform(
-        con: &mut MultiplexedConnection,
+        con: &mut SPConnection,
         name: &str,
         new_transform: SPTransform,
     ) -> Result<(), Box<dyn Error>> {
@@ -61,7 +61,7 @@ impl TransformsManager {
 
     // TODO: return success or fail
     pub async fn reparent_transform(
-        con: &mut MultiplexedConnection,
+        con: &mut SPConnection,
         new_parent_frame_id: &str,
         child_frame_id: &str,
     ) -> Result<(), Box<dyn Error>> {
@@ -69,7 +69,7 @@ impl TransformsManager {
     }
 
     pub async fn snap_to_parent_transform(
-        con: &mut MultiplexedConnection,
+        con: &mut SPConnection,
         new_parent_frame_id: &str,
         child_frame_id: &str,
     ) -> Result<(), Box<dyn Error>> {
@@ -77,7 +77,7 @@ impl TransformsManager {
     }
 
     pub async fn lookup_transform(
-        con: &mut MultiplexedConnection,
+        con: &mut SPConnection,
         parent_frame_id: &str,
         child_frame_id: &str,
     ) -> Result<SPTransformStamped, Box<dyn Error>> {
@@ -85,14 +85,14 @@ impl TransformsManager {
     }
 
     pub async fn get_transform(
-        con: &mut MultiplexedConnection,
+        con: &mut SPConnection,
         frame_id: &str,
     ) -> Result<SPTransformStamped, Box<dyn Error>> {
         get_transform::get_transform(con, frame_id).await
     }
 
     pub async fn load_transforms_from_path(
-        con: &mut MultiplexedConnection,
+        con: &mut SPConnection,
         path: &str,
     ) -> Result<(), Box<dyn Error>> {
         load_transforms_from_path::load_transforms_from_path(con, path).await

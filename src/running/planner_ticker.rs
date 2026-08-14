@@ -2,6 +2,18 @@ use crate::*;
 use std::sync::Arc;
 use tokio::time::{Duration, interval};
 
+// PERF: reads a fixed key set - good - but two things cost more than they need
+// to:
+//   - `keys` is built by concatenating `get_all_var_keys()` over every operation
+//     plus the operation names, with no `sort()/dedup()`. Operations typically
+//     share most of their variables, so the per-tick `MGET` sends the same key
+//     many times over. Deduplicating once here shrinks every request.
+//   - the tick runs at 500 ms and does a full `MGET` + `build_state` + diff
+//     even though the only thing it reacts to is `{sp_id}_replan_trigger`.
+//     Suggested: read just that flag (a single `GET`) and only fetch the full
+//     planning key set when it is set; or subscribe to a notification on it.
+//     Planning is rare and bursty - polling the whole operation model twice a
+//     second to discover that nothing is requested is most of this task's cost.
 pub async fn planner_ticker(
     sp_id: &str,
     model: &Model,
@@ -48,12 +60,15 @@ pub async fn planner_ticker(
             .collect::<Vec<String>>(),
     );
 
+    // PERF: one long-lived connection handle for the whole runner instead of
+    // re-fetching one every tick, and no pre-flight PING before the real work.
+    // `SPConnection` is cheap to clone, multiplexed and self-healing, so this
+    // handle stays valid across reconnects; a dropped socket now surfaces as an
+    // error on the command itself, which the callee already logs and skips.
+    let mut con = connection_manager.get_connection().await;
+
     loop {
         interval.tick().await;
-        if let Err(_) = connection_manager.check_redis_health(&log_target).await {
-            continue;
-        }
-        let mut con = connection_manager.get_connection().await;
         let state = match StateManager::get_state_for_keys(&mut con, &keys, &log_target).await {
             Some(s) => s,
             None => continue,
@@ -167,6 +182,17 @@ fn process_planner_tick(sp_id: &str, model: &Model, state: &State, log_target: &
 }
 
 // Returns a new state to add containing unique operations ad unique operation meta
+// PERF: `bfs_operation_planner(state.clone(), goal, model.operations.clone(), ..)`
+// deep-copies the entire state *and* the entire operation model on every replan
+// request. The model copy in particular is large (every operation, every
+// transition, every predicate) and is only read. Suggested: change the planner
+// to take `&State` and `&[Operation]`.
+// PERF: this call is synchronous and can run for up to `deadline_ms` (5000 ms
+// here) inside an async task, blocking the tokio worker thread for that whole
+// time - which stalls every other runner scheduled on that worker and is a very
+// likely cause of the "state changes stop happening" symptom during planning.
+// Suggested: run it on `tokio::task::spawn_blocking` (or a rayon pool) and
+// await the handle, so the runtime stays responsive while the search runs.
 fn handle_replan_request(
     sp_id: &str,
     ctx: &mut PlannerContext,

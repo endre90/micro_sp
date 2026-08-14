@@ -92,6 +92,21 @@ impl fmt::Display for OperationState {
     }
 }
 
+// PERF: an `Operation` owns six `Vec<Transition>`, each transition owning two
+// predicate trees and two action vectors, so `Operation::clone()` is a deep
+// copy of a fairly large graph. It is currently cloned very often on hot paths:
+// `process_operation` does `operation.clone().cancel(..)` etc. (unnecessary -
+// those methods take `&self`), `auto_operation_runner` clones a template per
+// activation and again per tick when rebuilding `active_auto_ops`, the BFS
+// planner clones one per node, and `Model::new` clones every transition vector
+// three times over. Suggested: hold the transition vectors as
+// `Arc<[Transition]>` so cloning an `Operation` is a handful of refcount bumps,
+// and store active operations as `Arc<Operation>` in the runners.
+// PERF: the runners key everything off `operation.name` via `format!`. Caching
+// the derived key strings (`{name}`, `{name}_information`,
+// `{name}_elapsed_executing_ms`, ...) on the struct - or in a side table built
+// when the operation is activated - removes about a dozen allocations per
+// operation per tick.
 #[derive(Debug, PartialEq, Clone, Eq, Hash, Serialize, Deserialize)]
 pub struct Operation {
     pub name: String,
@@ -199,6 +214,22 @@ impl Operation {
         )
     }
 
+    // PERF: this is evaluated for *every* auto operation on *every* tick of
+    // `auto_operation_runner`, so it is the single most frequently executed
+    // guard check in the system. Two costs to remove:
+    //   - `state.get_value(&self.name, ..)` clones the entire state map (see
+    //     `State::get_value`) before the cheap early-out even runs;
+    //   - `precondition.clone().eval(state, ..)` deep-copies the transition on
+    //     every precondition of every operation, including the ones whose guard
+    //     is immediately false. Both `Transition::eval` and `Predicate::eval`
+    //     only need `&self`; changing them makes this loop allocation-free.
+    // PERF: `OperationState::Initial.to_spvalue()` allocates a fresh `String`
+    // ("initial") and wraps it in an `SPValue` twice per call just to compare.
+    // Comparing against `&'static str` (or matching on
+    // `OperationState::from_str`) avoids two allocations per operation per tick.
+    // The same pattern appears in `eval_planning`, `can_be_completed`,
+    // `can_be_failed`, `can_be_timedout`, `can_be_cancelled` and every state
+    // transition method below.
     pub fn eval(&self, state: &State, log_target: &str) -> bool {
         if let Some(value) = state.get_value(&self.name, &log_target) {
             if value == OperationState::Initial.to_spvalue()
@@ -274,6 +305,9 @@ impl Operation {
         false
     }
 
+    // PERF: builds `format!("{}_elapsed_executing_ms", self.name)` (and the
+    // disabled variant) on every call, i.e. per executing operation per tick.
+    // Cache the key strings; see the note on the `Operation` struct.
     pub fn can_be_timedout(&self, state: &State, log_target: &str) -> bool {
         if let Some(value) = state.get_value(&self.name, &log_target) {
             if value == OperationState::Executing.to_spvalue() {
@@ -317,6 +351,17 @@ impl Operation {
     // }
 
     /// Check if we can stop the execution and cancel the operations
+    // PERF: called first in almost every arm of `process_operation`, so it runs
+    // for every active operation on every tick. It does two `state.get_value`
+    // calls (each a full-map clone today), builds
+    // `format!("{}_dashboard_command", sp_id)` every time, and constructs five
+    // `OperationState::*.to_spvalue()` `String`s for the comparison. Since the
+    // dashboard command is a single per-runner variable, read it *once* per
+    // tick in the runner loop and pass the result in, rather than re-reading it
+    // per operation.
+    // Note also the condition is `a || b || c != x || d != y || e != z`, which
+    // is true for essentially every state - so the expensive dashboard lookup
+    // happens unconditionally. Worth checking whether that was intended.
     pub fn can_be_cancelled(&self, sp_id: &str, state: &State, log_target: &str) -> bool {
         if let Some(value) = state.get_value(&self.name, &log_target) {
             if value == OperationState::Initial.to_spvalue()
@@ -362,6 +407,13 @@ impl Operation {
     }
 
     /// Start executing the operation. Check for eval_running() first.
+    // PERF: re-evaluates every precondition guard that `Operation::eval` just
+    // evaluated a moment earlier in `process_operation` - the whole guard set is
+    // walked twice per start. `evaluate_with_transition_index` already exists
+    // and returns the matching index; using it (and passing the index into
+    // `start`) halves the guard work at the moment an operation starts.
+    // PERF: `precondition.clone().eval(..)` then `precondition.clone().take(..)`
+    // clones the transition twice more.
     pub fn start(&self, state: &State, log_target: &str) -> State {
         let assignment = state.get_assignment(&self.name, &log_target);
         if assignment.val == OperationState::Initial.to_spvalue()
@@ -382,6 +434,11 @@ impl Operation {
     }
 
     /// Complete executing the operation. Check for can_be_completed() first.
+    // PERF: same double evaluation as `start` - `can_be_completed` walks all
+    // postcondition guards, then this walks them again to find the same one.
+    // `can_be_completed_with_transition_index` already returns the index; wiring
+    // it through `process_operation` removes the second walk. The same pattern
+    // repeats in `fail`, `bypass` and `timeout`.
     pub fn complete(&self, state: &State, log_target: &str) -> State {
         let assignment = state.get_assignment(&self.name, &log_target);
         if assignment.val == OperationState::Executing.to_spvalue() {

@@ -41,19 +41,54 @@ pub struct OperationLog {
 }
 
 // with agg for testing purposes, comment out the agg for running
+//
+// PERF (strong candidate for the CPU you see while SOPs run): this is a
+// read-modify-write of an *ever-growing* JSON blob, once per log message.
+// For every message it does a Redis `GET` of the whole log, a full
+// `serde_json` parse of it, an in-memory rearrangement, a full re-serialise,
+// and a `SET` of the whole thing back. Since the log only grows, message N
+// costs O(N) - so the total work is O(N^2) in the number of operation state
+// changes, in both CPU and Redis bandwidth. A SOP that produces a few thousand
+// log entries will make this task saturate a core and flood the connection that
+// every other runner shares, which also shows up as sluggish state updates.
+// Suggested, in order of impact:
+//   1. Stop round-tripping through Redis per message. Use a Redis LIST
+//      (`RPUSH` + periodic `LTRIM key -N -1`) or, better, a Redis STREAM
+//      (`XADD key MAXLEN ~ N *`), both of which are O(1) appends with no read,
+//      no parse and no rewrite. Readers can `LRANGE`/`XRANGE` when they
+//      actually want to display something.
+//   2. If the grouped `Vec<Vec<OperationLog>>` shape must be preserved, keep it
+//      in memory in this task (it is the single writer) and flush it to Redis
+//      on a timer (e.g. every 500 ms) instead of per message. That alone turns
+//      N round trips into N/50 and removes every parse.
+//   3. Cap the retained history explicitly - there is currently no bound at
+//      all, so memory, the serialised payload and the per-message cost grow
+//      without limit for the lifetime of the process.
+//   4. `check_redis_health` (a PING round trip) runs per received message, on
+//      top of the GET and SET - three RTTs per log line. Drop it here.
+//   5. The channel is `mpsc::channel::<LogMsg>(100)`; when this task falls
+//      behind, `logging_tx.send(..).await` inside `process_operation` blocks the
+//      *runner* until there is room. So a slow logger directly stalls operation
+//      processing. Either make the send non-blocking (`try_send` + drop with a
+//      warning) or make the logger cheap enough to keep up - preferably both.
 pub async fn operation_log_receiver_task(
     mut rx: mpsc::Receiver<LogMsg>,
     connection_manager: &Arc<ConnectionManager>,
     sp_id: &str,
 ) {
     let log_target = format!("{}_logger_receiver", sp_id);
+
+    // PERF: one long-lived connection handle for the whole task. This used to
+    // pre-flight a PING and re-fetch a handle for every single log message,
+    // i.e. three round trips per message where one is needed. `SPConnection`
+    // reconnects on its own, so the handle stays valid.
+    let mut con = connection_manager.get_connection().await;
+
+    log::info!(target: &log_target, "Online.");
+
     while let Some(log_msg) = rx.recv().await {
         match log_msg {
             LogMsg::OperationMsg(msg) => {
-                if let Err(_) = connection_manager.check_redis_health(&log_target).await {
-                    continue;
-                }
-                let mut con = connection_manager.get_connection().await;
 
                 let which_op_type_logger = match msg.operation_processing_type {
                     OperationProcessingType::Planned => {
@@ -179,10 +214,6 @@ pub async fn operation_log_receiver_task(
                 }
             }
             LogMsg::TransitionMsg(msg) => {
-                if let Err(_) = connection_manager.check_redis_health(&log_target).await {
-                    continue;
-                }
-                let mut con = connection_manager.get_connection().await;
                 let redis_key = format!("{}_logger_automatic_transitions", sp_id);
                 let mut log: Vec<TransitionMsg> = if let Some(log_spvalue) =
                     StateManager::get_sp_value(&mut con, &redis_key).await

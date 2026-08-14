@@ -1,9 +1,9 @@
 use crate::{TransformsManager, list_frames_in_dir, load_new_scenario};
-use redis::aio::MultiplexedConnection;
+use crate::SPConnection;
 use std::error::Error;
 
 pub(super) async fn load_transforms_from_path(
-    con: &mut MultiplexedConnection,
+    con: &mut SPConnection,
     path: &str,
 ) -> Result<(), Box<dyn Error>> {
     let list = list_frames_in_dir(path)?;

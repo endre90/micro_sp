@@ -1,7 +1,7 @@
 use redis::AsyncCommands;
-use redis::aio::MultiplexedConnection;
+use crate::SPConnection;
 
-pub(super) async fn remove_sp_value(con: &mut MultiplexedConnection, key: &str) {
+pub(super) async fn remove_sp_value(con: &mut SPConnection, key: &str) {
     match con.del::<_, ()>(&key).await {
         Ok(_) => {}
         Err(e) => {

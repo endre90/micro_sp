@@ -1,9 +1,10 @@
 use crate::{SPTransform, SPTransformStamped, SPValue, ToSPValue, TransformOrUnknown, tf_key};
-use redis::{AsyncCommands, aio::MultiplexedConnection};
+use crate::SPConnection;
+use redis::AsyncCommands;
 use std::error::Error;
 
 pub(super) async fn move_transform(
-    con: &mut MultiplexedConnection,
+    con: &mut SPConnection,
     name: &str,
     new_transform: SPTransform,
 ) -> Result<(), Box<dyn Error>> {

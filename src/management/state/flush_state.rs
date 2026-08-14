@@ -1,7 +1,7 @@
 use redis::cmd;
-use redis::aio::MultiplexedConnection;
+use crate::SPConnection;
 
-pub(super) async fn flush_state(con: &mut MultiplexedConnection) {
+pub(super) async fn flush_state(con: &mut SPConnection) {
     match cmd("FLUSHDB").query_async::<()>(con).await {
         Ok(_) => {}
         Err(e) => {

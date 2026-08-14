@@ -1,7 +1,8 @@
 use crate::SPValue;
-use redis::{AsyncCommands, aio::MultiplexedConnection};
+use crate::SPConnection;
+use redis::AsyncCommands;
 
-pub(super) async fn set_sp_value(con: &mut MultiplexedConnection, key: &str, value: &SPValue) {
+pub(super) async fn set_sp_value(con: &mut SPConnection, key: &str, value: &SPValue) {
     let value_str = match serde_json::to_string(value) {
         Ok(s) => s,
         Err(e) => {

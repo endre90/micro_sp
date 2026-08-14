@@ -21,6 +21,17 @@ pub enum SPWrapped {
 
 // experimantal
 impl SPWrapped {
+    // PERF: this is the leaf of every predicate evaluation, so it runs a few
+    // times per guard, per operation, per tick. Both hot arms allocate:
+    //   - `SPVariable(var)` goes through `State::get_value`, which today clones
+    //     the *entire* state map and then clones the value out of it;
+    //   - `SPValue(val) => val.clone()` copies a literal that is already owned
+    //     by the predicate and lives as long as it.
+    // Suggested: return `Cow<'_, SPValue>` (or add an `evaluate_ref` returning
+    // `Option<&SPValue>` for the variable/literal cases and fall back to owned
+    // only for the composite `Array`/`Map` arms). Combined with comparing
+    // `&SPValue` in `Predicate::eval`, guard evaluation becomes fully
+    // allocation-free for the scalar comparisons that make up most models.
     pub fn evaluate(&self, state: &State, log_target: &str) -> SPValue {
         match self {
             SPWrapped::SPVariable(var) => state

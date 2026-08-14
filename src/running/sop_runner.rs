@@ -1,6 +1,6 @@
 use crate::*;
 use log::Level;
-use redis::aio::MultiplexedConnection;
+use crate::SPConnection;
 use std::sync::Arc;
 use tokio::{
     sync::mpsc,
@@ -9,10 +9,48 @@ use tokio::{
 
 static TICK_INTERVAL: u64 = 100; // millis
 
+// PERF: this is the loop you feel when a SOP is running. Per 100 ms tick it
+// does: a PING round trip, a `KEYS *` + `MGET` of the entire database, a full
+// `state.clone()`, a recursive walk of the SOP tree that clones the tree
+// several times and evaluates every operation guard, a full-state diff, and an
+// MSET. Concretely, the things worth changing here:
+//
+// 1. `StateManager::get_full_state` -> `get_state_for_keys`. `SOP` already has
+//    `get_all_var_keys()`; union that with the per-operation bookkeeping keys
+//    (`{op}`, `{op}_information`, `{op}_elapsed_*`, `{op}_*_retry_counter`) and
+//    the handful of `{sp_id}_sop_*` keys. Recompute the set only when a SOP is
+//    activated or torn down, not per tick. This removes the blocking `KEYS *`.
+// 2. `active_sop_container.clone().unwrap()` appears three times in the
+//    `Executing` arm alone and deep-copies the whole SOP tree (every
+//    `Operation`, every `Transition`, every `Predicate`) each time. Use
+//    `as_ref()`/`if let Some(sop) = &active_sop_container` - the functions only
+//    need `&SOP`. Same for `sop_template.sop.clone()` in the activation path.
+// 3. `let mut new_state = state.clone()` clones the entire state map every tick
+//    just so the diff at the bottom has something to compare against. With
+//    `update_mut` + a dirty-key list (see `State`) you can drop both the clone
+//    and the diff scan.
+// 4. The `format!` calls building `new_sop_info` run every tick even when the
+//    text is identical to `old_sop_information` and is then discarded; the
+//    `visualize_sop(..)` in the `Initial` arm renders the whole tree to a
+//    string. Suggested: compare cheap discriminants first and only format when
+//    something actually changed.
+// 5. `model.sops.iter().find(|s| s.id == sop_id)` is a linear scan of the model
+//    every tick; a `HashMap<String, &SOPStruct>` built once at startup is O(1).
+// 6. Tick rate vs. latency: at 100 ms, and with each operation step having to
+//    round-trip through Redis, a SOP of N sequential operations takes at least
+//    ~2-3 ticks per operation. Driving this loop off change notifications (see
+//    `ConnectionManager`) rather than a timer is what actually fixes the
+//    "state change doesn't occur as quickly as I want" symptom; lowering
+//    `TICK_INTERVAL` only trades latency for more `KEYS *` storms.
+// 7. Note that `process_operation` charges elapsed time using
+//    `OPERAION_RUNNER_TICK_INTERVAL_MS` (200 ms) while this runner ticks at
+//    100 ms, so SOP operations accumulate elapsed time at 2x real speed and
+//    time out early. Measure real elapsed time with `Instant` instead of
+//    assuming a tick constant.
 pub async fn sop_runner(
     sp_id: &str,
     model: &Model,
-    logging_tx: mpsc::Sender<LogMsg>,
+    // logging_tx: mpsc::Sender<LogMsg>,
     connection_manager: &Arc<ConnectionManager>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     initialize_env_logger();
@@ -26,12 +64,15 @@ pub async fn sop_runner(
     let mut active_sop_container: Option<SOP> = None;
     // let mut terminated_operations: Vec<String> = vec!();
 
+    // PERF: one long-lived connection handle for the whole runner instead of
+    // re-fetching one every tick, and no pre-flight PING before the real work.
+    // `SPConnection` is cheap to clone, multiplexed and self-healing, so this
+    // handle stays valid across reconnects; a dropped socket now surfaces as an
+    // error on the command itself, which the callee already logs and skips.
+    let mut con = connection_manager.get_connection().await;
+
     loop {
         interval.tick().await;
-        if let Err(_) = connection_manager.check_redis_health(&log_target).await {
-            continue;
-        }
-        let mut con = connection_manager.get_connection().await;
         let state = match StateManager::get_full_state(&mut con).await {
             Some(s) => s,
             None => continue,
@@ -118,7 +159,7 @@ pub async fn sop_runner(
                         new_state.clone(),
                         &active_sop_container.clone().unwrap(),
                         con_clone,
-                        logging_tx.clone(),
+                        // logging_tx.clone(),
                         &log_target,
                     )
                     .await;
@@ -215,7 +256,12 @@ pub async fn sop_runner(
     }
 }
 
-async fn remove_operations_from_state(sop_id: &str, unique_sop: &SOP, mut con: MultiplexedConnection) {
+// PERF: three sequential Redis round trips (two `remove_sp_values` plus one
+// `remove_sp_value`) where one `DEL` of the concatenated key list would do.
+// Also the `println!` on the next line writes to stdout unconditionally and
+// bypasses the `log` filter - it should be `log::debug!` so it can be turned
+// off, since stdout writes are synchronous and block the tokio worker thread.
+async fn remove_operations_from_state(sop_id: &str, unique_sop: &SOP, mut con: SPConnection) {
     let ops_in_sop = get_all_operations_from_sop(&unique_sop);
     let mut op_ids_meta = vec![];
     let sop_id = format!("op_{}", sop_id);
@@ -238,12 +284,28 @@ async fn remove_operations_from_state(sop_id: &str, unique_sop: &SOP, mut con: M
     StateManager::remove_sp_value(&mut con, &sop_id).await;
 }
 
+// PERF: the tree walk threads `State` by value, so every recursion level moves
+// (and every `process_operation` call rebuilds) the whole state map. Taking
+// `&mut State` instead would let each node mutate in place with no copying.
+// PERF: `Box::pin(..)` on each recursive call heap-allocates a future per node
+// per tick. Since none of this recursion actually awaits anything except
+// `process_operation` (which only awaits the logging channel), the walk could
+// be a synchronous function that returns the collected log messages for the
+// caller to send - removing every `Box::pin` and every `.clone()` of `con` and
+// `logging_tx` along the way.
+// PERF: `SOP::Sequence`/`Alternative` call `child.get_state(&state, ..)` for
+// each child, and `get_state` recurses over that child's entire subtree doing a
+// state lookup and a `format!` per operation. Finding the active child of a
+// sequence is therefore O(subtree) per level, i.e. O(n^2) over the tick.
+// Suggested: compute every node's state once per tick in a single bottom-up
+// pass and cache it in a `Vec<SOPState>` indexed by node, then have the walk
+// read from that.
 async fn process_sop_node_tick(
     sp_id: &str,
     mut state: State,
     sop: &SOP,
-    con: redis::aio::MultiplexedConnection,
-    logging_tx: mpsc::Sender<LogMsg>,
+    con: crate::SPConnection,
+    // logging_tx: mpsc::Sender<LogMsg>,
     log_target: &str,
 ) -> State {
     match sop {
@@ -255,7 +317,7 @@ async fn process_sop_node_tick(
                 running::process_operation::OperationProcessingType::SOP,
                 None,
                 None,
-                logging_tx,
+                // logging_tx,
                 log_target,
                 // &mut terminated_operations
             )
@@ -269,7 +331,7 @@ async fn process_sop_node_tick(
 
             if let Some(child) = active_child {
                 state = Box::pin(process_sop_node_tick(
-                    sp_id, state, child, con, logging_tx, log_target,
+                    sp_id, state, child, con, log_target,
                 ))
                 .await;
             }
@@ -282,7 +344,7 @@ async fn process_sop_node_tick(
                     state,
                     child,
                     con.clone(),
-                    logging_tx.clone(),
+                    // logging_tx.clone(),
                     log_target,
                 ))
                 .await;
@@ -298,7 +360,7 @@ async fn process_sop_node_tick(
             // If a path is active, keep processing it
             if let Some(child) = active_child {
                 state = Box::pin(process_sop_node_tick(
-                    sp_id, state, child, con, logging_tx, log_target,
+                    sp_id, state, child, con, log_target,
                 ))
                 .await;
             } else {
@@ -313,7 +375,7 @@ async fn process_sop_node_tick(
                         state,
                         path_to_start,
                         con,
-                        logging_tx,
+                        // logging_tx,
                         log_target,
                     ))
                     .await;
@@ -343,6 +405,12 @@ fn can_sop_start(sp_id: &str, sop: &SOP, state: &State, log_target: &str) -> boo
     }
 }
 
+// PERF: fine as-is (runs once per SOP activation, not per tick), but note it
+// rebuilds every `Operation` - including cloning all its transition vectors -
+// only to change the `name`. If `Operation` held its transitions behind an
+// `Arc<[Transition]>`, uniquifying a large SOP would become almost free and
+// would also make the per-tick `operation.clone()` calls in `process_operation`
+// cheap.
 pub fn uniquify_sop_operations(sop: SOP) -> SOP {
     match sop {
         SOP::Operation(op) => {

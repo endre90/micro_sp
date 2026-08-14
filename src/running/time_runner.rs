@@ -5,6 +5,23 @@ use tokio::time::{Duration, interval};
 
 static TICK_INTERVAL_MS: u64 = 100;
 
+// PERF: the `set_state` call is *inside* the `for timer_id in 1..=number_of_timers`
+// loop, so a system with 10 timers performs 10 separate diffs and 10 separate
+// Redis round trips every 100 ms - 100 MSETs per second, almost all of them
+// writing values that did not change. Suggested: accumulate all timers into one
+// `new_state`, diff once, and write once outside the loop (and skip the write
+// when the diff is empty).
+// PERF/correctness: each iteration builds `new_state` from `state` (the tick's
+// original snapshot) rather than from the previous iteration's result, so with
+// the write moved out of the loop only the last timer's changes would survive -
+// thread a single `new_state` through the loop instead.
+// PERF: `elapsed_ms += TICK_INTERVAL_MS` assumes the tick never slips; since
+// every tick also waits on a PING and an MGET, timers drift long under load.
+// Storing the start `SystemTime` and computing `elapsed` from the wall clock is
+// both more accurate and removes a state write per timer per tick.
+// PERF: `request_state == ActionRequestState::Executing.to_string()` allocates
+// a fresh `String` for the comparison on every timer on every tick; compare
+// against a `&'static str` instead.
 pub async fn time_interface_runner(
     sp_id: &str,
     connection_manager: &Arc<ConnectionManager>,
@@ -24,12 +41,15 @@ pub async fn time_interface_runner(
         keys.push(format!("{}_timer_{}_elapsed_ms", sp_id, timer_id));
     }
 
+    // PERF: one long-lived connection handle for the whole runner instead of
+    // re-fetching one every tick, and no pre-flight PING before the real work.
+    // `SPConnection` is cheap to clone, multiplexed and self-healing, so this
+    // handle stays valid across reconnects; a dropped socket now surfaces as an
+    // error on the command itself, which the callee already logs and skips.
+    let mut con = connection_manager.get_connection().await;
+
     loop {
         interval.tick().await;
-        if let Err(_) = connection_manager.check_redis_health(&log_target).await {
-            continue;
-        }
-        let mut con = connection_manager.get_connection().await;
         let state = match StateManager::get_state_for_keys(&mut con, &keys, &log_target).await {
             Some(s) => s,
             None => continue,

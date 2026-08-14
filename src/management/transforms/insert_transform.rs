@@ -1,11 +1,12 @@
 use std::error::Error;
 
-use redis::{AsyncCommands, aio::MultiplexedConnection};
+use crate::SPConnection;
+use redis::AsyncCommands;
 
 use crate::{SPTransformStamped, ToSPValue, tf_key};
 
 pub(super) async fn insert_transform(
-    con: &mut MultiplexedConnection,
+    con: &mut SPConnection,
     transform: &SPTransformStamped,
 ) -> Result<(), Box<dyn Error>> {
     let key = tf_key(&transform.child_frame_id);

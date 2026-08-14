@@ -1,11 +1,12 @@
 use crate::{
     check_would_produce_cycle, tf_key, SPTransform, ToSPValue, TransformsManager
 };
-use redis::{AsyncCommands, aio::MultiplexedConnection};
+use crate::SPConnection;
+use redis::AsyncCommands;
 use std::error::Error;
 
 pub(super) async fn snap_to_parent_transform(
-    con: &mut MultiplexedConnection,
+    con: &mut SPConnection,
     new_parent_frame_id: &str,
     child_frame_id: &str,
 ) -> Result<(), Box<dyn Error>> {

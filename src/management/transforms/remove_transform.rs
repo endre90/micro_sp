@@ -1,10 +1,10 @@
 use redis::AsyncCommands;
-use redis::aio::MultiplexedConnection;
+use crate::SPConnection;
 use std::error::Error;
 use crate::tf_key;
 
 pub(super) async fn remove_transform(
-    con: &mut MultiplexedConnection,
+    con: &mut SPConnection,
     key: &str,
 ) -> Result<(), Box<dyn Error>> {
     let redis_key = tf_key(key);
