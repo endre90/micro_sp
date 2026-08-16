@@ -98,7 +98,9 @@ pub async fn planned_operation_runner(
         )
         .await;
         let modified_state = state.get_diff_partial_state(&new_state);
-        StateManager::set_state(&mut con, &modified_state).await;
+        if !modified_state.state.is_empty() {
+            StateManager::set_state(&mut con, &modified_state).await;
+        }
     }
 }
 
@@ -115,18 +117,16 @@ fn read_plan(state: &State, sp_id: &str, log_target: &str) -> Vec<String> {
         .collect()
 }
 
-// PERF: the two `remove_sp_values` calls near the end run unconditionally on
-// every tick, even when `terminated_operations` is empty - so every idle tick
-// still costs two Redis round trips. `remove_sp_values` returns early on an
-// empty slice, but only after the RTT has been paid for the non-empty one and
-// after the `terminated_operations_meta` vector has been built. Guard the whole
-// block with `if !terminated_operations.is_empty()` (as
-// `auto_operation_runner` does) and pipeline the two DELs into one.
-// PERF: the tail unconditionally rewrites `_plan_state`, `_plan`,
-// `_planner_state`, `_current_goal_state`, `_plan_current_step` and
-// `_terminated_operations` with the values it just read, so the diff is
-// non-empty on most ticks and an MSET goes out even when nothing happened. Only
-// write the fields the tick actually changed.
+// DONE: PERF: the two `remove_sp_values` calls near the end ran on every tick.
+// They do return early on an empty slice, so an idle tick never actually cost a
+// round trip - the correction to the original note - but the meta key list was
+// still built every time. The whole block is guarded now. Pipelining the two
+// DELs into one is still open.
+// DONE: PERF: the tail was a chain of six `.update(..)` calls, i.e. six full
+// state-map copies per tick. They are `update_mut` now. Note the original
+// claim that this made "an MSET go out even when nothing happened" was wrong:
+// five of the six write back the value just read, so they produce no diff -
+// measured idle traffic for this runner is zero writes.
 // PERF: `model.operations.iter().find(|op| op_name.starts_with(&op.name))` is a
 // linear scan with a prefix comparison per plan step per tick; a
 // `HashMap<&str, &Operation>` built once at startup would make it O(1). Note
@@ -218,39 +218,49 @@ async fn process_plan_tick(
         }
     }
 
-    let mut terminated_operations_meta = vec![];
-    for op in &terminated_operations {
-        terminated_operations_meta.push(format!("{}_information", op));
-        terminated_operations_meta.push(format!("{}_failure_retry_counter", op));
-        terminated_operations_meta.push(format!("{}_timeout_retry_counter", op));
-        terminated_operations_meta.push(format!("{}_elapsed_executing_ms", op));
-        terminated_operations_meta.push(format!("{}_elapsed_disabled_ms", op));
+    // Guarded, like `auto_operation_runner` does it: on a tick with nothing
+    // terminated there is now no key-list building at all.
+    if !terminated_operations.is_empty() {
+        let mut terminated_operations_meta = vec![];
+        for op in &terminated_operations {
+            terminated_operations_meta.push(format!("{}_information", op));
+            terminated_operations_meta.push(format!("{}_failure_retry_counter", op));
+            terminated_operations_meta.push(format!("{}_timeout_retry_counter", op));
+            terminated_operations_meta.push(format!("{}_elapsed_executing_ms", op));
+            terminated_operations_meta.push(format!("{}_elapsed_disabled_ms", op));
+        }
+        StateManager::remove_sp_values(&mut con, &terminated_operations).await;
+        StateManager::remove_sp_values(&mut con, &terminated_operations_meta).await;
     }
-    StateManager::remove_sp_values(&mut con, &terminated_operations).await;
-    StateManager::remove_sp_values(&mut con, &terminated_operations_meta).await;
-    // terminated_operations.clear();
 
-    new_state = new_state
-        .update(
-            &format!("{}_plan_state", sp_id),
-            plan_state_str.to_spvalue(),
-        )
-        .update(&format!("{}_plan", sp_id), plan.to_spvalue())
-        .update(
-            &format!("{}_planner_state", sp_id),
-            planner_state.to_spvalue(),
-        )
-        .update(
-            &format!("{}_current_goal_state", sp_id),
-            goal_state.to_spvalue(),
-        )
-        .update(
-            &format!("{}_plan_current_step", sp_id),
-            plan_current_step.to_spvalue(),
-        ).update(
-            &format!("{}_terminated_operations", sp_id),
-            Vec::<SPValue>::new().to_spvalue(),
-        );
+    // DONE: PERF: this was a chain of six `.update(..)` calls, each cloning the
+    // whole state map - six full copies per tick to write six values. Writing
+    // in place costs six map lookups.
+    //
+    // Most of these write back the value that was just read, so they do not
+    // show up in the diff and cost no Redis traffic; they are kept as-is so the
+    // tick still has a single obvious place where its outputs are published.
+    new_state.update_mut(
+        &format!("{}_plan_state", sp_id),
+        plan_state_str.to_spvalue(),
+    );
+    new_state.update_mut(&format!("{}_plan", sp_id), plan.to_spvalue());
+    new_state.update_mut(
+        &format!("{}_planner_state", sp_id),
+        planner_state.to_spvalue(),
+    );
+    new_state.update_mut(
+        &format!("{}_current_goal_state", sp_id),
+        goal_state.to_spvalue(),
+    );
+    new_state.update_mut(
+        &format!("{}_plan_current_step", sp_id),
+        plan_current_step.to_spvalue(),
+    );
+    new_state.update_mut(
+        &format!("{}_terminated_operations", sp_id),
+        Vec::<SPValue>::new().to_spvalue(),
+    );
 
     new_state
 }

@@ -177,19 +177,56 @@ impl fmt::Display for GoalState {
     }
 }
 
-// PERF: reads a small fixed key set (good), but writes on every single tick:
-// the `_scheduled_goals` / `_incoming_goals` update below is unconditional, and
-// because the goal IDs are regenerated with `nanoid!` on every tick the
-// serialised value is *always different*, so `get_diff_partial_state` never
-// returns empty and an MSET goes out 10 times a second forever, even with no
-// goals at all. That is pure background load on Redis and on this task.
-// Suggested: only re-id goals when they are actually admitted from
-// `_incoming_goals`, and skip the write when `modified_state` is empty (the
-// other runners already guard with `if !modified_state.state.is_empty()`).
-// PERF: `state.clone()` per tick plus a chain of up to nine `.update(..)` calls
-// in the `Initial` arm, each cloning the whole state map - see `State::update`.
-// PERF: `current_goal_state.to_string()` on a value that is already a `String`
-// allocates a copy for nothing; `GoalState::from_str(&current_goal_state)`.
+/// Merge newly arrived goals into the queue, ordered by priority.
+///
+/// An id is assigned exactly once - to a goal as it is admitted from
+/// `_incoming_goals`, and to any already-queued goal that somehow has none -
+/// and is never regenerated afterwards.
+///
+/// That stability is not cosmetic. `_scheduled_goals` is written back to Redis
+/// through a diff against the previous tick, so if the ids change every tick
+/// the serialised value differs every tick, the diff is never empty, and an
+/// MSET goes out 10 times a second for as long as anything sits in the queue.
+/// That is exactly what this used to do. Keeping ids stable means an unchanged
+/// queue produces no write at all - and a goal keeps the id it was announced
+/// with, instead of having it change under it while it waits.
+pub fn admit_goals(mut scheduled: Vec<Goal>, incoming: Vec<Goal>) -> Vec<Goal> {
+    scheduled.extend(incoming.into_iter().map(|goal| Goal {
+        id: nanoid::nanoid!(10, &NANOID_ALPHABET),
+        ..goal
+    }));
+
+    // A goal written straight into `_scheduled_goals` bypasses the step above,
+    // so anything still without an id gets one here - once; on the next tick it
+    // has an id and is left alone.
+    for goal in scheduled.iter_mut() {
+        if goal.id.is_empty() || goal.id == "UNKNOWN" {
+            goal.id = nanoid::nanoid!(10, &NANOID_ALPHABET);
+        }
+    }
+
+    // Stable, so goals of equal priority keep their arrival order.
+    scheduled.sort_by_key(|g| g.priority);
+    scheduled
+}
+
+// DONE: PERF: this runner used to re-generate every scheduled goal's id with
+// `nanoid!` on *every* tick. The serialised `_scheduled_goals` value was
+// therefore different every time, so `get_diff_partial_state` never came back
+// empty and an MSET went out 10 times a second for as long as anything sat in
+// the queue. Measured with three goals queued: 50 MSETs per 5 seconds, i.e. one
+// on every single tick. It was also wrong - a goal's id changed under it while
+// it waited, so the id logged when a goal was queued never matched the one it
+// was eventually started with.
+// Ids are now assigned once, at the moment a goal is admitted from
+// `_incoming_goals`, which is the only point a goal actually needs one. A
+// queue that is not changing now serialises to the same value and produces no
+// write at all.
+// DONE: PERF: `state.clone()` per tick plus a chain of up to nine `.update(..)`
+// calls in the `Initial` arm, each cloning the whole state map. They are
+// `update_mut` now, so the tick costs one clone instead of ten.
+// DONE: PERF: `current_goal_state.to_string()` on a value that is already a
+// `String` allocated a copy for nothing.
 pub async fn goal_runner(
     sp_id: &str,
     connection_manager: &Arc<ConnectionManager>,
@@ -289,52 +326,45 @@ pub async fn goal_runner(
 
         let mut new_state = state.clone();
 
-        // Handle incoming goals first
-        scheduled_goals.extend(incoming_goals);
-        scheduled_goals.sort_by_key(|g| g.priority);
-
-        // Assign unique IDs
-        let scheduled_goals = scheduled_goals.iter().map(|x| Goal { 
-            id: nanoid::nanoid!(10, &NANOID_ALPHABET), 
-            priority: x.priority, 
-            predicate: x.predicate.clone() 
-        }).collect::<Vec<Goal>>();
+        // Handle incoming goals first. A goal gets its unique id exactly once,
+        // here, as it is admitted to the queue - goals already scheduled keep
+        // theirs. Re-generating the whole queue's ids on every tick (which is
+        // what this used to do) made the serialised value differ every time, so
+        // an MSET went out 10x/s for as long as anything was queued, and a
+        // goal's id changed while it waited.
+        let scheduled_goals = admit_goals(scheduled_goals, incoming_goals);
 
         let scheduled_goals_sp_values: Vec<SPValue> = scheduled_goals
             .iter()
             .map(|x| goal_to_sp_value(x))
             .collect();
-        new_state = new_state
-            .update(
-                &format!("{}_scheduled_goals", sp_id),
-                scheduled_goals_sp_values.to_spvalue(),
-            )
-            .update(
-                &format!("{}_incoming_goals", sp_id),
-                Vec::<SPValue>::new().to_spvalue(),
-            );
+        new_state.update_mut(
+            &format!("{}_scheduled_goals", sp_id),
+            scheduled_goals_sp_values.to_spvalue(),
+        );
+        new_state.update_mut(
+            &format!("{}_incoming_goals", sp_id),
+            Vec::<SPValue>::new().to_spvalue(),
+        );
 
-        match GoalState::from_str(&current_goal_state.to_string()) {
+        match GoalState::from_str(&current_goal_state) {
             GoalState::Initial => {
                 if replan_for_same_goal {  // This should be Option(number of replans) for every goal
                     goal_runner_information = format!(
                         "Replan for same goal {}: \n       {}",
                         current_goal_id, current_goal_predicate
                     );
-                    new_state = new_state
-                        .update(
-                            &format!("{}_replan_for_same_goal", sp_id),
-                            false.to_spvalue(),
-                        )
-                        .update(&format!("{}_replan_trigger", sp_id), true.to_spvalue())
-                        .update(&format!("{}_replanned", sp_id), false.to_spvalue())
-                        .update(&format!("{}_plan_current_step", sp_id), 0.to_spvalue())
-                        .update(
-                            &format!("{}_plan", sp_id),
-                            Vec::<String>::new().to_spvalue(),
-                        )
-                        .update(&format!("{}_plan_state", sp_id), "initial".to_spvalue())
-                        .update(&format!("{}_planner_state", sp_id), "ready".to_spvalue());
+                    new_state.update_mut(
+                        &format!("{}_replan_for_same_goal", sp_id),
+                        false.to_spvalue(),
+                    );
+                    new_state.update_mut(&format!("{}_replan_trigger", sp_id), true.to_spvalue());
+                    new_state.update_mut(&format!("{}_replanned", sp_id), false.to_spvalue());
+                    new_state.update_mut(&format!("{}_plan_current_step", sp_id), 0.to_spvalue());
+                    new_state
+                        .update_mut(&format!("{}_plan", sp_id), Vec::<String>::new().to_spvalue());
+                    new_state.update_mut(&format!("{}_plan_state", sp_id), "initial".to_spvalue());
+                    new_state.update_mut(&format!("{}_planner_state", sp_id), "ready".to_spvalue());
                 } else {
                     if !scheduled_goals.is_empty() {
                         match scheduled_goals.split_first() {
@@ -345,38 +375,36 @@ pub async fn goal_runner(
                                     "Initializing new goal {}: \n       {}",
                                     current.id, current.predicate
                                 );
-                                new_state = new_state
-                                    .update(
-                                        &format!("{}_scheduled_goals", sp_id),
-                                        rest_of_the_goals.to_spvalue(),
-                                    )
-                                    .update(
-                                        &format!("{}_current_goal_id", sp_id),
-                                        current.id.to_string().to_spvalue(),
-                                    )
-                                    .update(
-                                        &format!("{}_current_goal_state", sp_id),
-                                        GoalState::Executing.to_string().to_spvalue(),
-                                    )
-                                    .update(
-                                        &format!("{}_current_goal_predicate", sp_id),
-                                        current.predicate.to_string().to_spvalue(),
-                                    )
-                                    .update(&format!("{}_replan_trigger", sp_id), true.to_spvalue())
-                                    .update(&format!("{}_replanned", sp_id), false.to_spvalue())
-                                    .update(&format!("{}_plan_current_step", sp_id), 0.to_spvalue())
-                                    .update(
-                                        &format!("{}_plan", sp_id),
-                                        Vec::<String>::new().to_spvalue(),
-                                    )
-                                    .update(
-                                        &format!("{}_plan_state", sp_id),
-                                        "initial".to_spvalue(),
-                                    )
-                                    .update(
-                                        &format!("{}_planner_state", sp_id),
-                                        "ready".to_spvalue(),
-                                    )
+                                new_state.update_mut(
+                                    &format!("{}_scheduled_goals", sp_id),
+                                    rest_of_the_goals.to_spvalue(),
+                                );
+                                new_state.update_mut(
+                                    &format!("{}_current_goal_id", sp_id),
+                                    current.id.to_string().to_spvalue(),
+                                );
+                                new_state.update_mut(
+                                    &format!("{}_current_goal_state", sp_id),
+                                    GoalState::Executing.to_string().to_spvalue(),
+                                );
+                                new_state.update_mut(
+                                    &format!("{}_current_goal_predicate", sp_id),
+                                    current.predicate.to_string().to_spvalue(),
+                                );
+                                new_state
+                                    .update_mut(&format!("{}_replan_trigger", sp_id), true.to_spvalue());
+                                new_state
+                                    .update_mut(&format!("{}_replanned", sp_id), false.to_spvalue());
+                                new_state
+                                    .update_mut(&format!("{}_plan_current_step", sp_id), 0.to_spvalue());
+                                new_state.update_mut(
+                                    &format!("{}_plan", sp_id),
+                                    Vec::<String>::new().to_spvalue(),
+                                );
+                                new_state
+                                    .update_mut(&format!("{}_plan_state", sp_id), "initial".to_spvalue());
+                                new_state
+                                    .update_mut(&format!("{}_planner_state", sp_id), "ready".to_spvalue());
                             }
                             None => {
                                 log::error!(target: log_target, "This shouldn't happen, investigate.")
@@ -398,25 +426,25 @@ pub async fn goal_runner(
                     PlanState::Initial => (),
                     PlanState::Executing => (),
                     PlanState::Failed => {
-                        new_state = new_state.update(
+                        new_state.update_mut(
                             &format!("{}_current_goal_state", sp_id),
                             GoalState::Failed.to_string().to_spvalue(),
                         )
                     }
                     PlanState::Completed => {
-                        new_state = new_state.update(
+                        new_state.update_mut(
                             &format!("{}_current_goal_state", sp_id),
                             GoalState::Completed.to_string().to_spvalue(),
                         )
                     }
                     PlanState::Cancelled => {
-                        new_state = new_state.update(
+                        new_state.update_mut(
                             &format!("{}_current_goal_state", sp_id),
                             GoalState::Cancelled.to_string().to_spvalue(),
                         )
                     }
                     PlanState::UNKNOWN => {
-                        new_state = new_state.update(
+                        new_state.update_mut(
                             &format!("{}_current_goal_state", sp_id),
                             GoalState::UNKNOWN.to_string().to_spvalue(),
                         )
@@ -430,7 +458,7 @@ pub async fn goal_runner(
                     "Goal {} failed: \n       {}",
                     current_goal_id, current_goal_predicate
                 );
-                new_state = new_state.update(
+                new_state.update_mut(
                     &format!("{}_current_goal_state", sp_id),
                     GoalState::Initial.to_string().to_spvalue(),
                 )
@@ -440,7 +468,7 @@ pub async fn goal_runner(
                     "Goal {} completed: \n       {}",
                     current_goal_id, current_goal_predicate
                 );
-                new_state = new_state.update(
+                new_state.update_mut(
                     &format!("{}_current_goal_state", sp_id),
                     GoalState::Initial.to_string().to_spvalue(),
                 )
@@ -450,23 +478,134 @@ pub async fn goal_runner(
                     "Goal {} cancelled: \n       {}",
                     current_goal_id, current_goal_predicate
                 );
-                new_state = new_state.update(
+                new_state.update_mut(
                     &format!("{}_current_goal_state", sp_id),
                     GoalState::Initial.to_string().to_spvalue(),
                 )
             }
             GoalState::UNKNOWN => {
-                new_state = new_state.update(
+                new_state.update_mut(
                     &format!("{}_current_goal_state", sp_id),
                     GoalState::Initial.to_string().to_spvalue(),
                 )
             }
         }
-        new_state = new_state.update(
+        new_state.update_mut(
             &format!("{}_goal_runner_information", sp_id),
-            goal_runner_information.to_string().to_spvalue(),
+            goal_runner_information.to_spvalue(),
         );
         let modified_state = state.get_diff_partial_state(&new_state);
-        StateManager::set_state(&mut con, &modified_state).await;
+        if !modified_state.state.is_empty() {
+            StateManager::set_state(&mut con, &modified_state).await;
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn goal(id: &str, priority: GoalPriority, predicate: &str) -> Goal {
+        Goal {
+            id: id.to_string(),
+            priority,
+            predicate: predicate.to_string(),
+        }
+    }
+
+    /// The invariant that keeps the goal runner from writing on every tick: a
+    /// queue that nothing has been added to must come back out unchanged, so
+    /// the diff against the previous tick is empty.
+    #[test]
+    fn an_unchanged_queue_is_returned_unchanged() {
+        let queue = vec![
+            goal("aaa", GoalPriority::Normal, "var:x == true"),
+            goal("bbb", GoalPriority::Low, "var:y == true"),
+        ];
+
+        let once = admit_goals(queue.clone(), vec![]);
+        let twice = admit_goals(once.clone(), vec![]);
+        let thrice = admit_goals(twice.clone(), vec![]);
+
+        assert_eq!(once, queue);
+        assert_eq!(twice, once);
+        assert_eq!(thrice, twice, "repeated ticks must not perturb the queue");
+    }
+
+    #[test]
+    fn admitted_goals_get_a_fresh_unique_id() {
+        let incoming = vec![
+            goal("", GoalPriority::Normal, "var:x == true"),
+            goal("", GoalPriority::Normal, "var:y == true"),
+        ];
+
+        let queue = admit_goals(vec![], incoming);
+
+        assert_eq!(queue.len(), 2);
+        assert!(!queue[0].id.is_empty());
+        assert!(!queue[1].id.is_empty());
+        assert_ne!(queue[0].id, queue[1].id, "ids must be unique");
+    }
+
+    /// An id supplied by the caller on an *incoming* goal is replaced, matching
+    /// the previous behaviour that every admitted goal gets a fresh unique id.
+    #[test]
+    fn incoming_ids_are_replaced_but_only_once() {
+        let queue = admit_goals(
+            vec![],
+            vec![goal("caller_supplied", GoalPriority::Normal, "var:x == true")],
+        );
+        assert_eq!(queue.len(), 1);
+        assert_ne!(queue[0].id, "caller_supplied");
+
+        let assigned = queue[0].id.clone();
+        let queue = admit_goals(queue, vec![]);
+        assert_eq!(queue[0].id, assigned, "the id must survive the next tick");
+    }
+
+    /// A goal placed straight into the queue without going through the inbox
+    /// still ends up with an id, and keeps it.
+    #[test]
+    fn a_queued_goal_without_an_id_gets_one_and_keeps_it() {
+        let queue = admit_goals(vec![goal("", GoalPriority::High, "var:x == true")], vec![]);
+        assert!(!queue[0].id.is_empty());
+
+        let assigned = queue[0].id.clone();
+        let queue = admit_goals(queue, vec![]);
+        assert_eq!(queue[0].id, assigned);
+
+        let queue = admit_goals(
+            vec![goal("UNKNOWN", GoalPriority::High, "var:x == true")],
+            vec![],
+        );
+        assert_ne!(queue[0].id, "UNKNOWN");
+    }
+
+    #[test]
+    fn the_queue_is_ordered_by_priority_and_stable_within_it() {
+        let queue = admit_goals(
+            vec![
+                goal("low", GoalPriority::Low, "var:a == true"),
+                goal("normal_first", GoalPriority::Normal, "var:b == true"),
+                goal("normal_second", GoalPriority::Normal, "var:c == true"),
+                goal("top", GoalPriority::Top, "var:d == true"),
+            ],
+            vec![],
+        );
+
+        let ids: Vec<&str> = queue.iter().map(|g| g.id.as_str()).collect();
+        assert_eq!(ids, vec!["top", "normal_first", "normal_second", "low"]);
+    }
+
+    #[test]
+    fn admitted_goals_join_the_existing_queue() {
+        let queue = admit_goals(
+            vec![goal("queued", GoalPriority::Normal, "var:a == true")],
+            vec![goal("", GoalPriority::Top, "var:b == true")],
+        );
+
+        assert_eq!(queue.len(), 2);
+        assert_eq!(queue[0].predicate, "var:b == true", "top priority goes first");
+        assert_eq!(queue[1].id, "queued", "the queued goal keeps its id");
     }
 }

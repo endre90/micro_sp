@@ -100,20 +100,53 @@
 //     KEYS, MGET, MSET, DEL, DEL sequentially. `redis::pipe()` collapses the
 //     writes; HGETALL collapses the reads.              -> management/state.rs
 //
-//  9. Unconditional per-tick writes. `process_operation` rewrites
-//     `_elapsed_*_ms` every tick and `goal_runner` re-ids its goal list with
-//     fresh nanoids every tick, so the "changed" delta is never empty and an
-//     MSET goes out ~10x/s even on a fully idle system. Derive elapsed time
-//     from a stored start `SystemTime` instead of accumulating tick constants
-//     (which are also wrong: `process_operation` charges 200 ms per tick while
-//     `sop_runner` ticks at 100 ms).       -> running/process_operation.rs, goal_runner.rs
+//  9. DONE. Unconditional per-tick writes. Measured against a real Redis
+//     rather than assumed, which corrected the item: eight runners idling for
+//     five seconds already issued *zero* writes, so the "MSET ~10x/s on a fully
+//     idle system" claim was wrong. Two real write storms did show up:
+//       - `goal_runner` re-generated every scheduled goal's id with `nanoid!`
+//         on every tick, so `_scheduled_goals` serialised differently every
+//         time and an MSET went out on every tick for as long as anything sat
+//         in the queue - 50 MSETs per 5 s, now 0. Ids are assigned once, on
+//         admission (`admit_goals`), and a goal now keeps the id it was
+//         announced with. Its `.update(..)` chains are `update_mut` too.
+//       - `time_interface_runner` called `set_state` *inside* its per-timer
+//         loop: 153 MSETs per 5 s with three timers running, now 51 (one per
+//         tick, regardless of timer count). All timers accumulate into one
+//         `new_state` threaded through the loop.
+//     `plan_runner` got its terminated-operations block guarded and its
+//     six-`update` tail converted to `update_mut`.
+//     `process_operation`'s `_elapsed_*_ms` write is the one that remains, and
+//     it is legitimate: it only fires for an operation that is actually
+//     running, where the counter really changed. Deriving elapsed time from a
+//     stored start `SystemTime` would remove it *and* fix the tick-constant bug
+//     (`process_operation` charges 200 ms per tick while `sop_runner` ticks at
+//     100 ms), but that is a timeout-semantics change, still open.
+//                       -> running/goal_runner.rs, time_runner.rs, plan_runner.rs
 //
-// 10. `bfs_operation_planner` runs synchronously inside an async task for up to
-//     its 5 s deadline, blocking a tokio worker and therefore other runners;
-//     internally it uses `Vec::insert(0, ..)` (O(n^2)), clones the full state
-//     per visited node, and hashes states by sorting all keys. Use
-//     `spawn_blocking`, a `VecDeque`, and a planning-variable-only visited key.
-//                             -> planning/operation.rs, running/planner_ticker.rs
+// 10. DONE. `bfs_operation_planner` ran synchronously inside an async task for
+//     up to its 5 s deadline, blocking a tokio worker and therefore the other
+//     runners scheduled on it; internally it used `Vec::insert(0, ..)` (O(n^2)
+//     over the search), cloned the full state into `visited` per node, hashed
+//     states by allocating and sorting every key, cloned the plan prefix per
+//     successor, and took the state and the whole operation model by value.
+//     It now runs on `spawn_blocking` from `planner_ticker` (with the
+//     operations behind an `Arc` built once before the loop), and internally
+//     uses a `VecDeque`, a visited key over only the model's variables, a
+//     parent-link arena for the plan, and `&State` / `&[Operation]`.
+//     Measured: a 12-operation problem over a 200-variable state went from
+//     ~3.0 s to ~1.25 s; and during a 1.3 s search a heartbeat task on the same
+//     runtime went from 1 tick (stalled) to 60 (unaffected) - that stall is the
+//     "state changes stop happening while planning" symptom.
+//     API note: `bfs_operation_planner` now takes `&State`, `&Predicate` and
+//     `&[Operation]` instead of owned values.
+//     Still open: the frontier holds a full `State` per node, so `take_planning`
+//     copies every variable including the ones planning never touches. Running
+//     the search over a projection of the state (the model's variables plus the
+//     goal's) would cut that, at the cost of relying on the key derivation
+//     being complete - see the note on `Transition::get_all_var_keys`.
+//     `bfs_transition_planner` still has the original shape; it is only used by
+//     tests.                    -> planning/operation.rs, running/planner_ticker.rs
 //
 // Smaller but cheap: hoist the per-tick `format!("{}_...", name)` key building
 // into cached key strings; `Arc<Model>` instead of five deep model clones;

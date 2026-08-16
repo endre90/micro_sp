@@ -43,14 +43,18 @@ pub enum OperationProcessingType {
 //    `SystemTime` in the state when the operation enters Executing/Disabled and
 //    compute elapsed time from the wall clock - more accurate, and it also
 //    removes two state writes per operation per tick.
-// 6. The three chained `.update(..)` calls at the end each clone the whole
-//    state map (see `State::update`), and `_elapsed_executing_ms` /
-//    `_elapsed_disabled_ms` are written every single tick for every operation,
-//    which means the delta is never empty and every tick produces Redis
-//    traffic even when the system is completely idle. Suggested: only write the
-//    elapsed counters when they are actually consulted (i.e. derive them from a
-//    stored start time, per point 5), which lets an idle system produce an
-//    empty diff and skip the MSET entirely.
+// 6. DONE (partly): the three chained `.update(..)` calls at the end each
+//    cloned the whole state map; they are `update_mut` now.
+//    The rest of the original note was wrong and the correction matters:
+//    `_elapsed_executing_ms` / `_elapsed_disabled_ms` are only *incremented* in
+//    the Executing and Disabled arms, so in every other state they are written
+//    back unchanged and produce no diff - and an idle system has no active
+//    operations to call this with at all. Measured: eight runners idling for
+//    five seconds issue zero MSETs. The remaining per-tick write is for an
+//    operation that is genuinely running, where the elapsed counter really did
+//    change. Deriving it from a stored start time (point 5) would remove that
+//    write too, and would fix the tick-constant bug, but it is a timeout
+//    semantics change rather than an idle-load one.
 pub(super) async fn process_operation(
     sp_id: &str,
     mut new_state: State,

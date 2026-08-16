@@ -5,23 +5,26 @@ use tokio::time::{Duration, interval};
 
 static TICK_INTERVAL_MS: u64 = 100;
 
-// PERF: the `set_state` call is *inside* the `for timer_id in 1..=number_of_timers`
-// loop, so a system with 10 timers performs 10 separate diffs and 10 separate
-// Redis round trips every 100 ms - 100 MSETs per second, almost all of them
-// writing values that did not change. Suggested: accumulate all timers into one
-// `new_state`, diff once, and write once outside the loop (and skip the write
-// when the diff is empty).
-// PERF/correctness: each iteration builds `new_state` from `state` (the tick's
-// original snapshot) rather than from the previous iteration's result, so with
-// the write moved out of the loop only the last timer's changes would survive -
-// thread a single `new_state` through the loop instead.
-// PERF: `elapsed_ms += TICK_INTERVAL_MS` assumes the tick never slips; since
-// every tick also waits on a PING and an MGET, timers drift long under load.
-// Storing the start `SystemTime` and computing `elapsed` from the wall clock is
-// both more accurate and removes a state write per timer per tick.
-// PERF: `request_state == ActionRequestState::Executing.to_string()` allocates
-// a fresh `String` for the comparison on every timer on every tick; compare
-// against a `&'static str` instead.
+// DONE: PERF: the `set_state` call used to be *inside* the
+// `for timer_id in 1..=number_of_timers` loop, so a diff and a Redis round trip
+// went out per timer per tick. Measured with three timers running: 153 MSETs
+// per 5 seconds against 50 MGETs - three writes on every tick. All timers now
+// accumulate into one `new_state`, which is diffed once and written once, so a
+// tick costs at most one MSET no matter how many timers there are (and none at
+// all when nothing changed).
+// Note the ordering hazard this had to fix: each iteration used to build
+// `new_state` from `state`, the tick's original snapshot, so simply hoisting
+// the write would have kept only the last timer's changes. A single
+// `new_state` is threaded through the loop instead.
+// DONE: PERF: `request_state == ActionRequestState::Executing.to_string()`
+// allocated a fresh `String` for the comparison on every timer on every tick.
+//
+// PERF (still open): `elapsed_ms += TICK_INTERVAL_MS` assumes the tick never
+// slips; since every tick also waits on an MGET, timers drift long under load.
+// Storing the start `SystemTime` and computing `elapsed` from the wall clock
+// would be more accurate and would remove the per-executing-timer write - at
+// the cost of `_timer_N_elapsed_ms` no longer being readable as live progress,
+// so it is left alone deliberately.
 pub async fn time_interface_runner(
     sp_id: &str,
     connection_manager: &Arc<ConnectionManager>,
@@ -55,7 +58,8 @@ pub async fn time_interface_runner(
             None => continue,
         };
 
-        let mut new_state: State;
+        // One accumulator for every timer, diffed and written once below.
+        let mut new_state = state.clone();
 
         for timer_id in 1..=number_of_timers {
             let mut request_trigger = state.get_bool_or_default_to_false(
@@ -85,7 +89,7 @@ pub async fn time_interface_runner(
 
             if request_trigger {
                 request_trigger = false;
-                if request_state == ActionRequestState::Initial.to_string() {
+                if matches!(ActionRequestState::from_str(&request_state), ActionRequestState::Initial) {
                     match command.as_str() {
                         "sleep" => {
                             if duration_ms > 0 {
@@ -105,7 +109,7 @@ pub async fn time_interface_runner(
                 }
             }
 
-            if request_state == ActionRequestState::Executing.to_string() {
+            if matches!(ActionRequestState::from_str(&request_state), ActionRequestState::Executing) {
                 elapsed_ms += TICK_INTERVAL_MS as i64;
 
                 if elapsed_ms >= duration_ms {
@@ -115,20 +119,22 @@ pub async fn time_interface_runner(
                 }
             }
 
-            new_state = state
-                .update(
-                    &format!("{}_timer_{}_request_trigger", sp_id, timer_id),
-                    request_trigger.to_spvalue(),
-                )
-                .update(
-                    &format!("{}_timer_{}_request_state", sp_id, timer_id),
-                    request_state.to_spvalue(),
-                )
-                .update(
-                    &format!("{}_timer_{}_elapsed_ms", sp_id, timer_id),
-                    elapsed_ms.to_spvalue(),
-                );
-            let modified_state = state.get_diff_partial_state(&new_state);
+            new_state.update_mut(
+                &format!("{}_timer_{}_request_trigger", sp_id, timer_id),
+                request_trigger.to_spvalue(),
+            );
+            new_state.update_mut(
+                &format!("{}_timer_{}_request_state", sp_id, timer_id),
+                request_state.to_spvalue(),
+            );
+            new_state.update_mut(
+                &format!("{}_timer_{}_elapsed_ms", sp_id, timer_id),
+                elapsed_ms.to_spvalue(),
+            );
+        }
+
+        let modified_state = state.get_diff_partial_state(&new_state);
+        if !modified_state.state.is_empty() {
             StateManager::set_state(&mut con, &modified_state).await;
         }
     }

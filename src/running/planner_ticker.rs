@@ -67,6 +67,12 @@ pub async fn planner_ticker(
     // error on the command itself, which the callee already logs and skips.
     let mut con = connection_manager.get_connection().await;
 
+    // The operations the planner searches over never change, but every replan
+    // has to hand them to a blocking task. Building the `Arc` once here turns
+    // that into a refcount bump instead of a deep copy of every operation,
+    // transition and predicate per replan.
+    let planning_operations = Arc::new(model.operations.clone());
+
     loop {
         interval.tick().await;
         let state = match StateManager::get_state_for_keys(&mut con, &keys, &log_target).await {
@@ -78,7 +84,8 @@ pub async fn planner_ticker(
             &log_target,
         );
 
-        let new_state = process_planner_tick(sp_id, &model, &state, &log_target);
+        let new_state =
+            process_planner_tick(sp_id, &planning_operations, &state, &log_target).await;
 
         let new_info = new_state.get_string_or_default_to_unknown(
             &format!("{}_planner_information", sp_id),
@@ -107,7 +114,12 @@ struct PlannerContext {
     planner_information: String,
 }
 
-fn process_planner_tick(sp_id: &str, model: &Model, state: &State, log_target: &str) -> State {
+async fn process_planner_tick(
+    sp_id: &str,
+    planning_operations: &Arc<Vec<Operation>>,
+    state: &State,
+    log_target: &str,
+) -> State {
     let mut ctx = PlannerContext {
         replan_trigger: state
             .get_bool_or_default_to_false(&format!("{}_replan_trigger", sp_id), &log_target),
@@ -144,7 +156,15 @@ fn process_planner_tick(sp_id: &str, model: &Model, state: &State, log_target: &
         ctx.replan_trigger = false;
         ctx.replanned = false;
     } else {
-        handle_replan_request(&sp_id, &mut ctx, &mut new_state, model, state, &log_target);
+        handle_replan_request(
+            &sp_id,
+            &mut ctx,
+            &mut new_state,
+            planning_operations,
+            state,
+            &log_target,
+        )
+        .await;
     }
 
     new_state
@@ -182,22 +202,24 @@ fn process_planner_tick(sp_id: &str, model: &Model, state: &State, log_target: &
 }
 
 // Returns a new state to add containing unique operations ad unique operation meta
-// PERF: `bfs_operation_planner(state.clone(), goal, model.operations.clone(), ..)`
-// deep-copies the entire state *and* the entire operation model on every replan
-// request. The model copy in particular is large (every operation, every
-// transition, every predicate) and is only read. Suggested: change the planner
-// to take `&State` and `&[Operation]`.
-// PERF: this call is synchronous and can run for up to `deadline_ms` (5000 ms
-// here) inside an async task, blocking the tokio worker thread for that whole
-// time - which stalls every other runner scheduled on that worker and is a very
-// likely cause of the "state changes stop happening" symptom during planning.
-// Suggested: run it on `tokio::task::spawn_blocking` (or a rayon pool) and
-// await the handle, so the runtime stays responsive while the search runs.
-fn handle_replan_request(
+//
+// DONE: PERF: `bfs_operation_planner(state.clone(), goal, model.operations.clone(), ..)`
+// deep-copied the entire state *and* the entire operation model on every replan
+// request. The planner takes `&State` and `&[Operation]` now; the operations
+// live in an `Arc` built once before the runner loop, so a replan clones the
+// state once and nothing else.
+//
+// DONE: PERF: the call was synchronous and could run for up to `deadline_ms`
+// (5000 ms here) inside an async task, blocking that tokio worker for the whole
+// time - stalling every other runner scheduled on it, and a very likely cause
+// of the "state changes stop happening" symptom during planning. It now runs on
+// `tokio::task::spawn_blocking`, so the runtime stays responsive while the
+// search runs.
+async fn handle_replan_request(
     sp_id: &str,
     ctx: &mut PlannerContext,
     new_state: &mut State,
-    model: &Model,
+    planning_operations: &Arc<Vec<Operation>>,
     state: &State,
     log_target: &str
 ) {
@@ -220,14 +242,35 @@ fn handle_replan_request(
     // ctx.replan_counter_total += 1;
 
     let goal = state.extract_goal(&sp_id);
-    let plan_result = bfs_operation_planner(
-        state.clone(),
-        goal,
-        model.operations.clone(),
-        20,
-        &log_target,
-        5000
-    );
+
+    // `spawn_blocking` needs owned data: the operations are behind an `Arc`
+    // built once at startup, so this is a refcount bump, and the state is
+    // cloned once per replan - not once per expanded node, as the old
+    // by-value signature forced.
+    let planning_state = state.clone();
+    let operations = Arc::clone(planning_operations);
+    let planner_log_target = log_target.to_string();
+    let plan_result = match tokio::task::spawn_blocking(move || {
+        bfs_operation_planner(
+            &planning_state,
+            &goal,
+            &operations,
+            20,
+            &planner_log_target,
+            5000,
+        )
+    })
+    .await
+    {
+        Ok(result) => result,
+        Err(e) => {
+            log::error!(target: log_target, "Planner task failed to run: {e}");
+            PlanningResult {
+                found: false,
+                ..Default::default()
+            }
+        }
+    };
 
     if !plan_result.found {
         ctx.plan_id = "".to_string();
