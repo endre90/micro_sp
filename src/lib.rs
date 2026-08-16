@@ -158,10 +158,40 @@
 //     ~1.6 MB and ~5.3 MB respectively, plus the startup CPU of six deep copies.
 //                          -> running/main_runner.rs, auto_runner.rs
 //
+// 12. DONE. The `Disabled` arm of `process_operation` rebuilt its information
+//     message on every tick for every disabled operation - cloning every
+//     precondition's guard and runner guard, wrapping them in two
+//     `Predicate::OR` trees and rendering both through `Display` - only for the
+//     `!=` check below to throw the identical string away. A disabled operation
+//     is exactly the one that sits there for minutes. Both steady-state
+//     messages (this and the waiting branch of `Executing`) are now built once,
+//     when the operation first reports that state, and skipped afterwards via
+//     an allocation-free prefix test against the message already in the state.
+//     Measured per disabled operation per tick: 1.2 us (1 precondition, 2
+//     conjuncts) / 5.9 us (3 x 4) / 17.3 us (5 x 8) of rebuild work, replaced
+//     by a ~2 ns check.                       -> running/process_operation.rs
+//
+// 13. DONE (mostly). `sop_runner` per-tick costs. `active_sop_container
+//     .clone().unwrap()` deep-copied the whole SOP tree - every `Operation`,
+//     `Transition` and `Predicate` - twice on every tick of a running SOP, and
+//     the walk was additionally handed `new_state.clone()` whose result is
+//     assigned straight back over it. All are borrows now. `SOP::get_state`
+//     allocated a `format!` copy of the operation name per leaf and collected a
+//     `Vec<SOPState>` per branch to run five `any`/`all` passes over; it is one
+//     allocation-free pass. Measured on a 30-operation nested SOP: one tree
+//     clone is 74 KB, so ~148 KB per tick (~1.5 MB/s at 100 ms) stops being
+//     allocated, and `get_state` went from 5350 ns / 76 allocations to
+//     1534 ns / 30 - at 60 operations, 9164 ns / 151 to 2645 ns / 60.
+//     Left open deliberately, both noted in place: the `Box::pin` per visited
+//     node (removing it means making `process_operation` synchronous, which is
+//     exactly what has to be undone to re-enable the logging channel), and
+//     precomputing every node's state once per tick (the walk threads `State`
+//     through, so a `Parallel` branch sees what the branch before it just did -
+//     precomputing would turn that into a one-tick delay, a behaviour change).
+//                          -> running/sop_runner.rs, modelling/sops.rs
+//
 // Smaller but cheap: hoist the per-tick `format!("{}_...", name)` key building
-// into cached key strings; dedup the `keys` vectors before `MGET`; only build
-// log/info strings when they actually changed (the `Disabled` arm of
-// `process_operation` renders full predicate trees every tick).
+// into cached key strings; dedup the `keys` vectors before `MGET`.
 //
 // Note: `src/management/snapshot.rs` and `src/utils/op_logger.rs` were removed
 // from the module tree (their `pub use`/`pub mod` lines below and in

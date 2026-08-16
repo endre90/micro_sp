@@ -22,16 +22,21 @@ pub enum OperationProcessingType {
 // 2. Each of those getters goes through `State::get_value`, which currently
 //    clones the entire state map (see the note there). Six clones of the whole
 //    state before any real work happens, per operation, per tick.
-// 3. The `format!` for `new_op_info` runs on every arm every tick, but the
+// 3. DONE: the `format!` for `new_op_info` ran on every arm every tick, but the
 //    result is only used if it differs from `old_operation_information`. The
-//    `Disabled` arm is the expensive one: it clones every precondition's guard
+//    `Disabled` arm was the expensive one: it clones every precondition's guard
 //    and runner guard into two `Predicate::OR` trees and renders both via
 //    `Display` - a full predicate-tree walk with string building - *every
 //    200 ms for every disabled operation*, and a disabled operation is exactly
-//    the one that stays disabled for a long time. This is a very plausible
-//    cause of the CPU spikes during SOP execution. Suggested: compute a cheap
-//    discriminant (state + a small enum for the reason) and only build the
-//    string when that discriminant changed.
+//    the one that stays disabled for a long time.
+//    Both steady-state messages (`Disabled` and the waiting branch of
+//    `Executing`) are pure functions of the operation, so they were rebuilt
+//    byte-identically every tick and then discarded by the `!=` check. They are
+//    now built once, when the operation first reports that state, and skipped
+//    afterwards via `info_already_reads_as` - an allocation-free prefix test
+//    against the message already in the state.
+//    The other arms fire on state transitions rather than every tick, so their
+//    `format!` calls are not on the steady-state path and are left alone.
 // 4. DONE: `operation.clone().cancel(..)` / `.timeout(..)` / `.fail(..)` /
 //    `.complete(..)` / `.retry(..)` deep-copied the whole `Operation` (all six
 //    transition vectors) just to call a `&self` method. All twelve `.clone()`
@@ -55,6 +60,22 @@ pub enum OperationProcessingType {
 //    change. Deriving it from a stored start time (point 5) would remove that
 //    write too, and would fix the tick-constant bug, but it is a timeout
 //    semantics change rather than an idle-load one.
+/// True when `info` already reads as `{before}{op_name}{after}...`.
+///
+/// The steady-state arms of `process_operation` build a message that is a pure
+/// function of the operation, so it is the *same string* on every tick for as
+/// long as the operation stays in that state. `new_op_info` starts out as the
+/// value already in the state, so when this returns true there is nothing to
+/// rebuild - the message, the logging decision and the write are all unchanged.
+///
+/// The check itself is allocation-free, which is the point: it has to be much
+/// cheaper than the message it avoids building.
+fn info_already_reads_as(info: &str, before: &str, op_name: &str, after: &str) -> bool {
+    info.strip_prefix(before)
+        .and_then(|rest| rest.strip_prefix(op_name))
+        .map_or(false, |rest| rest.starts_with(after))
+}
+
 pub(super) async fn process_operation(
     sp_id: &str,
     mut new_state: State,
@@ -141,24 +162,41 @@ pub(super) async fn process_operation(
                 logging_log = format!("Starting");
                 op_info_level = log::Level::Info;
             } else {
-                let mut or_clause = vec![];
-                let mut or_clause_full = vec![];
-                for precondition in &operation.preconditions {
-                    or_clause.push(precondition.runner_guard.clone());
-                    or_clause_full.push(Predicate::AND(vec![
-                        precondition.guard.clone(),
-                        precondition.runner_guard.clone(),
-                    ]));
-                }
-                new_op_info = format!(
-                    "Operation '{}' disabled. Please satisfy the runner guard: \n       {}\n       Debug full guard: \n       {}",
-                    operation.name,
-                    Predicate::OR(or_clause),
-                    Predicate::OR(or_clause_full)
-                );
-                logging_log = format!("Disabled");
-
                 op_info_level = log::Level::Warn;
+
+                // DONE: PERF: this is the expensive arm, and it is the one an
+                // operation sits in for minutes at a time. Building the message
+                // clones every precondition's guard *and* runner guard, wraps
+                // them in two `Predicate::OR` trees and renders both through
+                // `Display` - a full recursive tree walk with string building,
+                // for every disabled operation on every tick. The result is a
+                // pure function of the operation, so it was byte-identical
+                // every time and thrown away again by the `!=` below.
+                // Now it is built once, when the operation first reports as
+                // disabled, and skipped for as long as that message stands.
+                if !info_already_reads_as(
+                    &old_operation_information,
+                    "Operation '",
+                    &operation.name,
+                    "' disabled.",
+                ) {
+                    let mut or_clause = vec![];
+                    let mut or_clause_full = vec![];
+                    for precondition in &operation.preconditions {
+                        or_clause.push(precondition.runner_guard.clone());
+                        or_clause_full.push(Predicate::AND(vec![
+                            precondition.guard.clone(),
+                            precondition.runner_guard.clone(),
+                        ]));
+                    }
+                    new_op_info = format!(
+                        "Operation '{}' disabled. Please satisfy the runner guard: \n       {}\n       Debug full guard: \n       {}",
+                        operation.name,
+                        Predicate::OR(or_clause),
+                        Predicate::OR(or_clause_full)
+                    );
+                    logging_log = format!("Disabled");
+                }
             }
         }
         OperationState::Executing => {
@@ -185,13 +223,21 @@ pub(super) async fn process_operation(
                 logging_log = format!("Completing");
                 op_info_level = log::Level::Info;
             } else {
-                new_op_info = format!(
-                    "Waiting for operation '{}' to be completed.",
-                    operation.name
-                )
-                .to_string();
-                logging_log = format!("Executing");
                 op_info_level = log::Level::Info;
+
+                // Same idea as the `Disabled` arm, and the same steady state:
+                // an executing operation waits here tick after tick with a
+                // message that never changes.
+                if !info_already_reads_as(
+                    &old_operation_information,
+                    "Waiting for operation '",
+                    &operation.name,
+                    "' to be completed.",
+                ) {
+                    new_op_info =
+                        format!("Waiting for operation '{}' to be completed.", operation.name);
+                    logging_log = format!("Executing");
+                }
             }
         }
         OperationState::Completed => {
@@ -463,3 +509,205 @@ pub(super) async fn process_operation(
         //     terminated_operations.to_spvalue(),
         // )
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const SP_ID: &str = "sp";
+    const TARGET: &str = "test";
+
+    #[test]
+    fn info_already_reads_as_matches_only_the_right_operation() {
+        let msg = "Operation 'op_move' disabled. Please satisfy the runner guard: ...";
+
+        assert!(info_already_reads_as(
+            msg,
+            "Operation '",
+            "op_move",
+            "' disabled."
+        ));
+
+        // The hazard worth guarding: one operation name being a prefix of
+        // another must not make them look like the same message.
+        assert!(!info_already_reads_as(
+            msg,
+            "Operation '",
+            "op_mo",
+            "' disabled."
+        ));
+        assert!(!info_already_reads_as(
+            "Operation 'op_move_to_b' disabled. ...",
+            "Operation '",
+            "op_move",
+            "' disabled."
+        ));
+
+        // A different message for the same operation must not match either.
+        assert!(!info_already_reads_as(
+            "Disabling operation 'op_move'.",
+            "Operation '",
+            "op_move",
+            "' disabled."
+        ));
+        assert!(!info_already_reads_as("", "Operation '", "op_move", "' disabled."));
+    }
+
+    fn disabled_operation_state() -> (State, Operation) {
+        let mut state = State::new();
+        state.add_mut(
+            SPAssignment::new(SPVariable::new("ready", SPValueType::Bool), false.to_spvalue()),
+            TARGET,
+        );
+        state.add_mut(
+            SPAssignment::new(SPVariable::new("armed", SPValueType::Bool), false.to_spvalue()),
+            TARGET,
+        );
+        state.add_mut(
+            SPAssignment::new(
+                SPVariable::new(&format!("{}_dashboard_command", SP_ID), SPValueType::String),
+                "none".to_spvalue(),
+            ),
+            TARGET,
+        );
+
+        // Two preconditions, so the disabled message renders a non-trivial
+        // `Predicate::OR` tree - the thing that used to be rebuilt every tick.
+        let operation = Operation::new(
+            "stuck",
+            None,
+            None,
+            None,
+            None,
+            false,
+            vec![
+                Transition::parse(
+                    "start_a",
+                    "var:ready == true",
+                    "var:armed == true",
+                    Vec::<&str>::new(),
+                    Vec::<&str>::new(),
+                    &state,
+                ),
+                Transition::parse(
+                    "start_b",
+                    "var:armed == true",
+                    "var:ready == true",
+                    Vec::<&str>::new(),
+                    Vec::<&str>::new(),
+                    &state,
+                ),
+            ],
+            vec![Transition::parse(
+                "complete",
+                "true",
+                "true",
+                Vec::<&str>::new(),
+                Vec::<&str>::new(),
+                &state,
+            )],
+            vec![],
+            vec![],
+            vec![],
+            vec![],
+        );
+
+        let state = add_operation_state_tracking_variable(
+            &vec![operation.name.clone()],
+            &state,
+            TARGET,
+        );
+        let state = add_operation_meta_tracking_variables(
+            &vec![operation.name.clone()],
+            &state,
+            false,
+            TARGET,
+        );
+
+        (state, operation)
+    }
+
+    async fn tick(state: State, operation: &Operation) -> State {
+        process_operation(
+            SP_ID,
+            state,
+            operation,
+            OperationProcessingType::Automatic,
+            None,
+            None,
+            TARGET,
+        )
+        .await
+    }
+
+    /// The message must be produced in full the first time, and must be exactly
+    /// the same on every tick afterwards - the skip path has to be
+    /// indistinguishable from rebuilding it.
+    #[tokio::test]
+    async fn the_disabled_message_is_built_once_and_then_stays_identical() {
+        let (state, operation) = disabled_operation_state();
+        let info_key = format!("{}_information", operation.name);
+
+        // Tick 1: Initial -> disabled.
+        let state = tick(state, &operation).await;
+        assert_eq!(
+            state.get_string_or_default_to_unknown(&operation.name, TARGET),
+            "disabled"
+        );
+
+        // Tick 2: the Disabled arm builds the full message.
+        let state = tick(state, &operation).await;
+        let first = state.get_string_or_default_to_unknown(&info_key, TARGET);
+        assert!(
+            first.starts_with(&format!("Operation '{}' disabled.", operation.name)),
+            "unexpected disabled message: {first}"
+        );
+        assert!(
+            first.contains("Debug full guard:"),
+            "the message should still render both guard trees: {first}"
+        );
+        assert!(
+            first.contains("armed = true") && first.contains("ready = true"),
+            "the message should still name the runner guard variables: {first}"
+        );
+
+        // Ticks 3..: the skip path must reproduce it byte for byte.
+        let mut state = state;
+        for _ in 0..5 {
+            state = tick(state, &operation).await;
+            let again = state.get_string_or_default_to_unknown(&info_key, TARGET);
+            assert_eq!(again, first, "the disabled message must not change");
+        }
+    }
+
+    /// A disabled operation whose guard becomes satisfiable must still leave the
+    /// Disabled arm - the skip must not pin the operation to its old message.
+    #[tokio::test]
+    async fn a_disabled_operation_still_starts_when_its_guard_is_satisfied() {
+        let (state, operation) = disabled_operation_state();
+
+        let state = tick(state, &operation).await;
+        let mut state = tick(state, &operation).await;
+        assert_eq!(
+            state.get_string_or_default_to_unknown(&operation.name, TARGET),
+            "disabled"
+        );
+
+        state.update_mut("ready", true.to_spvalue());
+        state.update_mut("armed", true.to_spvalue());
+
+        let state = tick(state, &operation).await;
+        assert_eq!(
+            state.get_string_or_default_to_unknown(&operation.name, TARGET),
+            "executing",
+            "the operation should have started once its guards were satisfiable"
+        );
+        assert!(
+            state
+                .get_string_or_default_to_unknown(&format!("{}_information", operation.name), TARGET)
+                .starts_with("Starting disabled operation"),
+            "the information should have been replaced, not skipped"
+        );
+    }
+}
+

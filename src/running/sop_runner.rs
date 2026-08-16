@@ -21,11 +21,15 @@ static TICK_INTERVAL: u64 = 100; // millis
 //    and the handful of `{sp_id}_sop_*` keys - see `running::runner_keys`. It
 //    is recomputed only when a SOP is activated or torn down, not per tick, so
 //    the blocking `KEYS *` is gone.
-// 2. `active_sop_container.clone().unwrap()` appears three times in the
-//    `Executing` arm alone and deep-copies the whole SOP tree (every
-//    `Operation`, every `Transition`, every `Predicate`) each time. Use
-//    `as_ref()`/`if let Some(sop) = &active_sop_container` - the functions only
-//    need `&SOP`. Same for `sop_template.sop.clone()` in the activation path.
+// 2. DONE: `active_sop_container.clone().unwrap()` appeared three times and
+//    deep-copied the whole SOP tree (every `Operation`, every `Transition`,
+//    every `Predicate`) each time - twice per tick while a SOP was running.
+//    `visualize_sop` and `get_state` only need `&SOP`, and so does
+//    `process_sop_node_tick`, so all three are `as_ref()` now. A fourth copy
+//    per tick is gone too: the walk was handed `new_state.clone()` even though
+//    its result is assigned straight back over `new_state`.
+//    `sop_template.sop.clone()` in the activation path stays - that one is
+//    real, it is the tree that gets uniquified, and it runs once per SOP start.
 // 3. `let mut new_state = state.clone()` clones the entire state map every tick
 //    just so the diff at the bottom has something to compare against. With
 //    `update_mut` + a dirty-key list (see `State`) you can drop both the clone
@@ -168,7 +172,11 @@ pub async fn sop_runner(
                     new_sop_info = format!(
                         "Initializing a new SOP '{}':\n{}",
                         active_sop,
-                        visualize_sop(&active_sop_container.clone().unwrap())
+                        // DONE: PERF: `active_sop_container.clone().unwrap()`
+                        // deep-copied the whole SOP tree - every `Operation`,
+                        // every `Transition`, every `Predicate` - just to read
+                        // it. `visualize_sop` and `get_state` only need `&SOP`.
+                        visualize_sop(active_sop_container.as_ref().unwrap())
                     );
                 }
                 SOPState::Executing => {
@@ -177,10 +185,15 @@ pub async fn sop_runner(
                     let con_clone = con.clone();
                     new_sop_info = format!("Executing SOP '{active_sop}'.");
                     sop_info_level = log::Level::Info;
+                    // DONE: PERF: this arm ran on every tick of a running SOP
+                    // and cloned the whole SOP tree twice (once for the walk,
+                    // once for the root state check) plus the whole `State`
+                    // once - the `state.clone()` was pure waste, since the
+                    // result is assigned straight back over it.
                     new_state = process_sop_node_tick(
                         sp_id,
-                        new_state.clone(),
-                        &active_sop_container.clone().unwrap(),
+                        new_state,
+                        active_sop_container.as_ref().unwrap(),
                         con_clone,
                         // logging_tx.clone(),
                         &log_target,
@@ -188,7 +201,7 @@ pub async fn sop_runner(
                     .await;
 
                     let calculated_root_state = active_sop_container
-                        .clone()
+                        .as_ref()
                         .unwrap()
                         .get_state(&new_state, &log_target);
 
@@ -320,19 +333,23 @@ async fn remove_operations_from_state(sop_id: &str, unique_sop: &SOP, mut con: S
 // PERF: the tree walk threads `State` by value, so every recursion level moves
 // (and every `process_operation` call rebuilds) the whole state map. Taking
 // `&mut State` instead would let each node mutate in place with no copying.
-// PERF: `Box::pin(..)` on each recursive call heap-allocates a future per node
-// per tick. Since none of this recursion actually awaits anything except
-// `process_operation` (which only awaits the logging channel), the walk could
-// be a synchronous function that returns the collected log messages for the
-// caller to send - removing every `Box::pin` and every `.clone()` of `con` and
-// `logging_tx` along the way.
-// PERF: `SOP::Sequence`/`Alternative` call `child.get_state(&state, ..)` for
-// each child, and `get_state` recurses over that child's entire subtree doing a
-// state lookup and a `format!` per operation. Finding the active child of a
-// sequence is therefore O(subtree) per level, i.e. O(n^2) over the tick.
-// Suggested: compute every node's state once per tick in a single bottom-up
-// pass and cache it in a `Vec<SOPState>` indexed by node, then have the walk
-// read from that.
+// PERF (still open, deliberately): `Box::pin(..)` on each recursive call
+// heap-allocates a future per node per tick. `process_operation` currently has
+// no live await point at all - the only one is the commented-out logging send -
+// so this whole walk could be synchronous and the boxing would vanish. It is
+// left as it is because making it sync means making `process_operation` sync
+// too, and that is exactly what has to be undone to re-enable the logging
+// channel. The cost is one allocation per *visited* node, and the walk visits
+// one child per Sequence/Alternative level plus every Parallel branch, so it is
+// a handful per tick - far smaller than the tree clones that were removed.
+// PERF (still open): `SOP::Sequence`/`Alternative` call `child.get_state(..)`
+// for each child while searching for the active branch, and `get_state`
+// recurses over that child's entire subtree. Precomputing every node's state
+// once per tick would make it a single O(n) pass - but note the walk threads
+// `State` through as it goes, so a `Parallel` branch sees what the branch
+// before it just did. Precomputing up front would turn that into a one-tick
+// delay, which is a behaviour change, not just an optimisation. The constant
+// factor has been cut instead (see `SOP::get_state`).
 async fn process_sop_node_tick(
     sp_id: &str,
     mut state: State,

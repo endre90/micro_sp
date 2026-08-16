@@ -41,25 +41,27 @@ impl SOP {
         operations
     }
 
-    // PERF: `sop_runner` calls this repeatedly per tick - once for the root and
-    // once per child while searching for the active branch of each Sequence /
-    // Alternative - and each call re-walks the entire subtree below it, so the
-    // work is O(n^2) in the number of operations per tick. Suggested: evaluate
-    // the whole tree once per tick in a single bottom-up pass into a
-    // `Vec<SOPState>` (or return it alongside the walk) and have the runner read
-    // from that.
-    // PERF: the leaf arm builds `format!("{}", op.name)` - an allocating copy of
-    // an existing `String` - and then `get_string_or_default_to_unknown` clones
-    // the value out of the state (on top of `get_value`'s full-map clone).
-    // Passing `&op.name` and comparing `&str` removes both.
-    // PERF: the branch arms collect a `Vec<SOPState>` and then run five separate
-    // `iter().any()/all()` passes over it. A single fold that accumulates the
-    // four flags avoids the allocation and four of the five passes.
+    // PERF (still open): `sop_runner` calls this repeatedly per tick - once for
+    // the root and once per child while searching for the active branch of each
+    // Sequence / Alternative - and each call re-walks the entire subtree below
+    // it. Evaluating the whole tree once per tick into a `Vec<SOPState>` indexed
+    // by pre-order position would make it a single O(n) pass. It is left alone
+    // deliberately: `process_sop_node_tick` threads the state through the walk,
+    // so a `Parallel` branch sees what the branch before it just did, and
+    // precomputing every node's state up front would quietly change that to a
+    // one-tick delay. The constant factor is what has been fixed instead.
+    //
+    // DONE: PERF: the leaf arm built `format!("{}", op.name)` - a heap
+    // allocation copying a `String` this already owns - on every leaf visit.
+    // DONE: PERF: the branch arms collected a `Vec<SOPState>` and then ran five
+    // separate `iter().any()/all()` passes over it. One pass accumulates the
+    // flags now, with no allocation. Children are still all evaluated (no
+    // short-circuit), exactly as before.
     pub fn get_state(&self, state: &State, log_target: &str) -> SOPState {
         match self {
             SOP::Operation(op) => {
                 let operation_state =
-                    state.get_string_or_default_to_unknown(&format!("{}", op.name), &log_target);
+                    state.get_string_or_default_to_unknown(&op.name, &log_target);
                 match OperationState::from_str(&operation_state) {
                     OperationState::Initial => SOPState::Initial,
                     OperationState::Disabled => SOPState::Executing,
@@ -82,16 +84,26 @@ impl SOP {
                     return SOPState::Completed;
                 }
 
-                let states: Vec<SOPState> = sops
-                    .iter()
-                    .map(|s| s.get_state(state, log_target))
-                    .collect();
-
-                let any_fatal = states.iter().any(|s| *s == SOPState::Fatal);
-                let any_cancelled = states.iter().any(|s| *s == SOPState::Cancelled);
-                let all_initial = states.iter().all(|s| *s == SOPState::Initial);
-                let all_completed = states.iter().all(|s| *s == SOPState::Completed);
-                let any_not_initial = states.iter().any(|s| *s != SOPState::Initial);
+                let mut any_fatal = false;
+                let mut any_cancelled = false;
+                let mut all_initial = true;
+                let mut all_completed = true;
+                for child in sops {
+                    let child_state = child.get_state(state, log_target);
+                    if child_state == SOPState::Fatal {
+                        any_fatal = true;
+                    }
+                    if child_state == SOPState::Cancelled {
+                        any_cancelled = true;
+                    }
+                    if child_state != SOPState::Initial {
+                        all_initial = false;
+                    }
+                    if child_state != SOPState::Completed {
+                        all_completed = false;
+                    }
+                }
+                let any_not_initial = !all_initial;
 
                 if any_fatal {
                     return SOPState::Fatal;
@@ -120,16 +132,26 @@ impl SOP {
                     return SOPState::Completed;
                 }
 
-                let states: Vec<SOPState> = sops
-                    .iter()
-                    .map(|s| s.get_state(state, log_target))
-                    .collect();
-
-                let any_fatal = states.iter().any(|s| *s == SOPState::Fatal);
-                let any_cancelled = states.iter().any(|s| *s == SOPState::Cancelled);
-                let all_initial = states.iter().all(|s| *s == SOPState::Initial);
-                let any_completed = states.iter().any(|s| *s == SOPState::Completed);
-                let any_not_initial = states.iter().any(|s| *s != SOPState::Initial);
+                let mut any_fatal = false;
+                let mut any_cancelled = false;
+                let mut all_initial = true;
+                let mut any_completed = false;
+                for child in sops {
+                    let child_state = child.get_state(state, log_target);
+                    if child_state == SOPState::Fatal {
+                        any_fatal = true;
+                    }
+                    if child_state == SOPState::Cancelled {
+                        any_cancelled = true;
+                    }
+                    if child_state != SOPState::Initial {
+                        all_initial = false;
+                    }
+                    if child_state == SOPState::Completed {
+                        any_completed = true;
+                    }
+                }
+                let any_not_initial = !all_initial;
 
                 if any_fatal {
                     return SOPState::Fatal;
@@ -273,5 +295,225 @@ mod tests {
         // 2. Call the visualization function.
         //    When you run `cargo test -- --nocapture`, this tree will be printed.
         visualize_sop(&example_sop);
+    }
+}
+
+#[cfg(test)]
+mod get_state_tests {
+    use crate::*;
+
+    const TARGET: &str = "test";
+
+    fn state_with(operations: &[(&str, &str)]) -> State {
+        let mut state = State::new();
+        for (name, value) in operations {
+            state.add_mut(
+                SPAssignment::new(
+                    SPVariable::new(name, SPValueType::String),
+                    value.to_spvalue(),
+                ),
+                TARGET,
+            );
+        }
+        state
+    }
+
+    fn leaf(name: &str) -> SOP {
+        SOP::Operation(Box::new(Operation {
+            name: name.to_string(),
+            ..Default::default()
+        }))
+    }
+
+    /// How an operation's own state maps onto the SOP node state.
+    #[test]
+    fn a_leaf_reports_the_operations_state() {
+        let cases = [
+            ("initial", SOPState::Initial),
+            ("disabled", SOPState::Executing),
+            ("executing", SOPState::Executing),
+            ("timedout", SOPState::Executing),
+            ("failed", SOPState::Executing),
+            ("bypassed", SOPState::Executing),
+            ("completed", SOPState::Executing),
+            ("terminated_completed", SOPState::Completed),
+            ("terminated_bypassed", SOPState::Completed),
+            ("fatal", SOPState::Fatal),
+            ("terminated_fatal", SOPState::Fatal),
+            ("cancelled", SOPState::Cancelled),
+            ("terminated_cancelled", SOPState::Cancelled),
+            ("nonsense", SOPState::UNKNOWN),
+        ];
+
+        for (operation_state, expected) in cases {
+            let state = state_with(&[("op", operation_state)]);
+            assert_eq!(
+                leaf("op").get_state(&state, TARGET),
+                expected,
+                "operation state '{operation_state}'"
+            );
+        }
+    }
+
+    /// `Sequence` and `Parallel` share one decision table; this pins every row
+    /// of it, which is what the single-pass rewrite had to preserve.
+    #[test]
+    fn sequence_and_parallel_decision_table() {
+        let cases: [(&str, Vec<&str>, SOPState); 8] = [
+            ("all initial", vec!["initial", "initial"], SOPState::Initial),
+            (
+                "all terminated",
+                vec!["terminated_completed", "terminated_bypassed"],
+                SOPState::Completed,
+            ),
+            (
+                "part way through",
+                vec!["terminated_completed", "initial"],
+                SOPState::Executing,
+            ),
+            (
+                "one running",
+                vec!["executing", "initial"],
+                SOPState::Executing,
+            ),
+            ("one fatal", vec!["initial", "fatal"], SOPState::Fatal),
+            (
+                "fatal beats completed",
+                vec!["terminated_completed", "fatal"],
+                SOPState::Fatal,
+            ),
+            (
+                "one cancelled",
+                vec!["terminated_completed", "cancelled"],
+                SOPState::Cancelled,
+            ),
+            (
+                "fatal beats cancelled",
+                vec!["cancelled", "fatal"],
+                SOPState::Fatal,
+            ),
+        ];
+
+        for (label, operation_states, expected) in cases {
+            let named: Vec<(String, &str)> = operation_states
+                .iter()
+                .enumerate()
+                .map(|(i, s)| (format!("op{}", i), *s))
+                .collect();
+            let pairs: Vec<(&str, &str)> =
+                named.iter().map(|(n, s)| (n.as_str(), *s)).collect();
+            let state = state_with(&pairs);
+            let children: Vec<SOP> = named.iter().map(|(n, _)| leaf(n)).collect();
+
+            assert_eq!(
+                SOP::Sequence(children.clone()).get_state(&state, TARGET),
+                expected,
+                "Sequence: {label}"
+            );
+            assert_eq!(
+                SOP::Parallel(children).get_state(&state, TARGET),
+                expected,
+                "Parallel: {label}"
+            );
+        }
+    }
+
+    /// `Alternative` differs in exactly one place: *any* completed branch
+    /// completes the node, rather than requiring all of them.
+    #[test]
+    fn alternative_decision_table() {
+        let cases: [(&str, Vec<&str>, SOPState); 6] = [
+            ("all initial", vec!["initial", "initial"], SOPState::Initial),
+            (
+                "one branch taken and finished",
+                vec!["terminated_completed", "initial"],
+                SOPState::Completed,
+            ),
+            (
+                "one branch running",
+                vec!["executing", "initial"],
+                SOPState::Executing,
+            ),
+            ("one fatal", vec!["initial", "fatal"], SOPState::Fatal),
+            (
+                "fatal beats completed",
+                vec!["terminated_completed", "fatal"],
+                SOPState::Fatal,
+            ),
+            (
+                "cancelled beats completed",
+                vec!["terminated_completed", "cancelled"],
+                SOPState::Cancelled,
+            ),
+        ];
+
+        for (label, operation_states, expected) in cases {
+            let named: Vec<(String, &str)> = operation_states
+                .iter()
+                .enumerate()
+                .map(|(i, s)| (format!("op{}", i), *s))
+                .collect();
+            let pairs: Vec<(&str, &str)> =
+                named.iter().map(|(n, s)| (n.as_str(), *s)).collect();
+            let state = state_with(&pairs);
+            let children: Vec<SOP> = named.iter().map(|(n, _)| leaf(n)).collect();
+
+            assert_eq!(
+                SOP::Alternative(children).get_state(&state, TARGET),
+                expected,
+                "Alternative: {label}"
+            );
+        }
+    }
+
+    #[test]
+    fn an_empty_branch_counts_as_completed() {
+        let state = State::new();
+        assert_eq!(
+            SOP::Sequence(vec![]).get_state(&state, TARGET),
+            SOPState::Completed
+        );
+        assert_eq!(
+            SOP::Parallel(vec![]).get_state(&state, TARGET),
+            SOPState::Completed
+        );
+        assert_eq!(
+            SOP::Alternative(vec![]).get_state(&state, TARGET),
+            SOPState::Completed
+        );
+    }
+
+    /// Nesting has to propagate, since the runner asks the root for the state
+    /// of the whole tree.
+    #[test]
+    fn nested_branches_propagate() {
+        let state = state_with(&[
+            ("a", "terminated_completed"),
+            ("b", "terminated_completed"),
+            ("c", "executing"),
+            ("d", "initial"),
+        ]);
+
+        let tree = SOP::Sequence(vec![
+            SOP::Parallel(vec![leaf("a"), leaf("b")]),
+            SOP::Sequence(vec![leaf("c"), leaf("d")]),
+        ]);
+        assert_eq!(tree.get_state(&state, TARGET), SOPState::Executing);
+
+        let done = state_with(&[
+            ("a", "terminated_completed"),
+            ("b", "terminated_completed"),
+            ("c", "terminated_completed"),
+            ("d", "terminated_bypassed"),
+        ]);
+        assert_eq!(tree.get_state(&done, TARGET), SOPState::Completed);
+
+        let broken = state_with(&[
+            ("a", "terminated_completed"),
+            ("b", "terminated_completed"),
+            ("c", "terminated_completed"),
+            ("d", "fatal"),
+        ]);
+        assert_eq!(tree.get_state(&broken, TARGET), SOPState::Fatal);
     }
 }
