@@ -53,11 +53,19 @@ pub async fn planned_operation_runner(
     let static_keys = plan_runner_static_keys(sp_id, &model);
     let mut keys = static_keys.clone();
     let mut active_plan: Vec<String> = vec![];
+    let read_full_state = read_full_state_enabled();
+    if read_full_state {
+        log::warn!(target: &log_target, "MICRO_SP_READ_FULL_STATE is set: reading the whole keyspace every tick.");
+    }
 
     loop {
         interval.tick().await;
 
-        let mut state = match StateManager::get_state_for_keys(&mut con, &keys, &log_target).await {
+        let read = match read_full_state {
+            true => StateManager::get_full_state(&mut con).await,
+            false => StateManager::get_state_for_keys(&mut con, &keys, &log_target).await,
+        };
+        let mut state = match read {
             Some(s) => s,
             None => continue,
         };
@@ -67,14 +75,16 @@ pub async fn planned_operation_runner(
         // whose bookkeeping variables have to be in the key set before
         // `process_plan_tick` reads them - reading a variable that is not in
         // the state panics - so rebuild and re-read once when it changes.
-        let plan = read_plan(&state, sp_id, &log_target);
-        if plan != active_plan {
-            keys = keys_with_active_operations(&static_keys, &plan);
-            active_plan = plan;
-            state = match StateManager::get_state_for_keys(&mut con, &keys, &log_target).await {
-                Some(s) => s,
-                None => continue,
-            };
+        if !read_full_state {
+            let plan = read_plan(&state, sp_id, &log_target);
+            if plan != active_plan {
+                keys = keys_with_active_operations(&static_keys, &plan);
+                active_plan = plan;
+                state = match StateManager::get_state_for_keys(&mut con, &keys, &log_target).await {
+                    Some(s) => s,
+                    None => continue,
+                };
+            }
         }
 
         let con_clone = con.clone();

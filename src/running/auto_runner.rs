@@ -169,6 +169,10 @@ pub async fn auto_operation_runner(
     // have been activated with a `nanoid` suffix.
     let static_keys = auto_operation_runner_static_keys(sp_id, &model);
     let mut keys = static_keys.clone();
+    let read_full_state = read_full_state_enabled();
+    if read_full_state {
+        log::warn!(target: &log_target, "MICRO_SP_READ_FULL_STATE is set: reading the whole keyspace every tick.");
+    }
 
     // PERF: one long-lived connection handle for the whole runner instead of
     // re-fetching one every tick, and no pre-flight PING before the real work.
@@ -179,7 +183,11 @@ pub async fn auto_operation_runner(
 
     loop {
         interval.tick().await;
-        let state = match StateManager::get_state_for_keys(&mut con, &keys, &log_target).await {
+        let read = match read_full_state {
+            true => StateManager::get_full_state(&mut con).await,
+            false => StateManager::get_state_for_keys(&mut con, &keys, &log_target).await,
+        };
+        let state = match read {
             Some(s) => s,
             None => continue,
         };

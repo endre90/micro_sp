@@ -234,15 +234,38 @@ impl Transition {
     // }
 
         // TODO: test...
+    /// Every state variable this transition reads or writes.
+    ///
+    /// This feeds the runners' `get_state_for_keys` key sets, so anything
+    /// missing here is a variable missing from the state the runner reads - and
+    /// reading a variable that is not in the state panics.
+    ///
+    /// Note both halves of an action count: `var:a <- var:b` writes `a` *and*
+    /// reads `b`, and an array/map right-hand side can reference any number of
+    /// further variables (`Action::assign_mut` evaluates it through
+    /// `SPWrapped::evaluate`). Collecting only `a.var` - which is what this did
+    /// originally - silently dropped every right-hand side variable.
     pub fn get_all_var_keys(&self) -> Vec<String> {
+        fn action_var_keys(action: &Action) -> Vec<String> {
+            let mut keys = vec![action.var.name.clone()];
+            keys.extend(
+                action
+                    .var_or_val
+                    .get_variables()
+                    .into_iter()
+                    .map(|var| var.name),
+            );
+            keys
+        }
+
         let mut all_keys: Vec<String> = self.guard.get_predicate_var_keys()
             .into_iter()
             .chain(self.runner_guard.get_predicate_var_keys())
-            .chain(self.actions.iter().map(|a| a.var.name.clone()))
-            .chain(self.runner_actions.iter().map(|a| a.var.name.clone()))
+            .chain(self.actions.iter().flat_map(action_var_keys))
+            .chain(self.runner_actions.iter().flat_map(action_var_keys))
             .collect();
-    
-        all_keys.sort(); 
+
+        all_keys.sort();
         all_keys.dedup();
         all_keys
     }

@@ -25,8 +25,18 @@
 //     (for the plan runner, when `{sp_id}_plan` changes - it does not create its
 //     own operations). Measured on a scripted SOP + auto-operation + plan run:
 //     16 `KEYS` calls before, 0 after, with the same number of MGETs.
-//     `Operation::get_all_var_keys` was silently skipping `bypass_transitions`,
-//     which would have left a hole in every key set built from it; fixed.
+//     Two holes in the key derivation were found and fixed on the way, both of
+//     which were invisible while the runners read the whole database:
+//     `Operation::get_all_var_keys` skipped `bypass_transitions` entirely, and
+//     `Transition::get_all_var_keys` collected only an action's *target*
+//     variable - so `var:a <- var:b` never contributed `b`, which is how a
+//     consuming package's own variables usually enter a model. Every runner now
+//     also reads the union of *all* model variables rather than only those of
+//     the operations it drives, since guards routinely reference variables
+//     another operation group writes.
+//     Escape hatch: `MICRO_SP_READ_FULL_STATE=1` puts all three runners back on
+//     `get_full_state` with no code change, for the case where something still
+//     goes missing in the field.
 //     `StateManager::get_full_state` itself is unchanged and still available -
 //     if a whole-state read is ever needed again, store the state as one Redis
 //     HASH and use `HGETALL` rather than reinstating `KEYS *`.

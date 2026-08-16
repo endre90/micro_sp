@@ -67,6 +67,68 @@ pub fn keys_with_active_operations(static_keys: &[String], active_ops: &[String]
     normalize_keys(keys)
 }
 
+/// Environment escape hatch: with `MICRO_SP_READ_FULL_STATE` set to `1`/`true`,
+/// the three operation runners go back to `StateManager::get_full_state` (a
+/// `KEYS *` scan) instead of their key sets.
+///
+/// This exists because reading a variable that is not in the state panics, so a
+/// key set with a hole takes a runner down. The sets below are derived from the
+/// model and are meant to be complete, but a downstream package that builds its
+/// model in a way this derivation does not see can flip this on and keep
+/// running - at the cost of the blocking keyspace scan - instead of being stuck.
+/// If you ever need it, that is a bug in the derivation worth reporting.
+pub fn read_full_state_enabled() -> bool {
+    match std::env::var("MICRO_SP_READ_FULL_STATE") {
+        Ok(value) => matches!(value.trim().to_ascii_lowercase().as_str(), "1" | "true"),
+        Err(_) => false,
+    }
+}
+
+/// Every state variable referenced anywhere in the model.
+///
+/// All three runners use this whole union rather than just the variables of the
+/// operations they happen to drive. Guards routinely reference variables that
+/// another operation group writes (an auto operation reacting to something a
+/// planned operation set, a SOP guard reading an interface variable), and
+/// splitting the sets per group makes that a runtime panic. The union is still
+/// only the model's variables - it does not touch transforms, log blobs or
+/// anything else in the keyspace - so it costs a slightly longer `MGET` and
+/// saves a whole class of missing-variable failures.
+///
+/// The *template* operation names are included too: `Operation::eval` reads
+/// `{op.name}` to decide whether an operation may start, so those variables are
+/// consulted on every tick even when nothing is active.
+pub fn model_variable_keys(model: &Model) -> Vec<String> {
+    let mut keys: Vec<String> = Vec::new();
+
+    for op in model
+        .operations
+        .iter()
+        .chain(model.auto_operations.iter())
+        .chain(model.mutexed_auto_operations.iter())
+    {
+        keys.push(op.name.clone());
+        keys.extend(op.get_all_var_keys());
+    }
+
+    for transition in &model.auto_transitions {
+        keys.extend(transition.get_all_var_keys());
+    }
+
+    for sop in &model.sops {
+        // `{sop_id}_sop_information` is keyed by the *template* id.
+        keys.push(format!("{}_sop_information", sop.id));
+        // Guard and action variables are unaffected by uniquifying, so the
+        // template's key set covers the running copy too.
+        keys.extend(sop.sop.get_all_var_keys());
+        for op in get_all_operations_from_sop(&sop.sop) {
+            keys.push(op.name.clone());
+        }
+    }
+
+    normalize_keys(keys)
+}
+
 /// Keys `sop_runner` reads on every tick regardless of what is running.
 ///
 /// The per-operation bookkeeping variables of a running SOP are added on
@@ -80,37 +142,15 @@ pub fn sop_runner_static_keys(sp_id: &str, model: &Model) -> Vec<String> {
         // read by `Operation::can_be_cancelled` for every operation processed
         format!("{}_dashboard_command", sp_id),
     ];
-
-    for sop in &model.sops {
-        // `{sop_id}_sop_information` is keyed by the *template* id, so every
-        // template's info variable is a candidate.
-        keys.push(format!("{}_sop_information", sop.id));
-        // Guard and action variables are unaffected by uniquifying, so the
-        // template's key set covers the running copy too.
-        keys.extend(sop.sop.get_all_var_keys());
-    }
-
+    keys.extend(model_variable_keys(model));
     normalize_keys(keys)
 }
 
 /// Keys `auto_operation_runner` reads on every tick regardless of what is
 /// running.
-///
-/// Note that the *template* operation names are included: `Operation::eval`
-/// reads `{op.name}` to decide whether the operation may start, so those
-/// variables are consulted on every tick even when nothing is active.
 pub fn auto_operation_runner_static_keys(sp_id: &str, model: &Model) -> Vec<String> {
     let mut keys = vec![format!("{}_dashboard_command", sp_id)];
-
-    for op in model
-        .auto_operations
-        .iter()
-        .chain(model.mutexed_auto_operations.iter())
-    {
-        keys.push(op.name.clone());
-        keys.extend(op.get_all_var_keys());
-    }
-
+    keys.extend(model_variable_keys(model));
     normalize_keys(keys)
 }
 
@@ -132,11 +172,7 @@ pub fn plan_runner_static_keys(sp_id: &str, model: &Model) -> Vec<String> {
         // read by `Operation::can_be_cancelled` for every operation processed
         format!("{}_dashboard_command", sp_id),
     ];
-
-    for op in &model.operations {
-        keys.extend(op.get_all_var_keys());
-    }
-
+    keys.extend(model_variable_keys(model));
     normalize_keys(keys)
 }
 
@@ -163,6 +199,15 @@ mod tests {
             (bv!("cancelled_marker"), false.to_spvalue()),
             // touched only by a failure transition
             (bv!("failed_marker"), false.to_spvalue()),
+            // referenced only on the *right-hand side* of an action
+            // (`var:pose <- var:rhs_source`), the way a downstream package's
+            // own variables usually enter a model
+            (v!("rhs_source"), "b".to_spvalue()),
+            (v!("rhs_in_array"), "x".to_spvalue()),
+            (v!("rhs_in_map_key"), "k".to_spvalue()),
+            (v!("rhs_in_map_value"), "v".to_spvalue()),
+            (av!("collected"), Vec::<SPValue>::new().to_spvalue()),
+            (mv!("mapped"), Vec::<(SPValue, SPValue)>::new().to_spvalue()),
         ] {
             state.add_mut(assign!(var, val), TARGET);
         }
@@ -189,7 +234,10 @@ mod tests {
                 "complete",
                 "var:action_state == done",
                 "true",
-                vec!("var:trigger <- false", "var:pose <- b"),
+                // `var:pose <- var:rhs_source` reads `rhs_source`; it is not
+                // named in any guard, so the only way it reaches a key set is
+                // through the action's right-hand side.
+                vec!("var:trigger <- false", "var:pose <- var:rhs_source"),
                 Vec::<&str>::new(),
                 state
             )],
@@ -259,6 +307,115 @@ mod tests {
             }
         }
         restricted
+    }
+
+    /// The regression the runners actually tripped over: an action's
+    /// right-hand side is *read* when the action is applied
+    /// (`Action::assign_mut` -> `SPWrapped::evaluate` -> `State::get_value`),
+    /// but `Transition::get_all_var_keys` used to collect only the action's
+    /// target variable. A downstream package that assigns from its own
+    /// variables therefore had them missing from every runner key set.
+    #[test]
+    fn action_right_hand_side_variables_are_in_the_key_set() {
+        let state = model_state();
+
+        let plain = t!(
+            "assign_from_variable",
+            "true",
+            "true",
+            vec!("var:pose <- var:rhs_source"),
+            Vec::<&str>::new(),
+            &state
+        );
+        let keys: HashSet<String> = plain.get_all_var_keys().into_iter().collect();
+        assert!(keys.contains("pose"), "the action target must be included");
+        assert!(
+            keys.contains("rhs_source"),
+            "the variable the action assigns *from* must be included"
+        );
+
+        // The same applies to a runner action, and to variables nested inside
+        // an array or map right-hand side.
+        let nested = Transition::new(
+            "nested",
+            Predicate::TRUE,
+            Predicate::TRUE,
+            vec![Action::new(
+                av!("collected"),
+                SPWrapped::Array(vec![
+                    SPWrapped::SPVariable(v!("rhs_in_array")),
+                    SPWrapped::SPValue("literal".to_spvalue()),
+                ]),
+            )],
+            vec![Action::new(
+                mv!("mapped"),
+                SPWrapped::Map(vec![(
+                    SPWrapped::SPVariable(v!("rhs_in_map_key")),
+                    SPWrapped::SPVariable(v!("rhs_in_map_value")),
+                )]),
+            )],
+        );
+        let keys: HashSet<String> = nested.get_all_var_keys().into_iter().collect();
+        for key in [
+            "collected",
+            "rhs_in_array",
+            "mapped",
+            "rhs_in_map_key",
+            "rhs_in_map_value",
+        ] {
+            assert!(keys.contains(key), "missing '{key}' from a nested right-hand side");
+        }
+    }
+
+    /// A variable that only appears on the right-hand side of an action has to
+    /// survive all the way into the runners' key sets, not just into
+    /// `Transition::get_all_var_keys`.
+    #[test]
+    fn runner_key_sets_include_action_right_hand_side_variables() {
+        let state = model_state();
+        let model = test_model(&state);
+
+        for (name, keys) in [
+            ("sop_runner", sop_runner_static_keys(SP_ID, &model)),
+            (
+                "auto_operation_runner",
+                auto_operation_runner_static_keys(SP_ID, &model),
+            ),
+            ("plan_runner", plan_runner_static_keys(SP_ID, &model)),
+        ] {
+            let keys: HashSet<String> = keys.into_iter().collect();
+            assert!(
+                keys.contains("rhs_source"),
+                "{name} is missing an action's right-hand side variable"
+            );
+        }
+    }
+
+    /// Every runner reads the whole model's variables, not just those of the
+    /// operations it drives - guards routinely reference variables another
+    /// operation group writes.
+    #[test]
+    fn every_runner_sees_every_model_variable() {
+        let state = model_state();
+        let model = test_model(&state);
+        let model_keys: HashSet<String> = model_variable_keys(&model).into_iter().collect();
+
+        for (name, keys) in [
+            ("sop_runner", sop_runner_static_keys(SP_ID, &model)),
+            (
+                "auto_operation_runner",
+                auto_operation_runner_static_keys(SP_ID, &model),
+            ),
+            ("plan_runner", plan_runner_static_keys(SP_ID, &model)),
+        ] {
+            let keys: HashSet<String> = keys.into_iter().collect();
+            for key in &model_keys {
+                assert!(
+                    keys.contains(key),
+                    "{name} is missing model variable '{key}'"
+                );
+            }
+        }
     }
 
     #[test]
