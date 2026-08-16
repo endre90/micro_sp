@@ -10,16 +10,17 @@ use tokio::{
 static TICK_INTERVAL: u64 = 100; // millis
 
 // PERF: this is the loop you feel when a SOP is running. Per 100 ms tick it
-// does: a PING round trip, a `KEYS *` + `MGET` of the entire database, a full
-// `state.clone()`, a recursive walk of the SOP tree that clones the tree
-// several times and evaluates every operation guard, a full-state diff, and an
-// MSET. Concretely, the things worth changing here:
+// does: an `MGET` of its key set, a full `state.clone()`, a recursive walk of
+// the SOP tree that clones the tree several times and evaluates every operation
+// guard, a full-state diff, and an MSET. Concretely, the things worth changing
+// here:
 //
-// 1. `StateManager::get_full_state` -> `get_state_for_keys`. `SOP` already has
-//    `get_all_var_keys()`; union that with the per-operation bookkeeping keys
-//    (`{op}`, `{op}_information`, `{op}_elapsed_*`, `{op}_*_retry_counter`) and
-//    the handful of `{sp_id}_sop_*` keys. Recompute the set only when a SOP is
-//    activated or torn down, not per tick. This removes the blocking `KEYS *`.
+// 1. DONE: `StateManager::get_full_state` -> `get_state_for_keys`. The key set
+//    is `SOP::get_all_var_keys()` unioned with the per-operation bookkeeping
+//    keys (`{op}`, `{op}_information`, `{op}_elapsed_*`, `{op}_*_retry_counter`)
+//    and the handful of `{sp_id}_sop_*` keys - see `running::runner_keys`. It
+//    is recomputed only when a SOP is activated or torn down, not per tick, so
+//    the blocking `KEYS *` is gone.
 // 2. `active_sop_container.clone().unwrap()` appears three times in the
 //    `Executing` arm alone and deep-copies the whole SOP tree (every
 //    `Operation`, every `Transition`, every `Predicate`) each time. Use
@@ -64,6 +65,14 @@ pub async fn sop_runner(
     let mut active_sop_container: Option<SOP> = None;
     // let mut terminated_operations: Vec<String> = vec!();
 
+    // The variables read every tick no matter what is running, and the set
+    // actually requested from Redis. The latter grows with the bookkeeping
+    // variables of a SOP's operations while that SOP is active - their names
+    // only exist once `uniquify_sop_operations` has run, which is why the set
+    // is rebuilt there rather than computed once here.
+    let static_keys = sop_runner_static_keys(sp_id, model);
+    let mut keys = static_keys.clone();
+
     // PERF: one long-lived connection handle for the whole runner instead of
     // re-fetching one every tick, and no pre-flight PING before the real work.
     // `SPConnection` is cheap to clone, multiplexed and self-healing, so this
@@ -73,7 +82,7 @@ pub async fn sop_runner(
 
     loop {
         interval.tick().await;
-        let state = match StateManager::get_full_state(&mut con).await {
+        let state = match StateManager::get_state_for_keys(&mut con, &keys, &log_target).await {
             Some(s) => s,
             None => continue,
         };
@@ -120,17 +129,23 @@ pub async fn sop_runner(
                     let unique_sop = uniquify_sop_operations(sop_template.sop.clone());
                     active_sop_container = Some(unique_sop.clone());
                     let ops_in_sop = get_all_operations_from_sop(&unique_sop);
+                    let op_names: Vec<String> =
+                        ops_in_sop.iter().map(|x| x.name.clone()).collect();
+
+                    // The bookkeeping variables of these operations are created
+                    // in `new_state` below and written out by the diff at the
+                    // end of this tick; from the next tick on they have to be
+                    // read back, so the key set grows with them here.
+                    keys = keys_with_active_operations(&static_keys, &op_names);
+
                     new_state = add_operation_meta_tracking_variables(
-                        &ops_in_sop.iter().map(|x| x.name.clone()).collect(),
+                        &op_names,
                         &new_state,
                         false,
                         &log_target,
                     );
-                    new_state = add_operation_state_tracking_variable(
-                        &ops_in_sop.iter().map(|x| x.name.clone()).collect(),
-                        &new_state,
-                        &log_target,
-                    );
+                    new_state =
+                        add_operation_state_tracking_variable(&op_names, &new_state, &log_target);
                     new_sop_info = format!("SOP '{sop_id}' is enabled, starting execution.");
                     sop_info_level = log::Level::Info;
                     new_state =
@@ -190,6 +205,9 @@ pub async fn sop_runner(
 
                     active_sop_container = None;
                     active_unique_sop_id = None;
+                    // Those operation variables have just been deleted from
+                    // Redis, so stop asking for them.
+                    keys = static_keys.clone();
                 }
                 SOPState::Completed => {
                     new_sop_info = format!("Completed SOP '{active_sop}'.");
@@ -205,6 +223,9 @@ pub async fn sop_runner(
 
                     active_sop_container = None;
                     active_unique_sop_id = None;
+                    // Those operation variables have just been deleted from
+                    // Redis, so stop asking for them.
+                    keys = static_keys.clone();
                 }
                 SOPState::Cancelled => {
                     new_sop_info = format!("Cancelled SOP '{active_sop}'.");
@@ -220,6 +241,9 @@ pub async fn sop_runner(
 
                     active_sop_container = None;
                     active_unique_sop_id = None;
+                    // Those operation variables have just been deleted from
+                    // Redis, so stop asking for them.
+                    keys = static_keys.clone();
                 }
                 SOPState::UNKNOWN => {
                     new_sop_info = format!("SOP '{active_sop}' state id UNKNOWN.");
@@ -227,6 +251,7 @@ pub async fn sop_runner(
                     active_unique_sop_state = SOPState::Initial;
                     active_sop_container = None;
                     active_unique_sop_id = None;
+                    keys = static_keys.clone();
                 }
             },
         }

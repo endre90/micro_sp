@@ -123,14 +123,14 @@ pub async fn auto_transition_runner(
     }
 }
 
-// PERF: same shape as `sop_runner` and with the same three costs per 200 ms
-// tick - a PING, a blocking `KEYS *` + `MGET` of the whole database, and a full
-// `state.clone()`. Specifically:
-//   1. Replace `get_full_state` with `get_state_for_keys`. The key set is
-//      `model.auto_operations`/`mutexed_auto_operations` `get_all_var_keys()`
-//      unioned with the bookkeeping keys of whatever is currently in
-//      `active_auto_ops`/`active_mutexed_op`; both are known here, so the set
-//      can be rebuilt only when the active set changes.
+// PERF: same shape as `sop_runner`. Specifically:
+//   1. DONE: `get_full_state` (a blocking `KEYS *` + `MGET` of the whole
+//      database every 200 ms) is replaced with `get_state_for_keys`. The key
+//      set is `model.auto_operations`/`mutexed_auto_operations`
+//      `get_all_var_keys()` plus their template name variables, unioned with
+//      the bookkeeping keys of whatever is currently in
+//      `active_auto_ops`/`active_mutexed_op` - see `running::runner_keys`. It
+//      is rebuilt only when the active set changes.
 //   2. `for op in &model.auto_operations { if op.eval(&state, ..) }` evaluates
 //      every auto operation's preconditions every tick. `Operation::eval` first
 //      checks `state.get_value(&self.name, ..)` and only then the guards - but
@@ -163,6 +163,13 @@ pub async fn auto_operation_runner(
     let mut active_mutexed_op: Option<Operation> = None;
     let mut terminated_operations: Vec<String> = vec![];
 
+    // See the note on `sop_runner`: the static part comes from the model, the
+    // dynamic part is the bookkeeping variables of the operations currently in
+    // `active_auto_ops` / `active_mutexed_op`, whose names only exist once they
+    // have been activated with a `nanoid` suffix.
+    let static_keys = auto_operation_runner_static_keys(sp_id, &model);
+    let mut keys = static_keys.clone();
+
     // PERF: one long-lived connection handle for the whole runner instead of
     // re-fetching one every tick, and no pre-flight PING before the real work.
     // `SPConnection` is cheap to clone, multiplexed and self-healing, so this
@@ -172,7 +179,7 @@ pub async fn auto_operation_runner(
 
     loop {
         interval.tick().await;
-        let state = match StateManager::get_full_state(&mut con).await {
+        let state = match StateManager::get_state_for_keys(&mut con, &keys, &log_target).await {
             Some(s) => s,
             None => continue,
         };
@@ -278,6 +285,8 @@ pub async fn auto_operation_runner(
         let modified_state = state.get_diff_partial_state_and_add_missing(&new_state);
         StateManager::set_state(&mut con, &modified_state).await;
 
+        let active_set_changed = !new_op_ids.is_empty() || !terminated_operations.is_empty();
+
         if !terminated_operations.is_empty() {
             let mut terminated_operations_meta = vec![];
             for op in &terminated_operations {
@@ -291,6 +300,17 @@ pub async fn auto_operation_runner(
             StateManager::remove_sp_values(&mut con, &terminated_operations_meta).await;
 
             terminated_operations.clear();
+        }
+
+        // Operations were activated and/or terminated this tick, so the set of
+        // bookkeeping variables to read from the next tick on has changed.
+        if active_set_changed {
+            let active: Vec<String> = active_auto_ops
+                .iter()
+                .chain(active_mutexed_op.iter())
+                .map(|op| op.name.clone())
+                .collect();
+            keys = keys_with_active_operations(&static_keys, &active);
         }
     }
 }

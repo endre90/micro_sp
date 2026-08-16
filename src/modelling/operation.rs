@@ -669,6 +669,14 @@ impl Operation {
     //     }
     // }
 
+    /// Every state variable read or written by any of this operation's
+    /// transitions.
+    ///
+    /// This is what the runners use to build their `get_state_for_keys` key
+    /// sets, so a variable missing here is a variable missing from the state
+    /// the runner reads - and reading a missing variable panics. It does *not*
+    /// include the operation's own bookkeeping variables (`{name}`,
+    /// `{name}_information`, ...); see `running::runner_keys`.
     pub fn get_all_var_keys(&self) -> Vec<String> {
         let mut all_keys: Vec<String> = self
             .preconditions
@@ -686,6 +694,14 @@ impl Operation {
             )
             .chain(
                 self.timeout_transitions
+                    .iter()
+                    .flat_map(|t| t.get_all_var_keys()),
+            )
+            // `bypass_transitions` was missing here, so the variables that only
+            // a bypass guard/action touches were absent from every key set
+            // built from this function.
+            .chain(
+                self.bypass_transitions
                     .iter()
                     .flat_map(|t| t.get_all_var_keys()),
             )

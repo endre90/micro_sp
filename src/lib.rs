@@ -14,12 +14,23 @@
 //     (operations) x (ticks). Dropping four `.clone()` calls is the single
 //     cheapest large win.                                 -> core/sp_state.rs
 //
-//  2. `get_full_state` uses `KEYS *`, which is O(keyspace) and blocks the whole
-//     Redis server. Three runners call it at 100-200 ms, so ~20 blocking scans
-//     per second over a keyspace that also holds transforms and log blobs.
-//     Every one of them delays all other commands. Move those runners onto
-//     `get_state_for_keys` (they already have the key sets) or store the state
-//     as one Redis HASH and use `HGETALL`.       -> management/state/*, running/*
+//  2. DONE. `get_full_state` uses `KEYS *`, which is O(keyspace) and blocks the
+//     whole Redis server. `sop_runner`, `auto_operation_runner` and
+//     `planned_operation_runner` called it at 100-200 ms, so ~20 blocking scans
+//     per second over a keyspace that also holds transforms and log blobs, each
+//     delaying every other command. All three now use `get_state_for_keys`.
+//     Their key sets live in `running/runner_keys.rs`: a static part built from
+//     the model once before the loop, plus the six bookkeeping variables of the
+//     operations that are currently active, rebuilt when the active set changes
+//     (for the plan runner, when `{sp_id}_plan` changes - it does not create its
+//     own operations). Measured on a scripted SOP + auto-operation + plan run:
+//     16 `KEYS` calls before, 0 after, with the same number of MGETs.
+//     `Operation::get_all_var_keys` was silently skipping `bypass_transitions`,
+//     which would have left a hole in every key set built from it; fixed.
+//     `StateManager::get_full_state` itself is unchanged and still available -
+//     if a whole-state read is ever needed again, store the state as one Redis
+//     HASH and use `HGETALL` rather than reinstating `KEYS *`.
+//                        -> running/runner_keys.rs, management/state/get_full_state.rs
 //
 //  3. `operation_log_receiver_task` does GET + JSON parse + JSON serialise +
 //     SET of an unbounded, ever-growing log blob per log message - O(N^2) work
@@ -145,6 +156,7 @@ pub use crate::running::auto_runner::*;
 pub use crate::running::main_runner::*;
 pub use crate::running::plan_runner::*;
 pub use crate::running::planner_ticker::*;
+pub use crate::running::runner_keys::*;
 pub use crate::running::runner_states::*;
 pub use crate::running::sop_runner::*;
 pub use crate::running::state_init::*;

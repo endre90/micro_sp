@@ -16,12 +16,18 @@ use tokio::{
 // when a tick is skipped because Redis was slow.
 pub static OPERAION_RUNNER_TICK_INTERVAL_MS: u64 = 200;
 
-// PERF: third caller of `StateManager::get_full_state` - see the note there;
-// with `sop_runner` and `auto_operation_runner` this makes ~20 blocking
-// `KEYS *` scans per second. The key set for this runner is derivable from
-// `model.operations` `get_all_var_keys()` plus the `{sp_id}_plan*` /
-// `{sp_id}_terminated_operations` keys (the planner ticker already builds
-// almost exactly this list), so it can move to `get_state_for_keys`.
+// DONE: PERF: this was the third caller of `StateManager::get_full_state`;
+// with `sop_runner` and `auto_operation_runner` that made ~20 blocking
+// `KEYS *` scans per second. The key set is `model.operations`
+// `get_all_var_keys()` plus the `{sp_id}_plan*` /
+// `{sp_id}_terminated_operations` keys (see `running::runner_keys`), plus the
+// bookkeeping variables of the steps of the current plan.
+//
+// Unlike the other two runners this one does not create its operations itself -
+// `planner_ticker` writes the plan and the step variables - so it cannot know
+// from a local event when the dynamic part of its key set changed. It watches
+// `{sp_id}_plan` instead and re-reads once when it changes, which costs one
+// extra `MGET` per new plan rather than a keyspace scan per tick.
 // PERF: `con.clone()` per tick to hand a second handle to `process_plan_tick`
 // - pass `&mut con` instead; `SPConnection` is multiplexed, so the
 // clone buys nothing.
@@ -44,13 +50,32 @@ pub async fn planned_operation_runner(
     // error on the command itself, which the callee already logs and skips.
     let mut con = connection_manager.get_connection().await;
 
+    let static_keys = plan_runner_static_keys(sp_id, &model);
+    let mut keys = static_keys.clone();
+    let mut active_plan: Vec<String> = vec![];
+
     loop {
         interval.tick().await;
 
-        let state = match StateManager::get_full_state(&mut con).await {
+        let mut state = match StateManager::get_state_for_keys(&mut con, &keys, &log_target).await {
             Some(s) => s,
             None => continue,
         };
+
+        // The plan is produced by `planner_ticker`, so a new plan shows up here
+        // as a changed `{sp_id}_plan`. Its steps are uniquified operation names
+        // whose bookkeeping variables have to be in the key set before
+        // `process_plan_tick` reads them - reading a variable that is not in
+        // the state panics - so rebuild and re-read once when it changes.
+        let plan = read_plan(&state, sp_id, &log_target);
+        if plan != active_plan {
+            keys = keys_with_active_operations(&static_keys, &plan);
+            active_plan = plan;
+            state = match StateManager::get_state_for_keys(&mut con, &keys, &log_target).await {
+                Some(s) => s,
+                None => continue,
+            };
+        }
 
         let con_clone = con.clone();
         let new_state = process_plan_tick(
@@ -65,6 +90,19 @@ pub async fn planned_operation_runner(
         let modified_state = state.get_diff_partial_state(&new_state);
         StateManager::set_state(&mut con, &modified_state).await;
     }
+}
+
+/// The current plan as a list of (uniquified) operation names.
+///
+/// Used both by the tick itself and by the runner loop, which needs the step
+/// names to keep its `get_state_for_keys` key set in sync with the plan.
+fn read_plan(state: &State, sp_id: &str, log_target: &str) -> Vec<String> {
+    state
+        .get_array_or_default_to_empty(&format!("{}_plan", sp_id), log_target)
+        .iter()
+        .filter(|val| val.is_string())
+        .map(|y| y.to_string())
+        .collect()
 }
 
 // PERF: the two `remove_sp_values` calls near the end run unconditionally on
@@ -106,14 +144,7 @@ async fn process_plan_tick(
         state.get_string_or_default_to_unknown(&format!("{}_plan_state", sp_id), &log_target);
     let mut plan_current_step =
         state.get_int_or_default_to_zero(&format!("{}_plan_current_step", sp_id), &log_target);
-    let plan_of_sp_values =
-        state.get_array_or_default_to_empty(&format!("{}_plan", sp_id), &log_target);
-
-    let plan: Vec<String> = plan_of_sp_values
-        .iter()
-        .filter(|val| val.is_string())
-        .map(|y| y.to_string())
-        .collect();
+    let plan = read_plan(state, sp_id, &log_target);
 
     let terminated_operations_sp_value = state
         .get_array_or_default_to_empty(&format!("{}_terminated_operations", sp_id), &log_target);
