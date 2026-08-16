@@ -26,10 +26,17 @@
 //     over a run, on the shared connection. Replace with `RPUSH`/`XADD` plus a
 //     length cap, or buffer in memory and flush on a timer. -> utils/op_logger.rs
 //
-//  4. `Predicate::eval` and `Transition::eval`/`take` take `self` by value, so
-//     every caller clones the entire guard/action tree first - in loops, per
-//     operation, per tick, and per node in the planner. Changing them to
-//     `&self` is mechanical and removes the clones everywhere.
+//  4. DONE. `Predicate::eval` and `Transition::eval`/`take` took `self` by
+//     value, so every caller cloned the entire guard/action tree first - in
+//     loops, per operation, per tick, and per node in the planner. The
+//     signatures moved to `&self` (with `take_mut`/`take_planning_mut` as the
+//     in-place forms), and the call sites have now been migrated too: the
+//     ~30 dead `.clone()`/`.to_owned()` calls in `Operation`'s eight guard
+//     methods, in `process_operation` (twelve `operation.clone().x(..)` on
+//     `&self` methods), in `process_transition` and in both BFS planners are
+//     gone. `Operation::start`/`complete`/`fail`/`bypass`/`timeout` and
+//     `take_planning` additionally dropped one full `State` copy each by using
+//     `take_mut` + `assign_mut` instead of chaining `take` and `assign`.
 //                                    -> modelling/predicate.rs, transition.rs
 //
 //  5. DONE. `check_redis_health` fired a PING round trip before every tick of
@@ -93,9 +100,10 @@
 // actually changed (the `Disabled` arm of `process_operation` renders full
 // predicate trees every tick); batch `time_runner`'s per-timer writes into one.
 //
-// Note (unrelated to performance): the crate does not currently compile -
-// `src/management/snapshot.rs` was deleted but the `pub use` on line ~47 below
-// still refers to it.
+// Note: `src/management/snapshot.rs` and `src/utils/op_logger.rs` were removed
+// from the module tree (their `pub use`/`pub mod` lines below and in
+// `utils/mod.rs` are commented out), so the op-logger item (3) above is
+// currently dead code - fix it before re-enabling that module.
 // ============================================================================
 
 pub static MAX_ALLOWED_OPERATION_DURATION_MS: i64 = 600000; // milliseconds

@@ -47,7 +47,7 @@ pub fn bfs_transition_planner(
                         };
                     }
                 };
-                match goal.clone().eval(&s, &log_target) {
+                match goal.eval(&s, &log_target) {
                     true => {
                         break PlanningResult {
                             found: true,
@@ -69,10 +69,11 @@ pub fn bfs_transition_planner(
                                 visited.insert(s.clone());
                                 model
                                     .iter()
-                                    .for_each(|t| match t.clone().eval_planning(&s, &log_target) {
+                                    .for_each(|t| match t.eval_planning(&s, &log_target) {
                                         false => (),
                                         true => {
-                                            let next_s = t.clone().take_planning(&s, &log_target);
+                                            let mut next_s = s.clone();
+                                            t.take_planning_mut(&mut next_s, &log_target);
                                             let mut next_p = path.clone();
                                             next_p.push(t.name.clone());
                                             stack.insert(0, (next_s, next_p));

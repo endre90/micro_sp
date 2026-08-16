@@ -25,18 +25,17 @@ pub enum Predicate {
 }
 
 impl Predicate {
-    // DONE: PERF: taking `self` by value is the root cause of a large fraction of the
-    // allocation traffic in this crate. Because `eval` consumes the predicate,
-    // every caller has to clone the whole tree first - `precondition.clone().eval(..)`
-    // appears in a loop in eight `Operation` methods, `transition.to_owned().eval(..)`
-    // in `process_transition`, `goal.clone().eval(..)` once per node in the BFS
-    // planner. Each clone deep-copies every `Predicate` node, every `SPWrapped`
-    // and every `SPValue` inside it, and is then dropped microseconds later.
-    // Suggested: change the signature to `pub fn eval(&self, state: &State,
-    // log_target: &str) -> bool` and switch `into_iter()` to `iter()` in the
-    // AND/OR arms. This is a mechanical change (the callers just drop their
-    // `.clone()`) and removes the cost from every guard evaluation on every
-    // tick and every planner node.
+    // DONE: PERF: taking `self` by value was the root cause of a large fraction
+    // of the allocation traffic in this crate. Because `eval` consumed the
+    // predicate, every caller had to clone the whole tree first -
+    // `precondition.clone().eval(..)` in a loop in eight `Operation` methods,
+    // `transition.to_owned().eval(..)` in `process_transition`,
+    // `goal.clone().eval(..)` once per node in the BFS planner. Each clone
+    // deep-copied every `Predicate` node, every `SPWrapped` and every `SPValue`
+    // inside it, then dropped it microseconds later.
+    // `eval` now takes `&self` and uses `iter()` in the AND/OR arms, *and* all
+    // of those callers have had their `.clone()` / `.to_owned()` removed, so
+    // guard evaluation no longer allocates on any tick or planner node.
 
 
     // PERF: `AND`/`OR` already short-circuit via `all`/`any`, which is good.

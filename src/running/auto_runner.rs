@@ -22,12 +22,13 @@ pub static TRANSITION_RUNNER_TICK_INTERVAL_MS: u64 = 50;
 // until the next tick - an avoidable extra 50 ms of latency per chained
 // transition. Threading a single mutable `State` through the loop fixes both
 // the latency and the round trips.
-// PERF: `transition.to_owned().eval(..)` and `transition.clone()` deep-copy the
-// whole transition (guard predicate tree, runner guard, both action vectors)
-// twice per evaluation - and the first copy happens even for transitions whose
-// guard is false, which is the overwhelmingly common case. Change
-// `Predicate::eval`/`Transition::eval` to take `&self` (see the notes there)
-// and this becomes a pure borrow.
+// DONE: PERF: `transition.to_owned().eval(..)` and the two `transition.clone()`
+// calls used to deep-copy the whole transition (guard predicate tree, runner
+// guard, both action vectors) three times per evaluation - and the first copy
+// happened even for transitions whose guard is false, which is the
+// overwhelmingly common case. `Predicate::eval`/`Transition::eval` take `&self`
+// and the take path uses `take_mut`, so the common no-fire path now allocates
+// nothing at all.
 // PERF: `nanoid!` and the `format!` for the unique name are computed before the
 // guard result is used elsewhere; they are only needed when the transition
 // actually fires, which is already the case here - but the `TransitionMsg` with
@@ -40,16 +41,20 @@ async fn process_transition(
     // logging_tx: mpsc::Sender<LogMsg>,
     log_target: &str,
 ) {
-    if !transition.to_owned().eval(state, &log_target) {
+    if !transition.eval(state, &log_target) {
         return;
     }
 
+    // DONE: PERF: this used to clone the whole transition twice - once to rename
+    // it for the log line, once more for the by-value `take` - even though the
+    // rename only ever feeds a `format!`. The name is now built as a plain
+    // `String` and the actions are applied in place on one state copy.
     let unique_id = nanoid::nanoid!(10, &NANOID_ALPHABET);
-    let mut transition = transition.clone();
-    transition.name = format!("{}_{}", transition.name, unique_id);
+    let unique_name = format!("{}_{}", transition.name, unique_id);
 
-    let new_state = transition.to_owned().take(state, &log_target);
-    log::info!(target: &log_target, "Executed auto transition: '{}'.", transition.name);
+    let mut new_state = state.clone();
+    transition.take_mut(&mut new_state, &log_target);
+    log::info!(target: &log_target, "Executed auto transition: '{}'.", unique_name);
 
     // let transition_msg = TransitionMsg {
     //     transition_name: transition.name.clone(),

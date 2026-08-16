@@ -135,13 +135,13 @@ impl Transition {
         self.guard.eval(state, &log_target)
     }
 
-    // PERF: same by-value problem, and this one is on the hottest path in the
-    // system - `Operation::eval` / `can_be_completed` / `can_be_failed` /
-    // `start` / `complete` / `fail` / `timeout` / `bypass` all call
+    // DONE: PERF: same by-value problem, and this one is on the hottest path in
+    // the system - `Operation::eval` / `can_be_completed` / `can_be_failed` /
+    // `start` / `complete` / `fail` / `timeout` / `bypass` all used to call
     // `transition.clone().eval(..)` inside a loop, for every active operation,
-    // on every tick of three different runners. Changing this and
-    // `Predicate::eval` to `&self` removes a deep clone of the entire guard
-    // structure from each of those calls.
+    // on every tick of three different runners. This and `Predicate::eval` take
+    // `&self` and every one of those call sites now borrows, so a deep clone of
+    // the entire guard structure is gone from each of them.
     pub fn eval(&self, state: &State, log_target: &str) -> bool {
         self.guard.eval(state, &log_target) && self.runner_guard.eval(state, &log_target)
     }
@@ -171,11 +171,11 @@ impl Transition {
     /// DONE: same fix as `take_planning_mut` - previously one full-state clone
     /// here plus one per action and per runner action.
     ///
-    /// PERF (still open): `Operation::start` / `complete` / `fail` / `timeout`
-    /// / `bypass` call `precondition.clone().take(state, ..)` and then apply
-    /// the status write with a second `Action::assign`, which is still two
-    /// clones per operation step. Switching those to `take_mut` + `assign_mut`
-    /// on a single owned `State` removes both.
+    /// DONE: `Operation::start` / `complete` / `fail` / `timeout` / `bypass`
+    /// used to call `precondition.clone().take(state, ..)` and then apply the
+    /// status write with a second `Action::assign`, i.e. one transition clone
+    /// plus two full `State` copies per operation step. They now use `take_mut`
+    /// + `assign_mut` on a single owned `State`.
     pub fn take_mut(&self, state: &mut State, log_target: &str) {
         for a in &self.actions {
             a.assign_mut(state, &log_target);

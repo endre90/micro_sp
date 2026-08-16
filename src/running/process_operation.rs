@@ -32,10 +32,10 @@ pub enum OperationProcessingType {
 //    cause of the CPU spikes during SOP execution. Suggested: compute a cheap
 //    discriminant (state + a small enum for the reason) and only build the
 //    string when that discriminant changed.
-// 4. `operation.clone().cancel(..)` / `.timeout(..)` / `.fail(..)` /
-//    `.retry(..)` deep-copy the whole `Operation` (all six transition vectors)
-//    just to call a `&self` method - the `.clone()` is not needed at all here,
-//    since those methods already take `&self`.
+// 4. DONE: `operation.clone().cancel(..)` / `.timeout(..)` / `.fail(..)` /
+//    `.complete(..)` / `.retry(..)` deep-copied the whole `Operation` (all six
+//    transition vectors) just to call a `&self` method. All twelve `.clone()`
+//    calls are gone.
 // 5. `elapased_executing_ms += OPERAION_RUNNER_TICK_INTERVAL_MS` assumes this
 //    is called exactly on a 200 ms cadence, but `sop_runner` calls it at 100 ms
 //    and `auto_operation_runner` skips ticks whenever Redis is slow. Timeouts
@@ -102,7 +102,7 @@ pub(super) async fn process_operation(
     match OperationState::from_str(&operation_state) {
         OperationState::Initial => {
             if operation.can_be_cancelled(&sp_id, &new_state, &log_target) {
-                new_state = operation.clone().cancel(&new_state, &log_target);
+                new_state = operation.cancel(&new_state, &log_target);
                 new_op_info = format!("Cancelling operation '{}'.", operation.name).to_string();
                 logging_log = format!("Cancelling");
                 op_info_level = log::Level::Warn;
@@ -121,12 +121,12 @@ pub(super) async fn process_operation(
         OperationState::Disabled => {
             elapased_disabled_ms += OPERAION_RUNNER_TICK_INTERVAL_MS as i64;
             if operation.can_be_cancelled(&sp_id, &new_state, &log_target) {
-                new_state = operation.clone().cancel(&new_state, &log_target);
+                new_state = operation.cancel(&new_state, &log_target);
                 new_op_info = format!("Cancelling operation '{}'.", operation.name).to_string();
                 logging_log = format!("Cancelling");
                 op_info_level = log::Level::Warn;
             } else if operation.can_be_timedout(&new_state, &log_target) {
-                new_state = operation.clone().timeout(&new_state, &log_target);
+                new_state = operation.timeout(&new_state, &log_target);
                 new_op_info =
                     format!("Timeout for disabled operation '{}'.", operation.name).to_string();
                 logging_log = format!("Timeout");
@@ -160,23 +160,23 @@ pub(super) async fn process_operation(
         OperationState::Executing => {
             elapased_executing_ms += OPERAION_RUNNER_TICK_INTERVAL_MS as i64;
             if operation.can_be_cancelled(&sp_id, &new_state, &log_target) {
-                new_state = operation.clone().cancel(&new_state, &log_target);
+                new_state = operation.cancel(&new_state, &log_target);
                 new_op_info = format!("Cancelling operation '{}'.", operation.name).to_string();
                 logging_log = format!("Cancelling");
                 op_info_level = log::Level::Warn;
             } else if operation.can_be_failed(&new_state, &log_target) {
-                new_state = operation.clone().fail(&new_state, &log_target);
+                new_state = operation.fail(&new_state, &log_target);
                 new_op_info = format!("Failing operation '{}'.", operation.name).to_string();
                 logging_log = format!("Failing");
                 op_info_level = log::Level::Warn;
             } else if operation.can_be_timedout(&new_state, &log_target) {
-                new_state = operation.clone().timeout(&new_state, &log_target);
+                new_state = operation.timeout(&new_state, &log_target);
                 new_op_info =
                     format!("Timeout for executing operation '{}'.", operation.name).to_string();
                 logging_log = format!("Timeout");
                 op_info_level = log::Level::Warn;
             } else if operation.can_be_completed(&new_state, &log_target) {
-                new_state = operation.clone().complete(&new_state, &log_target);
+                new_state = operation.complete(&new_state, &log_target);
                 new_op_info = format!("Completing operation '{}'.", operation.name).to_string();
                 logging_log = format!("Completing");
                 op_info_level = log::Level::Info;
@@ -222,7 +222,7 @@ pub(super) async fn process_operation(
         }
         OperationState::Bypassed => {
             if operation.can_be_cancelled(&sp_id, &new_state, &log_target) {
-                new_state = operation.clone().cancel(&new_state, &log_target);
+                new_state = operation.cancel(&new_state, &log_target);
                 new_op_info = format!("Cancelling operation '{}'.", operation.name).to_string();
                 logging_log = format!("Cancelling");
             } else {
@@ -247,7 +247,7 @@ pub(super) async fn process_operation(
         }
         OperationState::Timedout => {
             if operation.can_be_cancelled(&sp_id, &new_state, &log_target) {
-                new_state = operation.clone().cancel(&new_state, &log_target);
+                new_state = operation.cancel(&new_state, &log_target);
                 new_op_info = format!("Cancelling operation '{}'.", operation.name).to_string();
                 logging_log = format!("Cancelling");
                 op_info_level = log::Level::Warn;
@@ -262,7 +262,7 @@ pub(super) async fn process_operation(
                     operation_timeout_retry_counter, operation.timeout_retries
                 );
                 op_info_level = log::Level::Warn;
-                new_state = operation.clone().retry(&new_state, &log_target);
+                new_state = operation.retry(&new_state, &log_target);
                 new_state.update_mut(
                     &format!("{}_timeout_retry_counter", operation.name),
                     operation_timeout_retry_counter.to_spvalue(),
@@ -281,7 +281,7 @@ pub(super) async fn process_operation(
         }
         OperationState::Failed => {
             if operation.can_be_cancelled(&sp_id, &new_state, &log_target) {
-                new_state = operation.clone().cancel(&new_state, &log_target);
+                new_state = operation.cancel(&new_state, &log_target);
                 new_op_info = format!("Cancelling operation '{}'.", operation.name).to_string();
                 logging_log = format!("Cancelling");
                 op_info_level = log::Level::Warn;
@@ -296,7 +296,7 @@ pub(super) async fn process_operation(
                     operation_failure_retry_counter, operation.failure_retries
                 );
                 op_info_level = log::Level::Warn;
-                new_state = operation.clone().retry(&new_state, &log_target);
+                new_state = operation.retry(&new_state, &log_target);
                 new_state.update_mut(
                     &format!("{}_failure_retry_counter", operation.name),
                     operation_failure_retry_counter.to_spvalue(),

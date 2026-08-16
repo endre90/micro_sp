@@ -21,12 +21,12 @@ use crate::*;
 //      canonical key, instead of the whole state. Runner bookkeeping like
 //      `*_elapsed_executing_ms` currently makes equivalent states look
 //      different, which both slows the search and can make it explore forever.
-//   3. `goal.clone().eval(&s, ..)` clones the entire goal predicate tree once
-//      per expanded node, purely because `Predicate::eval` takes `self` by
-//      value. Changing `eval` to `&self` removes this outright.
-//   4. `o.clone().eval_planning(..)` and `o.clone().take_planning(..)` clone the
-//      whole `Operation` per operation per node - both already take `&self`, so
-//      these `.clone()` calls are pure waste.
+//   3. DONE: `goal.clone().eval(&s, ..)` used to clone the entire goal
+//      predicate tree once per expanded node, purely because `Predicate::eval`
+//      took `self` by value. `eval` takes `&self` and the clone is gone.
+//   4. DONE: `o.clone().eval_planning(..)` and `o.clone().take_planning(..)`
+//      cloned the whole `Operation` per operation per node even though both
+//      take `&self`; those `.clone()` calls are gone.
 //   5. `path.clone()` per successor copies the whole plan prefix. A parent-link
 //      / arena representation (store `(state, parent_idx, op_name)` and
 //      reconstruct the path once at the end) makes this O(1).
@@ -77,7 +77,7 @@ pub fn bfs_operation_planner(
                         };
                     }
                 };
-                match goal.clone().eval(&s, &log_target) {
+                match goal.eval(&s, &log_target) {
                     true => {
                         break PlanningResult {
                             found: true,
@@ -99,10 +99,10 @@ pub fn bfs_operation_planner(
                                 visited.insert(s.clone());
                                 model
                                     .iter()
-                                    .for_each(|o| match o.clone().eval_planning(&s, &log_target) {
+                                    .for_each(|o| match o.eval_planning(&s, &log_target) {
                                         false => (),
                                         true => {
-                                            let next_s = o.clone().take_planning(&s, &log_target);
+                                            let next_s = o.take_planning(&s, &log_target);
                                             let mut next_p = path.clone();
                                             next_p.push(o.name.clone());
                                             stack.insert(0, (next_s, next_p));

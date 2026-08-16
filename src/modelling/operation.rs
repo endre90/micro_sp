@@ -94,12 +94,13 @@ impl fmt::Display for OperationState {
 
 // PERF: an `Operation` owns six `Vec<Transition>`, each transition owning two
 // predicate trees and two action vectors, so `Operation::clone()` is a deep
-// copy of a fairly large graph. It is currently cloned very often on hot paths:
-// `process_operation` does `operation.clone().cancel(..)` etc. (unnecessary -
-// those methods take `&self`), `auto_operation_runner` clones a template per
+// copy of a fairly large graph. It is still cloned on some hot paths:
+// `auto_operation_runner` clones a template per
 // activation and again per tick when rebuilding `active_auto_ops`, the BFS
 // planner clones one per node, and `Model::new` clones every transition vector
-// three times over. Suggested: hold the transition vectors as
+// three times over. (The `operation.clone().cancel(..)` calls in
+// `process_operation` are gone - those methods take `&self`.)
+// Suggested: hold the transition vectors as
 // `Arc<[Transition]>` so cloning an `Operation` is a handful of refcount bumps,
 // and store active operations as `Arc<Operation>` in the runners.
 // PERF: the runners key everything off `operation.name` via `format!`. Caching
@@ -193,7 +194,7 @@ impl Operation {
         if let Some(value) = state.get_value(&self.name, &log_target) {
             if value == OperationState::Initial.to_spvalue() {
                 for precondition in &self.preconditions {
-                    if precondition.clone().eval_planning(state, &log_target) {
+                    if precondition.eval_planning(state, &log_target) {
                         return true;
                     }
                 }
@@ -205,24 +206,28 @@ impl Operation {
 
     /// Execute the planing actions of both the pre and post conditions.
     /// Inex 0 taken as to indicate that the firstly defined transition should be taken when planning.
+    ///
+    /// DONE: this used to clone both transitions and build an intermediate
+    /// `State` between them; it now applies both in place on a single copy.
     pub fn take_planning(&self, state: &State, log_target: &str) -> State {
-        self.postconditions[0].clone().take_planning(
-            &self.preconditions[0]
-                .clone()
-                .take_planning(state, &log_target),
-            &log_target,
-        )
+        let mut new_state = state.clone();
+        self.preconditions[0].take_planning_mut(&mut new_state, &log_target);
+        self.postconditions[0].take_planning_mut(&mut new_state, &log_target);
+        new_state
     }
 
-    // PERF: this is evaluated for *every* auto operation on *every* tick of
-    // `auto_operation_runner`, so it is the single most frequently executed
-    // guard check in the system. Two costs to remove:
-    //   - `state.get_value(&self.name, ..)` clones the entire state map (see
-    //     `State::get_value`) before the cheap early-out even runs;
-    //   - `precondition.clone().eval(state, ..)` deep-copies the transition on
-    //     every precondition of every operation, including the ones whose guard
-    //     is immediately false. Both `Transition::eval` and `Predicate::eval`
-    //     only need `&self`; changing them makes this loop allocation-free.
+    // DONE: PERF: this is evaluated for *every* auto operation on *every* tick
+    // of `auto_operation_runner`, so it is the single most frequently executed
+    // guard check in the system. Both of its old costs are gone:
+    //   - `state.get_value(&self.name, ..)` no longer clones the entire state
+    //     map before the cheap early-out runs (see `State::get_value`);
+    //   - `precondition.clone().eval(state, ..)` used to deep-copy the
+    //     transition for every precondition of every operation, including the
+    //     ones whose guard is immediately false. `Transition::eval` and
+    //     `Predicate::eval` take `&self`, so the guard walk is now a pure
+    //     borrow. The same clone removal was applied to `eval_planning`,
+    //     `evaluate_with_transition_index`, `can_be_completed(_with_index)`,
+    //     `can_be_failed`, `start`, `complete`, `fail`, `bypass` and `timeout`.
     // PERF: `OperationState::Initial.to_spvalue()` allocates a fresh `String`
     // ("initial") and wraps it in an `SPValue` twice per call just to compare.
     // Comparing against `&'static str` (or matching on
@@ -236,7 +241,7 @@ impl Operation {
                 || value == OperationState::Disabled.to_spvalue()
             {
                 for precondition in &self.preconditions {
-                    if precondition.clone().eval(state, &log_target) {
+                    if precondition.eval(state, &log_target) {
                         return true;
                     }
                 }
@@ -250,7 +255,7 @@ impl Operation {
         if let Some(value) = state.get_value(&self.name, &log_target) {
             if value == OperationState::Initial.to_spvalue() {
                 for (index, precondition) in self.preconditions.iter().enumerate() {
-                    if precondition.clone().eval(state, &log_target) {
+                    if precondition.eval(state, &log_target) {
                         return (true, index);
                     }
                 }
@@ -268,7 +273,7 @@ impl Operation {
         if let Some(value) = state.get_value(&self.name, &log_target) {
             if value == OperationState::Executing.to_spvalue() {
                 for (index, postcondition) in self.postconditions.iter().enumerate() {
-                    if postcondition.clone().eval(state, &log_target) {
+                    if postcondition.eval(state, &log_target) {
                         return (true, index);
                     }
                 }
@@ -282,7 +287,7 @@ impl Operation {
         if let Some(value) = state.get_value(&self.name, &log_target) {
             if value == OperationState::Executing.to_spvalue() {
                 for postcondition in &self.postconditions {
-                    if postcondition.clone().eval(&state, &log_target) {
+                    if postcondition.eval(&state, &log_target) {
                         return true;
                     }
                 }
@@ -296,7 +301,7 @@ impl Operation {
         if let Some(value) = state.get_value(&self.name, &log_target) {
             if value == OperationState::Executing.to_spvalue() {
                 for fail_transition in &self.failure_transitions {
-                    if fail_transition.clone().eval(&state, &log_target) {
+                    if fail_transition.eval(&state, &log_target) {
                         return true;
                     }
                 }
@@ -412,21 +417,25 @@ impl Operation {
     // walked twice per start. `evaluate_with_transition_index` already exists
     // and returns the matching index; using it (and passing the index into
     // `start`) halves the guard work at the moment an operation starts.
-    // PERF: `precondition.clone().eval(..)` then `precondition.clone().take(..)`
-    // clones the transition twice more.
+    // DONE: PERF: the guard walk used to clone every precondition to evaluate it
+    // and clone the matching one again to take it, and `take` + `assign` built
+    // two intermediate `State`s. It now borrows the transition and applies both
+    // the actions and the status write in place on a single copy.
     pub fn start(&self, state: &State, log_target: &str) -> State {
         let assignment = state.get_assignment(&self.name, &log_target);
         if assignment.val == OperationState::Initial.to_spvalue()
             || assignment.val == OperationState::Disabled.to_spvalue()
         {
             for precondition in &self.preconditions {
-                if precondition.clone().eval(state, &log_target) {
+                if precondition.eval(state, &log_target) {
                     let action = Action::new(
                         assignment.var,
                         OperationState::Executing.to_spvalue().wrap(),
                     );
-                    return action
-                        .assign(&precondition.clone().take(state, &log_target), &log_target);
+                    let mut new_state = state.clone();
+                    precondition.take_mut(&mut new_state, &log_target);
+                    action.assign_mut(&mut new_state, &log_target);
+                    return new_state;
                 }
             }
         }
@@ -443,14 +452,15 @@ impl Operation {
         let assignment = state.get_assignment(&self.name, &log_target);
         if assignment.val == OperationState::Executing.to_spvalue() {
             for postcondition in &self.postconditions {
-                if postcondition.clone().eval(&state, &log_target) {
+                if postcondition.eval(&state, &log_target) {
                     let action = Action::new(
                         assignment.var,
                         OperationState::Completed.to_spvalue().wrap(),
                     );
-                    return postcondition
-                        .clone()
-                        .take(&action.assign(&state, &log_target), &log_target);
+                    let mut new_state = state.clone();
+                    action.assign_mut(&mut new_state, &log_target);
+                    postcondition.take_mut(&mut new_state, &log_target);
+                    return new_state;
                 }
             }
         }
@@ -462,12 +472,13 @@ impl Operation {
         let assignment = state.get_assignment(&self.name, &log_target);
         if assignment.val == OperationState::Executing.to_spvalue() {
             for fail_transition in &self.failure_transitions {
-                if fail_transition.clone().eval(&state, &log_target) {
+                if fail_transition.eval(&state, &log_target) {
                     let action =
                         Action::new(assignment.var, OperationState::Failed.to_spvalue().wrap());
-                    return fail_transition
-                        .clone()
-                        .take(&action.assign(&state, &log_target), &log_target);
+                    let mut new_state = state.clone();
+                    action.assign_mut(&mut new_state, &log_target);
+                    fail_transition.take_mut(&mut new_state, &log_target);
+                    return new_state;
                 }
             }
         }
@@ -536,16 +547,17 @@ impl Operation {
         {
             if self.bypass_transitions.len() > 0 {
                 for bypass_transition in &self.bypass_transitions {
-                    if bypass_transition.clone().eval(&state, &log_target) {
+                    if bypass_transition.eval(&state, &log_target) {
                         // Carefull: this can forbid the operation to bypass!
                         // Useful when you want to have different options to bypass and add some alternative conditions here
                         let action = Action::new(
                             assignment.var,
                             OperationState::Bypassed.to_spvalue().wrap(),
                         );
-                        return bypass_transition
-                            .clone()
-                            .take(&action.assign(&state, &log_target), &log_target);
+                        let mut new_state = state.clone();
+                        action.assign_mut(&mut new_state, &log_target);
+                        bypass_transition.take_mut(&mut new_state, &log_target);
+                        return new_state;
                     }
                 }
             } else {
@@ -565,16 +577,17 @@ impl Operation {
         {
             if self.timeout_transitions.len() > 0 {
                 for timeout_transition in &self.timeout_transitions {
-                    if timeout_transition.clone().eval(&state, &log_target) {
+                    if timeout_transition.eval(&state, &log_target) {
                         // Carefull: this can forbid the operation to timeout!
                         // Useful when you want to have different options to timeout and add some alternative conditions here
                         let action = Action::new(
                             assignment.var,
                             OperationState::Timedout.to_spvalue().wrap(),
                         );
-                        return timeout_transition
-                            .clone()
-                            .take(&action.assign(&state, &log_target), &log_target);
+                        let mut new_state = state.clone();
+                        action.assign_mut(&mut new_state, &log_target);
+                        timeout_transition.take_mut(&mut new_state, &log_target);
+                        return new_state;
                     }
                 }
             } else {
