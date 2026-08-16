@@ -1,6 +1,9 @@
 use crate::*;
 use std::sync::Arc;
-use tokio::time::{Duration, interval};
+
+/// Planning is rare and bursty, and the tick only reads two booleans until a
+/// replan is actually requested.
+pub static PLANNER_TICKER_TICK_INTERVAL_MS: u64 = 1;
 
 // DONE: PERF: two things cost more than they needed to:
 //   - `keys` was built by concatenating `get_all_var_keys()` over every
@@ -20,7 +23,7 @@ pub async fn planner_ticker(
     model: &Model,
     connection_manager: &Arc<ConnectionManager>,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let mut interval = interval(Duration::from_millis(500));
+    let mut interval = runner_interval("MICRO_SP_PLANNER_TICK_MS", PLANNER_TICKER_TICK_INTERVAL_MS);
     let log_target = &format!("{}_planner", sp_id);
 
     log::info!(target: log_target, "Online.");

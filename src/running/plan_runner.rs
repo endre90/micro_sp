@@ -2,10 +2,7 @@ use crate::{running::process_operation::OperationProcessingType, *};
 use crate::SPConnection;
 use std::sync::Arc;
 // use crate::SPConnection;
-use tokio::{
-    sync::mpsc,
-    time::{Duration, interval},
-};
+use tokio::sync::mpsc;
 
 // DONE (correctness): this constant used to do double duty as both the tick
 // period *and* the assumed time increment in `process_operation`'s elapsed-time
@@ -13,7 +10,9 @@ use tokio::{
 // at twice real speed. "How often do I poll" and "how much time has passed" are
 // separate now: each runner measures the latter with `Instant` and passes it in,
 // which also keeps the counters honest when a tick slips because Redis was slow.
-pub static OPERAION_RUNNER_TICK_INTERVAL_MS: u64 = 200;
+/// Shared by `planned_operation_runner` and `auto_operation_runner`.
+/// Override with `MICRO_SP_OPERATION_TICK_MS`. See `running::tick`.
+pub static OPERAION_RUNNER_TICK_INTERVAL_MS: u64 = 1;
 
 // DONE: PERF: this was the third caller of `StateManager::get_full_state`;
 // with `sop_runner` and `auto_operation_runner` that made ~20 blocking
@@ -37,7 +36,10 @@ pub async fn planned_operation_runner(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let sp_id = &model.name;
     let log_target = format!("{}_op_runner", sp_id);
-    let mut interval = interval(Duration::from_millis(OPERAION_RUNNER_TICK_INTERVAL_MS));
+    let mut interval = runner_interval(
+        "MICRO_SP_OPERATION_TICK_MS",
+        OPERAION_RUNNER_TICK_INTERVAL_MS,
+    );
 
     // Get only the relevant keys from the state
     log::info!(target: &log_target, "Online.");
@@ -58,12 +60,11 @@ pub async fn planned_operation_runner(
     }
 
     // Real time between ticks; see the note in `process_operation`.
-    let mut last_tick = std::time::Instant::now();
+    let mut tick_clock = TickClock::new();
 
     loop {
         interval.tick().await;
-        let tick_elapsed_ms = last_tick.elapsed().as_millis() as i64;
-        last_tick = std::time::Instant::now();
+        let tick_elapsed_ms = tick_clock.elapsed_ms();
 
         let read = match read_full_state {
             true => StateManager::get_full_state(&mut con).await,

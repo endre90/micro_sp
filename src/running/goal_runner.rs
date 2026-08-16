@@ -1,9 +1,9 @@
 use crate::*;
 use serde::{Deserialize, Serialize};
 use std::{fmt, sync::Arc};
-use tokio::time::{Duration, interval};
 
-static TICK_INTERVAL: u64 = 100; // millis
+/// Override with `MICRO_SP_GOAL_TICK_MS`. See `running::tick`.
+static TICK_INTERVAL: u64 = 1; // millis
 
 #[derive(Debug, PartialEq, Copy, Clone, Hash, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum GoalPriority {
@@ -232,7 +232,7 @@ pub async fn goal_runner(
     connection_manager: &Arc<ConnectionManager>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     initialize_env_logger();
-    let mut interval = interval(Duration::from_millis(TICK_INTERVAL));
+    let mut interval = runner_interval("MICRO_SP_GOAL_TICK_MS", TICK_INTERVAL);
     let log_target = &format!("{}_goal_runner", sp_id);
 
     log::info!(target: log_target, "Online.");

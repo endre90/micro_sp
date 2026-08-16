@@ -1,9 +1,11 @@
 use std::sync::Arc;
 
 use crate::*;
-use tokio::time::{Duration, interval};
 
-static TICK_INTERVAL_MS: u64 = 100;
+
+/// Also the resolution of every sleep timer. Override with
+/// `MICRO_SP_TIMER_TICK_MS`. See `running::tick`.
+static TICK_INTERVAL_MS: u64 = 1;
 
 // DONE: PERF: the `set_state` call used to be *inside* the
 // `for timer_id in 1..=number_of_timers` loop, so a diff and a Redis round trip
@@ -19,18 +21,25 @@ static TICK_INTERVAL_MS: u64 = 100;
 // DONE: PERF: `request_state == ActionRequestState::Executing.to_string()`
 // allocated a fresh `String` for the comparison on every timer on every tick.
 //
-// PERF (still open): `elapsed_ms += TICK_INTERVAL_MS` assumes the tick never
-// slips; since every tick also waits on an MGET, timers drift long under load.
-// Storing the start `SystemTime` and computing `elapsed` from the wall clock
-// would be more accurate and would remove the per-executing-timer write - at
-// the cost of `_timer_N_elapsed_ms` no longer being readable as live progress,
-// so it is left alone deliberately.
+// DONE (correctness): `elapsed_ms += TICK_INTERVAL_MS` charged a compile-time
+// constant per tick, so a sleep timer only kept real time while the loop
+// happened to run at exactly that period. It made the tick period and the
+// timer's notion of a millisecond the same number - which is fine until the
+// period changes. With the period now configurable (`MICRO_SP_TIMER_TICK_MS`)
+// this was actively dangerous: at a 1 ms tick every tick still charged 100 ms,
+// so a 60 second sleep finished in 600 milliseconds. The loop measures the real
+// time its tick took and advances by that instead.
+//
+// PERF (still open): the counter is written for every executing timer on every
+// tick. Deriving it from a stored start `SystemTime` would remove that write,
+// at the cost of `_timer_N_elapsed_ms` no longer being readable as live
+// progress - left alone deliberately.
 pub async fn time_interface_runner(
     sp_id: &str,
     connection_manager: &Arc<ConnectionManager>,
     number_of_timers: u64,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let mut interval = interval(Duration::from_millis(TICK_INTERVAL_MS));
+    let mut interval = runner_interval("MICRO_SP_TIMER_TICK_MS", TICK_INTERVAL_MS);
     let log_target = format!("{}_timer_interface", sp_id);
 
     log::info!(target: &log_target,  "Online.");
@@ -51,8 +60,13 @@ pub async fn time_interface_runner(
     // error on the command itself, which the callee already logs and skips.
     let mut con = connection_manager.get_connection().await;
 
+    // Real time between ticks. Timers count in milliseconds of wall clock, not
+    // in ticks.
+    let mut tick_clock = TickClock::new();
+
     loop {
         interval.tick().await;
+        let tick_elapsed_ms = tick_clock.elapsed_ms();
         let state = match StateManager::get_state_for_keys(&mut con, &keys, &log_target).await {
             Some(s) => s,
             None => continue,
@@ -110,7 +124,7 @@ pub async fn time_interface_runner(
             }
 
             if matches!(ActionRequestState::from_str(&request_state), ActionRequestState::Executing) {
-                elapsed_ms += TICK_INTERVAL_MS as i64;
+                elapsed_ms += tick_elapsed_ms;
 
                 if elapsed_ms >= duration_ms {
                     elapsed_ms = duration_ms;

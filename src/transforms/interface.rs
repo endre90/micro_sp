@@ -1,7 +1,9 @@
 use std::sync::Arc;
 
 use crate::*;
-use tokio::time::{Duration, interval};
+
+/// The tick only reads one boolean until a request is actually pending.
+pub static TF_INTERFACE_TICK_INTERVAL_MS: u64 = 1;
 
 // DONE: PERF: this polled every 250 ms with an `MGET` of 7 keys purely to check
 // a single boolean - the entire body below sits inside `if request_trigger`, so
@@ -14,7 +16,7 @@ pub async fn tf_interface(
     sp_id: &str,
     connection_manager: &Arc<ConnectionManager>,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let mut interval = interval(Duration::from_millis(250));
+    let mut interval = runner_interval("MICRO_SP_TF_TICK_MS", TF_INTERFACE_TICK_INTERVAL_MS);
     let log_target = format!("{}_tf_interface", sp_id);
 
     log::info!(target: &log_target,  "Online.");

@@ -4,11 +4,13 @@ use crate::{
 };
 use chrono::Utc;
 // use rand::seq::IndexedRandom;
-use std::{sync::Arc, time::Duration};
-use tokio::{sync::mpsc, time::interval};
+use std::sync::Arc;
+use tokio::sync::mpsc;
 
 // Add automatic operations here as well that finish immediatelly, god for setting some values, triggering robot moves etc.
-pub static TRANSITION_RUNNER_TICK_INTERVAL_MS: u64 = 50;
+/// Override with `MICRO_SP_AUTO_TRANSITION_TICK_MS`. See `running::tick` for
+/// what 1 ms costs and why it is the practical floor.
+pub static TRANSITION_RUNNER_TICK_INTERVAL_MS: u64 = 1;
 
 // DONE (correctness + PERF): this used to take `&State` and write its own
 // effects straight to Redis, inside the caller's `for t in
@@ -88,7 +90,10 @@ pub async fn auto_transition_runner(
     // logging_tx: mpsc::Sender<LogMsg>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     initialize_env_logger();
-    let mut interval = interval(Duration::from_millis(TRANSITION_RUNNER_TICK_INTERVAL_MS));
+    let mut interval = runner_interval(
+        "MICRO_SP_AUTO_TRANSITION_TICK_MS",
+        TRANSITION_RUNNER_TICK_INTERVAL_MS,
+    );
     let log_target = format!("{}_auto_transition_runner", name);
     let keys: Vec<String> = normalize_keys(
         model
@@ -160,7 +165,10 @@ pub async fn auto_operation_runner(
     connection_manager: &Arc<ConnectionManager>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     initialize_env_logger();
-    let mut interval = interval(Duration::from_millis(OPERAION_RUNNER_TICK_INTERVAL_MS));
+    let mut interval = runner_interval(
+        "MICRO_SP_OPERATION_TICK_MS",
+        OPERAION_RUNNER_TICK_INTERVAL_MS,
+    );
     let log_target = format!("{}_operation_runner", sp_id);
 
     let mut active_auto_ops: Vec<Operation> = vec![];
@@ -186,12 +194,11 @@ pub async fn auto_operation_runner(
     let mut con = connection_manager.get_connection().await;
 
     // Real time between ticks; see the note in `process_operation`.
-    let mut last_tick = std::time::Instant::now();
+    let mut tick_clock = TickClock::new();
 
     loop {
         interval.tick().await;
-        let tick_elapsed_ms = last_tick.elapsed().as_millis() as i64;
-        last_tick = std::time::Instant::now();
+        let tick_elapsed_ms = tick_clock.elapsed_ms();
 
         let read = match read_full_state {
             true => StateManager::get_full_state(&mut con).await,

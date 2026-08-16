@@ -338,6 +338,7 @@ pub use crate::running::main_runner::*;
 pub use crate::running::plan_runner::*;
 pub use crate::running::planner_ticker::*;
 pub use crate::running::runner_keys::*;
+pub use crate::running::tick::*;
 pub use crate::running::runner_states::*;
 pub use crate::running::sop_runner::*;
 pub use crate::running::state_init::*;

@@ -2,12 +2,10 @@ use crate::*;
 use log::Level;
 use crate::SPConnection;
 use std::sync::Arc;
-use tokio::{
-    sync::mpsc,
-    time::{Duration, interval},
-};
+use tokio::sync::mpsc;
 
-static TICK_INTERVAL: u64 = 100; // millis
+/// Override with `MICRO_SP_SOP_TICK_MS`. See `running::tick`.
+static TICK_INTERVAL: u64 = 1; // millis
 
 // PERF: this is the loop you feel when a SOP is running. Per 100 ms tick it
 // does: an `MGET` of its key set, a full `state.clone()`, a recursive walk of
@@ -59,7 +57,7 @@ pub async fn sop_runner(
     connection_manager: &Arc<ConnectionManager>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     initialize_env_logger();
-    let mut interval = interval(Duration::from_millis(TICK_INTERVAL));
+    let mut interval = runner_interval("MICRO_SP_SOP_TICK_MS", TICK_INTERVAL);
     let log_target = &format!("{}_sop_runner", sp_id);
 
     log::info!(target: log_target, "Online.");
@@ -92,12 +90,11 @@ pub async fn sop_runner(
     // counters by this rather than by a compile-time constant, which is what
     // made SOP operations - driven at 100 ms by a constant of 200 - time out at
     // half their configured deadline.
-    let mut last_tick = std::time::Instant::now();
+    let mut tick_clock = TickClock::new();
 
     loop {
         interval.tick().await;
-        let tick_elapsed_ms = last_tick.elapsed().as_millis() as i64;
-        last_tick = std::time::Instant::now();
+        let tick_elapsed_ms = tick_clock.elapsed_ms();
 
         let read = match read_full_state {
             true => StateManager::get_full_state(&mut con).await,
