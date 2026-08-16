@@ -88,8 +88,17 @@ pub async fn sop_runner(
     // error on the command itself, which the callee already logs and skips.
     let mut con = connection_manager.get_connection().await;
 
+    // Real time between ticks. `process_operation` advances the elapsed
+    // counters by this rather than by a compile-time constant, which is what
+    // made SOP operations - driven at 100 ms by a constant of 200 - time out at
+    // half their configured deadline.
+    let mut last_tick = std::time::Instant::now();
+
     loop {
         interval.tick().await;
+        let tick_elapsed_ms = last_tick.elapsed().as_millis() as i64;
+        last_tick = std::time::Instant::now();
+
         let read = match read_full_state {
             true => StateManager::get_full_state(&mut con).await,
             false => StateManager::get_state_for_keys(&mut con, &keys, &log_target).await,
@@ -196,6 +205,7 @@ pub async fn sop_runner(
                         active_sop_container.as_ref().unwrap(),
                         con_clone,
                         // logging_tx.clone(),
+                        tick_elapsed_ms,
                         &log_target,
                     )
                     .await;
@@ -356,6 +366,7 @@ async fn process_sop_node_tick(
     sop: &SOP,
     con: crate::SPConnection,
     // logging_tx: mpsc::Sender<LogMsg>,
+    tick_elapsed_ms: i64,
     log_target: &str,
 ) -> State {
     match sop {
@@ -368,6 +379,7 @@ async fn process_sop_node_tick(
                 None,
                 None,
                 // logging_tx,
+                tick_elapsed_ms,
                 log_target,
                 // &mut terminated_operations
             )
@@ -381,7 +393,7 @@ async fn process_sop_node_tick(
 
             if let Some(child) = active_child {
                 state = Box::pin(process_sop_node_tick(
-                    sp_id, state, child, con, log_target,
+                    sp_id, state, child, con, tick_elapsed_ms, log_target,
                 ))
                 .await;
             }
@@ -395,6 +407,7 @@ async fn process_sop_node_tick(
                     child,
                     con.clone(),
                     // logging_tx.clone(),
+                    tick_elapsed_ms,
                     log_target,
                 ))
                 .await;
@@ -410,7 +423,7 @@ async fn process_sop_node_tick(
             // If a path is active, keep processing it
             if let Some(child) = active_child {
                 state = Box::pin(process_sop_node_tick(
-                    sp_id, state, child, con, log_target,
+                    sp_id, state, child, con, tick_elapsed_ms, log_target,
                 ))
                 .await;
             } else {
@@ -426,6 +439,7 @@ async fn process_sop_node_tick(
                         path_to_start,
                         con,
                         // logging_tx,
+                        tick_elapsed_ms,
                         log_target,
                     ))
                     .await;

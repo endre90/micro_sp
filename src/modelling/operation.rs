@@ -390,16 +390,30 @@ impl Operation {
     // dashboard command is a single per-runner variable, read it *once* per
     // tick in the runner loop and pass the result in, rather than re-reading it
     // per operation.
-    // Note also the condition is `a || b || c != x || d != y || e != z`, which
-    // is true for essentially every state - so the expensive dashboard lookup
-    // happens unconditionally. Worth checking whether that was intended.
+    // DONE (correctness): the state guard read
+    //     Initial || Executing || != Disabled || != Failed || != Timedout
+    // Those last three are `!=`, almost certainly a typo for `==`, and they
+    // make the whole expression a tautology: any value that is not `Disabled`
+    // satisfies `!= Disabled`, and `Disabled` itself satisfies `!= Failed`. So
+    // the guard was true for *every* operation state and the method reduced to
+    // "is the dashboard command 'stop'".
+    //
+    // That is not harmless. `Operation::cancel` does not check the current
+    // state - it assigns `Cancelled` unconditionally - so pressing stop drove
+    // every operation to `Cancelled`, including ones that had already reached
+    // `Completed`, `Bypassed`, `Fatal` or a `Terminated(..)` state. A finished
+    // operation would be reported as cancelled.
+    //
+    // The guard now lists the states where cancelling an operation means
+    // something: it has been planned or is running, or it is stuck in a state
+    // it can still be recovered from. Terminal states are left alone.
     pub fn can_be_cancelled(&self, sp_id: &str, state: &State, log_target: &str) -> bool {
         if let Some(value) = state.get_value(&self.name, &log_target) {
             if value_is(&value, OperationState::Initial)
                 || value_is(&value, OperationState::Executing)
-                || !value_is(&value, OperationState::Disabled)
-                || !value_is(&value, OperationState::Failed)
-                || !value_is(&value, OperationState::Timedout)
+                || value_is(&value, OperationState::Disabled)
+                || value_is(&value, OperationState::Failed)
+                || value_is(&value, OperationState::Timedout)
             {
                 if let Some(dashboard_command) =
                     state.get_value(&format!("{}_dashboard_command", sp_id), &log_target)
@@ -828,6 +842,87 @@ mod operation_state_tests {
                     "wrong-typed value {:?} vs {:?}",
                     wrong_type,
                     expected
+                );
+            }
+        }
+    }
+}
+
+#[cfg(test)]
+mod can_be_cancelled_tests {
+    use crate::*;
+
+    const SP_ID: &str = "sp";
+    const TARGET: &str = "test";
+
+    fn state_with(operation_state: &str, dashboard_command: &str) -> State {
+        let mut state = State::new();
+        state.add_mut(
+            SPAssignment::new(
+                SPVariable::new("op_x", SPValueType::String),
+                operation_state.to_spvalue(),
+            ),
+            TARGET,
+        );
+        state.add_mut(
+            SPAssignment::new(
+                SPVariable::new(&format!("{}_dashboard_command", SP_ID), SPValueType::String),
+                dashboard_command.to_spvalue(),
+            ),
+            TARGET,
+        );
+        state
+    }
+
+    fn operation() -> Operation {
+        Operation {
+            name: "op_x".to_string(),
+            ..Default::default()
+        }
+    }
+
+    /// The states where cancelling means something: planned, running, or stuck
+    /// somewhere it can still be recovered from.
+    #[test]
+    fn stop_cancels_an_operation_that_has_not_finished() {
+        for operation_state in ["initial", "executing", "disabled", "failed", "timedout"] {
+            assert!(
+                operation().can_be_cancelled(SP_ID, &state_with(operation_state, "stop"), TARGET),
+                "'{operation_state}' should be cancellable"
+            );
+        }
+    }
+
+    /// The bug: the guard was a tautology, so `stop` drove *finished*
+    /// operations to `Cancelled` too - `Operation::cancel` does not check the
+    /// current state before assigning.
+    #[test]
+    fn stop_leaves_a_finished_operation_alone() {
+        for operation_state in [
+            "completed",
+            "bypassed",
+            "fatal",
+            "cancelled",
+            "terminated_completed",
+            "terminated_bypassed",
+            "terminated_fatal",
+            "terminated_cancelled",
+        ] {
+            assert!(
+                !operation().can_be_cancelled(SP_ID, &state_with(operation_state, "stop"), TARGET),
+                "'{operation_state}' is terminal and should not be cancellable"
+            );
+        }
+    }
+
+    #[test]
+    fn without_a_stop_command_nothing_is_cancellable() {
+        for operation_state in ["initial", "executing", "disabled", "failed", "timedout"] {
+            for command in ["none", "start", ""] {
+                assert!(
+                    !operation()
+                        .can_be_cancelled(SP_ID, &state_with(operation_state, command), TARGET),
+                    "'{operation_state}' with command '{command}' should not be cancellable"
                 );
             }
         }

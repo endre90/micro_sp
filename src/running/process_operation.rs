@@ -41,13 +41,20 @@ pub enum OperationProcessingType {
 //    `.complete(..)` / `.retry(..)` deep-copied the whole `Operation` (all six
 //    transition vectors) just to call a `&self` method. All twelve `.clone()`
 //    calls are gone.
-// 5. `elapased_executing_ms += OPERAION_RUNNER_TICK_INTERVAL_MS` assumes this
-//    is called exactly on a 200 ms cadence, but `sop_runner` calls it at 100 ms
-//    and `auto_operation_runner` skips ticks whenever Redis is slow. Timeouts
-//    are therefore wrong in both directions. Suggested: store the start
-//    `SystemTime` in the state when the operation enters Executing/Disabled and
-//    compute elapsed time from the wall clock - more accurate, and it also
-//    removes two state writes per operation per tick.
+// 5. DONE (correctness): `elapased_executing_ms += OPERAION_RUNNER_TICK_INTERVAL_MS`
+//    assumed this is called exactly on a 200 ms cadence. `sop_runner` calls it
+//    at 100 ms, so every SOP operation accumulated elapsed time at *twice* real
+//    speed and timed out at half its configured deadline; and any runner whose
+//    tick slipped because Redis was slow under-counted in the other direction.
+//    The caller now passes the wall-clock time its own tick actually took, so
+//    the counters track real elapsed milliseconds in both cases.
+//    Note this deliberately keeps the accumulate-into-state design rather than
+//    stamping a start `SystemTime` per operation: a start stamp needs two new
+//    per-operation variables, and any state persisted by an older build would
+//    not have them - which, with `State::get_value` panicking on a missing
+//    variable, turns a version skew into a crash. Accumulating needs no new
+//    variables at all. (The separate latent issue that the counters are never
+//    reset when an operation re-enters Executing is untouched here.)
 // 6. DONE (partly): the three chained `.update(..)` calls at the end each
 //    cloned the whole state map; they are `update_mut` now.
 //    The rest of the original note was wrong and the correction matters:
@@ -86,6 +93,10 @@ pub(super) async fn process_operation(
     // sop_state: Option<&mut String>,
     // logging_tx: mpsc::Sender<LogMsg>,
     // mut con: crate::SPConnection,
+    // Wall-clock milliseconds the caller's tick actually took. The elapsed
+    // counters advance by this, so they track real time no matter which runner
+    // is driving the operation or how badly a tick slipped.
+    tick_elapsed_ms: i64,
     log_target: &str,
     // terminated_operations: &mut Vec<String>
 ) -> State {
@@ -144,7 +155,7 @@ pub(super) async fn process_operation(
             }
         }
         OperationState::Disabled => {
-            elapased_disabled_ms += OPERAION_RUNNER_TICK_INTERVAL_MS as i64;
+            elapased_disabled_ms += tick_elapsed_ms;
             if operation.can_be_cancelled(&sp_id, &new_state, &log_target) {
                 new_state = operation.cancel(&new_state, &log_target);
                 new_op_info = format!("Cancelling operation '{}'.", operation.name).to_string();
@@ -200,7 +211,7 @@ pub(super) async fn process_operation(
             }
         }
         OperationState::Executing => {
-            elapased_executing_ms += OPERAION_RUNNER_TICK_INTERVAL_MS as i64;
+            elapased_executing_ms += tick_elapsed_ms;
             if operation.can_be_cancelled(&sp_id, &new_state, &log_target) {
                 new_state = operation.cancel(&new_state, &log_target);
                 new_op_info = format!("Cancelling operation '{}'.", operation.name).to_string();
@@ -635,6 +646,8 @@ mod tests {
             OperationProcessingType::Automatic,
             None,
             None,
+            // a 200 ms tick, matching the runners' cadence
+            200,
             TARGET,
         )
         .await
@@ -711,3 +724,162 @@ mod tests {
     }
 }
 
+
+#[cfg(test)]
+mod elapsed_tests {
+    use super::*;
+
+    const SP_ID: &str = "sp";
+    const TARGET: &str = "test";
+
+    /// An operation that starts and then sits in Executing forever.
+    fn executing_operation() -> (State, Operation) {
+        let mut state = State::new();
+        state.add_mut(
+            SPAssignment::new(SPVariable::new("go", SPValueType::Bool), true.to_spvalue()),
+            TARGET,
+        );
+        state.add_mut(
+            SPAssignment::new(
+                SPVariable::new(&format!("{}_dashboard_command", SP_ID), SPValueType::String),
+                "none".to_spvalue(),
+            ),
+            TARGET,
+        );
+
+        let operation = Operation::new(
+            "slow",
+            Some(1000),
+            Some(1000),
+            None,
+            None,
+            false,
+            vec![Transition::parse(
+                "start",
+                "var:go == true",
+                "true",
+                Vec::<&str>::new(),
+                Vec::<&str>::new(),
+                &state,
+            )],
+            // Never satisfiable, so it stays Executing.
+            vec![Transition::parse(
+                "complete",
+                "var:go == false",
+                "true",
+                Vec::<&str>::new(),
+                Vec::<&str>::new(),
+                &state,
+            )],
+            vec![],
+            vec![],
+            vec![],
+            vec![],
+        );
+
+        let state =
+            add_operation_state_tracking_variable(&vec![operation.name.clone()], &state, TARGET);
+        let state = add_operation_meta_tracking_variables(
+            &vec![operation.name.clone()],
+            &state,
+            false,
+            TARGET,
+        );
+        (state, operation)
+    }
+
+    async fn tick(state: State, operation: &Operation, tick_elapsed_ms: i64) -> State {
+        process_operation(
+            SP_ID,
+            state,
+            operation,
+            OperationProcessingType::Automatic,
+            None,
+            None,
+            tick_elapsed_ms,
+            TARGET,
+        )
+        .await
+    }
+
+    /// The bug: the increment was a compile-time constant of 200 ms, so an
+    /// operation driven by `sop_runner` at 100 ms aged twice as fast as real
+    /// time and hit its deadline at half the configured value.
+    #[tokio::test]
+    async fn elapsed_tracks_the_callers_real_tick_period() {
+        let (state, operation) = executing_operation();
+        let key = format!("{}_elapsed_executing_ms", operation.name);
+
+        // Tick 1 starts it; from then on it accumulates.
+        let mut state = tick(state, &operation, 100).await;
+        assert_eq!(
+            state.get_string_or_default_to_unknown(&operation.name, TARGET),
+            "executing"
+        );
+
+        for _ in 0..10 {
+            state = tick(state, &operation, 100).await;
+        }
+        assert_eq!(
+            state.get_value(&key, TARGET),
+            Some(1000.to_spvalue()),
+            "ten 100 ms ticks must count as 1000 ms, not 2000"
+        );
+    }
+
+    /// A slipped tick counts for the time it actually took.
+    #[tokio::test]
+    async fn a_slow_tick_counts_the_time_it_really_took() {
+        let (state, operation) = executing_operation();
+        let key = format!("{}_elapsed_executing_ms", operation.name);
+
+        let state = tick(state, &operation, 200).await;
+        let state = tick(state, &operation, 200).await;
+        let state = tick(state, &operation, 950).await;
+
+        assert_eq!(
+            state.get_value(&key, TARGET),
+            Some(1150.to_spvalue()),
+            "a 950 ms tick must count as 950 ms"
+        );
+    }
+
+    /// And the timeout that reads the counter fires after the configured
+    /// deadline in *real* time. Before the fix, a 1000 ms deadline driven at
+    /// 100 ms per tick fired after ~600 ms of real time, because each tick
+    /// charged the 200 ms constant.
+    ///
+    /// Note the counter is read at the start of a tick and incremented at the
+    /// end, so the timeout is observed a tick or two after the deadline is
+    /// actually crossed. That lag is pre-existing and not what this pins down -
+    /// what matters is that it can no longer fire *early*.
+    #[tokio::test]
+    async fn the_deadline_is_reached_in_real_time_not_early() {
+        let (state, operation) = executing_operation();
+
+        // 1000 ms deadline, driven at 100 ms per tick.
+        let mut state = tick(state, &operation, 100).await;
+
+        let mut real_ms_elapsed = 0;
+        let mut timed_out_after = None;
+        for _ in 0..40 {
+            state = tick(state, &operation, 100).await;
+            real_ms_elapsed += 100;
+            if state.get_string_or_default_to_unknown(&operation.name, TARGET) == "timedout" {
+                timed_out_after = Some(real_ms_elapsed);
+                break;
+            }
+        }
+
+        let timed_out_after = timed_out_after.expect("the operation should have timed out");
+        assert!(
+            timed_out_after >= 1000,
+            "timed out after only {timed_out_after} ms of real time, but the deadline is 1000 ms"
+        );
+        assert!(
+            timed_out_after <= 1300,
+            "timed out after {timed_out_after} ms, which is more lag than the read-then-increment \
+             ordering explains"
+        );
+    }
+}

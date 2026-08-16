@@ -561,6 +561,8 @@ mod tests {
                 running::process_operation::OperationProcessingType::Automatic,
                 None,
                 None,
+                // a 200 ms tick, matching the runners' cadence
+                200,
                 TARGET,
             )
             .await;
@@ -579,6 +581,7 @@ mod tests {
             running::process_operation::OperationProcessingType::Automatic,
             None,
             None,
+            200,
             TARGET,
         )
         .await;

@@ -33,15 +33,43 @@ mod flush_state;
 // collapse into HGETALL, and MSET+DEL+DEL collapse into one pipelined write -
 // taking six RTTs down to two.
 //
-// PERF (atomicity): read-modify-write here is not atomic. Two runners that tick
-// at the same time both read the full state, both compute a diff against their
-// own snapshot, and both write - so the later MSET can resurrect a value the
-// other runner just changed. Besides the correctness risk this shows up as
-// "the state change did not take" and an extra tick of latency when the write
-// is lost and has to be redone. Suggested: either give each runner exclusive
-// ownership of the keys it writes (it mostly already has that - it is the
-// full-state *reads* that create the overlap), or move the read-compute-write
-// into a Lua script / WATCH-MULTI-EXEC so it is atomic.
+// CORRECTNESS (open - needs a design decision, not a bug fix): read-modify-write
+// across runners is not atomic. Each runner reads a snapshot, computes a diff
+// against it, and writes the diff; two runners whose ticks overlap can both
+// decide what to write from the same stale read, and the later MSET wins. It
+// shows up as "the state change did not take" plus a tick of latency while it
+// is redone.
+//
+// Since each runner only writes keys whose value *changed* in its own tick,
+// this only bites where two runners genuinely write the same key. That set is
+// small and known:
+//
+//   {sp_id}_plan              planner_ticker, plan_runner, goal_runner
+//   {sp_id}_plan_state        plan_runner, goal_runner
+//   {sp_id}_planner_state     planner_ticker, plan_runner, goal_runner
+//   {sp_id}_plan_current_step plan_runner, goal_runner
+//   {sp_id}_current_goal_state plan_runner, goal_runner
+//   {sp_id}_replan_trigger    planner_ticker, goal_runner
+//   {sp_id}_replanned         planner_ticker, goal_runner
+//
+// Two ways out, both bigger than a fix:
+//
+//   1. Exclusive ownership per key. The natural split is planner_ticker owning
+//      `_planner_state`/`_plan`/`_plan_id`/`_plan_counter`, plan_runner owning
+//      `_plan_state`/`_plan_current_step`/`_terminated_operations`, and
+//      goal_runner owning the `_current_goal_*`/`_scheduled_goals`/`_replan_*`
+//      family. That does not work as a straight edit, because goal_runner
+//      currently *resets* the plan fields when it admits a new goal - the
+//      cross-writes are how the handover is implemented today. Doing this
+//      properly means reworking that handover so each runner resets its own
+//      fields when it observes a new `_current_goal_id`.
+//   2. Make the read-compute-write atomic with WATCH/MULTI/EXEC or a Lua
+//      script, and retry on conflict. Cheaper to implement, but it turns every
+//      tick into a transaction and needs a retry policy.
+//
+// Note `StateManager::apply` deliberately does *not* use `.atomic()`: batching
+// a runner's own writes into one MULTI/EXEC does nothing for this, because the
+// race is between the read and the write, not among the writes.
 //
 // PERF (serialisation): every value is `serde_json` encoded/decoded on every
 // hop. For `SPTransformStamped` and array/map values that is the dominant cost

@@ -249,6 +249,46 @@
 //         transforms - a correctness bug traded for a slow path. The SCAN fix
 //         above already took the dominant cost out.
 //
+// 15. Correctness fixes (these were bugs, not slow paths):
+//
+//     DONE:
+//       - Elapsed-time accounting. `process_operation` charged a compile-time
+//         constant of 200 ms per call, but `sop_runner` calls it at 100 ms - so
+//         every SOP operation aged at *twice* real speed and timed out at half
+//         its configured deadline. Any runner whose tick slipped because Redis
+//         was slow under-counted in the other direction. Each runner now
+//         measures its real tick period with `Instant` and passes it in.
+//                            -> running/process_operation.rs and its three callers
+//       - Plan step resolution. `op_name.starts_with(&op.name)` matched any
+//         operation whose name is a prefix of the step, so a model with both
+//         `op_move` and `op_move_to_b` could drive the wrong operation's
+//         transitions depending only on model order. Steps are
+//         `{name}_{nanoid}`, so they now resolve exactly, with a longest-match
+//         prefix fallback for step names that carry no suffix.
+//                                            -> running/plan_runner.rs
+//       - Auto transition chaining. Every transition was evaluated against the
+//         same snapshot and wrote its own effects straight to Redis, so a chain
+//         of N advanced one link per 50 ms tick, and two transitions writing
+//         the same variable both decided from the same stale read. A single
+//         `State` is threaded through the loop and written once. Measured: a
+//         four-link chain settles in 13 ms instead of >= 200 ms.
+//                                            -> running/auto_runner.rs
+//       - `Operation::can_be_cancelled` guard was a tautology: three of its
+//         five clauses were `!=` where `==` was meant, so it was true for every
+//         operation state. Since `Operation::cancel` does not check the current
+//         state, pressing stop drove *finished* operations to `Cancelled` too.
+//         It now lists the states where cancelling means something.
+//                                            -> modelling/operation.rs
+//
+//     OPEN (deliberately - see the long note in management/state.rs):
+//       - Read-modify-write across runners is not atomic. Seven `{sp_id}_*`
+//         keys are written by two or three runners each, and the handover
+//         between goal_runner, planner_ticker and plan_runner is currently
+//         *implemented* through those cross-writes. Fixing it means either
+//         reworking that handover to give each runner exclusive ownership, or
+//         wrapping each tick in WATCH/MULTI/EXEC with a retry policy. Both are
+//         design changes rather than bug fixes, so they need your call.
+//
 // Smaller but cheap: hoist the per-tick `format!("{}_...", name)` key building
 // into cached key strings (see the measurement above before bothering).
 //

@@ -4,24 +4,26 @@ use crate::{
 };
 use chrono::Utc;
 // use rand::seq::IndexedRandom;
-use crate::SPConnection;
 use std::{sync::Arc, time::Duration};
 use tokio::{sync::mpsc, time::interval};
 
 // Add automatic operations here as well that finish immediatelly, god for setting some values, triggering robot moves etc.
 pub static TRANSITION_RUNNER_TICK_INTERVAL_MS: u64 = 50;
 
-// PERF: issues its own `set_state` (a full Redis round trip) per fired
-// transition, inside the caller's `for t in &model.auto_transitions` loop. If
-// three auto transitions fire on the same tick that is three sequential MSETs.
-// Suggested: return the modified `State` (or accumulate into a shared
-// `new_state`) and have `auto_transition_runner` write once per tick.
-// PERF/correctness: each transition is evaluated against the same `state`
-// snapshot but the effects are written straight to Redis, so a transition whose
-// guard depends on a variable an earlier transition just wrote will not see it
-// until the next tick - an avoidable extra 50 ms of latency per chained
-// transition. Threading a single mutable `State` through the loop fixes both
-// the latency and the round trips.
+// DONE (correctness + PERF): this used to take `&State` and write its own
+// effects straight to Redis, inside the caller's `for t in
+// &model.auto_transitions` loop. Two problems, one fix:
+//   - every transition in the loop was evaluated against the *same* snapshot,
+//     so a transition whose guard depends on a variable an earlier transition
+//     had just written did not see it until the next tick. A chain of N auto
+//     transitions therefore took N ticks - 50 ms each - instead of one. Worse,
+//     two transitions writing the same variable both decided what to write from
+//     the same stale read, so the later one silently overwrote the earlier.
+//   - each firing transition issued its own `set_state`, so three transitions
+//     firing on one tick meant three sequential MSETs.
+// It now applies its actions to a single `State` threaded through the loop,
+// which the caller diffs and writes once. Transitions see each other's effects
+// within the tick, in model order.
 // DONE: PERF: `transition.to_owned().eval(..)` and the two `transition.clone()`
 // calls used to deep-copy the whole transition (guard predicate tree, runner
 // guard, both action vectors) three times per evaluation - and the first copy
@@ -34,10 +36,9 @@ pub static TRANSITION_RUNNER_TICK_INTERVAL_MS: u64 = 50;
 // actually fires, which is already the case here - but the `TransitionMsg` with
 // its `format!("Executed.")` and `Utc::now()` is built even when nobody
 // consumes the log. Consider gating on `log::log_enabled!`.
-async fn process_transition(
-    con: &mut SPConnection,
+fn process_transition(
     transition: &Transition,
-    state: &State,
+    state: &mut State,
     // logging_tx: mpsc::Sender<LogMsg>,
     log_target: &str,
 ) {
@@ -52,8 +53,7 @@ async fn process_transition(
     let unique_id = nanoid::nanoid!(10, &NANOID_ALPHABET);
     let unique_name = format!("{}_{}", transition.name, unique_id);
 
-    let mut new_state = state.clone();
-    transition.take_mut(&mut new_state, &log_target);
+    transition.take_mut(state, &log_target);
     log::info!(target: &log_target, "Executed auto transition: '{}'.", unique_name);
 
     // let transition_msg = TransitionMsg {
@@ -67,9 +67,6 @@ async fn process_transition(
     //     Ok(()) => (),
     //     Err(e) => log::error!(target: &log_target, "Failed to send logging with: {e}."),
     // }
-
-    let modified_state = state.get_diff_partial_state(&new_state);
-    StateManager::set_state(con, &modified_state).await;
 }
 
 // PERF: this runner is already doing the right thing on the read side - it
@@ -117,8 +114,16 @@ pub async fn auto_transition_runner(
             None => continue,
         };
 
+        // One `State` threaded through every transition, so each sees what the
+        // ones before it did, and one write for the whole tick.
+        let mut new_state = state.clone();
         for t in &model.auto_transitions {
-            process_transition(&mut con, t, &state, &log_target).await;
+            process_transition(t, &mut new_state, &log_target);
+        }
+
+        let modified_state = state.get_diff_partial_state(&new_state);
+        if !modified_state.state.is_empty() {
+            StateManager::set_state(&mut con, &modified_state).await;
         }
     }
 }
@@ -180,8 +185,14 @@ pub async fn auto_operation_runner(
     // error on the command itself, which the callee already logs and skips.
     let mut con = connection_manager.get_connection().await;
 
+    // Real time between ticks; see the note in `process_operation`.
+    let mut last_tick = std::time::Instant::now();
+
     loop {
         interval.tick().await;
+        let tick_elapsed_ms = last_tick.elapsed().as_millis() as i64;
+        last_tick = std::time::Instant::now();
+
         let read = match read_full_state {
             true => StateManager::get_full_state(&mut con).await,
             false => StateManager::get_state_for_keys(&mut con, &keys, &log_target).await,
@@ -241,6 +252,7 @@ pub async fn auto_operation_runner(
                 None,
                 None,
                 // logging_tx.clone(),
+                tick_elapsed_ms,
                 &log_target,
             )
             .await;
@@ -269,6 +281,7 @@ pub async fn auto_operation_runner(
                 None,
                 None,
                 // logging_tx.clone(),
+                tick_elapsed_ms,
                 &log_target,
             )
             .await;
@@ -321,5 +334,95 @@ pub async fn auto_operation_runner(
                 .collect();
             keys = keys_with_active_operations(&static_keys, &active);
         }
+    }
+}
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const TARGET: &str = "test";
+
+    fn state() -> State {
+        let mut state = State::new();
+        for name in ["a", "b", "c"] {
+            state.add_mut(
+                SPAssignment::new(SPVariable::new(name, SPValueType::Bool), false.to_spvalue()),
+                TARGET,
+            );
+        }
+        state
+    }
+
+    fn link(name: &str, needs: Option<&str>, sets: &str, state: &State) -> Transition {
+        let guard = match needs {
+            Some(needs) => format!("var:{} == true && var:{} == false", needs, sets),
+            None => format!("var:{} == false", sets),
+        };
+        Transition::parse(
+            name,
+            &guard,
+            "true",
+            vec![format!("var:{} <- true", sets).as_str()],
+            Vec::<&str>::new(),
+            state,
+        )
+    }
+
+    /// The bug: every transition was evaluated against the same snapshot, so a
+    /// chain of three took three ticks - one link per tick - instead of one.
+    #[test]
+    fn a_chain_of_transitions_completes_within_one_tick() {
+        let state = state();
+        let transitions = vec![
+            link("first", None, "a", &state),
+            link("second", Some("a"), "b", &state),
+            link("third", Some("b"), "c", &state),
+        ];
+
+        let mut new_state = state.clone();
+        for t in &transitions {
+            process_transition(t, &mut new_state, TARGET);
+        }
+
+        for name in ["a", "b", "c"] {
+            assert_eq!(
+                new_state.get_value(name, TARGET),
+                Some(true.to_spvalue()),
+                "'{name}' should have been set in the same tick"
+            );
+        }
+    }
+
+    /// Order still matters within a tick: a link whose predecessor comes later
+    /// in the model does not fire until the next tick, as before.
+    #[test]
+    fn a_chain_listed_backwards_still_advances_one_link_per_tick() {
+        let state = state();
+        let transitions = vec![
+            link("third", Some("b"), "c", &state),
+            link("second", Some("a"), "b", &state),
+            link("first", None, "a", &state),
+        ];
+
+        let mut new_state = state.clone();
+        for t in &transitions {
+            process_transition(t, &mut new_state, TARGET);
+        }
+        assert_eq!(new_state.get_value("a", TARGET), Some(true.to_spvalue()));
+        assert_eq!(new_state.get_value("b", TARGET), Some(false.to_spvalue()));
+        assert_eq!(new_state.get_value("c", TARGET), Some(false.to_spvalue()));
+    }
+
+    /// A transition whose guard is false must leave the state untouched.
+    #[test]
+    fn a_transition_that_does_not_fire_changes_nothing() {
+        let state = state();
+        let blocked = link("blocked", Some("a"), "b", &state);
+
+        let mut new_state = state.clone();
+        process_transition(&blocked, &mut new_state, TARGET);
+
+        assert_eq!(new_state, state);
+        assert!(state.get_diff_partial_state(&new_state).state.is_empty());
     }
 }
