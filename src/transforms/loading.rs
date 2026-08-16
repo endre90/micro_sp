@@ -331,25 +331,323 @@ fn extract_transform(json: &Value) -> Option<SPTransform> {
     }
 }
 
-#[test]
-fn test_load_and_deserialize_from_file() {
-    initialize_env_logger();
+/// Loading a scenario off disk.
+///
+/// This is the crate's only file-system input path: a directory of JSON frame
+/// definitions written by hand or by a scene editor, turned into the transform
+/// buffer the whole TF subsystem then works from. It is therefore also the place
+/// where a typo in somebody's scene file gets its first and only validation.
+///
+/// The rules that matter, and that these tests pin, are all about *partial*
+/// failure: one malformed file must cost that one frame and not the scenario,
+/// and a frame with `enable_transform: false` must be left out entirely rather
+/// than loaded in a disabled state.
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::*;
 
-    log::warn!("Starting the test_deserialize_transform_stamped test...");
+    /// A scratch directory that cleans itself up. `tempfile` is not a
+    /// dependency, and adding one for this would be more machinery than the
+    /// three tests that need it are worth.
+    struct ScratchDir {
+        path: std::path::PathBuf,
+    }
 
-    let manifest_dir = std::env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR is not set");
-
-    let path = format!("{}/src/transforms/examples/data", manifest_dir);
-    println!("{}", path);
-    let frames = list_frames_in_dir(&path);
-
-    match frames {
-        Ok(frames) => {
-            // println!("Frames: {:?}", frames);
-            let scenario = load_new_scenario(&frames);
-            println!("{:#?}", scenario);
+    impl ScratchDir {
+        fn new() -> Self {
+            let path = std::env::temp_dir().join(format!(
+                "micro_sp_loading_{}",
+                nanoid::nanoid!(10, &NANOID_ALPHABET)
+            ));
+            fs::create_dir_all(&path).unwrap();
+            ScratchDir { path }
         }
-        _ => panic!(),
+
+        fn as_str(&self) -> &str {
+            self.path.to_str().unwrap()
+        }
+
+        fn write(&self, name: &str, contents: &str) -> String {
+            let file = self.path.join(name);
+            if let Some(parent) = file.parent() {
+                fs::create_dir_all(parent).unwrap();
+            }
+            std::fs::write(&file, contents).unwrap();
+            file.to_str().unwrap().to_string()
+        }
+    }
+
+    impl Drop for ScratchDir {
+        fn drop(&mut self) {
+            let _ = fs::remove_dir_all(&self.path);
+        }
+    }
+
+    fn frame_json(child: &str, parent: &str, x: f64, metadata: &str) -> String {
+        format!(
+            r#"{{
+                "parent_frame_id": "{parent}",
+                "child_frame_id": "{child}",
+                "transform": {{
+                    "translation": {{ "x": {x}, "y": 0.0, "z": 0.0 }},
+                    "rotation": {{ "x": 0.0, "y": 0.0, "z": 0.0, "w": 1.0 }}
+                }},
+                "metadata": {metadata}
+            }}"#
+        )
+    }
+
+    /// The bundled example scenario, which is what a consumer copies as a
+    /// starting point - so it has to keep loading.
+    #[test]
+    fn the_bundled_example_scenario_loads() {
+        let manifest_dir =
+            std::env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR is not set");
+        let path = format!("{}/src/transforms/examples/data", manifest_dir);
+
+        let frames = list_frames_in_dir(&path).expect("the example data should be readable");
+        assert!(!frames.is_empty(), "the example directory should not be empty");
+
+        let scenario = load_new_scenario(&frames);
+        assert!(!scenario.is_empty(), "the example scenario should load frames");
+
+        // Every loaded frame is keyed by its own child id, and the metadata in
+        // the files is carried through rather than dropped.
+        for (key, transform) in &scenario {
+            assert_eq!(key, &transform.child_frame_id);
+            assert!(!transform.parent_frame_id.is_empty());
+        }
+        assert!(
+            scenario.contains_key("chair"),
+            "expected the example 'chair' frame, got {:?}",
+            scenario.keys()
+        );
+        // 'chair' is declared with `active_transform: false` in the data.
+        assert!(!scenario["chair"].active_transform);
+    }
+
+    #[test]
+    fn listing_a_directory_that_does_not_exist_is_an_error() {
+        let result = list_frames_in_dir("/definitely/not/a/real/directory");
+        assert!(result.is_err());
+        let message = result.unwrap_err().to_string();
+        assert!(
+            message.contains("Empty scenario is loaded"),
+            "unexpected message: {message}"
+        );
+    }
+
+    #[test]
+    fn listing_an_empty_directory_yields_no_frames() {
+        let dir = ScratchDir::new();
+        assert_eq!(list_frames_in_dir(dir.as_str()).unwrap(), Vec::<String>::new());
+    }
+
+    /// `.json` files are collected recursively, and anything else is left
+    /// alone - a README or a `.bak` next to the scene files must not break it.
+    #[test]
+    fn json_files_are_collected_recursively_and_others_ignored() {
+        let dir = ScratchDir::new();
+        dir.write("a.json", &frame_json("a", "world", 1.0, "{}"));
+        dir.write("nested/b.json", &frame_json("b", "a", 2.0, "{}"));
+        dir.write("nested/deeper/c.json", &frame_json("c", "b", 3.0, "{}"));
+        dir.write("notes.txt", "not a frame");
+        dir.write("nested/a.json.bak", "not a frame either");
+
+        let scenario = load_new_scenario(&vec![dir.as_str().to_string()]);
+
+        assert_eq!(scenario.len(), 3, "got {:?}", scenario.keys());
+        for child in ["a", "b", "c"] {
+            assert!(scenario.contains_key(child), "{child} missing");
+        }
+    }
+
+    /// `enable_transform: false` means "do not load this frame at all", which is
+    /// how a scene file is commented out. Its absence from the buffer is the
+    /// whole point.
+    #[test]
+    fn a_disabled_frame_is_not_loaded() {
+        let dir = ScratchDir::new();
+        dir.write(
+            "on.json",
+            &frame_json("on", "world", 1.0, r#"{"enable_transform": true}"#),
+        );
+        dir.write(
+            "off.json",
+            &frame_json("off", "world", 1.0, r#"{"enable_transform": false}"#),
+        );
+
+        let scenario = load_new_scenario(&vec![dir.as_str().to_string()]);
+
+        assert!(scenario.contains_key("on"));
+        assert!(!scenario.contains_key("off"), "a disabled frame must be skipped");
+    }
+
+    /// Both metadata flags default to true when absent, so a minimal scene file
+    /// with no metadata at all still loads as an active, enabled frame.
+    #[test]
+    fn the_metadata_flags_default_to_true() {
+        let dir = ScratchDir::new();
+        dir.write("plain.json", &frame_json("plain", "world", 1.0, "{}"));
+
+        let scenario = load_new_scenario(&vec![dir.as_str().to_string()]);
+
+        let frame = &scenario["plain"];
+        assert!(frame.active_transform);
+        assert!(frame.enable_transform);
+    }
+
+    /// Every way a file can be unusable. Each costs that file and nothing else,
+    /// which is what lets a scenario survive one bad edit.
+    #[test]
+    fn a_malformed_file_is_skipped_without_losing_the_others() {
+        let dir = ScratchDir::new();
+        dir.write("good.json", &frame_json("good", "world", 1.0, "{}"));
+        dir.write("not_json.json", "{ this is not json,,, }");
+        dir.write(
+            "no_child.json",
+            r#"{"parent_frame_id": "world", "transform": {"translation": {"x":0.0,"y":0.0,"z":0.0}, "rotation": {"x":0.0,"y":0.0,"z":0.0,"w":1.0}}, "metadata": {}}"#,
+        );
+        dir.write(
+            "no_parent.json",
+            r#"{"child_frame_id": "x", "transform": {"translation": {"x":0.0,"y":0.0,"z":0.0}, "rotation": {"x":0.0,"y":0.0,"z":0.0,"w":1.0}}, "metadata": {}}"#,
+        );
+        dir.write(
+            "no_transform.json",
+            r#"{"parent_frame_id": "world", "child_frame_id": "y", "metadata": {}}"#,
+        );
+        dir.write(
+            "bad_transform.json",
+            r#"{"parent_frame_id": "world", "child_frame_id": "z", "transform": "not a transform", "metadata": {}}"#,
+        );
+        dir.write(
+            "wrong_type_child.json",
+            r#"{"parent_frame_id": "world", "child_frame_id": 42, "transform": {"translation": {"x":0.0,"y":0.0,"z":0.0}, "rotation": {"x":0.0,"y":0.0,"z":0.0,"w":1.0}}, "metadata": {}}"#,
+        );
+
+        let scenario = load_new_scenario(&vec![dir.as_str().to_string()]);
+
+        assert_eq!(
+            scenario.len(),
+            1,
+            "only the good frame should have loaded, got {:?}",
+            scenario.keys()
+        );
+        assert!(scenario.contains_key("good"));
+    }
+
+    /// Metadata is converted into the crate's own `SPValue` map, with the keys
+    /// sorted so the same file always produces the same value - which is what
+    /// keeps a reload from showing up as a state change.
+    #[test]
+    fn metadata_is_converted_and_ordered_deterministically() {
+        let dir = ScratchDir::new();
+        dir.write(
+            "meta.json",
+            &frame_json(
+                "meta",
+                "world",
+                1.0,
+                r#"{"zone": 0.5, "frame_type": "waypoint", "visualize_mesh": true, "next_frame": ["b", "c"], "mesh_type": 3, "nested": {"k": "v"}, "nothing": null}"#,
+            ),
+        );
+
+        let first = load_new_scenario(&vec![dir.as_str().to_string()]);
+        let second = load_new_scenario(&vec![dir.as_str().to_string()]);
+        assert_eq!(
+            first["meta"].metadata, second["meta"].metadata,
+            "the same file must convert to the same metadata every time"
+        );
+
+        let MapOrUnknown::Map(entries) = &first["meta"].metadata else {
+            panic!("expected a metadata map");
+        };
+        let keys: Vec<String> = entries.iter().map(|(k, _)| k.to_string()).collect();
+        let mut sorted = keys.clone();
+        sorted.sort();
+        assert_eq!(keys, sorted, "metadata keys must be sorted");
+
+        // A JSON null carries no type, so it is dropped rather than guessed at.
+        assert!(!keys.contains(&"nothing".to_string()));
+
+        // And the whole thing decodes into the typed metadata struct.
+        let decoded = decode_metadata(&first["meta"].metadata);
+        assert_eq!(decoded.frame_type, Some("waypoint".to_string()));
+        assert_eq!(decoded.zone, 0.5);
+        assert_eq!(decoded.mesh_type, 3);
+        assert!(decoded.visualize_mesh);
+        assert_eq!(
+            decoded.next_frame.map(|f| f.len()),
+            Some(2),
+            "the next_frame array should have survived the round trip"
+        );
+    }
+
+    /// Metadata that is not an object at all cannot be converted, and becomes
+    /// UNKNOWN rather than an empty map - so a consumer can tell "no metadata"
+    /// from "metadata that made no sense".
+    #[test]
+    fn non_object_metadata_becomes_unknown() {
+        let dir = ScratchDir::new();
+        dir.write("weird.json", &frame_json("weird", "world", 1.0, r#""a string""#));
+
+        let scenario = load_new_scenario(&vec![dir.as_str().to_string()]);
+        assert_eq!(scenario["weird"].metadata, MapOrUnknown::UNKNOWN);
+    }
+
+    /// The `_no_check` variant takes explicit file paths rather than walking
+    /// directories, and - as its name says - loads disabled frames too.
+    #[test]
+    fn load_new_scenario_no_check_takes_paths_and_keeps_disabled_frames() {
+        let dir = ScratchDir::new();
+        let on = dir.write(
+            "on.json",
+            &frame_json("on", "world", 1.0, r#"{"enable_transform": true}"#),
+        );
+        let off = dir.write(
+            "off.json",
+            &frame_json("off", "world", 2.0, r#"{"enable_transform": false}"#),
+        );
+
+        let scenario = load_new_scenario_no_check(&vec![on, off]);
+
+        assert_eq!(scenario.len(), 2);
+        assert!(scenario["on"].enable_transform);
+        assert!(
+            !scenario["off"].enable_transform,
+            "the disabled frame is loaded, but still marked disabled"
+        );
+
+        // It is a plain path list, so a directory or a missing file is skipped.
+        let mixed = load_new_scenario_no_check(&vec![
+            dir.as_str().to_string(),
+            "/no/such/file.json".to_string(),
+        ]);
+        assert!(mixed.is_empty());
+    }
+
+    /// A later file wins when two declare the same child frame - the buffer is
+    /// keyed by child id, so one frame can only have one parent.
+    #[test]
+    fn a_duplicate_child_frame_is_overwritten_rather_than_duplicated() {
+        let dir = ScratchDir::new();
+        let first = dir.write("first.json", &frame_json("dup", "world", 1.0, "{}"));
+        let second = dir.write("second.json", &frame_json("dup", "other", 2.0, "{}"));
+
+        let scenario = load_new_scenario_no_check(&vec![first, second]);
+
+        assert_eq!(scenario.len(), 1);
+        assert_eq!(scenario["dup"].parent_frame_id, "other");
+        assert_eq!(scenario["dup"].transform.translation.x.0, 2.0);
+    }
+
+    #[test]
+    fn the_error_type_carries_its_message() {
+        let error = ErrorMsg::new("something went wrong");
+        assert_eq!(error.to_string(), "something went wrong");
+        let boxed: Box<dyn std::error::Error> = Box::new(error);
+        assert_eq!(boxed.to_string(), "something went wrong");
     }
 }
 

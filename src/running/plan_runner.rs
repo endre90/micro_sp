@@ -10,10 +10,6 @@ use tokio::sync::mpsc;
 // at twice real speed. "How often do I poll" and "how much time has passed" are
 // separate now: each runner measures the latter with `Instant` and passes it in,
 // which also keeps the counters honest when a tick slips because Redis was slow.
-/// Shared by `planned_operation_runner` and `auto_operation_runner`.
-/// Override with `MICRO_SP_OPERATION_TICK_MS`. See `running::tick`.
-pub static OPERAION_RUNNER_TICK_INTERVAL_MS: u64 = 1;
-
 // DONE: PERF: this was the third caller of `StateManager::get_full_state`;
 // with `sop_runner` and `auto_operation_runner` that made ~20 blocking
 // `KEYS *` scans per second. The key set is `model.operations`
@@ -36,10 +32,7 @@ pub async fn planned_operation_runner(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let sp_id = &model.name;
     let log_target = format!("{}_op_runner", sp_id);
-    let mut interval = runner_interval(
-        "MICRO_SP_OPERATION_TICK_MS",
-        OPERAION_RUNNER_TICK_INTERVAL_MS,
-    );
+    let mut interval = runner_interval();
 
     // Get only the relevant keys from the state
     log::info!(target: &log_target, "Online.");
@@ -385,5 +378,370 @@ mod tests {
             find_step_operation(&operations, "op_stage_2_A1b2C3d4E5").map(|o| o.name.as_str()),
             Some("op_stage_2_A1b2C3d4E5"),
         );
+    }
+}
+
+/// The plan runner, driven end to end against a real Redis.
+///
+/// This runner is the executor: it takes the plan `planner_ticker` produced,
+/// walks it one step at a time through `process_operation`, and reports back
+/// through `{sp_id}_plan_state` - which is what `goal_runner` watches. The plan
+/// state machine itself (Initial -> Executing -> Completed / Failed) had no
+/// coverage at all; only the step-name resolution above did.
+#[cfg(test)]
+mod plan_runner_tests {
+    use super::*;
+    use serial_test::serial;
+    use std::time::Duration;
+    use testcontainers::{ContainerAsync, ImageExt, core::ContainerPort, runners::AsyncRunner};
+    use testcontainers_modules::redis::Redis;
+
+    const SP: &str = "sp";
+    const TARGET: &str = "test";
+
+    async fn redis() -> (ContainerAsync<Redis>, Arc<ConnectionManager>) {
+        let container = Redis::default()
+            .with_mapped_port(6379, ContainerPort::Tcp(6379))
+            .start()
+            .await
+            .unwrap();
+        let manager = Arc::new(ConnectionManager::new().await);
+        let mut con = manager.get_connection().await;
+        StateManager::flush_state(&mut con).await;
+        (container, manager)
+    }
+
+    fn key(suffix: &str) -> String {
+        format!("{SP}_{suffix}")
+    }
+
+    /// A model of two operations that walk `pos` from a to b to c.
+    fn model(state: &State) -> Model {
+        let hop = |name: &str, from: &str, to: &str| {
+            Operation::new(
+                name,
+                Some(10_000),
+                Some(10_000),
+                None,
+                None,
+                false,
+                vec![Transition::parse(
+                    "start",
+                    &format!("var:pos == {from}"),
+                    "true",
+                    Vec::<&str>::new(),
+                    Vec::<&str>::new(),
+                    state,
+                )],
+                vec![Transition::parse(
+                    "complete",
+                    "true",
+                    "true",
+                    vec![format!("var:pos <- {to}").as_str()],
+                    Vec::<&str>::new(),
+                    state,
+                )],
+                vec![],
+                vec![],
+                vec![],
+                vec![],
+            )
+        };
+
+        Model::new(
+            SP,
+            vec![],
+            vec![],
+            vec![],
+            vec![],
+            vec![hop("a_to_b", "a", "b"), hop("b_to_c", "b", "c")],
+        )
+    }
+
+    fn domain() -> State {
+        let mut state = State::new();
+        state.add_mut(
+            SPAssignment::new(SPVariable::new("pos", SPValueType::String), "a".to_spvalue()),
+            TARGET,
+        );
+        state
+    }
+
+    /// Seed Redis with everything the runner reads, plus a plan of `steps`.
+    async fn deploy(manager: &Arc<ConnectionManager>, steps: &[String]) -> Model {
+        let domain = domain();
+        let model = model(&domain);
+
+        let mut state = generate_runner_state_variables(SP, 0, TARGET);
+        state.extend_mut(generate_operation_state_variables(&model, false, TARGET), true);
+        state.extend_mut(domain, true);
+        state.add_mut(
+            SPAssignment::new(
+                SPVariable::new(&key("dashboard_command"), SPValueType::String),
+                "none".to_spvalue(),
+            ),
+            TARGET,
+        );
+        state = state.update(&key("terminated_operations"), Vec::<SPValue>::new().to_spvalue());
+        state = state.update(
+            &key("plan"),
+            steps.iter().map(|s| s.to_spvalue()).collect::<Vec<SPValue>>().to_spvalue(),
+        );
+        state = state.update(&key("plan_state"), "initial".to_spvalue());
+        state = state.update(&key("plan_current_step"), 0.to_spvalue());
+
+        // The step instances need their own bookkeeping variables, which
+        // `planner_ticker` would normally have created.
+        let steps: Vec<String> = steps.to_vec();
+        state = add_operation_state_tracking_variable(&steps, &state, TARGET);
+        state = add_operation_meta_tracking_variables(&steps, &state, false, TARGET);
+
+        let mut con = manager.get_connection().await;
+        StateManager::set_state(&mut con, &state).await;
+        model
+    }
+
+    fn spawn_runner(manager: &Arc<ConnectionManager>, model: Model) -> tokio::task::JoinHandle<()> {
+        let manager = Arc::clone(manager);
+        tokio::spawn(async move {
+            let _ = planned_operation_runner(&model, &manager).await;
+        })
+    }
+
+    async fn text(con: &mut SPConnection, suffix: &str) -> String {
+        match StateManager::get_sp_value(con, &key(suffix)).await {
+            Some(SPValue::String(StringOrUnknown::String(s))) => s,
+            other => format!("{other:?}"),
+        }
+    }
+
+    async fn wait_for(con: &mut SPConnection, suffix: &str, expected: &str, ms: u64) -> String {
+        let deadline = std::time::Instant::now() + Duration::from_millis(ms);
+        let mut last = String::new();
+        while std::time::Instant::now() < deadline {
+            last = text(con, suffix).await;
+            if last == expected {
+                return last;
+            }
+            tokio::time::sleep(Duration::from_millis(2)).await;
+        }
+        last
+    }
+
+    fn steps() -> Vec<String> {
+        vec![
+            "op_a_to_b_AAAAAAAAAA".to_string(),
+            "op_b_to_c_BBBBBBBBBB".to_string(),
+        ]
+    }
+
+    /// The whole executor: a found plan is picked up, both steps run in order,
+    /// and the plan reports `completed`.
+    #[tokio::test]
+    #[serial]
+    async fn a_found_plan_is_executed_step_by_step_to_completion() {
+        let (_container, manager) = redis().await;
+        let mut con = manager.get_connection().await;
+        let model = deploy(&manager, &steps()).await;
+
+        let runner = spawn_runner(&manager, model);
+        // This is what `planner_ticker` reports when it finds a plan.
+        StateManager::set_sp_value(&mut con, &key("planner_state"), &"found".to_spvalue()).await;
+
+        let plan_state = wait_for(&mut con, "plan_state", "completed", 5000).await;
+        runner.abort();
+
+        assert_eq!(plan_state, "completed");
+        assert_eq!(
+            StateManager::get_sp_value(&mut con, "pos").await,
+            Some("c".to_spvalue()),
+            "both steps should have run, in order"
+        );
+        assert_eq!(
+            StateManager::get_sp_value(&mut con, &key("plan_current_step")).await,
+            Some(2.to_spvalue()),
+            "the cursor should have walked off the end of the plan"
+        );
+    }
+
+    /// `planner_state == not_found` fails the plan without executing anything -
+    /// this is how "there is no route to the goal" reaches the goal runner.
+    #[tokio::test]
+    #[serial]
+    async fn a_plan_that_was_not_found_fails_immediately() {
+        let (_container, manager) = redis().await;
+        let mut con = manager.get_connection().await;
+        let model = deploy(&manager, &[]).await;
+
+        let runner = spawn_runner(&manager, model);
+        StateManager::set_sp_value(&mut con, &key("planner_state"), &"not_found".to_spvalue()).await;
+
+        let plan_state = wait_for(&mut con, "plan_state", "failed", 3000).await;
+        runner.abort();
+
+        assert_eq!(plan_state, "failed");
+        assert_eq!(
+            StateManager::get_sp_value(&mut con, "pos").await,
+            Some("a".to_spvalue()),
+            "nothing should have been executed"
+        );
+    }
+
+    /// An empty plan is trivially complete - the planner says "we are already in
+    /// the goal" that way.
+    #[tokio::test]
+    #[serial]
+    async fn an_empty_plan_completes_at_once() {
+        let (_container, manager) = redis().await;
+        let mut con = manager.get_connection().await;
+        let model = deploy(&manager, &[]).await;
+
+        let runner = spawn_runner(&manager, model);
+        StateManager::set_sp_value(&mut con, &key("planner_state"), &"found".to_spvalue()).await;
+
+        assert_eq!(
+            wait_for(&mut con, "plan_state", "completed", 3000).await,
+            "completed"
+        );
+        runner.abort();
+    }
+
+    /// A step naming an operation the model does not contain fails the plan
+    /// rather than being skipped - a skipped step would mean the plan claims to
+    /// have reached the goal without doing the work.
+    #[tokio::test]
+    #[serial]
+    async fn a_step_with_no_matching_operation_fails_the_plan() {
+        let (_container, manager) = redis().await;
+        let mut con = manager.get_connection().await;
+        let model = deploy(&manager, &["op_does_not_exist_CCCCCCCCCC".to_string()]).await;
+
+        let runner = spawn_runner(&manager, model);
+        StateManager::set_sp_value(&mut con, &key("planner_state"), &"found".to_spvalue()).await;
+
+        assert_eq!(
+            wait_for(&mut con, "plan_state", "failed", 3000).await,
+            "failed"
+        );
+        runner.abort();
+    }
+
+    /// Pressing stop cancels the running step, and `process_operation` reports
+    /// that back as a cancelled plan.
+    #[tokio::test]
+    #[serial]
+    async fn stop_cancels_the_running_plan() {
+        let (_container, manager) = redis().await;
+        let mut con = manager.get_connection().await;
+        // A step whose operation can never complete, so it sits in Executing.
+        let domain = domain();
+        let blocked = Operation::new(
+            "stuck",
+            Some(10_000),
+            Some(10_000),
+            None,
+            None,
+            false,
+            vec![Transition::parse(
+                "start",
+                "var:pos == a",
+                "true",
+                Vec::<&str>::new(),
+                Vec::<&str>::new(),
+                &domain,
+            )],
+            vec![Transition::parse(
+                "never",
+                "false",
+                "true",
+                Vec::<&str>::new(),
+                Vec::<&str>::new(),
+                &domain,
+            )],
+            vec![],
+            vec![],
+            vec![],
+            vec![],
+        );
+        let model = Model::new(SP, vec![], vec![], vec![], vec![], vec![blocked]);
+        let step = "op_stuck_DDDDDDDDDD".to_string();
+
+        let mut state = generate_runner_state_variables(SP, 0, TARGET);
+        state.extend_mut(generate_operation_state_variables(&model, false, TARGET), true);
+        state.extend_mut(domain, true);
+        state.add_mut(
+            SPAssignment::new(
+                SPVariable::new(&key("dashboard_command"), SPValueType::String),
+                "none".to_spvalue(),
+            ),
+            TARGET,
+        );
+        state = state.update(&key("terminated_operations"), Vec::<SPValue>::new().to_spvalue());
+        state = state.update(&key("plan"), vec![step.to_spvalue()].to_spvalue());
+        state = state.update(&key("plan_state"), "initial".to_spvalue());
+        state = state.update(&key("plan_current_step"), 0.to_spvalue());
+        state = add_operation_state_tracking_variable(&vec![step.clone()], &state, TARGET);
+        state = add_operation_meta_tracking_variables(&vec![step.clone()], &state, false, TARGET);
+        StateManager::set_state(&mut con, &state).await;
+
+        let runner = spawn_runner(&manager, model);
+        StateManager::set_sp_value(&mut con, &key("planner_state"), &"found".to_spvalue()).await;
+        assert_eq!(
+            wait_for(&mut con, "plan_state", "executing", 3000).await,
+            "executing"
+        );
+
+        // The operator presses stop.
+        StateManager::set_sp_value(&mut con, &key("dashboard_command"), &"stop".to_spvalue()).await;
+
+        let deadline = std::time::Instant::now() + Duration::from_millis(3000);
+        let mut step_state = String::new();
+        while std::time::Instant::now() < deadline {
+            step_state = match StateManager::get_sp_value(&mut con, &step).await {
+                Some(SPValue::String(StringOrUnknown::String(s))) => s,
+                other => format!("{other:?}"),
+            };
+            if step_state == "cancelled" {
+                break;
+            }
+            tokio::time::sleep(Duration::from_millis(2)).await;
+        }
+        // The plan state follows on the *next* tick: `process_operation` only
+        // reports the cancellation once it re-enters with the operation already
+        // in `cancelled`.
+        let plan_state = wait_for(&mut con, "plan_state", &PlanState::Cancelled.to_string(), 3000).await;
+        runner.abort();
+
+        assert_eq!(step_state, "cancelled", "the running step must be cancelled");
+        assert_eq!(
+            plan_state,
+            PlanState::Cancelled.to_string(),
+            "and the plan must report it - even though nothing can read it back, \
+             see plan_state_cancelled_does_not_survive_the_round_trip"
+        );
+    }
+
+    /// An idle runner - no plan, nothing found - must not write.
+    #[tokio::test]
+    #[serial]
+    async fn an_idle_runner_writes_nothing() {
+        let (_container, manager) = redis().await;
+        let mut con = manager.get_connection().await;
+        let model = deploy(&manager, &steps()).await;
+
+        let runner = spawn_runner(&manager, model);
+        tokio::time::sleep(Duration::from_millis(100)).await;
+
+        let before = StateManager::get_full_state(&mut con).await.unwrap();
+        tokio::time::sleep(Duration::from_millis(300)).await;
+        let after = StateManager::get_full_state(&mut con).await.unwrap();
+
+        assert!(
+            before.get_diff_partial_state(&after).state.is_empty(),
+            "a plan runner with nothing to execute must not write: {:?}",
+            before.get_diff_partial_state(&after)
+        );
+        assert!(!runner.is_finished());
+        runner.abort();
     }
 }

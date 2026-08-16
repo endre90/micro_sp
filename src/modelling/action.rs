@@ -268,3 +268,196 @@ mod tests {
         a1.assign(&s, "t");
     }
 }
+
+/// Arithmetic actions and rendering.
+///
+/// `Assign` is exercised everywhere; `Increment` and `Decrement` are not, and
+/// they are the two that can *panic* - deliberately, on a type mismatch,
+/// because incrementing a string or mixing an integer variable with a float
+/// value is a model error rather than something to paper over at runtime. Since
+/// these run inside a runner tick, a panic here takes that runner's task down,
+/// so exactly which combinations panic is worth being explicit about.
+#[cfg(test)]
+mod arithmetic_tests {
+    use crate::*;
+
+    const TARGET: &str = "test";
+
+    fn state() -> State {
+        State::from_vec(&vec![
+            (SPVariable::new("counter", SPValueType::Int64), 10.to_spvalue()),
+            (SPVariable::new("ratio", SPValueType::Float64), 1.5.to_spvalue()),
+            (SPVariable::new("label", SPValueType::String), "x".to_spvalue()),
+            (SPVariable::new("step", SPValueType::Int64), 3.to_spvalue()),
+        ])
+    }
+
+    fn action(var: &str, kind: ActionType, value: SPWrapped, state: &State) -> Action {
+        Action {
+            var: state.get_assignment(var, TARGET).var,
+            var_or_val: value,
+            action_type: kind,
+        }
+    }
+
+    #[test]
+    fn incrementing_an_integer_adds_to_it() {
+        let state = state();
+        let plus = action("counter", ActionType::Increment, 5.wrap(), &state);
+        assert_eq!(
+            plus.assign(&state, TARGET).get_value("counter", TARGET),
+            Some(15.to_spvalue())
+        );
+    }
+
+    #[test]
+    fn decrementing_an_integer_subtracts_from_it() {
+        let state = state();
+        let minus = action("counter", ActionType::Decrement, 4.wrap(), &state);
+        assert_eq!(
+            minus.assign(&state, TARGET).get_value("counter", TARGET),
+            Some(6.to_spvalue())
+        );
+    }
+
+    #[test]
+    fn floats_increment_and_decrement_too() {
+        let state = state();
+        let plus = action("ratio", ActionType::Increment, 0.5.wrap(), &state);
+        assert_eq!(
+            plus.assign(&state, TARGET).get_value("ratio", TARGET),
+            Some(2.0.to_spvalue())
+        );
+
+        let minus = action("ratio", ActionType::Decrement, 0.5.wrap(), &state);
+        assert_eq!(
+            minus.assign(&state, TARGET).get_value("ratio", TARGET),
+            Some(1.0.to_spvalue())
+        );
+    }
+
+    /// The value can come from another variable, not just a literal - which is
+    /// how a step size lives in the state.
+    #[test]
+    fn the_amount_can_come_from_another_variable() {
+        let state = state();
+        let step = state.get_assignment("step", TARGET).var;
+        let plus = action("counter", ActionType::Increment, step.wrap(), &state);
+        assert_eq!(
+            plus.assign(&state, TARGET).get_value("counter", TARGET),
+            Some(13.to_spvalue())
+        );
+    }
+
+    /// Negative amounts are allowed, so increment and decrement are genuine
+    /// inverses rather than "add a positive number" helpers.
+    #[test]
+    fn a_negative_amount_reverses_the_direction() {
+        let state = state();
+        let plus_negative = action("counter", ActionType::Increment, (-3).wrap(), &state);
+        assert_eq!(
+            plus_negative.assign(&state, TARGET).get_value("counter", TARGET),
+            Some(7.to_spvalue())
+        );
+    }
+
+    /// The four ways to get it wrong, each of which panics rather than
+    /// silently coercing. Mixing integer and float is deliberately rejected in
+    /// both directions - the alternative would be a variable quietly losing
+    /// precision or changing type.
+    #[test]
+    fn mismatched_types_panic_rather_than_coercing() {
+        let state = state();
+        let previous = std::panic::take_hook();
+        std::panic::set_hook(Box::new(|_| {}));
+
+        let cases: Vec<(&str, Action)> = vec![
+            (
+                "int variable, float amount",
+                action("counter", ActionType::Increment, 0.5.wrap(), &state),
+            ),
+            (
+                "float variable, int amount",
+                action("ratio", ActionType::Increment, 1.wrap(), &state),
+            ),
+            (
+                "non-numeric variable",
+                action("label", ActionType::Increment, 1.wrap(), &state),
+            ),
+            (
+                "non-numeric variable, decrement",
+                action("label", ActionType::Decrement, 1.wrap(), &state),
+            ),
+            (
+                "int variable, float amount, decrement",
+                action("counter", ActionType::Decrement, 0.5.wrap(), &state),
+            ),
+            (
+                "float variable, int amount, decrement",
+                action("ratio", ActionType::Decrement, 1.wrap(), &state),
+            ),
+        ];
+
+        for (label, action) in cases {
+            let state = state.clone();
+            let result =
+                std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| action.assign(&state, TARGET)));
+            assert!(result.is_err(), "{label} should have panicked");
+        }
+
+        std::panic::set_hook(previous);
+    }
+
+    /// The empty action is what a model with an unparseable action ends up
+    /// holding (see `Transition::parse`), and it is an assignment to a variable
+    /// called "empty" - so applying it to a real state panics, which is how the
+    /// model error eventually surfaces.
+    #[test]
+    fn the_empty_action_assigns_to_a_variable_nobody_declares() {
+        let empty = Action::empty();
+        assert_eq!(empty.var.name, "empty");
+        assert_eq!(empty.action_type, ActionType::Assign);
+
+        let previous = std::panic::take_hook();
+        std::panic::set_hook(Box::new(|_| {}));
+        let state = state();
+        let result =
+            std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| empty.assign(&state, TARGET)));
+        std::panic::set_hook(previous);
+
+        assert!(
+            result.is_err(),
+            "applying the empty action to a state that has no 'empty' variable must panic"
+        );
+    }
+
+    /// `Display` distinguishes the three action types - this is what shows up
+    /// in the "please satisfy the runner guard" message.
+    #[test]
+    fn display_shows_which_kind_of_action_it_is() {
+        let state = state();
+        assert_eq!(
+            action("counter", ActionType::Assign, 1.wrap(), &state).to_string(),
+            "counter <= 1"
+        );
+        assert_eq!(
+            action("counter", ActionType::Increment, 1.wrap(), &state).to_string(),
+            "counter += 1"
+        );
+        assert_eq!(
+            action("counter", ActionType::Decrement, 1.wrap(), &state).to_string(),
+            "counter -= 1"
+        );
+    }
+
+    /// The owned `assign` must leave its input alone.
+    #[test]
+    fn the_owned_assign_does_not_mutate_its_input() {
+        let state = state();
+        let plus = action("counter", ActionType::Increment, 1.wrap(), &state);
+        let after = plus.assign(&state, TARGET);
+
+        assert_eq!(state.get_value("counter", TARGET), Some(10.to_spvalue()));
+        assert_eq!(after.get_value("counter", TARGET), Some(11.to_spvalue()));
+    }
+}

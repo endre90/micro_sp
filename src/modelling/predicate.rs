@@ -783,3 +783,239 @@ mod tests {
         println!("{:?}", new_pred)
     }
 }
+
+/// Predicate projection and rendering.
+///
+/// `keep_only` and `remove` are the two projection operators - they cut a guard
+/// down to the variables a caller cares about, and are marked experimental in
+/// the source. They are also the two functions in this file with a genuinely
+/// subtle contract: what happens to an `AND`/`OR` when every one of its
+/// children is projected away, and what happens to a comparison when only *one*
+/// side mentions a removed variable. Both answers matter, because a projection
+/// that silently turns a restrictive guard into a permissive one is how a
+/// planner ends up producing a plan that cannot execute.
+#[cfg(test)]
+mod projection_tests {
+    use crate::*;
+
+    const TARGET: &str = "test";
+
+    fn state() -> State {
+        State::from_vec(&vec![
+            (SPVariable::new("a", SPValueType::Bool), true.to_spvalue()),
+            (SPVariable::new("b", SPValueType::Bool), false.to_spvalue()),
+            (SPVariable::new("n", SPValueType::Int64), 5.to_spvalue()),
+        ])
+    }
+
+    fn var(name: &str, state: &State) -> SPVariable {
+        state.get_assignment(name, TARGET).var
+    }
+
+    fn eq(name: &str, value: SPValue, state: &State) -> Predicate {
+        Predicate::EQ(var(name, state).wrap(), value.wrap())
+    }
+
+    fn only(names: &[&str]) -> Vec<String> {
+        names.iter().map(|n| n.to_string()).collect()
+    }
+
+    /// A comparison survives only if *every* variable it mentions is kept.
+    #[test]
+    fn keep_only_drops_a_comparison_that_mentions_anything_else() {
+        let state = state();
+        let about_a = eq("a", true.to_spvalue(), &state);
+
+        assert_eq!(about_a.keep_only(&only(&["a"])), Some(about_a.clone()));
+        assert_eq!(about_a.keep_only(&only(&["b"])), None);
+        assert_eq!(about_a.keep_only(&only(&[])), None);
+
+        // Both sides count, not just the left one.
+        let a_vs_b = Predicate::EQ(var("a", &state).wrap(), var("b", &state).wrap());
+        assert_eq!(a_vs_b.keep_only(&only(&["a"])), None);
+        assert_eq!(a_vs_b.keep_only(&only(&["a", "b"])), Some(a_vs_b.clone()));
+    }
+
+    /// The constants survive any projection - they mention nothing.
+    #[test]
+    fn the_constants_always_survive() {
+        assert_eq!(Predicate::TRUE.keep_only(&only(&[])), Some(Predicate::TRUE));
+        assert_eq!(Predicate::FALSE.keep_only(&only(&[])), Some(Predicate::FALSE));
+        assert_eq!(Predicate::TRUE.remove(&only(&["a"])), Some(Predicate::TRUE));
+        assert_eq!(Predicate::FALSE.remove(&only(&["a"])), Some(Predicate::FALSE));
+    }
+
+    /// The interesting case: a conjunction whose children are partly projected
+    /// away. What is left is the conjunction of the survivors - and a single
+    /// survivor is unwrapped rather than left as a one-element `AND`.
+    #[test]
+    fn a_conjunction_keeps_the_children_that_survive() {
+        let state = state();
+        let about_a = eq("a", true.to_spvalue(), &state);
+        let about_b = eq("b", false.to_spvalue(), &state);
+        let about_n = eq("n", 5.to_spvalue(), &state);
+        let all = Predicate::AND(vec![about_a.clone(), about_b.clone(), about_n.clone()]);
+
+        assert_eq!(all.keep_only(&only(&["a", "b", "n"])), Some(all.clone()));
+        assert_eq!(
+            all.keep_only(&only(&["a", "b"])),
+            Some(Predicate::AND(vec![about_a.clone(), about_b]))
+        );
+        assert_eq!(
+            all.keep_only(&only(&["a"])),
+            Some(about_a),
+            "one survivor is unwrapped rather than left in a one-element AND"
+        );
+    }
+
+    /// And the case worth being loud about: projecting away *everything* in a
+    /// conjunction yields `None`, not `TRUE`. A caller that treats `None` as
+    /// "no constraint" is the one that turns a guard into a tautology - the
+    /// function itself refuses to make that decision.
+    #[test]
+    fn projecting_away_every_child_yields_none_rather_than_true() {
+        let state = state();
+        let all = Predicate::AND(vec![
+            eq("a", true.to_spvalue(), &state),
+            eq("b", false.to_spvalue(), &state),
+        ]);
+
+        assert_eq!(all.keep_only(&only(&["n"])), None);
+        assert_eq!(all.remove(&only(&["a", "b"])), None);
+
+        let any = Predicate::OR(vec![
+            eq("a", true.to_spvalue(), &state),
+            eq("b", false.to_spvalue(), &state),
+        ]);
+        assert_eq!(any.keep_only(&only(&["n"])), None);
+        assert_eq!(any.remove(&only(&["a", "b"])), None);
+    }
+
+    /// `remove` is the complement of `keep_only`: it drops the comparisons that
+    /// mention the listed variables and keeps everything else.
+    #[test]
+    fn remove_is_the_complement_of_keep_only() {
+        let state = state();
+        let about_a = eq("a", true.to_spvalue(), &state);
+        let about_b = eq("b", false.to_spvalue(), &state);
+        let both = Predicate::AND(vec![about_a.clone(), about_b.clone()]);
+
+        assert_eq!(both.remove(&only(&["b"])), Some(about_a.clone()));
+        assert_eq!(both.remove(&only(&["a"])), Some(about_b));
+        assert_eq!(both.remove(&only(&[])), Some(both.clone()));
+    }
+
+    /// `NOT` follows its child: if the child projects away, so does the
+    /// negation, rather than becoming `NOT(TRUE)`.
+    #[test]
+    fn a_negation_follows_its_child() {
+        let state = state();
+        let about_a = eq("a", true.to_spvalue(), &state);
+        let negated = Predicate::NOT(Box::new(about_a.clone()));
+
+        assert_eq!(negated.keep_only(&only(&["a"])), Some(negated.clone()));
+        assert_eq!(negated.keep_only(&only(&["b"])), None);
+        assert_eq!(negated.remove(&only(&["a"])), None);
+    }
+
+    #[test]
+    fn projection_recurses_through_nesting() {
+        let state = state();
+        let about_a = eq("a", true.to_spvalue(), &state);
+        let about_b = eq("b", false.to_spvalue(), &state);
+        let about_n = eq("n", 5.to_spvalue(), &state);
+
+        let nested = Predicate::AND(vec![
+            about_a.clone(),
+            Predicate::OR(vec![about_b.clone(), about_n.clone()]),
+        ]);
+
+        assert_eq!(
+            nested.keep_only(&only(&["a", "n"])),
+            Some(Predicate::AND(vec![about_a.clone(), about_n.clone()])),
+            "the inner OR loses one child and is unwrapped"
+        );
+        assert_eq!(
+            nested.keep_only(&only(&["a"])),
+            Some(about_a),
+            "with the whole inner OR gone, the AND unwraps too"
+        );
+    }
+
+    /// Every comparison operator is treated the same way by the projection, so
+    /// the shared match arm has to actually cover all six.
+    #[test]
+    fn every_comparison_operator_projects_the_same_way() {
+        let state = state();
+        let lhs = var("n", &state).wrap();
+        let rhs = 5.to_spvalue().wrap();
+
+        let operators = [
+            Predicate::EQ(lhs.clone(), rhs.clone()),
+            Predicate::NEQ(lhs.clone(), rhs.clone()),
+            Predicate::LTEQ(lhs.clone(), rhs.clone()),
+            Predicate::GTEQ(lhs.clone(), rhs.clone()),
+            Predicate::LT(lhs.clone(), rhs.clone()),
+            Predicate::GT(lhs, rhs),
+        ];
+
+        for predicate in operators {
+            assert_eq!(
+                predicate.keep_only(&only(&["n"])),
+                Some(predicate.clone()),
+                "{predicate} should have been kept"
+            );
+            assert_eq!(
+                predicate.keep_only(&only(&["a"])),
+                None,
+                "{predicate} should have been projected away"
+            );
+            assert_eq!(predicate.remove(&only(&["n"])), None);
+        }
+    }
+
+    /// The ordering comparisons themselves, which the projection tests build on
+    /// but never evaluate.
+    #[test]
+    fn the_ordering_operators_compare_values() {
+        let state = state();
+        let n = var("n", &state).wrap();
+
+        assert!(Predicate::LT(n.clone(), 6.to_spvalue().wrap()).eval(&state, TARGET));
+        assert!(!Predicate::LT(n.clone(), 5.to_spvalue().wrap()).eval(&state, TARGET));
+        assert!(Predicate::LTEQ(n.clone(), 5.to_spvalue().wrap()).eval(&state, TARGET));
+        assert!(Predicate::GT(n.clone(), 4.to_spvalue().wrap()).eval(&state, TARGET));
+        assert!(!Predicate::GT(n.clone(), 5.to_spvalue().wrap()).eval(&state, TARGET));
+        assert!(Predicate::GTEQ(n, 5.to_spvalue().wrap()).eval(&state, TARGET));
+    }
+
+    /// `Display` is what a disabled operation's message renders, so every
+    /// variant has to have a form.
+    #[test]
+    fn display_renders_every_variant() {
+        let state = state();
+        let a = var("a", &state).wrap();
+        let value = true.to_spvalue().wrap();
+
+        assert_eq!(Predicate::TRUE.to_string(), "TRUE");
+        assert_eq!(Predicate::FALSE.to_string(), "FALSE");
+        assert_eq!(Predicate::EQ(a.clone(), value.clone()).to_string(), "a = true");
+        assert_eq!(Predicate::NEQ(a.clone(), value.clone()).to_string(), "a != true");
+        assert_eq!(Predicate::LTEQ(a.clone(), value.clone()).to_string(), "a <= true");
+        assert_eq!(Predicate::GTEQ(a.clone(), value.clone()).to_string(), "a >= true");
+        assert_eq!(Predicate::LT(a.clone(), value.clone()).to_string(), "a < true");
+        assert_eq!(Predicate::GT(a.clone(), value.clone()).to_string(), "a > true");
+        assert_eq!(
+            Predicate::NOT(Box::new(Predicate::TRUE)).to_string(),
+            "!(TRUE)"
+        );
+        assert_eq!(
+            Predicate::AND(vec![Predicate::TRUE, Predicate::FALSE]).to_string(),
+            "(TRUE && FALSE)"
+        );
+        assert_eq!(
+            Predicate::OR(vec![Predicate::TRUE, Predicate::FALSE]).to_string(),
+            "(TRUE || FALSE)"
+        );
+    }
+}

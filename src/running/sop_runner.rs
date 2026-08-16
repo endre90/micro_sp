@@ -4,9 +4,6 @@ use crate::SPConnection;
 use std::sync::Arc;
 use tokio::sync::mpsc;
 
-/// Override with `MICRO_SP_SOP_TICK_MS`. See `running::tick`.
-static TICK_INTERVAL: u64 = 1; // millis
-
 // PERF: this is the loop you feel when a SOP is running. Per 100 ms tick it
 // does: an `MGET` of its key set, a full `state.clone()`, a recursive walk of
 // the SOP tree that clones the tree several times and evaluates every operation
@@ -44,12 +41,11 @@ static TICK_INTERVAL: u64 = 1; // millis
 //    ~2-3 ticks per operation. Driving this loop off change notifications (see
 //    `ConnectionManager`) rather than a timer is what actually fixes the
 //    "state change doesn't occur as quickly as I want" symptom; lowering
-//    `TICK_INTERVAL` only trades latency for more `KEYS *` storms.
-// 7. Note that `process_operation` charges elapsed time using
-//    `OPERAION_RUNNER_TICK_INTERVAL_MS` (200 ms) while this runner ticks at
-//    100 ms, so SOP operations accumulate elapsed time at 2x real speed and
-//    time out early. Measure real elapsed time with `Instant` instead of
-//    assuming a tick constant.
+//    `MICRO_SP_TICK_INTERVAL_MS` only trades latency for more `KEYS *` storms.
+// 7. DONE: `process_operation` used to charge elapsed time from a per-runner
+//    tick constant, so SOP operations accumulated elapsed time at the wrong
+//    speed and timed out early. Real elapsed time is measured with `Instant`
+//    (see `running::tick::TickClock`) and passed in instead.
 pub async fn sop_runner(
     sp_id: &str,
     model: &Model,
@@ -57,7 +53,7 @@ pub async fn sop_runner(
     connection_manager: &Arc<ConnectionManager>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     initialize_env_logger();
-    let mut interval = runner_interval("MICRO_SP_SOP_TICK_MS", TICK_INTERVAL);
+    let mut interval = runner_interval();
     let log_target = &format!("{}_sop_runner", sp_id);
 
     log::info!(target: log_target, "Online.");
@@ -491,5 +487,635 @@ pub fn uniquify_sop_operations(sop: SOP) -> SOP {
         SOP::Alternative(sops) => {
             SOP::Alternative(sops.into_iter().map(uniquify_sop_operations).collect())
         }
+    }
+}
+
+/// The SOP runner, driven end to end against a real Redis.
+///
+/// This is the runner with the most moving parts and it had no tests at all:
+/// activation (uniquifying the tree, creating every operation's bookkeeping
+/// variables, growing the read key set), the per-tick tree walk, and the three
+/// teardown paths (completed / fatal / cancelled) that delete those variables
+/// again. None of it is reachable without Redis, because the walk carries a
+/// connection and the teardown deletes keys.
+///
+/// What the tests below are really checking is that a SOP *finishes* - that the
+/// root node's state converges - and that the runner cleans up after itself, so
+/// running the same SOP twice does not accumulate keys.
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serial_test::serial;
+    use std::time::Duration;
+    use testcontainers::{ContainerAsync, ImageExt, core::ContainerPort, runners::AsyncRunner};
+    use testcontainers_modules::redis::Redis;
+
+    const SP: &str = "sp";
+    const TARGET: &str = "test";
+    const SOP_ID: &str = "test_sop";
+
+    async fn redis() -> (ContainerAsync<Redis>, Arc<ConnectionManager>) {
+        let container = Redis::default()
+            .with_mapped_port(6379, ContainerPort::Tcp(6379))
+            .start()
+            .await
+            .unwrap();
+        let manager = Arc::new(ConnectionManager::new().await);
+        let mut con = manager.get_connection().await;
+        StateManager::flush_state(&mut con).await;
+        (container, manager)
+    }
+
+    /// The domain the SOP operates on: one boolean per step.
+    fn domain(flags: &[&str]) -> State {
+        let mut state = State::new();
+        for flag in flags {
+            state.add_mut(
+                SPAssignment::new(SPVariable::new(flag, SPValueType::Bool), false.to_spvalue()),
+                TARGET,
+            );
+        }
+        state
+    }
+
+    /// An operation that sets `flag` when it starts and completes once it is
+    /// set - i.e. one that always runs to completion in two ticks.
+    fn step(name: &str, flag: &str, state: &State) -> SOP {
+        SOP::Operation(Box::new(Operation::new(
+            name,
+            Some(10_000),
+            Some(10_000),
+            None,
+            None,
+            false,
+            vec![Transition::parse(
+                "start",
+                &format!("var:{flag} == false"),
+                "true",
+                vec![format!("var:{flag} <- true").as_str()],
+                Vec::<&str>::new(),
+                state,
+            )],
+            vec![Transition::parse(
+                "complete",
+                &format!("var:{flag} == true"),
+                "true",
+                Vec::<&str>::new(),
+                Vec::<&str>::new(),
+                state,
+            )],
+            vec![],
+            vec![],
+            vec![],
+            vec![],
+        )))
+    }
+
+    /// An operation that starts but never satisfies its postcondition, times
+    /// out quickly, and is allowed to be bypassed.
+    fn bypassing_step(name: &str, flag: &str, state: &State) -> SOP {
+        SOP::Operation(Box::new(Operation::new(
+            name,
+            Some(20),
+            Some(10_000),
+            None,
+            None,
+            true,
+            vec![Transition::parse(
+                "start",
+                &format!("var:{flag} == false"),
+                "true",
+                vec![format!("var:{flag} <- true").as_str()],
+                Vec::<&str>::new(),
+                state,
+            )],
+            vec![Transition::parse(
+                "never",
+                "false",
+                "true",
+                Vec::<&str>::new(),
+                Vec::<&str>::new(),
+                state,
+            )],
+            vec![],
+            vec![],
+            vec![],
+            vec![],
+        )))
+    }
+
+    /// Build the model plus the full initial state the runner needs in Redis.
+    async fn deploy(sop: SOP, flags: &[&str], manager: &Arc<ConnectionManager>) -> Model {
+        let model = Model::new(
+            SP,
+            vec![],
+            vec![],
+            vec![],
+            vec![SOPStruct {
+                id: SOP_ID.to_string(),
+                sop,
+            }],
+            vec![],
+        );
+
+        let mut state = generate_runner_state_variables(SP, 0, TARGET);
+        state.extend_mut(generate_operation_state_variables(&model, false, TARGET), true);
+        state.extend_mut(domain(flags), true);
+        state.add_mut(
+            SPAssignment::new(
+                SPVariable::new(&format!("{SP}_dashboard_command"), SPValueType::String),
+                "none".to_spvalue(),
+            ),
+            TARGET,
+        );
+        state = state.update(&format!("{SP}_sop_id"), SOP_ID.to_spvalue());
+
+        let mut con = manager.get_connection().await;
+        StateManager::set_state(&mut con, &state).await;
+        model
+    }
+
+    fn spawn_runner(
+        manager: &Arc<ConnectionManager>,
+        model: Model,
+    ) -> tokio::task::JoinHandle<()> {
+        let manager = Arc::clone(manager);
+        tokio::spawn(async move {
+            let _ = sop_runner(SP, &model, &manager).await;
+        })
+    }
+
+    async fn value(con: &mut SPConnection, key: &str) -> String {
+        match StateManager::get_sp_value(con, key).await {
+            Some(SPValue::String(StringOrUnknown::String(s))) => s,
+            other => format!("{other:?}"),
+        }
+    }
+
+    async fn wait_for(con: &mut SPConnection, key: &str, expected: &str, timeout_ms: u64) -> String {
+        let deadline = std::time::Instant::now() + Duration::from_millis(timeout_ms);
+        let mut last = String::new();
+        while std::time::Instant::now() < deadline {
+            last = value(con, key).await;
+            if last == expected {
+                return last;
+            }
+            tokio::time::sleep(Duration::from_millis(5)).await;
+        }
+        last
+    }
+
+    async fn enable_sop(con: &mut SPConnection) {
+        StateManager::set_sp_value(con, &format!("{SP}_sop_enabled"), &true.to_spvalue()).await;
+    }
+
+    /// The whole point of the runner: a sequence of operations runs to
+    /// completion and the SOP reports `completed`.
+    #[tokio::test]
+    #[serial]
+    async fn a_sequence_runs_to_completion() {
+        let (_container, manager) = redis().await;
+        let mut con = manager.get_connection().await;
+
+        let state = domain(&["a", "b"]);
+        let sop = SOP::Sequence(vec![step("one", "a", &state), step("two", "b", &state)]);
+        let model = deploy(sop, &["a", "b"], &manager).await;
+
+        let runner = spawn_runner(&manager, model);
+        enable_sop(&mut con).await;
+
+        let sop_state = wait_for(&mut con, &format!("{SP}_sop_state"), "completed", 5000).await;
+        runner.abort();
+
+        assert_eq!(sop_state, "completed");
+        assert_eq!(
+            StateManager::get_sp_value(&mut con, "a").await,
+            Some(true.to_spvalue()),
+            "the first step's action should have run"
+        );
+        assert_eq!(
+            StateManager::get_sp_value(&mut con, "b").await,
+            Some(true.to_spvalue()),
+            "the second step's action should have run"
+        );
+    }
+
+    /// A `Sequence` is ordered: the second step must not run before the first
+    /// has finished. Without that the whole abstraction is pointless, and the
+    /// walk's "first child that is not Completed" rule is what enforces it.
+    #[tokio::test]
+    #[serial]
+    async fn a_sequence_does_not_start_its_second_step_early() {
+        let (_container, manager) = redis().await;
+        let mut con = manager.get_connection().await;
+
+        let state = domain(&["a", "b"]);
+        // The first step can never complete, so the second must never run.
+        let blocked = SOP::Operation(Box::new(Operation::new(
+            "blocked",
+            Some(10_000),
+            Some(10_000),
+            None,
+            None,
+            false,
+            vec![Transition::parse(
+                "start",
+                "var:a == false",
+                "true",
+                vec!["var:a <- true"],
+                Vec::<&str>::new(),
+                &state,
+            )],
+            vec![Transition::parse(
+                "never",
+                "false",
+                "true",
+                Vec::<&str>::new(),
+                Vec::<&str>::new(),
+                &state,
+            )],
+            vec![],
+            vec![],
+            vec![],
+            vec![],
+        )));
+        let sop = SOP::Sequence(vec![blocked, step("two", "b", &state)]);
+        let model = deploy(sop, &["a", "b"], &manager).await;
+
+        let runner = spawn_runner(&manager, model);
+        enable_sop(&mut con).await;
+
+        assert_eq!(
+            wait_for(&mut con, "a", "true", 3000).await,
+            "Some(Bool(Bool(true)))",
+            "the first step should have started"
+        );
+        tokio::time::sleep(Duration::from_millis(300)).await;
+        runner.abort();
+
+        assert_eq!(
+            StateManager::get_sp_value(&mut con, "b").await,
+            Some(false.to_spvalue()),
+            "the second step ran while the first was still executing"
+        );
+    }
+
+    /// `Parallel` runs every branch on the same tick, so both flags are set
+    /// without either branch waiting for the other.
+    #[tokio::test]
+    #[serial]
+    async fn parallel_branches_all_run() {
+        let (_container, manager) = redis().await;
+        let mut con = manager.get_connection().await;
+
+        let state = domain(&["a", "b", "c"]);
+        let sop = SOP::Parallel(vec![
+            step("one", "a", &state),
+            step("two", "b", &state),
+            step("three", "c", &state),
+        ]);
+        let model = deploy(sop, &["a", "b", "c"], &manager).await;
+
+        let runner = spawn_runner(&manager, model);
+        enable_sop(&mut con).await;
+
+        let sop_state = wait_for(&mut con, &format!("{SP}_sop_state"), "completed", 5000).await;
+        runner.abort();
+
+        assert_eq!(sop_state, "completed");
+        for flag in ["a", "b", "c"] {
+            assert_eq!(
+                StateManager::get_sp_value(&mut con, flag).await,
+                Some(true.to_spvalue()),
+                "branch '{flag}' did not run"
+            );
+        }
+    }
+
+    /// `Alternative` picks exactly one branch - the first one that can start -
+    /// and leaves the others alone.
+    #[tokio::test]
+    #[serial]
+    async fn an_alternative_takes_exactly_one_branch() {
+        let (_container, manager) = redis().await;
+        let mut con = manager.get_connection().await;
+
+        let state = domain(&["a", "b"]);
+        let sop = SOP::Alternative(vec![step("one", "a", &state), step("two", "b", &state)]);
+        let model = deploy(sop, &["a", "b"], &manager).await;
+
+        let runner = spawn_runner(&manager, model);
+        enable_sop(&mut con).await;
+
+        let sop_state = wait_for(&mut con, &format!("{SP}_sop_state"), "completed", 5000).await;
+        runner.abort();
+
+        assert_eq!(sop_state, "completed");
+        let a = StateManager::get_sp_value(&mut con, "a").await;
+        let b = StateManager::get_sp_value(&mut con, "b").await;
+        assert_eq!(a, Some(true.to_spvalue()), "the first viable branch runs");
+        assert_eq!(
+            b,
+            Some(false.to_spvalue()),
+            "the second branch must not also run"
+        );
+    }
+
+    /// Teardown: when the SOP finishes, the per-operation bookkeeping variables
+    /// it created on activation are deleted again. Without this every SOP run
+    /// would leave a permanent residue in the keyspace.
+    #[tokio::test]
+    #[serial]
+    async fn finishing_a_sop_removes_the_operation_variables_it_created() {
+        let (_container, manager) = redis().await;
+        let mut con = manager.get_connection().await;
+
+        let state = domain(&["a"]);
+        let sop = SOP::Sequence(vec![step("one", "a", &state)]);
+        let model = deploy(sop, &["a"], &manager).await;
+
+        let before: i64 = redis::cmd("DBSIZE").query_async(&mut con).await.unwrap();
+
+        let runner = spawn_runner(&manager, model);
+        enable_sop(&mut con).await;
+        assert_eq!(
+            wait_for(&mut con, &format!("{SP}_sop_state"), "completed", 5000).await,
+            "completed"
+        );
+
+        // Give the teardown tick a moment to land.
+        tokio::time::sleep(Duration::from_millis(200)).await;
+        runner.abort();
+
+        let after: i64 = redis::cmd("DBSIZE").query_async(&mut con).await.unwrap();
+        assert_eq!(
+            before, after,
+            "the uniquified operation's variables should have been deleted again"
+        );
+    }
+
+    /// The enable flag is consumed on activation, so a SOP runs once per
+    /// request rather than restarting forever.
+    #[tokio::test]
+    #[serial]
+    async fn the_enable_flag_is_consumed() {
+        let (_container, manager) = redis().await;
+        let mut con = manager.get_connection().await;
+
+        let state = domain(&["a"]);
+        let sop = SOP::Sequence(vec![step("one", "a", &state)]);
+        let model = deploy(sop, &["a"], &manager).await;
+
+        let runner = spawn_runner(&manager, model);
+        enable_sop(&mut con).await;
+        assert_eq!(
+            wait_for(&mut con, &format!("{SP}_sop_state"), "completed", 5000).await,
+            "completed"
+        );
+        runner.abort();
+
+        assert_eq!(
+            StateManager::get_sp_value(&mut con, &format!("{SP}_sop_enabled")).await,
+            Some(false.to_spvalue())
+        );
+    }
+
+    /// A `sop_id` that is not in the model is skipped with a debug line rather
+    /// than crashing the runner - a dashboard can write anything into that key.
+    #[tokio::test]
+    #[serial]
+    async fn an_unknown_sop_id_is_ignored_without_killing_the_runner() {
+        let (_container, manager) = redis().await;
+        let mut con = manager.get_connection().await;
+
+        let state = domain(&["a"]);
+        let sop = SOP::Sequence(vec![step("one", "a", &state)]);
+        let model = deploy(sop, &["a"], &manager).await;
+
+        let runner = spawn_runner(&manager, model);
+        StateManager::set_sp_value(&mut con, &format!("{SP}_sop_id"), &"nope".to_spvalue()).await;
+        enable_sop(&mut con).await;
+        tokio::time::sleep(Duration::from_millis(300)).await;
+
+        assert!(!runner.is_finished(), "the runner must survive an unknown id");
+        assert_eq!(
+            StateManager::get_sp_value(&mut con, "a").await,
+            Some(false.to_spvalue()),
+            "and must not have run anything"
+        );
+
+        // Point it at the real SOP and it picks up from there.
+        StateManager::set_sp_value(&mut con, &format!("{SP}_sop_id"), &SOP_ID.to_spvalue()).await;
+        assert_eq!(
+            wait_for(&mut con, &format!("{SP}_sop_state"), "completed", 5000).await,
+            "completed"
+        );
+        runner.abort();
+    }
+
+    /// An idle runner with nothing enabled must not write.
+    #[tokio::test]
+    #[serial]
+    async fn an_idle_runner_writes_nothing() {
+        let (_container, manager) = redis().await;
+        let mut con = manager.get_connection().await;
+
+        let state = domain(&["a"]);
+        let sop = SOP::Sequence(vec![step("one", "a", &state)]);
+        let model = deploy(sop, &["a"], &manager).await;
+
+        let runner = spawn_runner(&manager, model);
+        tokio::time::sleep(Duration::from_millis(100)).await;
+
+        let before = StateManager::get_full_state(&mut con).await.unwrap();
+        tokio::time::sleep(Duration::from_millis(300)).await;
+        let after = StateManager::get_full_state(&mut con).await.unwrap();
+
+        assert!(
+            before.get_diff_partial_state(&after).state.is_empty(),
+            "a disabled SOP runner must not write"
+        );
+        assert!(!runner.is_finished());
+        runner.abort();
+    }
+
+    /// A SOP whose operation dies takes the whole SOP to `fatal`, and the
+    /// runner tears it down - deleting the operation variables and going back
+    /// to idle so a new SOP can be started.
+    #[tokio::test]
+    #[serial]
+    async fn a_fatal_operation_fatals_and_tears_down_the_sop() {
+        let (_container, manager) = redis().await;
+        let mut con = manager.get_connection().await;
+
+        let state = domain(&["a"]);
+        // Starts, never completes, times out fast, no retries, no bypass.
+        let doomed = SOP::Operation(Box::new(Operation::new(
+            "doomed",
+            Some(20),
+            Some(10_000),
+            None,
+            None,
+            false,
+            vec![Transition::parse(
+                "start",
+                "var:a == false",
+                "true",
+                vec!["var:a <- true"],
+                Vec::<&str>::new(),
+                &state,
+            )],
+            vec![Transition::parse(
+                "never",
+                "false",
+                "true",
+                Vec::<&str>::new(),
+                Vec::<&str>::new(),
+                &state,
+            )],
+            vec![],
+            vec![],
+            vec![],
+            vec![],
+        )));
+        let model = deploy(SOP::Sequence(vec![doomed]), &["a"], &manager).await;
+
+        let before: i64 = redis::cmd("DBSIZE").query_async(&mut con).await.unwrap();
+
+        let runner = spawn_runner(&manager, model);
+        enable_sop(&mut con).await;
+
+        let sop_state = wait_for(&mut con, &format!("{SP}_sop_state"), "fatal", 5000).await;
+        assert_eq!(sop_state, "fatal");
+
+        // And it tears down, so the runner is free for the next SOP.
+        let deadline = std::time::Instant::now() + Duration::from_millis(3000);
+        let mut after = before + 1;
+        while std::time::Instant::now() < deadline {
+            after = redis::cmd("DBSIZE").query_async(&mut con).await.unwrap();
+            if after == before {
+                break;
+            }
+            tokio::time::sleep(Duration::from_millis(5)).await;
+        }
+        assert!(!runner.is_finished());
+        runner.abort();
+        assert_eq!(after, before, "a fatal SOP must clean up after itself too");
+    }
+
+    /// Pressing stop cancels the running operation, which cancels the SOP, and
+    /// the runner tears it down through the third of its three teardown paths.
+    #[tokio::test]
+    #[serial]
+    async fn stop_cancels_a_running_sop_and_tears_it_down() {
+        let (_container, manager) = redis().await;
+        let mut con = manager.get_connection().await;
+
+        let state = domain(&["a"]);
+        // Starts and then sits in Executing indefinitely.
+        let long_running = SOP::Operation(Box::new(Operation::new(
+            "long",
+            Some(10_000),
+            Some(10_000),
+            None,
+            None,
+            false,
+            vec![Transition::parse(
+                "start",
+                "var:a == false",
+                "true",
+                vec!["var:a <- true"],
+                Vec::<&str>::new(),
+                &state,
+            )],
+            vec![Transition::parse(
+                "never",
+                "false",
+                "true",
+                Vec::<&str>::new(),
+                Vec::<&str>::new(),
+                &state,
+            )],
+            vec![],
+            vec![],
+            vec![],
+            vec![],
+        )));
+        let model = deploy(SOP::Sequence(vec![long_running]), &["a"], &manager).await;
+
+        let before: i64 = redis::cmd("DBSIZE").query_async(&mut con).await.unwrap();
+
+        let runner = spawn_runner(&manager, model);
+        enable_sop(&mut con).await;
+        assert_eq!(
+            wait_for(&mut con, &format!("{SP}_sop_state"), "executing", 5000).await,
+            "executing",
+            "the SOP should be running before we stop it"
+        );
+
+        StateManager::set_sp_value(
+            &mut con,
+            &format!("{SP}_dashboard_command"),
+            &"stop".to_spvalue(),
+        )
+        .await;
+
+        let sop_state = wait_for(&mut con, &format!("{SP}_sop_state"), "cancelled", 5000).await;
+        assert_eq!(sop_state, "cancelled");
+
+        let deadline = std::time::Instant::now() + Duration::from_millis(3000);
+        let mut after = before + 1;
+        while std::time::Instant::now() < deadline {
+            after = redis::cmd("DBSIZE").query_async(&mut con).await.unwrap();
+            if after == before {
+                break;
+            }
+            tokio::time::sleep(Duration::from_millis(5)).await;
+        }
+        assert!(!runner.is_finished());
+        runner.abort();
+        assert_eq!(after, before, "a cancelled SOP must clean up after itself");
+    }
+
+    /// BUG (consequence of `Operation::terminate` ignoring every reason except
+    /// `Completed`, see `process_operation`): a bypassed operation never
+    /// reaches `terminated_bypassed`, and `SOP::get_state` maps plain
+    /// `Bypassed` to `Executing`. So the branch containing it reports
+    /// `Executing` forever and the SOP never finishes - the runner sits there
+    /// re-walking a tree that can no longer make progress.
+    ///
+    /// `can_be_bypassed` exists precisely so that a non-critical step can time
+    /// out without killing the procedure, so this defeats the feature.
+    #[tokio::test]
+    #[serial]
+    async fn a_bypassed_operation_never_lets_its_sop_finish() {
+        let (_container, manager) = redis().await;
+        let mut con = manager.get_connection().await;
+
+        let state = domain(&["a", "b"]);
+        let sop = SOP::Sequence(vec![
+            bypassing_step("flaky", "a", &state),
+            step("after", "b", &state),
+        ]);
+        let model = deploy(sop, &["a", "b"], &manager).await;
+
+        let runner = spawn_runner(&manager, model);
+        enable_sop(&mut con).await;
+
+        // Long enough for it to start, time out and bypass several times over.
+        tokio::time::sleep(Duration::from_millis(1500)).await;
+        let sop_state = value(&mut con, &format!("{SP}_sop_state")).await;
+        let after_ran = StateManager::get_sp_value(&mut con, "b").await;
+        runner.abort();
+
+        assert_eq!(
+            sop_state, "executing",
+            "if this now reads 'completed' the terminate() bug is fixed"
+        );
+        assert_eq!(
+            after_ran,
+            Some(false.to_spvalue()),
+            "and the step after the bypassed one is never reached"
+        );
     }
 }

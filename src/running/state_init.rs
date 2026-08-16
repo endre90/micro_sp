@@ -629,6 +629,392 @@ mod tests {
     }
 }
 
+/// State initialisation.
+///
+/// This module decides what exists in Redis before any runner starts, and every
+/// runner then reads a key set derived from the same model. The two have to
+/// agree exactly: a variable a runner reads but that initialisation does not
+/// create is not a default, it is a panic in that runner's task (see
+/// `State::get_value`). So the property worth testing here is not "does it
+/// create some variables" but "does it create *every* variable the runners ask
+/// for" - which is what the first test below checks against
+/// `running::runner_keys`.
+#[cfg(test)]
+mod state_init_tests {
+    use crate::*;
+
+    const SP: &str = "sp";
+    const TARGET: &str = "test";
+
+    fn domain() -> State {
+        State::from_vec(&vec![
+            (SPVariable::new("a", SPValueType::Bool), false.to_spvalue()),
+            (SPVariable::new("b", SPValueType::Bool), false.to_spvalue()),
+        ])
+    }
+
+    fn operation(name: &str, flag: &str, state: &State) -> Operation {
+        Operation::new(
+            name,
+            None,
+            None,
+            None,
+            None,
+            false,
+            vec![Transition::parse(
+                "start",
+                &format!("var:{flag} == false"),
+                "true",
+                vec![format!("var:{flag} <- true").as_str()],
+                Vec::<&str>::new(),
+                state,
+            )],
+            vec![Transition::parse(
+                "complete",
+                &format!("var:{flag} == true"),
+                "true",
+                Vec::<&str>::new(),
+                Vec::<&str>::new(),
+                state,
+            )],
+            vec![],
+            vec![],
+            vec![],
+            vec![],
+        )
+    }
+
+    fn model(state: &State) -> Model {
+        Model::new(
+            SP,
+            vec![Transition::parse(
+                "beat",
+                "var:a == false",
+                "true",
+                vec!["var:a <- true"],
+                Vec::<&str>::new(),
+                state,
+            )],
+            vec![operation("auto", "a", state)],
+            vec![operation("mutexed", "b", state)],
+            vec![SOPStruct {
+                id: "the_sop".to_string(),
+                sop: SOP::Sequence(vec![SOP::Operation(Box::new(operation(
+                    "in_sop", "a", state,
+                )))]),
+            }],
+            vec![operation("planned", "b", state)],
+        )
+    }
+
+    /// The contract between initialisation and every runner's read set. A key
+    /// in `*_static_keys` that initialisation does not create takes that runner
+    /// down on its first tick.
+    #[test]
+    fn initialisation_covers_every_key_the_runners_read() {
+        let domain = domain();
+        let model = model(&domain);
+
+        let mut state = generate_runner_state_variables(SP, 2, TARGET);
+        state.extend_mut(generate_operation_state_variables(&model, false, TARGET), true);
+        state.extend_mut(domain, true);
+        // Not model-derived, so a consumer has to declare it - which is exactly
+        // the kind of thing this test is here to make visible.
+        state.add_mut(
+            SPAssignment::new(
+                SPVariable::new(&format!("{SP}_dashboard_command"), SPValueType::String),
+                "none".to_spvalue(),
+            ),
+            TARGET,
+        );
+
+        for (label, keys) in [
+            ("sop_runner", sop_runner_static_keys(SP, &model)),
+            (
+                "auto_operation_runner",
+                auto_operation_runner_static_keys(SP, &model),
+            ),
+            ("plan_runner", plan_runner_static_keys(SP, &model)),
+        ] {
+            let missing: Vec<&String> = keys.iter().filter(|k| !state.contains(k)).collect();
+            assert!(
+                missing.is_empty(),
+                "{label} reads keys that initialisation does not create: {missing:?}"
+            );
+        }
+    }
+
+    /// Every operation in the model - planned, auto, mutexed, and the ones
+    /// inside a SOP - gets a state variable, and every SOP gets an information
+    /// variable keyed by its template id.
+    #[test]
+    fn every_operation_in_the_model_gets_a_state_variable() {
+        let domain = domain();
+        let model = model(&domain);
+        let state = generate_operation_state_variables(&model, false, TARGET);
+
+        for name in ["op_planned", "op_auto", "op_mutexed", "in_sop"] {
+            assert!(state.contains(name), "{name} has no state variable");
+            assert_eq!(
+                state.get_value(name, TARGET),
+                Some("initial".to_spvalue()),
+                "{name} should start in 'initial'"
+            );
+        }
+        assert!(state.contains("the_sop_sop_information"));
+    }
+
+    /// Coverability tracking adds a counter per auto transition. It is off by
+    /// default, and the difference is exactly those counters.
+    #[test]
+    fn coverability_tracking_adds_transition_counters() {
+        let domain = domain();
+        let model = model(&domain);
+
+        let without = generate_operation_state_variables(&model, false, TARGET);
+        let with = generate_operation_state_variables(&model, true, TARGET);
+
+        assert!(!without.contains("transition_beat_taken"));
+        assert!(with.contains("transition_beat_taken"));
+        assert_eq!(with.get_value("transition_beat_taken", TARGET), Some(0.to_spvalue()));
+    }
+
+    /// The timer variables scale with the number of timers asked for, and are
+    /// exactly the ones `time_interface_runner` reads.
+    #[test]
+    fn the_timer_variables_match_the_number_of_timers() {
+        let two = generate_runner_state_variables(SP, 2, TARGET);
+
+        for timer in 1..=2 {
+            for suffix in [
+                "request_trigger",
+                "request_state",
+                "command",
+                "duration_ms",
+                "elapsed_ms",
+            ] {
+                let key = format!("{SP}_timer_{timer}_{suffix}");
+                assert!(two.contains(&key), "{key} missing");
+            }
+        }
+        assert!(!two.contains(&format!("{SP}_timer_3_request_trigger")));
+
+        let none = generate_runner_state_variables(SP, 0, TARGET);
+        assert!(!none.contains(&format!("{SP}_timer_1_request_trigger")));
+    }
+
+    /// The bookkeeping variables `process_operation` reads for every operation
+    /// it drives. All five have to exist or the first tick panics.
+    #[test]
+    fn the_operation_meta_variables_are_all_created() {
+        let ops = vec!["op_one".to_string(), "op_two".to_string()];
+        let state = add_operation_meta_tracking_variables(&ops, &State::new(), false, TARGET);
+
+        for op in &ops {
+            for suffix in [
+                "_information",
+                "_elapsed_executing_ms",
+                "_elapsed_disabled_ms",
+                "_failure_retry_counter",
+                "_timeout_retry_counter",
+            ] {
+                assert!(state.contains(&format!("{op}{suffix}")), "{op}{suffix} missing");
+            }
+        }
+
+        // They start UNKNOWN rather than zero, and the accessors turn that into
+        // the zero the runners then count up from.
+        assert_eq!(state.get_int_or_default_to_zero("op_one_elapsed_executing_ms", TARGET), 0);
+
+        let covered = add_operation_meta_tracking_variables(&ops, &State::new(), true, TARGET);
+        assert!(covered.contains("op_one_visited_executing"));
+        assert!(!state.contains("op_one_visited_executing"));
+    }
+
+    /// `all_values_to_unknown` keeps every variable and its *type* while
+    /// clearing the value - it is the "we lost track of the world" reset, not a
+    /// delete.
+    #[test]
+    fn all_values_to_unknown_clears_values_but_keeps_the_variables() {
+        let state = State::from_vec(&vec![
+            (SPVariable::new("b", SPValueType::Bool), true.to_spvalue()),
+            (SPVariable::new("i", SPValueType::Int64), 7.to_spvalue()),
+            (SPVariable::new("f", SPValueType::Float64), 1.5.to_spvalue()),
+            (SPVariable::new("s", SPValueType::String), "x".to_spvalue()),
+            (
+                SPVariable::new("arr", SPValueType::Array),
+                vec![1.to_spvalue()].to_spvalue(),
+            ),
+            (
+                SPVariable::new("map", SPValueType::Map),
+                vec![("k".to_spvalue(), "v".to_spvalue())].to_spvalue(),
+            ),
+            (
+                SPVariable::new("t", SPValueType::Time),
+                std::time::SystemTime::now().to_spvalue(),
+            ),
+            (
+                SPVariable::new("tf", SPValueType::Transform),
+                SPTransformStamped {
+                    active_transform: true,
+                    enable_transform: true,
+                    time_stamp: std::time::SystemTime::now(),
+                    parent_frame_id: "world".to_string(),
+                    child_frame_id: "robot".to_string(),
+                    transform: SPTransform::default(),
+                    metadata: MapOrUnknown::UNKNOWN,
+                }
+                .to_spvalue(),
+            ),
+        ]);
+
+        let cleared = all_values_to_unknown(&state);
+
+        assert_eq!(cleared.state.len(), state.state.len(), "nothing is removed");
+        let expected = [
+            ("b", SPValue::Bool(BoolOrUnknown::UNKNOWN)),
+            ("i", SPValue::Int64(IntOrUnknown::UNKNOWN)),
+            ("f", SPValue::Float64(FloatOrUnknown::UNKNOWN)),
+            ("s", SPValue::String(StringOrUnknown::UNKNOWN)),
+            ("arr", SPValue::Array(ArrayOrUnknown::UNKNOWN)),
+            ("map", SPValue::Map(MapOrUnknown::UNKNOWN)),
+            ("t", SPValue::Time(TimeOrUnknown::UNKNOWN)),
+            ("tf", SPValue::Transform(TransformOrUnknown::UNKNOWN)),
+        ];
+        for (name, unknown) in expected {
+            assert_eq!(
+                cleared.get_value(name, TARGET),
+                Some(unknown),
+                "{name} should have been cleared to its type's UNKNOWN"
+            );
+        }
+    }
+
+    /// `get_all_operations_from_sop` is the traversal every caller actually
+    /// uses, and unlike `SOP::get_all_operation_names` it reaches through
+    /// branches - see the note on that one in `modelling::sops`.
+    #[test]
+    fn get_all_operations_from_sop_reaches_every_leaf() {
+        let domain = domain();
+        let tree = SOP::Sequence(vec![
+            SOP::Operation(Box::new(operation("one", "a", &domain))),
+            SOP::Parallel(vec![
+                SOP::Operation(Box::new(operation("two", "b", &domain))),
+                SOP::Alternative(vec![SOP::Operation(Box::new(operation("three", "a", &domain)))]),
+            ]),
+        ]);
+
+        let names: Vec<String> = get_all_operations_from_sop(&tree)
+            .iter()
+            .map(|o| o.name.clone())
+            .collect();
+        assert_eq!(names, vec!["one", "two", "three"]);
+
+        assert!(get_all_operations_from_sop(&SOP::Sequence(vec![])).is_empty());
+    }
+
+    /// `reset_all_operations` puts the planned operations and every request
+    /// interface back to their starting values - it is what a "reset the
+    /// system" button calls.
+    #[test]
+    fn reset_all_operations_resets_operations_and_request_interfaces() {
+        let domain = domain();
+        let model = model(&domain);
+
+        let mut state = generate_operation_state_variables(&model, false, TARGET);
+        state = state.update("op_planned", "executing".to_spvalue());
+        // A running instance of that operation, as the plan runner creates it.
+        state.add_mut(
+            SPAssignment::new(
+                SPVariable::new("op_planned_A1b2C3d4E5", SPValueType::String),
+                "failed".to_spvalue(),
+            ),
+            TARGET,
+        );
+        state.add_mut(
+            SPAssignment::new(
+                SPVariable::new("op_planned_A1b2C3d4E5_information", SPValueType::String),
+                "keep me".to_spvalue(),
+            ),
+            TARGET,
+        );
+        state.add_mut(
+            SPAssignment::new(
+                SPVariable::new("gripper_request_state", SPValueType::String),
+                "succeeded".to_spvalue(),
+            ),
+            TARGET,
+        );
+        state.add_mut(
+            SPAssignment::new(
+                SPVariable::new("gripper_request_trigger", SPValueType::Bool),
+                true.to_spvalue(),
+            ),
+            TARGET,
+        );
+
+        let reset = reset_all_operations(&state, &model);
+
+        assert_eq!(reset.get_value("op_planned", TARGET), Some("initial".to_spvalue()));
+        assert_eq!(
+            reset.get_value("op_planned_A1b2C3d4E5", TARGET),
+            Some("initial".to_spvalue()),
+            "running instances of the operation are reset too"
+        );
+        assert_eq!(
+            reset.get_value("op_planned_A1b2C3d4E5_information", TARGET),
+            Some("keep me".to_spvalue()),
+            "the bookkeeping variables are excluded by suffix"
+        );
+        assert_eq!(
+            reset.get_value("gripper_request_state", TARGET),
+            Some("initial".to_spvalue())
+        );
+        assert_eq!(
+            reset.get_value("gripper_request_trigger", TARGET),
+            Some(false.to_spvalue())
+        );
+    }
+
+    /// BUG (consequence of `SOP::get_all_operation_names` losing everything
+    /// below a branch - see `modelling::sops`): `reset_all_operations` iterates
+    /// that traversal to reset a SOP's operations, so it resets none of them.
+    ///
+    /// A SOP operation left in a terminal state across a reset means the SOP
+    /// reports as already finished the next time it is enabled.
+    #[test]
+    fn reset_all_operations_does_not_reset_a_sops_operations() {
+        let domain = domain();
+        let model = model(&domain);
+
+        let mut state = generate_operation_state_variables(&model, false, TARGET);
+        state = state.update("in_sop", "terminated_completed".to_spvalue());
+
+        let reset = reset_all_operations(&state, &model);
+
+        assert_eq!(
+            reset.get_value("in_sop", TARGET),
+            Some("terminated_completed".to_spvalue()),
+            "if this now reads 'initial' the get_all_operation_names bug is fixed"
+        );
+    }
+
+    /// `now_as_millis_i64` is used for the runner start time; the only thing
+    /// worth pinning is that it is a real, monotonically-sane wall clock rather
+    /// than the `0` its error path falls back to.
+    #[test]
+    fn now_as_millis_returns_a_plausible_wall_clock() {
+        let first = now_as_millis_i64();
+        std::thread::sleep(std::time::Duration::from_millis(5));
+        let second = now_as_millis_i64();
+
+        // Some time after 2020-01-01, which is when the error fallback of 0
+        // would be obvious.
+        assert!(first > 1_577_836_800_000, "got {first}");
+        assert!(second >= first, "time went backwards: {first} -> {second}");
+    }
+}
+
 // PERF: calls `State::add` five times per operation, and `add` currently clones
 // the entire state map *twice* per call (see the note there). Registering a
 // 20-operation SOP therefore performs ~200 full-state copies inside a single

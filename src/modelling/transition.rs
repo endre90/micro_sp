@@ -914,3 +914,226 @@ mod tests {
     //     }
     // }
 }
+
+/// Model parsing and rendering.
+///
+/// `Transition::parse` is how every model in every consuming package is
+/// written, and its error handling is deliberately non-fatal: a guard that does
+/// not parse becomes `FALSE` and an action that does not parse becomes
+/// `Action::empty()`, both with a log line. That means a typo in a model does
+/// not stop the process - it silently disables one transition instead, which is
+/// worth pinning precisely because it is so quiet.
+#[cfg(test)]
+mod parse_tests {
+    use crate::*;
+
+    const TARGET: &str = "test";
+
+    fn state() -> State {
+        State::from_vec(&vec![
+            (SPVariable::new("a", SPValueType::Bool), false.to_spvalue()),
+            (SPVariable::new("b", SPValueType::Bool), false.to_spvalue()),
+            (SPVariable::new("n", SPValueType::Int64), 1.to_spvalue()),
+        ])
+    }
+
+    #[test]
+    fn a_well_formed_transition_parses_into_its_parts() {
+        let state = state();
+        let transition = Transition::parse(
+            "go",
+            "var:a == false",
+            "var:b == false",
+            vec!["var:a <- true"],
+            vec!["var:b <- true"],
+            &state,
+        );
+
+        assert_eq!(transition.name, "go");
+        assert_eq!(transition.actions.len(), 1);
+        assert_eq!(transition.runner_actions.len(), 1);
+        assert!(transition.eval(&state, TARGET));
+
+        let taken = transition.clone().take(&state, TARGET);
+        assert_eq!(taken.get_value("a", TARGET), Some(true.to_spvalue()));
+        assert_eq!(
+            taken.get_value("b", TARGET),
+            Some(true.to_spvalue()),
+            "take applies the runner actions too"
+        );
+    }
+
+    /// A guard that does not parse becomes `FALSE`, so the transition can never
+    /// fire. The model still loads - the failure is a log line and a dead
+    /// transition, not a startup error.
+    #[test]
+    fn an_unparseable_guard_becomes_false_rather_than_failing_to_load() {
+        let state = state();
+        let broken = Transition::parse(
+            "broken",
+            "var:a === maybe",
+            "true",
+            Vec::<&str>::new(),
+            Vec::<&str>::new(),
+            &state,
+        );
+
+        assert_eq!(broken.guard, Predicate::FALSE);
+        assert!(!broken.eval(&state, TARGET), "a dead transition never fires");
+    }
+
+    /// Same for the runner guard, which is the half a model author is most
+    /// likely to leave malformed since it is often just "true".
+    #[test]
+    fn an_unparseable_runner_guard_becomes_false() {
+        let state = state();
+        let broken = Transition::parse(
+            "broken",
+            "var:a == false",
+            "not a predicate at all",
+            Vec::<&str>::new(),
+            Vec::<&str>::new(),
+            &state,
+        );
+
+        assert_eq!(broken.runner_guard, Predicate::FALSE);
+        assert!(
+            !broken.eval(&state, TARGET),
+            "eval requires both guards, so a broken runner guard disables it"
+        );
+    }
+
+    /// An action that does not parse becomes `Action::empty()` - which assigns
+    /// `false` to a variable called "empty". It does not remove the action, so
+    /// the transition still fires and still does *something*, just not what the
+    /// model said.
+    #[test]
+    fn an_unparseable_action_becomes_the_empty_action() {
+        let state = state();
+        let broken = Transition::parse(
+            "broken",
+            "true",
+            "true",
+            vec!["var:a <<== nonsense"],
+            vec!["also nonsense"],
+            &state,
+        );
+
+        assert_eq!(broken.actions.len(), 1, "the action is replaced, not dropped");
+        assert_eq!(broken.actions[0], Action::empty());
+        assert_eq!(broken.runner_actions[0], Action::empty());
+
+        // And the transition still evaluates as enabled, which is the part that
+        // makes this quiet: a model with a typo'd action runs.
+        assert!(broken.eval(&state, TARGET));
+    }
+
+    /// A well-formed action next to a broken one is unaffected.
+    #[test]
+    fn a_broken_action_does_not_take_its_neighbours_with_it() {
+        let state = state();
+        let transition = Transition::parse(
+            "mixed",
+            "true",
+            "true",
+            vec!["var:a <- true", "garbage", "var:b <- true"],
+            Vec::<&str>::new(),
+            &state,
+        );
+
+        assert_eq!(transition.actions.len(), 3);
+        assert_eq!(transition.actions[1], Action::empty());
+
+        let mut taken = state.clone();
+        // `empty` is not in the state, so applying it would panic - check the
+        // two good ones by evaluating them directly instead.
+        transition.actions[0].assign_mut(&mut taken, TARGET);
+        transition.actions[2].assign_mut(&mut taken, TARGET);
+        assert_eq!(taken.get_value("a", TARGET), Some(true.to_spvalue()));
+        assert_eq!(taken.get_value("b", TARGET), Some(true.to_spvalue()));
+    }
+
+    /// The empty transition is the "never fires, does nothing" element.
+    #[test]
+    fn the_empty_transition_never_fires() {
+        let state = state();
+        let empty = Transition::empty();
+
+        assert_eq!(empty.name, "empty");
+        assert_eq!(empty.guard, Predicate::FALSE);
+        assert!(!empty.eval(&state, TARGET));
+        assert!(empty.actions.is_empty());
+        assert!(empty.get_all_var_keys().is_empty());
+    }
+
+    /// The default is the opposite: it always fires and does nothing, which is
+    /// what makes `..Default::default()` usable when building an `Operation` in
+    /// a test or a fixture.
+    #[test]
+    fn the_default_transition_always_fires_and_does_nothing() {
+        let state = state();
+        let default = Transition::default();
+
+        assert_eq!(default.name, "unknown");
+        assert_eq!(default.guard, Predicate::TRUE);
+        assert_eq!(default.runner_guard, Predicate::TRUE);
+        assert!(default.eval(&state, TARGET));
+        assert_eq!(default.clone().take(&state, TARGET), state);
+    }
+
+    /// `Display` is what every "operation disabled, please satisfy" message is
+    /// built from, so it has to render the guard and all the actions.
+    #[test]
+    fn display_renders_the_guard_and_every_action() {
+        let state = state();
+
+        let none = Transition::parse(
+            "none",
+            "var:a == false",
+            "true",
+            Vec::<&str>::new(),
+            Vec::<&str>::new(),
+            &state,
+        );
+        assert_eq!(none.to_string(), "none: a = false / []");
+
+        let one = Transition::parse(
+            "one",
+            "var:a == false",
+            "true",
+            vec!["var:a <- true"],
+            Vec::<&str>::new(),
+            &state,
+        );
+        assert_eq!(one.to_string(), "one: a = false / [a <= true]");
+
+        let many = Transition::parse(
+            "many",
+            "var:a == false",
+            "true",
+            vec!["var:a <- true", "var:b <- true"],
+            Vec::<&str>::new(),
+            &state,
+        );
+        assert_eq!(many.to_string(), "many: a = false / [a <= true, b <= true]");
+    }
+
+    /// The owned `take` must not disturb the state it was given - the runners
+    /// rely on being able to diff before against after.
+    #[test]
+    fn the_owned_take_leaves_the_original_state_alone() {
+        let state = state();
+        let transition = Transition::parse(
+            "go",
+            "true",
+            "true",
+            vec!["var:n <- 5"],
+            Vec::<&str>::new(),
+            &state,
+        );
+
+        let after = transition.take(&state, TARGET);
+        assert_eq!(state.get_value("n", TARGET), Some(1.to_spvalue()));
+        assert_eq!(after.get_value("n", TARGET), Some(5.to_spvalue()));
+    }
+}

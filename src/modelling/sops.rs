@@ -466,6 +466,93 @@ mod get_state_tests {
         }
     }
 
+    /// The keys a SOP contributes to a runner's read set come from here, so a
+    /// variable missed here is a variable the runner never reads and a guard
+    /// that never becomes true.
+    #[test]
+    fn get_all_var_keys_reaches_every_leaf_of_the_tree() {
+        let mut state = State::new();
+        for name in ["a", "b", "c"] {
+            state.add_mut(
+                SPAssignment::new(SPVariable::new(name, SPValueType::Bool), false.to_spvalue()),
+                TARGET,
+            );
+        }
+
+        let op_with_guard = |name: &str, var: &str| {
+            SOP::Operation(Box::new(Operation::new(
+                name,
+                None,
+                None,
+                None,
+                None,
+                false,
+                vec![Transition::parse(
+                    "start",
+                    &format!("var:{var} == true"),
+                    "true",
+                    Vec::<&str>::new(),
+                    Vec::<&str>::new(),
+                    &state,
+                )],
+                vec![],
+                vec![],
+                vec![],
+                vec![],
+                vec![],
+            )))
+        };
+
+        let tree = SOP::Sequence(vec![
+            op_with_guard("one", "a"),
+            SOP::Parallel(vec![
+                op_with_guard("two", "b"),
+                SOP::Alternative(vec![op_with_guard("three", "c")]),
+            ]),
+        ]);
+
+        let keys = tree.get_all_var_keys();
+        for expected in ["a", "b", "c"] {
+            assert!(
+                keys.contains(&expected.to_string()),
+                "'{expected}' is guarded by a nested leaf and must be in the key set: {keys:?}"
+            );
+        }
+    }
+
+    /// BUG: `get_all_operation_names` only ever returns names for a bare
+    /// `SOP::Operation`. The branch arms recurse (`s.get_all_operation_names()`)
+    /// but throw the result away instead of extending `operations`, so any
+    /// `Sequence`/`Parallel`/`Alternative` - i.e. every real SOP - reports zero
+    /// operations.
+    ///
+    /// Consequence: `reset_all_operations` iterates
+    /// `sop_struct.sop.get_all_operation_names()` to put a SOP's operations back
+    /// to "initial", and therefore resets none of them. The working traversal
+    /// already exists next door as `get_all_operations_from_sop`
+    /// (`running/state_init.rs`), which is what every other caller uses; the
+    /// test below shows the two disagreeing.
+    #[test]
+    fn get_all_operation_names_loses_everything_below_a_branch() {
+        let tree = SOP::Sequence(vec![leaf("first"), leaf("second")]);
+
+        assert_eq!(
+            tree.get_all_operation_names(),
+            Vec::<String>::new(),
+            "if this now returns the two names the bug is fixed - see the doc comment"
+        );
+
+        // The traversal that does work, for contrast.
+        let working: Vec<String> = get_all_operations_from_sop(&tree)
+            .iter()
+            .map(|o| o.name.clone())
+            .collect();
+        assert_eq!(working, vec!["first".to_string(), "second".to_string()]);
+
+        // A bare leaf is the one shape that does report its name.
+        assert_eq!(leaf("only").get_all_operation_names(), vec!["only".to_string()]);
+    }
+
     #[test]
     fn an_empty_branch_counts_as_completed() {
         let state = State::new();

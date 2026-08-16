@@ -8,9 +8,6 @@ use std::sync::Arc;
 use tokio::sync::mpsc;
 
 // Add automatic operations here as well that finish immediatelly, god for setting some values, triggering robot moves etc.
-/// Override with `MICRO_SP_AUTO_TRANSITION_TICK_MS`. See `running::tick` for
-/// what 1 ms costs and why it is the practical floor.
-pub static TRANSITION_RUNNER_TICK_INTERVAL_MS: u64 = 1;
 
 // DONE (correctness + PERF): this used to take `&State` and write its own
 // effects straight to Redis, inside the caller's `for t in
@@ -90,10 +87,7 @@ pub async fn auto_transition_runner(
     // logging_tx: mpsc::Sender<LogMsg>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     initialize_env_logger();
-    let mut interval = runner_interval(
-        "MICRO_SP_AUTO_TRANSITION_TICK_MS",
-        TRANSITION_RUNNER_TICK_INTERVAL_MS,
-    );
+    let mut interval = runner_interval();
     let log_target = format!("{}_auto_transition_runner", name);
     let keys: Vec<String> = normalize_keys(
         model
@@ -165,10 +159,7 @@ pub async fn auto_operation_runner(
     connection_manager: &Arc<ConnectionManager>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     initialize_env_logger();
-    let mut interval = runner_interval(
-        "MICRO_SP_OPERATION_TICK_MS",
-        OPERAION_RUNNER_TICK_INTERVAL_MS,
-    );
+    let mut interval = runner_interval();
     let log_target = format!("{}_operation_runner", sp_id);
 
     let mut active_auto_ops: Vec<Operation> = vec![];
@@ -343,6 +334,392 @@ pub async fn auto_operation_runner(
         }
     }
 }
+/// The two automatic runners, driven end to end against a real Redis.
+///
+/// `auto_transition_runner` fires guard-less state rewrites; `auto_operation_runner`
+/// activates an operation instance whenever a template's guard becomes true,
+/// drives it, and deletes its bookkeeping variables once it terminates. Neither
+/// is reachable without Redis, and the activation/teardown bookkeeping - which
+/// is where the "operations accumulate in the keyspace" class of bug lives - had
+/// no coverage at all.
+#[cfg(test)]
+mod runner_tests {
+    use super::*;
+    use serial_test::serial;
+    use std::time::Duration;
+    use testcontainers::{ContainerAsync, ImageExt, core::ContainerPort, runners::AsyncRunner};
+    use testcontainers_modules::redis::Redis;
+
+    const SP: &str = "sp";
+    const TARGET: &str = "test";
+
+    async fn redis() -> (ContainerAsync<Redis>, Arc<ConnectionManager>) {
+        let container = Redis::default()
+            .with_mapped_port(6379, ContainerPort::Tcp(6379))
+            .start()
+            .await
+            .unwrap();
+        let manager = Arc::new(ConnectionManager::new().await);
+        let mut con = manager.get_connection().await;
+        StateManager::flush_state(&mut con).await;
+        (container, manager)
+    }
+
+    fn flags(names: &[&str]) -> State {
+        let mut state = State::new();
+        for name in names {
+            state.add_mut(
+                SPAssignment::new(SPVariable::new(name, SPValueType::Bool), false.to_spvalue()),
+                TARGET,
+            );
+        }
+        state
+    }
+
+    /// An operation that sets `flag` on start and completes once it is set.
+    fn auto_op(name: &str, flag: &str, state: &State) -> Operation {
+        Operation::new(
+            name,
+            Some(10_000),
+            Some(10_000),
+            None,
+            None,
+            false,
+            vec![Transition::parse(
+                "start",
+                &format!("var:{flag} == false"),
+                "true",
+                vec![format!("var:{flag} <- true").as_str()],
+                Vec::<&str>::new(),
+                state,
+            )],
+            vec![Transition::parse(
+                "complete",
+                &format!("var:{flag} == true"),
+                "true",
+                Vec::<&str>::new(),
+                Vec::<&str>::new(),
+                state,
+            )],
+            vec![],
+            vec![],
+            vec![],
+            vec![],
+        )
+    }
+
+    async fn deploy(manager: &Arc<ConnectionManager>, model: &Model, domain: State) {
+        let mut state = generate_runner_state_variables(SP, 0, TARGET);
+        state.extend_mut(generate_operation_state_variables(model, false, TARGET), true);
+        state.extend_mut(domain, true);
+        state.add_mut(
+            SPAssignment::new(
+                SPVariable::new(&format!("{SP}_dashboard_command"), SPValueType::String),
+                "none".to_spvalue(),
+            ),
+            TARGET,
+        );
+        let mut con = manager.get_connection().await;
+        StateManager::set_state(&mut con, &state).await;
+    }
+
+    fn spawn_transitions(
+        manager: &Arc<ConnectionManager>,
+        model: Model,
+    ) -> tokio::task::JoinHandle<()> {
+        let manager = Arc::clone(manager);
+        tokio::spawn(async move {
+            let _ = auto_transition_runner(SP, &model, &manager).await;
+        })
+    }
+
+    fn spawn_operations(
+        manager: &Arc<ConnectionManager>,
+        model: Model,
+    ) -> tokio::task::JoinHandle<()> {
+        let manager = Arc::clone(manager);
+        tokio::spawn(async move {
+            let _ = auto_operation_runner(SP, &model, &manager).await;
+        })
+    }
+
+    async fn wait_true(con: &mut SPConnection, key: &str, ms: u64) -> bool {
+        let deadline = std::time::Instant::now() + Duration::from_millis(ms);
+        while std::time::Instant::now() < deadline {
+            if StateManager::get_sp_value(con, key).await == Some(true.to_spvalue()) {
+                return true;
+            }
+            tokio::time::sleep(Duration::from_millis(2)).await;
+        }
+        false
+    }
+
+    /// The chain-in-one-tick property, this time through Redis rather than
+    /// against `process_transition` directly: three dependent transitions settle
+    /// without costing three ticks.
+    #[tokio::test]
+    #[serial]
+    async fn a_chain_of_auto_transitions_settles() {
+        let (_container, manager) = redis().await;
+        let mut con = manager.get_connection().await;
+        let domain = flags(&["a", "b", "c"]);
+
+        let link = |name: &str, needs: Option<&str>, sets: &str| {
+            let guard = match needs {
+                Some(needs) => format!("var:{needs} == true && var:{sets} == false"),
+                None => format!("var:{sets} == false"),
+            };
+            Transition::parse(
+                name,
+                &guard,
+                "true",
+                vec![format!("var:{sets} <- true").as_str()],
+                Vec::<&str>::new(),
+                &domain,
+            )
+        };
+
+        let model = Model::new(
+            SP,
+            vec![
+                link("first", None, "a"),
+                link("second", Some("a"), "b"),
+                link("third", Some("b"), "c"),
+            ],
+            vec![],
+            vec![],
+            vec![],
+            vec![],
+        );
+        deploy(&manager, &model, domain).await;
+
+        let runner = spawn_transitions(&manager, model);
+        let settled = wait_true(&mut con, "c", 3000).await;
+        runner.abort();
+
+        assert!(settled, "the whole chain should have fired");
+        for flag in ["a", "b", "c"] {
+            assert_eq!(
+                StateManager::get_sp_value(&mut con, flag).await,
+                Some(true.to_spvalue())
+            );
+        }
+    }
+
+    /// Once every guard is false the runner has nothing to do, and must stop
+    /// writing. An auto transition runner that keeps writing is the worst case
+    /// for idle load, since it is the fastest-ticking runner.
+    #[tokio::test]
+    #[serial]
+    async fn a_settled_auto_transition_runner_writes_nothing() {
+        let (_container, manager) = redis().await;
+        let mut con = manager.get_connection().await;
+        let domain = flags(&["a"]);
+
+        let model = Model::new(
+            SP,
+            vec![Transition::parse(
+                "once",
+                "var:a == false",
+                "true",
+                vec!["var:a <- true"],
+                Vec::<&str>::new(),
+                &domain,
+            )],
+            vec![],
+            vec![],
+            vec![],
+            vec![],
+        );
+        deploy(&manager, &model, domain).await;
+
+        let runner = spawn_transitions(&manager, model);
+        assert!(wait_true(&mut con, "a", 3000).await);
+
+        let before = StateManager::get_full_state(&mut con).await.unwrap();
+        tokio::time::sleep(Duration::from_millis(300)).await;
+        let after = StateManager::get_full_state(&mut con).await.unwrap();
+
+        assert!(!runner.is_finished());
+        runner.abort();
+        assert!(
+            before.get_diff_partial_state(&after).state.is_empty(),
+            "a settled auto transition runner must not write"
+        );
+    }
+
+    /// An auto operation activates on its own, runs, terminates, and has its
+    /// bookkeeping variables deleted again - so a system that runs the same auto
+    /// operation a thousand times does not grow a thousand key sets.
+    #[tokio::test]
+    #[serial]
+    async fn an_auto_operation_activates_runs_and_cleans_up_after_itself() {
+        let (_container, manager) = redis().await;
+        let mut con = manager.get_connection().await;
+        let domain = flags(&["a"]);
+
+        let model = Model::new(
+            SP,
+            vec![],
+            vec![auto_op("do_it", "a", &domain)],
+            vec![],
+            vec![],
+            vec![],
+        );
+        deploy(&manager, &model, domain).await;
+
+        let before: i64 = redis::cmd("DBSIZE").query_async(&mut con).await.unwrap();
+
+        let runner = spawn_operations(&manager, model);
+        assert!(
+            wait_true(&mut con, "a", 3000).await,
+            "the operation should have started on its own"
+        );
+
+        // Wait for the keyspace to come back to where it started, which only
+        // happens once the operation has terminated and been cleaned up.
+        let deadline = std::time::Instant::now() + Duration::from_millis(3000);
+        let mut after = before + 1;
+        while std::time::Instant::now() < deadline {
+            after = redis::cmd("DBSIZE").query_async(&mut con).await.unwrap();
+            if after == before {
+                break;
+            }
+            tokio::time::sleep(Duration::from_millis(5)).await;
+        }
+        assert!(!runner.is_finished());
+        runner.abort();
+
+        assert_eq!(
+            after, before,
+            "the terminated operation's variables should have been deleted"
+        );
+    }
+
+    /// Every auto operation whose guard holds runs; they are not mutually
+    /// exclusive.
+    #[tokio::test]
+    #[serial]
+    async fn auto_operations_run_concurrently() {
+        let (_container, manager) = redis().await;
+        let mut con = manager.get_connection().await;
+        let domain = flags(&["a", "b"]);
+
+        let model = Model::new(
+            SP,
+            vec![],
+            vec![auto_op("one", "a", &domain), auto_op("two", "b", &domain)],
+            vec![],
+            vec![],
+            vec![],
+        );
+        deploy(&manager, &model, domain).await;
+
+        let runner = spawn_operations(&manager, model);
+        assert!(wait_true(&mut con, "a", 3000).await);
+        assert!(wait_true(&mut con, "b", 3000).await);
+        runner.abort();
+    }
+
+    /// The mutexed set is the opposite: at most one of them runs at a time.
+    #[tokio::test]
+    #[serial]
+    async fn only_one_mutexed_auto_operation_runs_at_a_time() {
+        let (_container, manager) = redis().await;
+        let mut con = manager.get_connection().await;
+        let domain = flags(&["a", "b"]);
+
+        // Neither can ever complete, so whichever starts holds the mutex.
+        let stuck = |name: &str, flag: &str| {
+            Operation::new(
+                name,
+                Some(10_000),
+                Some(10_000),
+                None,
+                None,
+                false,
+                vec![Transition::parse(
+                    "start",
+                    &format!("var:{flag} == false"),
+                    "true",
+                    vec![format!("var:{flag} <- true").as_str()],
+                    Vec::<&str>::new(),
+                    &domain,
+                )],
+                vec![Transition::parse(
+                    "never",
+                    "false",
+                    "true",
+                    Vec::<&str>::new(),
+                    Vec::<&str>::new(),
+                    &domain,
+                )],
+                vec![],
+                vec![],
+                vec![],
+                vec![],
+            )
+        };
+
+        let model = Model::new(
+            SP,
+            vec![],
+            vec![],
+            vec![stuck("one", "a"), stuck("two", "b")],
+            vec![],
+            vec![],
+        );
+        deploy(&manager, &model, domain).await;
+
+        let runner = spawn_operations(&manager, model);
+        assert!(wait_true(&mut con, "a", 3000).await, "the first should start");
+        tokio::time::sleep(Duration::from_millis(300)).await;
+        runner.abort();
+
+        assert_eq!(
+            StateManager::get_sp_value(&mut con, "b").await,
+            Some(false.to_spvalue()),
+            "the second mutexed operation must wait for the first to finish"
+        );
+    }
+
+    /// An auto operation whose guard never holds costs nothing.
+    #[tokio::test]
+    #[serial]
+    async fn an_auto_operation_runner_with_nothing_to_do_writes_nothing() {
+        let (_container, manager) = redis().await;
+        let mut con = manager.get_connection().await;
+        let mut domain = flags(&["a"]);
+        // Already true, so the guard `var:a == false` never holds.
+        domain = domain.update("a", true.to_spvalue());
+
+        let model = Model::new(
+            SP,
+            vec![],
+            vec![auto_op("never", "a", &domain)],
+            vec![],
+            vec![],
+            vec![],
+        );
+        deploy(&manager, &model, domain).await;
+
+        let runner = spawn_operations(&manager, model);
+        tokio::time::sleep(Duration::from_millis(100)).await;
+
+        let before = StateManager::get_full_state(&mut con).await.unwrap();
+        tokio::time::sleep(Duration::from_millis(300)).await;
+        let after = StateManager::get_full_state(&mut con).await.unwrap();
+
+        assert!(!runner.is_finished());
+        runner.abort();
+        assert!(
+            before.get_diff_partial_state(&after).state.is_empty(),
+            "an idle auto operation runner must not write: {:?}",
+            before.get_diff_partial_state(&after)
+        );
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -736,3 +736,121 @@ mod tests {
         );
     }
 }
+
+/// Lookup failure and depth limits.
+///
+/// The happy paths - direct parent, direct child, chains, branches - are well
+/// covered above. What is not is what happens when the buffer is *broken*: a
+/// frame whose parent is not in the buffer, and a chain longer than
+/// `MAX_TRANSFORM_CHAIN`. Both matter because the buffer is assembled from JSON
+/// files and from whatever other processes have written into Redis, so a
+/// dangling parent is a realistic state, and the depth limit is the only thing
+/// standing between a malformed buffer and an unbounded walk.
+#[cfg(test)]
+mod failure_tests {
+    use crate::*;
+    use nalgebra::Isometry3;
+    use std::collections::HashMap;
+    use std::time::SystemTime;
+
+    fn transform(child: &str, parent: &str, x: f64) -> SPTransformStamped {
+        SPTransformStamped {
+            active_transform: true,
+            enable_transform: true,
+            time_stamp: SystemTime::now(),
+            parent_frame_id: parent.to_string(),
+            child_frame_id: child.to_string(),
+            transform: SPTransform {
+                translation: SPTranslation {
+                    x: ordered_float::OrderedFloat(x),
+                    y: ordered_float::OrderedFloat(0.0),
+                    z: ordered_float::OrderedFloat(0.0),
+                },
+                rotation: SPTransform::default().rotation,
+            },
+            metadata: MapOrUnknown::UNKNOWN,
+        }
+    }
+
+    fn buffer(edges: &[(&str, &str)]) -> HashMap<String, SPTransformStamped> {
+        edges
+            .iter()
+            .map(|(child, parent)| (child.to_string(), transform(child, parent, 1.0)))
+            .collect()
+    }
+
+    /// Walking up to a root that is not reachable - because a link in the chain
+    /// is missing from the buffer - fails rather than looping or returning a
+    /// partial chain.
+    #[test]
+    fn walking_to_a_root_that_is_not_there_fails() {
+        // b -> a, but 'a' itself is not in the buffer, so the walk from b
+        // cannot reach 'world'.
+        let buffer = buffer(&[("b", "a")]);
+        assert_eq!(parent_to_root("b", "world", &buffer), None);
+    }
+
+    /// A frame is its own root - the identity case the walk short-circuits on
+    /// before it does any work at all.
+    #[test]
+    fn a_frame_is_its_own_root() {
+        let buffer = buffer(&[("a", "world")]);
+        assert_eq!(parent_to_root("world", "world", &buffer), Some(Isometry3::identity()));
+    }
+
+    /// A cycle in the buffer would walk forever; `MAX_TRANSFORM_CHAIN` is what
+    /// stops it. `TransformsManager` refuses to create one (see
+    /// `transforms::cycles`), so this is the belt to that braces - and the only
+    /// thing that saves the lookup if a cycle ever arrives another way.
+    #[test]
+    fn a_cycle_is_stopped_by_the_chain_limit_rather_than_looping_forever() {
+        let buffer = buffer(&[("a", "b"), ("b", "a")]);
+
+        // Neither direction can reach an outside root, and neither hangs.
+        assert_eq!(parent_to_root("a", "world", &buffer), None);
+        assert_eq!(parent_to_root("b", "world", &buffer), None);
+    }
+
+    /// A chain longer than the limit is refused even though it is perfectly
+    /// well formed - the limit is a hard bound, not a cycle detector.
+    #[test]
+    fn a_chain_longer_than_the_limit_is_refused() {
+        let mut buffer = HashMap::new();
+        let depth = MAX_TRANSFORM_CHAIN + 5;
+        for i in 0..depth {
+            let parent = if i == 0 {
+                "world".to_string()
+            } else {
+                format!("f{}", i - 1)
+            };
+            let child = format!("f{}", i);
+            buffer.insert(child.clone(), transform(&child, &parent, 1.0));
+        }
+
+        let deepest = format!("f{}", depth - 1);
+        assert_eq!(
+            parent_to_root(&deepest, "world", &buffer),
+            None,
+            "a chain of {depth} must hit the limit"
+        );
+
+        // And a chain just inside the limit still resolves.
+        assert!(parent_to_root("f2", "world", &buffer).is_some());
+    }
+
+    /// A lookup between two frames with no common root fails rather than
+    /// returning an arbitrary transform.
+    #[test]
+    fn a_lookup_across_two_disconnected_trees_fails() {
+        let buffer = buffer(&[("a", "world"), ("x", "other_world")]);
+        assert!(lookup_transform_with_root("a", "x", "world", &buffer).is_none());
+    }
+
+    /// A lookup naming a frame that is not in the buffer at all fails.
+    #[test]
+    fn a_lookup_of_an_unknown_frame_fails() {
+        let buffer = buffer(&[("a", "world")]);
+        assert!(lookup_transform_with_root("world", "nope", "world", &buffer).is_none());
+        assert!(lookup_transform_with_root("nope", "a", "world", &buffer).is_none());
+    }
+}

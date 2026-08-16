@@ -365,3 +365,139 @@ mod tests {
         assert_eq!(format!("{}", unknown_transform), "UNKNOWN");
     }
 }
+
+/// The composite `SPWrapped` variants.
+///
+/// `SPWrapped::Array` and `SPWrapped::Map` are the experimental half of this
+/// enum: they let a predicate or an action build a value out of *other*
+/// variables rather than out of a literal. They are the only variants whose
+/// `evaluate` recurses, and the only ones `get_variables` has to walk - which
+/// matters beyond evaluation, because `get_variables` is what feeds the
+/// runners' key sets, and a variable missed there is a key the runner never
+/// reads.
+#[cfg(test)]
+mod composite_tests {
+    use crate::*;
+
+    const TARGET: &str = "test";
+
+    fn state() -> State {
+        State::from_vec(&vec![
+            (SPVariable::new("a", SPValueType::Int64), 1.to_spvalue()),
+            (SPVariable::new("b", SPValueType::Int64), 2.to_spvalue()),
+            (SPVariable::new("k", SPValueType::String), "key".to_spvalue()),
+        ])
+    }
+
+    fn var(name: &str, state: &State) -> SPWrapped {
+        state.get_assignment(name, TARGET).var.wrap()
+    }
+
+    #[test]
+    fn an_array_evaluates_each_of_its_elements() {
+        let state = state();
+        let array = SPWrapped::Array(vec![
+            var("a", &state),
+            var("b", &state),
+            42.to_spvalue().wrap(),
+        ]);
+
+        assert_eq!(
+            array.evaluate(&state, TARGET),
+            vec![1.to_spvalue(), 2.to_spvalue(), 42.to_spvalue()].to_spvalue()
+        );
+    }
+
+    #[test]
+    fn a_map_evaluates_both_its_keys_and_its_values() {
+        let state = state();
+        let map = SPWrapped::Map(vec![
+            (var("k", &state), var("a", &state)),
+            ("literal".to_spvalue().wrap(), var("b", &state)),
+        ]);
+
+        assert_eq!(
+            map.evaluate(&state, TARGET),
+            SPValue::Map(MapOrUnknown::Map(vec![
+                ("key".to_spvalue(), 1.to_spvalue()),
+                ("literal".to_spvalue(), 2.to_spvalue()),
+            ]))
+        );
+    }
+
+    #[test]
+    fn composites_nest() {
+        let state = state();
+        let nested = SPWrapped::Array(vec![SPWrapped::Map(vec![(
+            var("k", &state),
+            SPWrapped::Array(vec![var("a", &state)]),
+        )])]);
+
+        assert_eq!(
+            nested.evaluate(&state, TARGET),
+            vec![SPValue::Map(MapOrUnknown::Map(vec![(
+                "key".to_spvalue(),
+                vec![1.to_spvalue()].to_spvalue()
+            )]))]
+            .to_spvalue()
+        );
+    }
+
+    #[test]
+    fn an_empty_composite_evaluates_to_an_empty_value() {
+        let state = state();
+        assert_eq!(
+            SPWrapped::Array(vec![]).evaluate(&state, TARGET),
+            Vec::<SPValue>::new().to_spvalue()
+        );
+        assert_eq!(
+            SPWrapped::Map(vec![]).evaluate(&state, TARGET),
+            SPValue::Map(MapOrUnknown::Map(vec![]))
+        );
+    }
+
+    /// `get_variables` has to reach through both composites, in both halves of
+    /// a map entry - this is what decides whether a runner reads the key.
+    #[test]
+    fn get_variables_reaches_through_both_composites() {
+        let state = state();
+
+        assert_eq!(var("a", &state).get_variables().len(), 1);
+        assert!(1.to_spvalue().wrap().get_variables().is_empty());
+
+        let array = SPWrapped::Array(vec![var("a", &state), 9.to_spvalue().wrap(), var("b", &state)]);
+        let names: Vec<String> = array.get_variables().iter().map(|v| v.name.clone()).collect();
+        assert_eq!(names, vec!["a".to_string(), "b".to_string()]);
+
+        let map = SPWrapped::Map(vec![(var("k", &state), var("a", &state))]);
+        let names: Vec<String> = map.get_variables().iter().map(|v| v.name.clone()).collect();
+        assert_eq!(
+            names,
+            vec!["k".to_string(), "a".to_string()],
+            "a variable used as a map *key* counts too"
+        );
+    }
+
+    /// A composite has no `Display` form of its own - it renders as the
+    /// placeholder. Worth pinning because these strings end up in the "please
+    /// satisfy the runner guard" message a user reads.
+    #[test]
+    fn a_composite_renders_as_a_placeholder() {
+        let state = state();
+        assert_eq!(SPWrapped::Array(vec![var("a", &state)]).to_string(), "TODO!");
+        assert_eq!(
+            SPWrapped::Map(vec![(var("k", &state), var("a", &state))]).to_string(),
+            "TODO!"
+        );
+    }
+
+    /// Evaluating a variable that is not in the state panics, like every other
+    /// read path in the crate.
+    #[test]
+    #[should_panic(expected = "not in state")]
+    fn evaluating_a_missing_variable_panics() {
+        let state = state();
+        let missing = SPWrapped::SPVariable(SPVariable::new("nope", SPValueType::Int64));
+        let _ = missing.evaluate(&state, TARGET);
+    }
+}

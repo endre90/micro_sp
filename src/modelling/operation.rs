@@ -928,3 +928,342 @@ mod can_be_cancelled_tests {
         }
     }
 }
+
+/// The state-transition methods, guarded.
+///
+/// Every one of these is written as "if the operation is in the state I expect,
+/// do the thing; otherwise log and return the state unchanged". Those guards
+/// are the last line of defence against a runner driving an operation out of
+/// order, and returning the state *unchanged* is what makes a wrong call a
+/// no-op rather than a corruption. `process_operation` covers the in-order
+/// paths; this covers the refusals, plus the two `_with_transition_index`
+/// lookups that nothing currently calls.
+#[cfg(test)]
+mod guard_tests {
+    use crate::*;
+
+    const TARGET: &str = "test";
+    const OP: &str = "op_test";
+
+    fn world() -> State {
+        let mut state = State::new();
+        for name in ["go", "alt", "done", "broken", "late"] {
+            state.add_mut(
+                SPAssignment::new(SPVariable::new(name, SPValueType::Bool), false.to_spvalue()),
+                TARGET,
+            );
+        }
+        state
+    }
+
+    fn transition(name: &str, guard: &str, state: &State) -> Transition {
+        Transition::parse(
+            name,
+            guard,
+            "true",
+            Vec::<&str>::new(),
+            Vec::<&str>::new(),
+            state,
+        )
+    }
+
+    /// An operation with two preconditions, two postconditions, a failure
+    /// transition and a timeout transition - enough to reach every branch.
+    fn operation(state: &State) -> Operation {
+        Operation::new(
+            OP,
+            Some(1000),
+            Some(1000),
+            None,
+            None,
+            true,
+            vec![
+                transition("start_a", "var:go == true", state),
+                transition("start_b", "var:alt == true", state),
+            ],
+            vec![
+                transition("complete_a", "var:done == true", state),
+                transition("complete_b", "var:alt == true", state),
+            ],
+            vec![transition("fail", "var:broken == true", state)],
+            vec![transition("timeout", "var:late == true", state)],
+            vec![],
+            vec![],
+        )
+    }
+
+    fn in_state(state: &State, operation_state: &str) -> State {
+        let mut state = state.clone();
+        state.add_mut(
+            SPAssignment::new(
+                SPVariable::new(OP, SPValueType::String),
+                operation_state.to_spvalue(),
+            ),
+            TARGET,
+        );
+        state
+    }
+
+    fn op_state(state: &State) -> String {
+        state.get_string_or_default_to_unknown(OP, TARGET)
+    }
+
+    /// `evaluate_with_transition_index` reports *which* precondition enabled the
+    /// operation - the index the `start` path is supposed to reuse rather than
+    /// re-walking the guards.
+    #[test]
+    fn evaluate_with_transition_index_reports_the_matching_precondition() {
+        let world = world();
+        let operation = operation(&world);
+
+        let first = in_state(&world.update("go", true.to_spvalue()), "initial");
+        assert_eq!(operation.evaluate_with_transition_index(&first, TARGET), (true, 0));
+
+        let second = in_state(&world.update("alt", true.to_spvalue()), "initial");
+        assert_eq!(operation.evaluate_with_transition_index(&second, TARGET), (true, 1));
+
+        let neither = in_state(&world, "initial");
+        assert_eq!(operation.evaluate_with_transition_index(&neither, TARGET), (false, 0));
+    }
+
+    /// Unlike `eval`, the indexed form only accepts `initial` - it does not
+    /// also accept `disabled`. That asymmetry is why swapping one for the other
+    /// would be a behaviour change, and is worth having pinned.
+    #[test]
+    fn evaluate_with_transition_index_does_not_accept_a_disabled_operation() {
+        let world = world().update("go", true.to_spvalue());
+        let operation = operation(&world);
+        let disabled = in_state(&world, "disabled");
+
+        assert!(operation.eval(&disabled, TARGET), "eval accepts disabled");
+        assert_eq!(
+            operation.evaluate_with_transition_index(&disabled, TARGET),
+            (false, 0),
+            "the indexed form does not"
+        );
+    }
+
+    #[test]
+    fn can_be_completed_with_transition_index_reports_the_matching_postcondition() {
+        let world = world();
+        let operation = operation(&world);
+
+        let first = in_state(&world.update("done", true.to_spvalue()), "executing");
+        assert_eq!(
+            operation.can_be_completed_with_transition_index(&first, TARGET),
+            (true, 0)
+        );
+
+        let second = in_state(&world.update("alt", true.to_spvalue()), "executing");
+        assert_eq!(
+            operation.can_be_completed_with_transition_index(&second, TARGET),
+            (true, 1)
+        );
+
+        // Only while executing.
+        let not_executing = in_state(&world.update("done", true.to_spvalue()), "initial");
+        assert_eq!(
+            operation.can_be_completed_with_transition_index(&not_executing, TARGET),
+            (false, 0)
+        );
+    }
+
+    /// Every method refuses to act from a state it does not expect, and returns
+    /// the state untouched when it does. This is the table - each row is a
+    /// method, the state it refuses from, and the state that must be unchanged
+    /// afterwards.
+    #[test]
+    fn every_transition_method_refuses_from_the_wrong_state() {
+        let world = world()
+            .update("go", true.to_spvalue())
+            .update("done", true.to_spvalue())
+            .update("broken", true.to_spvalue())
+            .update("late", true.to_spvalue());
+        let operation = operation(&world);
+
+        type Method = fn(&Operation, &State, &str) -> State;
+        let cases: Vec<(&str, Method, &str)> = vec![
+            ("disable", Operation::disable, "executing"),
+            ("start", Operation::start, "completed"),
+            ("complete", Operation::complete, "initial"),
+            ("fail", Operation::fail, "initial"),
+            ("timeout", Operation::timeout, "initial"),
+            ("fatal", Operation::fatal, "executing"),
+            ("retry", Operation::retry, "executing"),
+            ("bypass", Operation::bypass, "executing"),
+        ];
+
+        for (label, method, wrong_state) in cases {
+            let state = in_state(&world, wrong_state);
+            let after = method(&operation, &state, TARGET);
+            assert_eq!(
+                after, state,
+                "{label} from '{wrong_state}' must leave the state untouched"
+            );
+        }
+    }
+
+    /// And each one does act from the state it does expect.
+    #[test]
+    fn every_transition_method_acts_from_the_right_state() {
+        let world = world()
+            .update("go", true.to_spvalue())
+            .update("done", true.to_spvalue())
+            .update("broken", true.to_spvalue())
+            .update("late", true.to_spvalue());
+        let operation = operation(&world);
+
+        type Method = fn(&Operation, &State, &str) -> State;
+        let cases: Vec<(&str, Method, &str, &str)> = vec![
+            ("disable", Operation::disable, "initial", "disabled"),
+            ("start", Operation::start, "initial", "executing"),
+            ("start from disabled", Operation::start, "disabled", "executing"),
+            ("complete", Operation::complete, "executing", "completed"),
+            ("fail", Operation::fail, "executing", "failed"),
+            ("timeout", Operation::timeout, "executing", "timedout"),
+            ("timeout from disabled", Operation::timeout, "disabled", "timedout"),
+            ("fatal from failed", Operation::fatal, "failed", "fatal"),
+            ("fatal from timedout", Operation::fatal, "timedout", "fatal"),
+            ("retry from failed", Operation::retry, "failed", "initial"),
+            ("retry from timedout", Operation::retry, "timedout", "initial"),
+            // `bypass` is reached from a *failed* or *timedout* operation - it
+            // is the "this step did not work, carry on anyway" path, not
+            // something an executing operation does.
+            ("bypass from failed", Operation::bypass, "failed", "bypassed"),
+            ("bypass from timedout", Operation::bypass, "timedout", "bypassed"),
+        ];
+
+        for (label, method, from, expected) in cases {
+            let state = in_state(&world, from);
+            let after = method(&operation, &state, TARGET);
+            assert_eq!(op_state(&after), expected, "{label}");
+        }
+    }
+
+    /// `cancel` is the exception: it has no guard at all, so it moves an
+    /// operation to `cancelled` from anywhere. That is deliberate - the caller
+    /// (`process_operation`) checks `can_be_cancelled` first - but it means
+    /// calling it directly bypasses that check entirely.
+    #[test]
+    fn cancel_has_no_guard_of_its_own() {
+        let world = world();
+        let operation = operation(&world);
+
+        for from in ["initial", "executing", "completed", "terminated_completed", "fatal"] {
+            let state = in_state(&world, from);
+            assert_eq!(
+                op_state(&operation.cancel(&state, TARGET)),
+                "cancelled",
+                "cancel from '{from}'"
+            );
+        }
+    }
+
+    /// `initialize` is the other unguarded one - it is the recovery path for an
+    /// operation in an unrecognised state, so it has to work from anywhere.
+    #[test]
+    fn initialize_works_from_any_state() {
+        let world = world();
+        let operation = operation(&world);
+
+        for from in ["nonsense", "executing", "terminated_fatal"] {
+            let state = in_state(&world, from);
+            assert_eq!(op_state(&operation.initialize(&state, TARGET)), "initial");
+        }
+    }
+
+    /// `reinitialize` is guarded, and only from the two states where starting
+    /// over makes sense.
+    #[test]
+    fn reinitialize_only_from_completed_or_fatal() {
+        let world = world();
+        let operation = operation(&world);
+
+        for from in ["completed", "fatal"] {
+            let state = in_state(&world, from);
+            assert_eq!(op_state(&operation.reinitialize(&state, TARGET)), "initial", "{from}");
+        }
+        for from in ["executing", "initial", "failed"] {
+            let state = in_state(&world, from);
+            assert_eq!(operation.reinitialize(&state, TARGET), state, "{from}");
+        }
+    }
+
+    /// BUG: `terminate` only implements `TerminationReason::Completed`; its
+    /// `_ => state.clone()` arm makes the other three silent no-ops. See
+    /// `running::process_operation::state_machine_tests` and
+    /// `running::sop_runner::tests::a_bypassed_operation_never_lets_its_sop_finish`
+    /// for what that costs at runtime.
+    #[test]
+    fn terminate_only_handles_the_completed_reason() {
+        let world = world();
+        let operation = operation(&world);
+
+        let completed = in_state(&world, "completed");
+        assert_eq!(
+            op_state(&operation.terminate(&completed, TerminationReason::Completed, TARGET)),
+            "terminated_completed"
+        );
+
+        for (from, reason) in [
+            ("bypassed", TerminationReason::Bypassed),
+            ("fatal", TerminationReason::Fatal),
+            ("cancelled", TerminationReason::Cancelled),
+        ] {
+            let state = in_state(&world, from);
+            assert_eq!(
+                operation.terminate(&state, reason, TARGET),
+                state,
+                "terminate({from}) is currently a no-op - if this now changes the \
+                 state the bug is fixed"
+            );
+        }
+
+        // And the Completed reason is itself guarded on the operation actually
+        // being completed.
+        let executing = in_state(&world, "executing");
+        assert_eq!(
+            operation.terminate(&executing, TerminationReason::Completed, TARGET),
+            executing
+        );
+    }
+
+    /// With no timeout/bypass transitions declared, `timeout` and `bypass` are
+    /// unconditional; with them declared, the transition's guard can *prevent*
+    /// the operation from timing out at all - the "careful" note in the source.
+    #[test]
+    fn a_timeout_transition_guard_can_prevent_the_timeout() {
+        let world = world();
+        let guarded = operation(&world); // its timeout transition needs `late`
+
+        let not_late = in_state(&world, "executing");
+        assert_eq!(
+            guarded.timeout(&not_late, TARGET),
+            not_late,
+            "the timeout transition's guard is false, so it does not time out"
+        );
+
+        let late = in_state(&world.update("late", true.to_spvalue()), "executing");
+        assert_eq!(op_state(&guarded.timeout(&late, TARGET)), "timedout");
+
+        // With no timeout transitions at all it is unconditional.
+        let plain = Operation::new(
+            OP,
+            Some(1000),
+            Some(1000),
+            None,
+            None,
+            true,
+            vec![transition("start", "true", &world)],
+            vec![transition("complete", "true", &world)],
+            vec![],
+            vec![],
+            vec![],
+            vec![],
+        );
+        assert_eq!(op_state(&plain.timeout(&not_late, TARGET)), "timedout");
+
+        let timedout = in_state(&world, "timedout");
+        assert_eq!(op_state(&plain.bypass(&timedout, TARGET)), "bypassed");
+    }
+}

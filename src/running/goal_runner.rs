@@ -2,9 +2,6 @@ use crate::*;
 use serde::{Deserialize, Serialize};
 use std::{fmt, sync::Arc};
 
-/// Override with `MICRO_SP_GOAL_TICK_MS`. See `running::tick`.
-static TICK_INTERVAL: u64 = 1; // millis
-
 #[derive(Debug, PartialEq, Copy, Clone, Hash, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum GoalPriority {
     Top, // Useful to schedule housekeeping for example every 5 minutes
@@ -232,7 +229,7 @@ pub async fn goal_runner(
     connection_manager: &Arc<ConnectionManager>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     initialize_env_logger();
-    let mut interval = runner_interval("MICRO_SP_GOAL_TICK_MS", TICK_INTERVAL);
+    let mut interval = runner_interval();
     let log_target = &format!("{}_goal_runner", sp_id);
 
     log::info!(target: log_target, "Online.");
@@ -607,5 +604,679 @@ mod tests {
         assert_eq!(queue.len(), 2);
         assert_eq!(queue[0].predicate, "var:b == true", "top priority goes first");
         assert_eq!(queue[1].id, "queued", "the queued goal keeps its id");
+    }
+}
+
+/// The goal wire format.
+///
+/// A goal crosses the process boundary as a three-element `SPValue::Array`
+/// written into `{sp_id}_incoming_goals` by whatever is asking for work - a
+/// dashboard, a ROS bridge, another micro_sp process. `sp_value_to_goal` is the
+/// only validation on that path, and a goal it rejects is dropped silently by
+/// the runner (`Err(_) => ()`), so its rejection rules are part of the contract.
+#[cfg(test)]
+mod goal_encoding_tests {
+    use super::*;
+
+    fn goal(id: &str, priority: GoalPriority, predicate: &str) -> Goal {
+        Goal {
+            id: id.to_string(),
+            priority,
+            predicate: predicate.to_string(),
+        }
+    }
+
+    #[test]
+    fn a_goal_survives_the_round_trip() {
+        for priority in [
+            GoalPriority::Top,
+            GoalPriority::High,
+            GoalPriority::Normal,
+            GoalPriority::Low,
+        ] {
+            let original = goal("abc123", priority, "var:pos == c");
+            let encoded = goal_to_sp_value(&original);
+            assert_eq!(sp_value_to_goal(&encoded), Ok(original));
+        }
+    }
+
+    /// The convenience constructor used by callers that only have a predicate
+    /// string has to produce the same encoding.
+    #[test]
+    fn goal_string_to_sp_value_matches_goal_to_sp_value() {
+        let from_string =
+            goal_string_to_sp_value("abc123", &"var:x == true".to_string(), GoalPriority::High);
+        let from_goal = goal_to_sp_value(&goal("abc123", GoalPriority::High, "var:x == true"));
+        assert_eq!(from_string, from_goal);
+    }
+
+    /// Every way a malformed goal can arrive. Each of these is dropped by the
+    /// runner rather than crashing it, so the point is that they are *rejected*
+    /// rather than decoded into something plausible-looking.
+    #[test]
+    fn a_malformed_goal_is_rejected() {
+        let cases: Vec<(&str, SPValue)> = vec![
+            ("not an array", "just a string".to_spvalue()),
+            (
+                "an UNKNOWN array",
+                SPValue::Array(ArrayOrUnknown::UNKNOWN),
+            ),
+            ("too short", vec!["a".to_spvalue(), 1.to_spvalue()].to_spvalue()),
+            (
+                "too long",
+                vec![
+                    "a".to_spvalue(),
+                    1.to_spvalue(),
+                    "p".to_spvalue(),
+                    "extra".to_spvalue(),
+                ]
+                .to_spvalue(),
+            ),
+            (
+                "id of the wrong type",
+                vec![1.to_spvalue(), 1.to_spvalue(), "p".to_spvalue()].to_spvalue(),
+            ),
+            (
+                "priority of the wrong type",
+                vec!["a".to_spvalue(), "high".to_spvalue(), "p".to_spvalue()].to_spvalue(),
+            ),
+            (
+                "predicate of the wrong type",
+                vec!["a".to_spvalue(), 1.to_spvalue(), 7.to_spvalue()].to_spvalue(),
+            ),
+        ];
+
+        for (label, value) in cases {
+            assert!(
+                sp_value_to_goal(&value).is_err(),
+                "{label} should have been rejected"
+            );
+        }
+    }
+
+    /// A priority integer that is out of range is clamped to `Low` rather than
+    /// rejected - a goal with a nonsense priority still runs, last.
+    #[test]
+    fn an_out_of_range_priority_becomes_low() {
+        for out_of_range in [-1, 4, 99, i64::MAX] {
+            assert_eq!(GoalPriority::from_int(&out_of_range), GoalPriority::Low);
+        }
+    }
+
+    #[test]
+    fn priority_maps_between_int_string_and_variant() {
+        let table = [
+            (GoalPriority::Top, 0, "top"),
+            (GoalPriority::High, 1, "high"),
+            (GoalPriority::Normal, 2, "normal"),
+            (GoalPriority::Low, 3, "low"),
+        ];
+
+        for (variant, int, text) in table {
+            assert_eq!(variant.to_int(), int);
+            assert_eq!(GoalPriority::from_int(&int), variant);
+            assert_eq!(variant.to_string(), text);
+            assert_eq!(GoalPriority::from_str(text), variant);
+        }
+
+        assert_eq!(GoalPriority::from_str("URGENT"), GoalPriority::Low);
+        assert_eq!(GoalPriority::from_str(""), GoalPriority::Low);
+    }
+
+    /// The ordering the queue is sorted by. `Top` has to sort *first*, which
+    /// depends on the declaration order of the enum rather than on anything
+    /// written down - worth pinning, because reordering the variants silently
+    /// inverts the scheduler.
+    #[test]
+    fn priorities_order_top_first() {
+        let mut priorities = vec![
+            GoalPriority::Low,
+            GoalPriority::Top,
+            GoalPriority::Normal,
+            GoalPriority::High,
+        ];
+        priorities.sort();
+        assert_eq!(
+            priorities,
+            vec![
+                GoalPriority::Top,
+                GoalPriority::High,
+                GoalPriority::Normal,
+                GoalPriority::Low
+            ]
+        );
+    }
+
+    /// Unlike `PlanState` and `SOPState`, `GoalState` round-trips completely -
+    /// including `Cancelled`, and including the lowercase "unknown" that its
+    /// `Display` produces.
+    #[test]
+    fn goal_state_round_trips_through_its_string_form() {
+        for variant in [
+            GoalState::Initial,
+            GoalState::Executing,
+            GoalState::Failed,
+            GoalState::Cancelled,
+            GoalState::Completed,
+            GoalState::UNKNOWN,
+        ] {
+            let text = variant.to_string();
+            assert_eq!(
+                GoalState::from_str(&text),
+                variant,
+                "'{text}' must parse back to {variant:?}"
+            );
+            assert_eq!(variant.clone().to_spvalue(), text.to_spvalue());
+        }
+    }
+
+    #[test]
+    fn an_unrecognised_goal_state_is_unknown() {
+        for junk in ["", "Initial", "UNKNOWN", "nonsense"] {
+            assert_eq!(GoalState::from_str(junk), GoalState::UNKNOWN, "{junk:?}");
+        }
+    }
+}
+
+/// The goal runner, driven end to end against a real Redis.
+///
+/// The runner is one long loop with no extractable pure core, so this is the
+/// only way to reach it. What it implements is the top of the control stack:
+/// take the highest-priority queued goal, publish it as the current goal, ask
+/// the planner for a plan, and then watch `{sp_id}_plan_state` to decide
+/// whether the goal succeeded, failed or was cancelled.
+///
+/// Every one of those is a cross-runner handover through shared keys, so the
+/// tests below are written as "set what the other runner would have set, then
+/// check what this one does about it".
+#[cfg(test)]
+mod goal_runner_tests {
+    use super::*;
+    use serial_test::serial;
+    use std::time::Duration;
+    use testcontainers::{ContainerAsync, ImageExt, core::ContainerPort, runners::AsyncRunner};
+    use testcontainers_modules::redis::Redis;
+
+    const SP: &str = "sp";
+    const TARGET: &str = "test";
+
+    async fn redis() -> (ContainerAsync<Redis>, Arc<ConnectionManager>) {
+        let container = Redis::default()
+            .with_mapped_port(6379, ContainerPort::Tcp(6379))
+            .start()
+            .await
+            .unwrap();
+        let manager = Arc::new(ConnectionManager::new().await);
+        let mut con = manager.get_connection().await;
+        StateManager::flush_state(&mut con).await;
+        let state = generate_runner_state_variables(SP, 0, TARGET);
+        StateManager::set_state(&mut con, &state).await;
+        (container, manager)
+    }
+
+    fn key(suffix: &str) -> String {
+        format!("{SP}_{suffix}")
+    }
+
+    fn spawn_runner(manager: &Arc<ConnectionManager>) -> tokio::task::JoinHandle<()> {
+        let manager = Arc::clone(manager);
+        tokio::spawn(async move {
+            let _ = goal_runner(SP, &manager).await;
+        })
+    }
+
+    async fn text(con: &mut SPConnection, suffix: &str) -> String {
+        match StateManager::get_sp_value(con, &key(suffix)).await {
+            Some(SPValue::String(StringOrUnknown::String(s))) => s,
+            other => format!("{other:?}"),
+        }
+    }
+
+    async fn wait_for(con: &mut SPConnection, suffix: &str, expected: &str, ms: u64) -> String {
+        let deadline = std::time::Instant::now() + Duration::from_millis(ms);
+        let mut last = String::new();
+        while std::time::Instant::now() < deadline {
+            last = text(con, suffix).await;
+            if last == expected {
+                return last;
+            }
+            tokio::time::sleep(Duration::from_millis(5)).await;
+        }
+        last
+    }
+
+    async fn queue_incoming(con: &mut SPConnection, goals: Vec<(GoalPriority, &str)>) {
+        let encoded: Vec<SPValue> = goals
+            .into_iter()
+            .map(|(priority, predicate)| {
+                goal_string_to_sp_value("", &predicate.to_string(), priority)
+            })
+            .collect();
+        StateManager::set_sp_value(con, &key("incoming_goals"), &encoded.to_spvalue()).await;
+    }
+
+    async fn scheduled(con: &mut SPConnection) -> Vec<Goal> {
+        match StateManager::get_sp_value(con, &key("scheduled_goals")).await {
+            Some(SPValue::Array(ArrayOrUnknown::Array(items))) => {
+                items.iter().filter_map(|v| sp_value_to_goal(v).ok()).collect()
+            }
+            _ => vec![],
+        }
+    }
+
+    /// The handover that starts everything: a goal arrives, gets admitted,
+    /// becomes the current goal, and the planner is triggered.
+    #[tokio::test]
+    #[serial]
+    async fn an_incoming_goal_becomes_the_current_goal_and_triggers_the_planner() {
+        let (_container, manager) = redis().await;
+        let mut con = manager.get_connection().await;
+        StateManager::set_sp_value(&mut con, &key("current_goal_state"), &"initial".to_spvalue())
+            .await;
+
+        let runner = spawn_runner(&manager);
+        queue_incoming(&mut con, vec![(GoalPriority::Normal, "var:pos == c")]).await;
+
+        assert_eq!(
+            wait_for(&mut con, "current_goal_state", "executing", 3000).await,
+            "executing"
+        );
+        assert_eq!(text(&mut con, "current_goal_predicate").await, "var:pos == c");
+        assert!(!text(&mut con, "current_goal_id").await.is_empty());
+        runner.abort();
+
+        // The planner handshake is armed, and the previous plan is cleared.
+        assert_eq!(
+            StateManager::get_sp_value(&mut con, &key("replan_trigger")).await,
+            Some(true.to_spvalue())
+        );
+        assert_eq!(
+            StateManager::get_sp_value(&mut con, &key("replanned")).await,
+            Some(false.to_spvalue())
+        );
+        assert_eq!(text(&mut con, "planner_state").await, "ready");
+        assert_eq!(text(&mut con, "plan_state").await, "initial");
+        assert_eq!(
+            StateManager::get_sp_value(&mut con, &key("plan_current_step")).await,
+            Some(0.to_spvalue())
+        );
+        assert!(scheduled(&mut con).await.is_empty(), "the queue is drained");
+    }
+
+    /// The inbox is drained on admission, so a producer can write into it
+    /// without first reading what is there.
+    #[tokio::test]
+    #[serial]
+    async fn the_inbox_is_emptied_once_its_goals_are_admitted() {
+        let (_container, manager) = redis().await;
+        let mut con = manager.get_connection().await;
+        StateManager::set_sp_value(&mut con, &key("current_goal_state"), &"executing".to_spvalue())
+            .await;
+        StateManager::set_sp_value(&mut con, &key("plan_state"), &"executing".to_spvalue()).await;
+
+        let runner = spawn_runner(&manager);
+        queue_incoming(
+            &mut con,
+            vec![
+                (GoalPriority::Low, "var:a == true"),
+                (GoalPriority::Top, "var:b == true"),
+            ],
+        )
+        .await;
+
+        let deadline = std::time::Instant::now() + Duration::from_millis(3000);
+        while std::time::Instant::now() < deadline && scheduled(&mut con).await.len() < 2 {
+            tokio::time::sleep(Duration::from_millis(5)).await;
+        }
+        runner.abort();
+
+        assert_eq!(
+            StateManager::get_sp_value(&mut con, &key("incoming_goals")).await,
+            Some(Vec::<SPValue>::new().to_spvalue())
+        );
+
+        // And the queue came out priority-ordered, with ids assigned.
+        let queue = scheduled(&mut con).await;
+        assert_eq!(queue.len(), 2);
+        assert_eq!(queue[0].predicate, "var:b == true", "Top goes first");
+        assert!(queue.iter().all(|g| !g.id.is_empty()));
+    }
+
+    /// Goals are taken one at a time: the second stays queued until the first
+    /// has finished.
+    #[tokio::test]
+    #[serial]
+    async fn only_one_goal_is_started_at_a_time() {
+        let (_container, manager) = redis().await;
+        let mut con = manager.get_connection().await;
+        StateManager::set_sp_value(&mut con, &key("current_goal_state"), &"initial".to_spvalue())
+            .await;
+        StateManager::set_sp_value(&mut con, &key("plan_state"), &"executing".to_spvalue()).await;
+
+        let runner = spawn_runner(&manager);
+        queue_incoming(
+            &mut con,
+            vec![
+                (GoalPriority::High, "var:first == true"),
+                (GoalPriority::Normal, "var:second == true"),
+            ],
+        )
+        .await;
+
+        assert_eq!(
+            wait_for(&mut con, "current_goal_state", "executing", 3000).await,
+            "executing"
+        );
+        tokio::time::sleep(Duration::from_millis(200)).await;
+        runner.abort();
+
+        assert_eq!(text(&mut con, "current_goal_predicate").await, "var:first == true");
+        let queue = scheduled(&mut con).await;
+        assert_eq!(queue.len(), 1, "the second goal must still be queued");
+        assert_eq!(queue[0].predicate, "var:second == true");
+    }
+
+    /// The outcomes the plan runner reports back, and what each does to the
+    /// goal. The observable end state is the same for all of them - the goal is
+    /// released and the next queued goal starts - so each test parks a second
+    /// goal in the queue and checks that it takes over. Asserting on the
+    /// intermediate `completed`/`failed` value would be a race: at a 5 ms tick
+    /// the runner passes through it and back to `initial` faster than a poller
+    /// can reliably observe.
+    async fn the_plan_finishing_as(outcome: &str) -> String {
+        let (_container, manager) = redis().await;
+        let mut con = manager.get_connection().await;
+        StateManager::set_sp_value(&mut con, &key("current_goal_state"), &"executing".to_spvalue())
+            .await;
+        StateManager::set_sp_value(
+            &mut con,
+            &key("current_goal_predicate"),
+            &"var:running == true".to_spvalue(),
+        )
+        .await;
+        StateManager::set_sp_value(&mut con, &key("plan_state"), &"executing".to_spvalue()).await;
+
+        let runner = spawn_runner(&manager);
+        // Park the next goal in the queue so the handover is observable.
+        queue_incoming(&mut con, vec![(GoalPriority::Normal, "var:next == true")]).await;
+        let deadline = std::time::Instant::now() + Duration::from_millis(3000);
+        while std::time::Instant::now() < deadline && scheduled(&mut con).await.is_empty() {
+            tokio::time::sleep(Duration::from_millis(5)).await;
+        }
+        assert_eq!(
+            text(&mut con, "current_goal_predicate").await,
+            "var:running == true",
+            "the queued goal must not start while one is executing"
+        );
+
+        // The plan runner reports the outcome.
+        StateManager::set_sp_value(&mut con, &key("plan_state"), &outcome.to_spvalue()).await;
+
+        let taken_over = wait_for(&mut con, "current_goal_predicate", "var:next == true", 3000).await;
+        runner.abort();
+        taken_over
+    }
+
+    #[tokio::test]
+    #[serial]
+    async fn a_completed_plan_frees_the_runner_for_the_next_goal() {
+        assert_eq!(
+            the_plan_finishing_as("completed").await,
+            "var:next == true",
+            "a completed plan must release the goal and let the queue advance"
+        );
+    }
+
+    #[tokio::test]
+    #[serial]
+    async fn a_failed_plan_frees_the_runner_for_the_next_goal() {
+        assert_eq!(
+            the_plan_finishing_as("failed").await,
+            "var:next == true",
+            "a failed plan must release the goal rather than wedge the runner"
+        );
+    }
+
+    /// BUG, reachable from here: `process_operation` sets `{sp_id}_plan_state`
+    /// to "cancelled" when a planned operation is cancelled, and the
+    /// `PlanState::Cancelled` arm above is meant to move the goal to
+    /// `GoalState::Cancelled`. It never runs, because `PlanState::from_str` has
+    /// no "cancelled" arm and the value arrives as `UNKNOWN` - so the goal takes
+    /// the `UNKNOWN` arm instead and is never reported as cancelled.
+    ///
+    /// The goal does still get released, which is why this has gone unnoticed;
+    /// what is lost is the distinction between "the operator stopped it" and
+    /// "something unrecognised happened". The information line is the stable
+    /// witness: the `Cancelled` arm is the only thing that writes "cancelled"
+    /// into it, and it never does. See
+    /// `running::runner_states::tests::plan_state_cancelled_does_not_survive_the_round_trip`.
+    #[tokio::test]
+    #[serial]
+    async fn a_cancelled_plan_is_never_reported_as_a_cancelled_goal() {
+        let (_container, manager) = redis().await;
+        let mut con = manager.get_connection().await;
+        StateManager::set_sp_value(&mut con, &key("current_goal_state"), &"executing".to_spvalue())
+            .await;
+        StateManager::set_sp_value(&mut con, &key("plan_state"), &"executing".to_spvalue()).await;
+        StateManager::set_sp_value(
+            &mut con,
+            &key("current_goal_id"),
+            &"goal_one".to_spvalue(),
+        )
+        .await;
+
+        let runner = spawn_runner(&manager);
+        tokio::time::sleep(Duration::from_millis(100)).await;
+
+        // Watch every information line the runner writes from here on. Note
+        // the goal id must not itself contain the word being searched for.
+        let mut seen_information: Vec<String> = vec![];
+        StateManager::set_sp_value(
+            &mut con,
+            &key("plan_state"),
+            &PlanState::Cancelled.to_string().to_spvalue(),
+        )
+        .await;
+        let deadline = std::time::Instant::now() + Duration::from_millis(1000);
+        while std::time::Instant::now() < deadline {
+            let information = text(&mut con, "goal_runner_information").await;
+            if seen_information.last() != Some(&information) {
+                seen_information.push(information);
+            }
+            tokio::time::sleep(Duration::from_millis(2)).await;
+        }
+        runner.abort();
+
+        assert!(
+            !seen_information.iter().any(|i| i.contains("cancelled")),
+            "if a 'cancelled' line now appears the PlanState::from_str hole is fixed: {seen_information:?}"
+        );
+        // It is released all the same, so the system does not wedge.
+        assert_eq!(text(&mut con, "current_goal_state").await, "initial");
+    }
+
+    /// `_replan_for_same_goal` re-plans without taking a new goal off the
+    /// queue - the escape hatch for "the world moved, work out a new route to
+    /// the same place".
+    #[tokio::test]
+    #[serial]
+    async fn replan_for_same_goal_re_triggers_the_planner_for_the_current_goal() {
+        let (_container, manager) = redis().await;
+        let mut con = manager.get_connection().await;
+        StateManager::set_sp_value(&mut con, &key("current_goal_state"), &"initial".to_spvalue())
+            .await;
+        StateManager::set_sp_value(
+            &mut con,
+            &key("current_goal_predicate"),
+            &"var:pos == c".to_spvalue(),
+        )
+        .await;
+        StateManager::set_sp_value(&mut con, &key("current_goal_id"), &"goal_one".to_spvalue())
+            .await;
+        StateManager::set_sp_value(&mut con, &key("replan_for_same_goal"), &true.to_spvalue())
+            .await;
+
+        let runner = spawn_runner(&manager);
+        let deadline = std::time::Instant::now() + Duration::from_millis(3000);
+        while std::time::Instant::now() < deadline
+            && StateManager::get_sp_value(&mut con, &key("replan_for_same_goal")).await
+                != Some(false.to_spvalue())
+        {
+            tokio::time::sleep(Duration::from_millis(2)).await;
+        }
+        runner.abort();
+
+        assert_eq!(
+            text(&mut con, "current_goal_id").await,
+            "goal_one",
+            "the current goal must not have been replaced"
+        );
+        assert_eq!(text(&mut con, "current_goal_predicate").await, "var:pos == c");
+        assert_eq!(
+            StateManager::get_sp_value(&mut con, &key("replan_trigger")).await,
+            Some(true.to_spvalue()),
+            "the planner is asked again"
+        );
+        assert_eq!(text(&mut con, "planner_state").await, "ready");
+        assert_eq!(text(&mut con, "plan_state").await, "initial");
+        assert_eq!(
+            StateManager::get_sp_value(&mut con, &key("replan_for_same_goal")).await,
+            Some(false.to_spvalue()),
+            "the request is consumed, so it re-plans once rather than forever"
+        );
+    }
+
+    /// The limitation of that escape hatch, worth writing down because it is
+    /// surprising: the replan branch leaves `_current_goal_state` at `initial`,
+    /// so if anything is queued, the *very next* tick takes the `Initial` arm
+    /// again, pops that goal, and replaces the goal the replan was for. A
+    /// replan for the same goal is therefore only reliable while the queue is
+    /// empty.
+    #[tokio::test]
+    #[serial]
+    async fn a_queued_goal_overrides_a_replan_for_the_same_goal() {
+        let (_container, manager) = redis().await;
+        let mut con = manager.get_connection().await;
+        StateManager::set_sp_value(&mut con, &key("current_goal_state"), &"initial".to_spvalue())
+            .await;
+        StateManager::set_sp_value(
+            &mut con,
+            &key("current_goal_predicate"),
+            &"var:pos == c".to_spvalue(),
+        )
+        .await;
+        StateManager::set_sp_value(&mut con, &key("current_goal_id"), &"goal_one".to_spvalue())
+            .await;
+        StateManager::set_sp_value(&mut con, &key("replan_for_same_goal"), &true.to_spvalue())
+            .await;
+
+        let runner = spawn_runner(&manager);
+        queue_incoming(&mut con, vec![(GoalPriority::Normal, "var:other == true")]).await;
+
+        let taken_over =
+            wait_for(&mut con, "current_goal_predicate", "var:other == true", 3000).await;
+        runner.abort();
+
+        assert_eq!(
+            taken_over, "var:other == true",
+            "if this no longer happens, the replan branch now holds the goal"
+        );
+        assert_ne!(text(&mut con, "current_goal_id").await, "goal_one");
+    }
+
+    /// An unrecognised goal state - a key that was never initialised, or one a
+    /// dashboard wrote by hand - is recovered from rather than being fatal.
+    #[tokio::test]
+    #[serial]
+    async fn an_unknown_goal_state_recovers_to_initial() {
+        let (_container, manager) = redis().await;
+        let mut con = manager.get_connection().await;
+        StateManager::set_sp_value(&mut con, &key("current_goal_state"), &"nonsense".to_spvalue())
+            .await;
+
+        let runner = spawn_runner(&manager);
+        let seen = wait_for(&mut con, "current_goal_state", "initial", 3000).await;
+        runner.abort();
+
+        assert_eq!(seen, "initial");
+    }
+
+    /// With nothing queued and nothing running, the runner has to be silent -
+    /// this is the state a deployment spends most of its time in. The
+    /// "unchanged queue produces no write" property is the one the id-stability
+    /// fix was about, and here it is end to end.
+    #[tokio::test]
+    #[serial]
+    async fn an_idle_runner_with_a_queue_still_writes_nothing() {
+        let (_container, manager) = redis().await;
+        let mut con = manager.get_connection().await;
+        StateManager::set_sp_value(&mut con, &key("current_goal_state"), &"executing".to_spvalue())
+            .await;
+        StateManager::set_sp_value(&mut con, &key("plan_state"), &"executing".to_spvalue()).await;
+
+        let runner = spawn_runner(&manager);
+        // Leave a few goals sitting in the queue.
+        queue_incoming(
+            &mut con,
+            vec![
+                (GoalPriority::Normal, "var:a == true"),
+                (GoalPriority::Low, "var:b == true"),
+                (GoalPriority::High, "var:c == true"),
+            ],
+        )
+        .await;
+        let deadline = std::time::Instant::now() + Duration::from_millis(3000);
+        while std::time::Instant::now() < deadline && scheduled(&mut con).await.len() < 3 {
+            tokio::time::sleep(Duration::from_millis(5)).await;
+        }
+        tokio::time::sleep(Duration::from_millis(100)).await;
+
+        let before = StateManager::get_full_state(&mut con).await.unwrap();
+        tokio::time::sleep(Duration::from_millis(400)).await;
+        let after = StateManager::get_full_state(&mut con).await.unwrap();
+
+        assert!(!runner.is_finished());
+        runner.abort();
+        assert!(
+            before.get_diff_partial_state(&after).state.is_empty(),
+            "a queue that is not changing must not be rewritten on every tick: {:?}",
+            before.get_diff_partial_state(&after)
+        );
+    }
+
+    /// A malformed goal in the inbox is dropped without taking the runner down
+    /// or poisoning the queue.
+    #[tokio::test]
+    #[serial]
+    async fn a_malformed_incoming_goal_is_dropped() {
+        let (_container, manager) = redis().await;
+        let mut con = manager.get_connection().await;
+        StateManager::set_sp_value(&mut con, &key("current_goal_state"), &"executing".to_spvalue())
+            .await;
+        StateManager::set_sp_value(&mut con, &key("plan_state"), &"executing".to_spvalue()).await;
+
+        let runner = spawn_runner(&manager);
+        StateManager::set_sp_value(
+            &mut con,
+            &key("incoming_goals"),
+            &vec![
+                "not a goal".to_spvalue(),
+                goal_string_to_sp_value("", &"var:good == true".to_string(), GoalPriority::Normal),
+            ]
+            .to_spvalue(),
+        )
+        .await;
+
+        let deadline = std::time::Instant::now() + Duration::from_millis(3000);
+        while std::time::Instant::now() < deadline && scheduled(&mut con).await.is_empty() {
+            tokio::time::sleep(Duration::from_millis(5)).await;
+        }
+        tokio::time::sleep(Duration::from_millis(100)).await;
+        assert!(!runner.is_finished(), "the runner must survive bad input");
+        runner.abort();
+
+        let queue = scheduled(&mut con).await;
+        assert_eq!(queue.len(), 1, "only the well-formed goal is admitted");
+        assert_eq!(queue[0].predicate, "var:good == true");
     }
 }

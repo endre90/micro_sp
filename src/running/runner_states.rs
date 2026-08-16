@@ -310,3 +310,206 @@ impl fmt::Display for RunnerState {
         }
     }
 }
+
+/// These enums are the crate's wire format. Every one of them is written into
+/// Redis as the string `Display`/`to_spvalue` produces and read back out of
+/// Redis through `from_str`, by a *different* runner in a different process -
+/// `plan_runner` writes `{sp_id}_plan_state`, `goal_runner` reads it; the SOP
+/// runner writes `{sp_id}_sop_state`, the operations read it.
+///
+/// So the property that actually matters here is not "does `Display` produce a
+/// nice string" but `from_str(x.to_string()) == x` for every variant. A variant
+/// that fails it is silently unreachable on the reading side, and the branch
+/// that handles it is dead code - which is exactly what the two tests at the
+/// bottom of this module pin down.
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn plan_state_maps_strings_both_ways() {
+        let pairs = [
+            (PlanState::Initial, "initial"),
+            (PlanState::Executing, "executing"),
+            (PlanState::Failed, "failed"),
+            (PlanState::Completed, "completed"),
+            (PlanState::UNKNOWN, "UNKNOWN"),
+        ];
+
+        for (variant, text) in pairs {
+            assert_eq!(variant.to_string(), text, "Display for {variant:?}");
+            assert_eq!(
+                variant.clone().to_spvalue(),
+                text.to_spvalue(),
+                "to_spvalue for {variant:?}"
+            );
+            assert_eq!(
+                PlanState::from_str(text),
+                variant,
+                "{text} must parse back to the variant it was written from"
+            );
+        }
+    }
+
+    /// BUG (dead branch): `PlanState::Cancelled` renders as "cancelled" but
+    /// `from_str` has no arm for it - the `"cancelled" => PlanState::Cancelled`
+    /// line is commented out - so it reads back as `UNKNOWN`.
+    ///
+    /// Consequence, and the reason this is pinned rather than ignored:
+    /// `process_operation` sets `{sp_id}_plan_state` to `PlanState::Cancelled`
+    /// when a planned operation is cancelled, and `goal_runner` matches on
+    /// `PlanState::from_str(&plan_state)` with a `PlanState::Cancelled` arm that
+    /// moves the goal to `GoalState::Cancelled`. That arm can never be taken:
+    /// the cancelled plan arrives as `UNKNOWN` and the goal stays `Executing`.
+    ///
+    /// Uncommenting the `from_str` arm fixes it and makes this test fail, which
+    /// is the intended signal - update it then.
+    #[test]
+    fn plan_state_cancelled_does_not_survive_the_round_trip() {
+        assert_eq!(PlanState::Cancelled.to_string(), "cancelled");
+        assert_eq!(
+            PlanState::from_str("cancelled"),
+            PlanState::UNKNOWN,
+            "if this now returns Cancelled the bug is fixed - see the doc comment"
+        );
+    }
+
+    #[test]
+    fn sop_state_maps_strings_both_ways() {
+        let pairs = [
+            (SOPState::Initial, "initial"),
+            (SOPState::Executing, "executing"),
+            (SOPState::Fatal, "fatal"),
+            (SOPState::Completed, "completed"),
+            (SOPState::UNKNOWN, "UNKNOWN"),
+        ];
+
+        for (variant, text) in pairs {
+            assert_eq!(variant.to_string(), text, "Display for {variant:?}");
+            assert_eq!(variant.clone().to_spvalue(), text.to_spvalue());
+            assert_eq!(SOPState::from_str(text), variant);
+        }
+    }
+
+    /// The same hole as `PlanState::Cancelled`, in the enum the SOP runner uses.
+    /// `SOP::get_state` can return `SOPState::Cancelled` for a cancelled branch
+    /// and `sop_runner` writes it to `{sp_id}_sop_state`; anything reading that
+    /// back with `from_str` sees `UNKNOWN`.
+    #[test]
+    fn sop_state_cancelled_does_not_survive_the_round_trip() {
+        assert_eq!(SOPState::Cancelled.to_string(), "cancelled");
+        assert_eq!(SOPState::from_str("cancelled"), SOPState::UNKNOWN);
+    }
+
+    #[test]
+    fn planner_state_maps_strings_both_ways() {
+        let pairs = [
+            (PlannerState::Found, "found"),
+            (PlannerState::NotFound, "not_found"),
+            (PlannerState::Ready, "ready"),
+            (PlannerState::UNKNOWN, "UNKNOWN"),
+        ];
+
+        for (variant, text) in pairs {
+            assert_eq!(variant.to_string(), text, "Display for {variant:?}");
+            assert_eq!(variant.clone().to_spvalue(), text.to_spvalue());
+            assert_eq!(PlannerState::from_str(text), variant);
+        }
+    }
+
+    #[test]
+    fn service_request_state_maps_strings_both_ways() {
+        let pairs = [
+            (ServiceRequestState::Initial, "initial"),
+            (ServiceRequestState::Succeeded, "succeeded"),
+            (ServiceRequestState::Failed, "failed"),
+            (ServiceRequestState::UNKNOWN, "UNKNOWN"),
+        ];
+
+        for (variant, text) in pairs {
+            assert_eq!(variant.to_string(), text);
+            assert_eq!(ServiceRequestState::from_str(text).to_string(), text);
+        }
+    }
+
+    #[test]
+    fn action_request_state_maps_strings_both_ways() {
+        let pairs = [
+            (ActionRequestState::Initial, "initial"),
+            (ActionRequestState::Executing, "executing"),
+            (ActionRequestState::Succeeded, "succeeded"),
+            (ActionRequestState::Failed, "failed"),
+            (ActionRequestState::UNKNOWN, "UNKNOWN"),
+        ];
+
+        for (variant, text) in pairs {
+            assert_eq!(variant.to_string(), text);
+            assert_eq!(ActionRequestState::from_str(text).to_string(), text);
+        }
+    }
+
+    #[test]
+    fn runner_state_maps_strings_both_ways() {
+        let pairs = [
+            (RunnerState::Idle, "idle"),
+            (RunnerState::Running, "running"),
+            (RunnerState::Paused, "paused"),
+            (RunnerState::Stopped, "stopped"),
+            (RunnerState::UNKNOWN, "UNKNOWN"),
+        ];
+
+        for (variant, text) in pairs {
+            assert_eq!(variant.to_string(), text, "Display for {variant:?}");
+            assert_eq!(variant.clone().to_spvalue(), text.to_spvalue());
+            assert_eq!(RunnerState::from_str(text), variant);
+        }
+    }
+
+    /// A value that is not one of the known strings - a typo, a key that was
+    /// never initialised, a state written by an older build - has to land on
+    /// `UNKNOWN` rather than on whichever variant happens to be first.
+    #[test]
+    fn anything_unrecognised_parses_as_unknown() {
+        for junk in ["", "Initial", "INITIAL", " initial", "nonsense", "42"] {
+            assert_eq!(PlanState::from_str(junk), PlanState::UNKNOWN, "{junk:?}");
+            assert_eq!(SOPState::from_str(junk), SOPState::UNKNOWN, "{junk:?}");
+            assert_eq!(
+                PlannerState::from_str(junk),
+                PlannerState::UNKNOWN,
+                "{junk:?}"
+            );
+            assert_eq!(RunnerState::from_str(junk), RunnerState::UNKNOWN, "{junk:?}");
+            assert_eq!(ServiceRequestState::from_str(junk).to_string(), "UNKNOWN");
+            assert_eq!(ActionRequestState::from_str(junk).to_string(), "UNKNOWN");
+        }
+    }
+
+    /// Everything defaults to `UNKNOWN`, so a freshly constructed runner never
+    /// claims to be in a real state before it has read one.
+    #[test]
+    fn every_default_is_unknown() {
+        assert_eq!(PlanState::default(), PlanState::UNKNOWN);
+        assert_eq!(SOPState::default(), SOPState::UNKNOWN);
+        assert_eq!(PlannerState::default(), PlannerState::UNKNOWN);
+        assert_eq!(RunnerState::default(), RunnerState::UNKNOWN);
+        assert_eq!(ServiceRequestState::default().to_string(), "UNKNOWN");
+        assert_eq!(ActionRequestState::default().to_string(), "UNKNOWN");
+    }
+
+    /// `RunnerState` is the one that also goes through serde (it is
+    /// `Serialize`/`Deserialize`), so pin that path too.
+    #[test]
+    fn runner_state_survives_serde() {
+        for variant in [
+            RunnerState::Idle,
+            RunnerState::Running,
+            RunnerState::Stopped,
+            RunnerState::Paused,
+            RunnerState::UNKNOWN,
+        ] {
+            let json = serde_json::to_string(&variant).unwrap();
+            let back: RunnerState = serde_json::from_str(&json).unwrap();
+            assert_eq!(back, variant);
+        }
+    }
+}

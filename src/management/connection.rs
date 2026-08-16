@@ -250,3 +250,189 @@ pub async fn restore_state_from_snapshot(
         );
     }
 }
+
+/// The connection layer.
+///
+/// Most of this module is the *recovery* path - health checks, reconnect
+/// waiting, error classification, the background monitor - which is precisely
+/// the code that only ever runs when something has already gone wrong, and so
+/// was entirely uncovered. It is also the code that was rewritten when the
+/// per-tick PING was removed, so what its replacements actually do is worth
+/// having written down.
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{SPAssignment, SPValue, SPValueType, SPVariable, StringOrUnknown, ToSPValue};
+    use serial_test::serial;
+    use testcontainers::{ContainerAsync, ImageExt, core::ContainerPort, runners::AsyncRunner};
+    use testcontainers_modules::redis::Redis;
+
+    const TARGET: &str = "test";
+
+    async fn redis() -> (ContainerAsync<Redis>, Arc<ConnectionManager>) {
+        let container = Redis::default()
+            .with_mapped_port(6379, ContainerPort::Tcp(6379))
+            .start()
+            .await
+            .unwrap();
+        let manager = Arc::new(ConnectionManager::new().await);
+        let mut con = manager.get_connection().await;
+        StateManager::flush_state(&mut con).await;
+        (container, manager)
+    }
+
+    /// The address is built from `REDIS_HOST`/`REDIS_PORT`, which is how a
+    /// deployment points a process at its Redis - worth pinning because the
+    /// default is a silent fallback rather than an error.
+    #[tokio::test]
+    #[serial]
+    async fn the_address_comes_from_the_environment_with_a_local_default() {
+        let (_container, manager) = redis().await;
+        assert_eq!(
+            manager.redis_addr(),
+            "redis://127.0.0.1:6379",
+            "with REDIS_HOST/REDIS_PORT unset it must default to a local Redis"
+        );
+    }
+
+    /// `get_connection` is documented as a refcount bump rather than a new
+    /// connection. The observable consequence is what matters: two handles are
+    /// the same underlying connection, so a write through one is visible
+    /// through the other immediately.
+    #[tokio::test]
+    #[serial]
+    async fn handles_are_cheap_clones_of_one_connection() {
+        let (_container, manager) = redis().await;
+
+        let mut first = manager.get_connection().await;
+        let mut second = manager.connection();
+
+        StateManager::set_sp_value(&mut first, "shared", &"written".to_spvalue()).await;
+        assert_eq!(
+            StateManager::get_sp_value(&mut second, "shared").await,
+            Some("written".to_spvalue())
+        );
+
+        // And a hundred of them cost nothing and all still work.
+        let handles: Vec<SPConnection> = (0..100).map(|_| manager.connection()).collect();
+        for mut handle in handles {
+            assert_eq!(
+                StateManager::get_sp_value(&mut handle, "shared").await,
+                Some("written".to_spvalue())
+            );
+        }
+    }
+
+    #[tokio::test]
+    #[serial]
+    async fn a_healthy_redis_answers_the_health_check() {
+        let (_container, manager) = redis().await;
+        assert!(manager.check_redis_health(TARGET).await.is_ok());
+    }
+
+    /// `reconnect` waits for health rather than performing a reconnect itself.
+    /// Against a live Redis it therefore returns straight away - the property
+    /// that matters is that it does not block a caller that is already fine.
+    #[tokio::test]
+    #[serial]
+    async fn reconnect_returns_immediately_when_redis_is_already_healthy() {
+        let (_container, manager) = redis().await;
+
+        let started = std::time::Instant::now();
+        manager.reconnect(TARGET).await;
+        assert!(
+            started.elapsed() < Duration::from_millis(500),
+            "reconnect blocked for {:?} on a healthy connection",
+            started.elapsed()
+        );
+    }
+
+    /// Error classification decides whether a runner skips a tick or logs a
+    /// bug. It must not panic on either kind, including on an error that is not
+    /// an I/O error at all.
+    #[tokio::test]
+    #[serial]
+    async fn redis_errors_are_classified_without_panicking() {
+        let (_container, manager) = redis().await;
+        let mut con = manager.get_connection().await;
+
+        // A type error: ask for a list operation on a string key.
+        StateManager::set_sp_value(&mut con, "a_string", &"value".to_spvalue()).await;
+        let error = redis::cmd("LPUSH")
+            .arg("a_string")
+            .arg("x")
+            .query_async::<()>(&mut con)
+            .await
+            .expect_err("LPUSH on a string key must fail");
+
+        assert!(!error.is_io_error(), "this is a type error, not an I/O error");
+        manager.handle_redis_error(&error, TARGET).await;
+    }
+
+    /// The health monitor replaces the old per-runner, per-tick PING with one
+    /// probe for the whole process. It must actually keep running, and it must
+    /// stay quiet while everything is fine.
+    #[tokio::test]
+    #[serial]
+    async fn the_health_monitor_keeps_running_in_the_background() {
+        let (_container, manager) = redis().await;
+
+        let monitor =
+            manager.spawn_health_monitor(TARGET, Duration::from_millis(50));
+        tokio::time::sleep(Duration::from_millis(300)).await;
+
+        assert!(
+            !monitor.is_finished(),
+            "the health monitor must not exit on its own"
+        );
+        monitor.abort();
+    }
+
+    /// The snapshot restore path: with a snapshot held, an empty Redis is
+    /// repopulated from it.
+    #[tokio::test]
+    #[serial]
+    async fn a_snapshot_is_written_back_into_an_empty_redis() {
+        let (_container, manager) = redis().await;
+        let mut con = manager.get_connection().await;
+
+        let mut snapshot = State::new();
+        snapshot.add_mut(
+            SPAssignment::new(
+                SPVariable::new("restored", SPValueType::String),
+                "from_snapshot".to_spvalue(),
+            ),
+            TARGET,
+        );
+        let held = Arc::new(RwLock::new(Some(snapshot)));
+
+        restore_state_from_snapshot(&mut con, &held, TARGET).await;
+
+        assert_eq!(
+            StateManager::get_sp_value(&mut con, "restored").await,
+            Some(SPValue::String(StringOrUnknown::String(
+                "from_snapshot".to_string()
+            )))
+        );
+    }
+
+    /// With no snapshot yet - the state at process start, before the first
+    /// successful read - the restore is a no-op rather than a write of an empty
+    /// state, which would otherwise wipe whatever another process had put there.
+    #[tokio::test]
+    #[serial]
+    async fn no_snapshot_means_nothing_is_written() {
+        let (_container, manager) = redis().await;
+        let mut con = manager.get_connection().await;
+        StateManager::set_sp_value(&mut con, "existing", &"untouched".to_spvalue()).await;
+
+        let empty: Arc<RwLock<Option<State>>> = Arc::new(RwLock::new(None));
+        restore_state_from_snapshot(&mut con, &empty, TARGET).await;
+
+        assert_eq!(
+            StateManager::get_sp_value(&mut con, "existing").await,
+            Some("untouched".to_spvalue()),
+            "an absent snapshot must not disturb what is already there"
+        );
+    }
+}

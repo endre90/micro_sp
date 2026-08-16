@@ -41,8 +41,8 @@ pub enum OperationProcessingType {
 //    `.complete(..)` / `.retry(..)` deep-copied the whole `Operation` (all six
 //    transition vectors) just to call a `&self` method. All twelve `.clone()`
 //    calls are gone.
-// 5. DONE (correctness): `elapased_executing_ms += OPERAION_RUNNER_TICK_INTERVAL_MS`
-//    assumed this is called exactly on a 200 ms cadence. `sop_runner` calls it
+// 5. DONE (correctness): `elapased_executing_ms += <the operation runner's tick
+//    constant>` assumed this is called exactly on a 200 ms cadence. `sop_runner` calls it
 //    at 100 ms, so every SOP operation accumulated elapsed time at *twice* real
 //    speed and timed out at half its configured deadline; and any runner whose
 //    tick slipped because Redis was slow under-counted in the other direction.
@@ -881,5 +881,814 @@ mod elapsed_tests {
             "timed out after {timed_out_after} ms, which is more lag than the read-then-increment \
              ordering explains"
         );
+    }
+}
+
+/// The operation state machine, arm by arm.
+///
+/// `process_operation` is the single place where an operation's lifecycle is
+/// decided, and all three operation runners funnel through it: the plan runner
+/// with `Planned`, the SOP runner with `SOP`, the auto runner with `Automatic`.
+/// Every arm is reachable from a real deployment, several of them only on a bad
+/// day (a timeout, a failure with retries exhausted, an operator pressing stop),
+/// and those are exactly the ones nobody exercises by hand.
+///
+/// The tests below walk each arm of the `match` and pin: which state the
+/// operation lands in, which bookkeeping variable is written, and - for the
+/// `Planned` type - what happens to the plan cursor and the plan state, since
+/// those are the values the plan runner writes back to Redis for the goal
+/// runner to read.
+#[cfg(test)]
+mod state_machine_tests {
+    use super::*;
+
+    const SP_ID: &str = "sp";
+    const TARGET: &str = "test";
+    const OP: &str = "op_test";
+
+    /// A world with three switches in it: `go` gates the precondition, `done`
+    /// the postcondition, `broken` the failure transition. Plus the dashboard
+    /// command the cancel guard reads.
+    fn world() -> State {
+        let mut state = State::new();
+        for name in ["go", "done", "broken"] {
+            state.add_mut(
+                SPAssignment::new(SPVariable::new(name, SPValueType::Bool), false.to_spvalue()),
+                TARGET,
+            );
+        }
+        state.add_mut(
+            SPAssignment::new(
+                SPVariable::new(&format!("{}_dashboard_command", SP_ID), SPValueType::String),
+                "none".to_spvalue(),
+            ),
+            TARGET,
+        );
+        state
+    }
+
+    fn transition(name: &str, guard: &str, actions: Vec<&str>, state: &State) -> Transition {
+        Transition::parse(name, guard, "true", actions, Vec::<&str>::new(), state)
+    }
+
+    /// The operation under test: starts on `go`, completes on `done`, fails on
+    /// `broken`. Timeouts and retries are configurable per test.
+    fn operation(
+        timeout_executing_ms: Option<i64>,
+        timeout_disabled_ms: Option<i64>,
+        failure_retries: Option<i64>,
+        timeout_retries: Option<i64>,
+        can_be_bypassed: bool,
+    ) -> (State, Operation) {
+        let state = world();
+        let operation = Operation::new(
+            OP,
+            timeout_executing_ms,
+            timeout_disabled_ms,
+            failure_retries,
+            timeout_retries,
+            can_be_bypassed,
+            vec![transition(
+                "start",
+                "var:go == true",
+                vec!["var:go <- false"],
+                &state,
+            )],
+            vec![transition("complete", "var:done == true", vec![], &state)],
+            vec![transition("fail", "var:broken == true", vec![], &state)],
+            vec![],
+            vec![],
+            vec![],
+        );
+
+        let state = add_operation_state_tracking_variable(&vec![OP.to_string()], &state, TARGET);
+        let state =
+            add_operation_meta_tracking_variables(&vec![OP.to_string()], &state, false, TARGET);
+        (state, operation)
+    }
+
+    /// A plain operation with no timeouts worth reaching and no retries.
+    fn plain() -> (State, Operation) {
+        operation(Some(10_000), Some(10_000), None, None, false)
+    }
+
+    async fn tick(state: State, operation: &Operation, elapsed_ms: i64) -> State {
+        process_operation(
+            SP_ID,
+            state,
+            operation,
+            OperationProcessingType::Automatic,
+            None,
+            None,
+            elapsed_ms,
+            TARGET,
+        )
+        .await
+    }
+
+    async fn tick_planned(
+        state: State,
+        operation: &Operation,
+        step: &mut i64,
+        plan_state: &mut String,
+    ) -> State {
+        process_operation(
+            SP_ID,
+            state,
+            operation,
+            OperationProcessingType::Planned,
+            Some(step),
+            Some(plan_state),
+            10,
+            TARGET,
+        )
+        .await
+    }
+
+    fn op_state(state: &State) -> String {
+        state.get_string_or_default_to_unknown(OP, TARGET)
+    }
+
+    fn info(state: &State) -> String {
+        state.get_string_or_default_to_unknown(&format!("{OP}_information"), TARGET)
+    }
+
+    fn counter(state: &State, suffix: &str) -> i64 {
+        state.get_int_or_default_to_zero(&format!("{OP}_{suffix}"), TARGET)
+    }
+
+    fn set(state: &State, key: &str, value: SPValue) -> State {
+        state.update(key, value)
+    }
+
+    fn stop_pressed(state: &State) -> State {
+        set(
+            state,
+            &format!("{}_dashboard_command", SP_ID),
+            "stop".to_spvalue(),
+        )
+    }
+
+    /// Drive the operation into a given state, so each arm's test can start
+    /// from it directly.
+    fn in_state(state: &State, operation_state: &str) -> State {
+        set(state, OP, operation_state.to_spvalue())
+    }
+
+    // ---------------------------------------------------------------- UNKNOWN
+
+    /// An operation whose tracking variable holds something nobody recognises -
+    /// a key that was never initialised, or one left over from an older build -
+    /// is put back to `initial` rather than being acted on.
+    #[tokio::test]
+    async fn an_unknown_operation_is_initialised() {
+        let (state, operation) = plain();
+        let state = in_state(&state, "nonsense");
+
+        let state = tick(state, &operation, 10).await;
+
+        assert_eq!(op_state(&state), "initial");
+    }
+
+    // ---------------------------------------------------------------- Initial
+
+    #[tokio::test]
+    async fn an_initial_operation_whose_guard_holds_starts() {
+        let (state, operation) = plain();
+        let state = set(&state, "go", true.to_spvalue());
+
+        let state = tick(state, &operation, 10).await;
+
+        assert_eq!(op_state(&state), "executing");
+        assert_eq!(info(&state), format!("Starting initialized operation '{OP}'."));
+        assert_eq!(
+            state.get_value("go", TARGET),
+            Some(false.to_spvalue()),
+            "starting must also take the precondition's actions"
+        );
+    }
+
+    #[tokio::test]
+    async fn an_initial_operation_whose_guard_does_not_hold_is_disabled() {
+        let (state, operation) = plain();
+
+        let state = tick(state, &operation, 10).await;
+
+        assert_eq!(op_state(&state), "disabled");
+        assert_eq!(info(&state), format!("Disabling operation '{OP}'."));
+    }
+
+    #[tokio::test]
+    async fn stop_cancels_an_initial_operation_before_it_starts() {
+        let (state, operation) = plain();
+        let state = set(&state, "go", true.to_spvalue());
+        let state = stop_pressed(&state);
+
+        let state = tick(state, &operation, 10).await;
+
+        assert_eq!(op_state(&state), "cancelled");
+        assert_eq!(
+            state.get_value("go", TARGET),
+            Some(true.to_spvalue()),
+            "cancelling must not run the precondition's actions"
+        );
+    }
+
+    // --------------------------------------------------------------- Disabled
+
+    /// The steady state: a disabled operation builds its "please satisfy the
+    /// runner guard" message once and then leaves it alone. This is the
+    /// allocation-free skip that the `info_already_reads_as` check exists for,
+    /// and the property it has to preserve is that the message stops changing.
+    #[tokio::test]
+    async fn a_disabled_operation_settles_on_one_message() {
+        let (state, operation) = plain();
+
+        let state = tick(state, &operation, 10).await; // -> disabled
+        let state = tick(state, &operation, 10).await; // builds the long message
+        let settled = info(&state);
+        assert!(
+            settled.starts_with(&format!("Operation '{OP}' disabled.")),
+            "unexpected message: {settled}"
+        );
+
+        for _ in 0..5 {
+            let next = tick(state.clone(), &operation, 10).await;
+            assert_eq!(info(&next), settled, "the message must stop changing");
+        }
+    }
+
+    /// Time spent disabled accumulates in its own counter, separately from
+    /// executing time.
+    #[tokio::test]
+    async fn disabled_time_accumulates_in_its_own_counter() {
+        let (state, operation) = plain();
+
+        let mut state = tick(state, &operation, 10).await; // -> disabled
+        assert_eq!(counter(&state, "elapsed_disabled_ms"), 0);
+
+        for _ in 0..4 {
+            state = tick(state, &operation, 25).await;
+        }
+
+        assert_eq!(counter(&state, "elapsed_disabled_ms"), 100);
+        assert_eq!(
+            counter(&state, "elapsed_executing_ms"),
+            0,
+            "a disabled operation must not age its executing counter"
+        );
+    }
+
+    #[tokio::test]
+    async fn a_disabled_operation_starts_once_its_guard_holds() {
+        let (state, operation) = plain();
+
+        let state = tick(state, &operation, 10).await; // -> disabled
+        assert_eq!(op_state(&state), "disabled");
+
+        let state = set(&state, "go", true.to_spvalue());
+        let state = tick(state, &operation, 10).await;
+
+        assert_eq!(op_state(&state), "executing");
+        assert_eq!(info(&state), format!("Starting disabled operation '{OP}'."));
+    }
+
+    /// An operation nobody ever enables must not sit disabled forever - the
+    /// disabled timeout is what turns "the guard never became true" into a
+    /// visible failure.
+    #[tokio::test]
+    async fn a_disabled_operation_times_out_on_its_own_deadline() {
+        let (state, operation) = operation(Some(10_000), Some(50), None, None, false);
+
+        let mut state = tick(state, &operation, 10).await; // -> disabled
+        for _ in 0..10 {
+            state = tick(state, &operation, 20).await;
+            if op_state(&state) == "timedout" {
+                break;
+            }
+        }
+
+        assert_eq!(op_state(&state), "timedout");
+        assert_eq!(
+            info(&state),
+            format!("Timeout for disabled operation '{OP}'.")
+        );
+    }
+
+    #[tokio::test]
+    async fn stop_cancels_a_disabled_operation() {
+        let (state, operation) = plain();
+        let state = tick(state, &operation, 10).await; // -> disabled
+        let state = stop_pressed(&state);
+
+        let state = tick(state, &operation, 10).await;
+
+        assert_eq!(op_state(&state), "cancelled");
+    }
+
+    // -------------------------------------------------------------- Executing
+
+    #[tokio::test]
+    async fn an_executing_operation_completes_when_its_postcondition_holds() {
+        let (state, operation) = plain();
+        let state = in_state(&state, "executing");
+        let state = set(&state, "done", true.to_spvalue());
+
+        let state = tick(state, &operation, 10).await;
+
+        assert_eq!(op_state(&state), "completed");
+        assert_eq!(info(&state), format!("Completing operation '{OP}'."));
+    }
+
+    /// The waiting message is the other steady state built once and then
+    /// skipped.
+    #[tokio::test]
+    async fn an_executing_operation_settles_on_one_waiting_message() {
+        let (state, operation) = plain();
+        let state = in_state(&state, "executing");
+
+        let state = tick(state, &operation, 10).await;
+        assert_eq!(
+            info(&state),
+            format!("Waiting for operation '{OP}' to be completed.")
+        );
+
+        let settled = info(&state);
+        for _ in 0..5 {
+            let next = tick(state.clone(), &operation, 10).await;
+            assert_eq!(info(&next), settled);
+        }
+    }
+
+    #[tokio::test]
+    async fn an_executing_operation_fails_when_its_failure_transition_fires() {
+        let (state, operation) = plain();
+        let state = in_state(&state, "executing");
+        let state = set(&state, "broken", true.to_spvalue());
+
+        let state = tick(state, &operation, 10).await;
+
+        assert_eq!(op_state(&state), "failed");
+        assert_eq!(info(&state), format!("Failing operation '{OP}'."));
+    }
+
+    /// Failing beats completing when both guards hold at once - worth pinning
+    /// because it is the arm ordering inside the `Executing` match, not
+    /// anything the model expresses.
+    #[tokio::test]
+    async fn failing_takes_precedence_over_completing() {
+        let (state, operation) = plain();
+        let state = in_state(&state, "executing");
+        let state = set(&state, "done", true.to_spvalue());
+        let state = set(&state, "broken", true.to_spvalue());
+
+        let state = tick(state, &operation, 10).await;
+
+        assert_eq!(op_state(&state), "failed");
+    }
+
+    /// And cancelling beats everything.
+    #[tokio::test]
+    async fn stop_takes_precedence_over_every_other_executing_outcome() {
+        let (state, operation) = plain();
+        let state = in_state(&state, "executing");
+        let state = set(&state, "done", true.to_spvalue());
+        let state = set(&state, "broken", true.to_spvalue());
+        let state = stop_pressed(&state);
+
+        let state = tick(state, &operation, 10).await;
+
+        assert_eq!(op_state(&state), "cancelled");
+    }
+
+    // -------------------------------------------------------------- Completed
+
+    /// Completing resets both retry counters, so an operation that failed twice
+    /// and then succeeded starts its next run with a full budget rather than
+    /// with two retries already spent.
+    #[tokio::test]
+    async fn completing_resets_the_retry_counters_and_terminates() {
+        let (state, operation) = plain();
+        let state = in_state(&state, "completed");
+        let state = set(
+            &state,
+            &format!("{OP}_failure_retry_counter"),
+            2.to_spvalue(),
+        );
+        let state = set(
+            &state,
+            &format!("{OP}_timeout_retry_counter"),
+            1.to_spvalue(),
+        );
+
+        let state = tick(state, &operation, 10).await;
+
+        assert_eq!(counter(&state, "failure_retry_counter"), 0);
+        assert_eq!(counter(&state, "timeout_retry_counter"), 0);
+        assert_eq!(
+            op_state(&state),
+            "terminated_completed",
+            "a completed operation is terminated so the runner stops driving it"
+        );
+    }
+
+    /// The plan cursor only advances for a `Planned` operation - a SOP or auto
+    /// operation completing must not move somebody else's plan along.
+    #[tokio::test]
+    async fn completing_advances_the_plan_cursor_only_when_planned() {
+        let (state, operation) = plain();
+        let completed = in_state(&state, "completed");
+
+        let mut step = 3;
+        let mut plan_state = PlanState::Executing.to_string();
+        let _ = tick_planned(completed.clone(), &operation, &mut step, &mut plan_state).await;
+        assert_eq!(step, 4, "a planned operation completing advances the plan");
+
+        let mut step = 3;
+        let _ = process_operation(
+            SP_ID,
+            completed,
+            &operation,
+            OperationProcessingType::SOP,
+            Some(&mut step),
+            None,
+            10,
+            TARGET,
+        )
+        .await;
+        assert_eq!(step, 3, "a SOP operation must not touch the plan cursor");
+    }
+
+    // --------------------------------------------------------------- Bypassed
+
+    /// BUG: `Operation::terminate` only implements
+    /// `TerminationReason::Completed` - its `_ => state.clone()` arm makes
+    /// `Bypassed`, `Fatal` and `Cancelled` silent no-ops. So the
+    /// `terminate(.., Bypassed)` call at the end of this arm does nothing and
+    /// the operation stays in `bypassed` rather than reaching
+    /// `terminated_bypassed`.
+    ///
+    /// Consequence: `SOP::get_state` maps `Bypassed` to `SOPState::Executing`
+    /// and only `Terminated(Bypassed)` to `SOPState::Completed`, so a bypassed
+    /// operation inside a SOP leaves that branch reporting `Executing` forever
+    /// and the SOP never completes. See
+    /// `sop_runner`'s `a_bypassed_operation_never_lets_its_sop_finish`.
+    ///
+    /// The plan runner is not affected the same way: it advances the cursor and
+    /// moves on to the next step, so the stuck operation is simply never looked
+    /// at again.
+    #[tokio::test]
+    async fn a_bypassed_operation_advances_the_plan_but_never_terminates() {
+        let (state, operation) = plain();
+        let state = in_state(&state, "bypassed");
+
+        let mut step = 0;
+        let mut plan_state = PlanState::Executing.to_string();
+        let state = tick_planned(state, &operation, &mut step, &mut plan_state).await;
+
+        assert_eq!(step, 1, "the plan moves on");
+        assert!(info(&state).contains("bypassed"));
+        assert_eq!(
+            op_state(&state),
+            "bypassed",
+            "if this now reads terminated_bypassed the terminate() bug is fixed"
+        );
+    }
+
+    /// Dead code, worth pinning so it is not mistaken for working: the
+    /// `Bypassed` arm opens with a `can_be_cancelled` check, but
+    /// `can_be_cancelled` only lists Initial / Executing / Disabled / Failed /
+    /// Timedout - never Bypassed - so that branch can never be taken and
+    /// pressing stop on a bypassed operation still advances the plan.
+    #[tokio::test]
+    async fn stop_cannot_cancel_a_bypassed_operation() {
+        let (state, operation) = plain();
+        let state = in_state(&state, "bypassed");
+        let state = stop_pressed(&state);
+
+        assert!(
+            !operation.can_be_cancelled(SP_ID, &state, TARGET),
+            "bypassed is not a cancellable state"
+        );
+
+        let mut step = 0;
+        let mut plan_state = PlanState::Executing.to_string();
+        let state = tick_planned(state, &operation, &mut step, &mut plan_state).await;
+
+        assert_eq!(step, 1, "the cancel branch is unreachable, so the plan advances");
+        assert!(info(&state).contains("bypassed"));
+    }
+
+    // --------------------------------------------------------------- Timedout
+
+    /// With retries left, a timeout is retried and the counter goes up.
+    #[tokio::test]
+    async fn a_timedout_operation_retries_while_it_has_retries_left() {
+        let (state, operation) = operation(Some(10_000), Some(10_000), None, Some(2), false);
+        let state = in_state(&state, "timedout");
+
+        let state = tick(state, &operation, 10).await;
+        assert_eq!(counter(&state, "timeout_retry_counter"), 1);
+        assert_eq!(
+            info(&state),
+            format!("Retrying operation (timeout) '{OP}'. Retry 1 out of 2.")
+        );
+        assert_eq!(op_state(&state), "initial", "a retry puts it back to initial");
+
+        let state = in_state(&state, "timedout");
+        let state = tick(state, &operation, 10).await;
+        assert_eq!(counter(&state, "timeout_retry_counter"), 2);
+
+        // Third time: the budget is spent, and with no bypass it is fatal.
+        let state = in_state(&state, "timedout");
+        let state = tick(state, &operation, 10).await;
+        assert_eq!(op_state(&state), "fatal");
+    }
+
+    /// An operation marked `can_be_bypassed` skips instead of killing the plan.
+    #[tokio::test]
+    async fn a_timedout_operation_with_no_retries_is_bypassed_when_allowed() {
+        let (state, operation) = operation(Some(10_000), Some(10_000), None, None, true);
+        let state = in_state(&state, "timedout");
+
+        let state = tick(state, &operation, 10).await;
+
+        assert_eq!(info(&state), format!("Operation '{OP}' timedout. Bypassing."));
+        assert_eq!(op_state(&state), "bypassed");
+    }
+
+    #[tokio::test]
+    async fn a_timedout_operation_with_no_retries_and_no_bypass_is_fatal() {
+        let (state, operation) = plain();
+        let state = in_state(&state, "timedout");
+
+        let state = tick(state, &operation, 10).await;
+
+        assert_eq!(info(&state), format!("Operation '{OP}' timedout."));
+        assert_eq!(op_state(&state), "fatal");
+    }
+
+    #[tokio::test]
+    async fn stop_cancels_a_timedout_operation() {
+        let (state, operation) = operation(Some(10_000), Some(10_000), None, Some(2), false);
+        let state = in_state(&state, "timedout");
+        let state = stop_pressed(&state);
+
+        let state = tick(state, &operation, 10).await;
+
+        assert_eq!(op_state(&state), "cancelled");
+        assert_eq!(
+            counter(&state, "timeout_retry_counter"),
+            0,
+            "cancelling must not spend a retry"
+        );
+    }
+
+    // ----------------------------------------------------------------- Failed
+
+    #[tokio::test]
+    async fn a_failed_operation_retries_while_it_has_retries_left() {
+        let (state, operation) = operation(Some(10_000), Some(10_000), Some(2), None, false);
+        let state = in_state(&state, "failed");
+
+        let state = tick(state, &operation, 10).await;
+        assert_eq!(counter(&state, "failure_retry_counter"), 1);
+        assert_eq!(
+            info(&state),
+            format!("Retrying operation (failure) '{OP}'. Retry 1 out of 2.")
+        );
+
+        let state = in_state(&state, "failed");
+        let state = tick(state, &operation, 10).await;
+        assert_eq!(counter(&state, "failure_retry_counter"), 2);
+        assert_eq!(op_state(&state), "initial");
+    }
+
+    /// Running out of failure retries clears *both* counters on the way out, so
+    /// the operation's next run is not started with a spent budget.
+    #[tokio::test]
+    async fn a_failed_operation_out_of_retries_is_fatal_and_clears_the_counters() {
+        let (state, operation) = operation(Some(10_000), Some(10_000), Some(1), None, false);
+        let state = in_state(&state, "failed");
+        let state = set(
+            &state,
+            &format!("{OP}_failure_retry_counter"),
+            1.to_spvalue(),
+        );
+        let state = set(
+            &state,
+            &format!("{OP}_timeout_retry_counter"),
+            1.to_spvalue(),
+        );
+
+        let state = tick(state, &operation, 10).await;
+
+        assert_eq!(
+            info(&state),
+            format!("Operation '{OP}' has no more retries left.")
+        );
+        assert_eq!(op_state(&state), "fatal");
+        assert_eq!(counter(&state, "failure_retry_counter"), 0);
+        assert_eq!(counter(&state, "timeout_retry_counter"), 0);
+    }
+
+    #[tokio::test]
+    async fn a_failed_operation_out_of_retries_is_bypassed_when_allowed() {
+        let (state, operation) = operation(Some(10_000), Some(10_000), None, None, true);
+        let state = in_state(&state, "failed");
+
+        let state = tick(state, &operation, 10).await;
+
+        assert_eq!(
+            info(&state),
+            format!("Operation '{OP}' has no more retries left. Bypassing.")
+        );
+        assert_eq!(op_state(&state), "bypassed");
+    }
+
+    #[tokio::test]
+    async fn stop_cancels_a_failed_operation() {
+        let (state, operation) = operation(Some(10_000), Some(10_000), Some(2), None, false);
+        let state = in_state(&state, "failed");
+        let state = stop_pressed(&state);
+
+        let state = tick(state, &operation, 10).await;
+
+        assert_eq!(op_state(&state), "cancelled");
+        assert_eq!(counter(&state, "failure_retry_counter"), 0);
+    }
+
+    // ------------------------------------------------------------------ Fatal
+
+    /// A fatal operation fails the *plan*, which is how a dead operation
+    /// reaches the goal runner. Only for `Planned` - a fatal SOP operation is
+    /// the SOP's business, not the plan's.
+    #[tokio::test]
+    async fn a_fatal_planned_operation_fails_the_plan() {
+        let (state, operation) = plain();
+        let state = in_state(&state, "fatal");
+
+        let mut step = 0;
+        let mut plan_state = PlanState::Executing.to_string();
+        let state = tick_planned(state, &operation, &mut step, &mut plan_state).await;
+
+        assert_eq!(plan_state, PlanState::Failed.to_string());
+        assert_eq!(
+            info(&state),
+            format!("Operation '{OP}' unrecoverable. Stopping execution.")
+        );
+        // Same `terminate` no-op as the bypass arm: it stays `fatal` rather
+        // than reaching `terminated_fatal`.
+        assert_eq!(op_state(&state), "fatal");
+    }
+
+    /// The `Fatal` and `Cancelled` arms are re-entered on every tick for as
+    /// long as the runner keeps the operation in its active set, because
+    /// `terminate` never moves it out of those states. That is idempotent here
+    /// (the message and the plan state are the same every time, so the diff is
+    /// empty and nothing is written), which is the reason it has gone
+    /// unnoticed - but it does mean an operation that died stays in the runner's
+    /// key set and its guards keep being evaluated.
+    #[tokio::test]
+    async fn a_fatal_operation_stays_fatal_and_settles() {
+        let (state, operation) = plain();
+        let state = in_state(&state, "fatal");
+
+        let once = tick(state, &operation, 10).await;
+        assert_eq!(op_state(&once), "fatal");
+
+        let twice = tick(once.clone(), &operation, 10).await;
+        assert_eq!(
+            once.get_diff_partial_state(&twice).state.len(),
+            0,
+            "re-entering the Fatal arm must at least not write anything new"
+        );
+    }
+
+    // -------------------------------------------------------------- Cancelled
+
+    #[tokio::test]
+    async fn a_cancelled_planned_operation_cancels_the_plan() {
+        let (state, operation) = plain();
+        let state = in_state(&state, "cancelled");
+
+        let mut step = 0;
+        let mut plan_state = PlanState::Executing.to_string();
+        let state = tick_planned(state, &operation, &mut step, &mut plan_state).await;
+
+        assert_eq!(plan_state, PlanState::Cancelled.to_string());
+        assert_eq!(
+            info(&state),
+            format!("Operation '{OP}' cancelled. Stopping execution.")
+        );
+        assert_eq!(op_state(&state), "cancelled", "same terminate() no-op");
+
+        // And note where that `plan_state` ends up: the plan runner writes it
+        // to `{sp_id}_plan_state` as the string "cancelled", which
+        // `PlanState::from_str` cannot parse back - see
+        // `running::runner_states::tests::plan_state_cancelled_does_not_survive_the_round_trip`.
+        assert_eq!(PlanState::from_str(&plan_state), PlanState::UNKNOWN);
+    }
+
+    // ------------------------------------------------------------- Terminated
+
+    /// A terminated operation is inert: whatever the reason, further ticks
+    /// leave it exactly where it is. The runners keep calling this for as long
+    /// as the operation is in their active set, so "does nothing" has to be
+    /// literally true, or a finished operation would keep writing on every tick.
+    #[tokio::test]
+    async fn a_terminated_operation_is_inert() {
+        for reason in [
+            "terminated_completed",
+            "terminated_bypassed",
+            "terminated_fatal",
+            "terminated_cancelled",
+        ] {
+            let (state, operation) = plain();
+            let state = in_state(&state, reason);
+
+            let once = tick(state, &operation, 10).await;
+            assert_eq!(op_state(&once), reason, "{reason} must stay put");
+            assert_eq!(info(&once), format!("Operation '{OP}' terminated."));
+
+            let twice = tick(once.clone(), &operation, 10).await;
+            assert_eq!(
+                once.get_diff_partial_state(&twice).state.len(),
+                0,
+                "a second tick on a {reason} operation must write nothing"
+            );
+        }
+    }
+
+    /// Even stop does not move a terminated operation - the cancel guard does
+    /// not list the terminated states, so pressing stop after everything has
+    /// finished is a no-op rather than a mass re-cancel. This is the bug the
+    /// `can_be_cancelled` fix was about, from the other side.
+    #[tokio::test]
+    async fn stop_does_not_disturb_a_terminated_operation() {
+        let (state, operation) = plain();
+        let state = in_state(&state, "terminated_completed");
+        let state = stop_pressed(&state);
+
+        let state = tick(state, &operation, 10).await;
+
+        assert_eq!(op_state(&state), "terminated_completed");
+    }
+
+    // ------------------------------------------------------------ whole cycle
+
+    /// The happy path end to end, as the auto runner drives it: initial ->
+    /// executing -> completed -> terminated, one tick per step.
+    #[tokio::test]
+    async fn the_happy_path_runs_start_to_terminated() {
+        let (state, operation) = plain();
+
+        let state = set(&state, "go", true.to_spvalue());
+        let state = tick(state, &operation, 10).await;
+        assert_eq!(op_state(&state), "executing");
+
+        let state = set(&state, "done", true.to_spvalue());
+        let state = tick(state, &operation, 10).await;
+        assert_eq!(op_state(&state), "completed");
+
+        let state = tick(state, &operation, 10).await;
+        assert_eq!(op_state(&state), "terminated_completed");
+
+        // And it stays there.
+        let state = tick(state, &operation, 10).await;
+        assert_eq!(op_state(&state), "terminated_completed");
+    }
+
+    /// The unhappy path, end to end: it starts, never completes, times out,
+    /// spends its one retry, times out again, and dies. This is the sequence a
+    /// runner actually walks through - the individual arms above are each one
+    /// step of it.
+    #[tokio::test]
+    async fn the_timeout_path_retries_once_and_then_dies() {
+        let (state, operation) = operation(Some(50), Some(10_000), None, Some(1), false);
+
+        let mut state = set(&state, "go", true.to_spvalue());
+        let mut seen: Vec<String> = vec![];
+        for _ in 0..40 {
+            state = tick(state, &operation, 20).await;
+            let current = op_state(&state);
+            if seen.last().map(|s| s.as_str()) != Some(current.as_str()) {
+                seen.push(current.clone());
+            }
+            if current == "fatal" {
+                break;
+            }
+            // Re-arm the precondition so a retry can start again.
+            if current == "initial" {
+                state = set(&state, "go", true.to_spvalue());
+            }
+        }
+
+        assert_eq!(
+            seen,
+            vec!["executing", "timedout", "initial", "executing", "timedout", "fatal"],
+            "the whole timeout-retry-timeout-die sequence"
+        );
+        assert_eq!(counter(&state, "timeout_retry_counter"), 1);
     }
 }
