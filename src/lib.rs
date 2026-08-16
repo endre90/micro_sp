@@ -148,11 +148,20 @@
 //     `bfs_transition_planner` still has the original shape; it is only used by
 //     tests.                    -> planning/operation.rs, running/planner_ticker.rs
 //
+// 11. DONE. `Arc<Model>`. `main_runner` cloned the model five times and two of
+//     the spawned runners cloned it again internally, so seven deep copies of
+//     every operation, transition, predicate and action were live for the whole
+//     process. It is one `Arc<Model>` now, with each task holding a refcount.
+//     Runner signatures are unchanged (`&Model`), so nothing downstream breaks.
+//     Measured with a counting allocator: one deep copy of a 30-operation model
+//     is ~271 KB and of a 100-operation model ~878 KB, so this gives back
+//     ~1.6 MB and ~5.3 MB respectively, plus the startup CPU of six deep copies.
+//                          -> running/main_runner.rs, auto_runner.rs
+//
 // Smaller but cheap: hoist the per-tick `format!("{}_...", name)` key building
-// into cached key strings; `Arc<Model>` instead of five deep model clones;
-// dedup the `keys` vectors before `MGET`; only build log/info strings when they
-// actually changed (the `Disabled` arm of `process_operation` renders full
-// predicate trees every tick); batch `time_runner`'s per-timer writes into one.
+// into cached key strings; dedup the `keys` vectors before `MGET`; only build
+// log/info strings when they actually changed (the `Disabled` arm of
+// `process_operation` renders full predicate trees every tick).
 //
 // Note: `src/management/snapshot.rs` and `src/utils/op_logger.rs` were removed
 // from the module tree (their `pub use`/`pub mod` lines below and in

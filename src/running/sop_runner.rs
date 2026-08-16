@@ -291,14 +291,14 @@ pub async fn sop_runner(
 
 // PERF: three sequential Redis round trips (two `remove_sp_values` plus one
 // `remove_sp_value`) where one `DEL` of the concatenated key list would do.
-// Also the `println!` on the next line writes to stdout unconditionally and
-// bypasses the `log` filter - it should be `log::debug!` so it can be turned
-// off, since stdout writes are synchronous and block the tokio worker thread.
+// DONE: the `println!` here wrote to stdout unconditionally, bypassing the
+// `log` filter, on every SOP teardown - and a stdout write is synchronous, so
+// it blocks the tokio worker for the duration.
 async fn remove_operations_from_state(sop_id: &str, unique_sop: &SOP, mut con: SPConnection) {
     let ops_in_sop = get_all_operations_from_sop(&unique_sop);
     let mut op_ids_meta = vec![];
     let sop_id = format!("op_{}", sop_id);
-    println!("REMOVING: {}", sop_id);
+    log::debug!(target: "sop_runner", "Removing operation variables for '{}'.", sop_id);
     let mut op_ids = ops_in_sop
         .iter()
         .map(|x| x.name.to_string())

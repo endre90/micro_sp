@@ -5,11 +5,16 @@ use std::sync::Arc;
 
 // Run everything and provide a model
 //
-// PERF: `model.clone()` is done five times here (and each spawned runner then
-// clones it *again* internally), so the process holds ~10 deep copies of every
-// operation, transition, predicate and action for its whole lifetime. Suggested:
-// wrap it once - `let model = Arc::new(model);` - and hand each task an
-// `Arc::clone`. Same for `sp_id`, which is cloned per task.
+// DONE: PERF: `model.clone()` was done five times here and two of the spawned
+// runners then cloned it *again* internally, so the process held seven deep
+// copies of every operation, transition, predicate and action for its whole
+// lifetime. The model is wrapped in an `Arc` once and each task gets an
+// `Arc::clone`, which is a refcount bump. The runners still take `&Model`, so
+// no signature changed - the reference is taken from the `Arc` inside each
+// task.
+//
+// `sp_id` is still cloned per task, deliberately: it is a short `String` and
+// four of them at startup is not worth an `Arc` and the churn.
 //
 // PERF (the big architectural one): seven independent tasks each poll Redis on
 // their own timer - 50 ms, 100 ms x4, 200 ms x2, 250 ms, 500 ms. Together they
@@ -53,8 +58,12 @@ pub async fn main_runner(
     // let op_vars = generate_operation_state_variables(&model, coverability_tracking);
     // let state = state.extend(op_vars, true);
 
+    // One deep copy of the model for the whole process; every task below holds
+    // an `Arc::clone` of it.
+    let model = Arc::new(model);
+
     log::info!(target: &format!("{sp_id}_micro_sp"), "Spawning planner.");
-    let model_clone = model.clone();
+    let model_clone = Arc::clone(&model);
     let con_clone = connection_manager.clone();
     let sp_id_clone = sp_id.clone();
     tokio::task::spawn(async move {
@@ -72,7 +81,7 @@ pub async fn main_runner(
     // });
 
     log::info!(target:  &format!("{sp_id}_micro_sp"), "Spawning SOP runner.");
-    let model_clone = model.clone();
+    let model_clone = Arc::clone(&model);
     let con_clone = connection_manager.clone();
     let sp_id_clone = sp_id.clone();
     // let op_log_tx_clone = op_log_tx.clone();
@@ -84,7 +93,7 @@ pub async fn main_runner(
     });
 
     log::info!(target:  &format!("{sp_id}_micro_sp"), "Spawning operation runner.");
-    let model_clone = model.clone();
+    let model_clone = Arc::clone(&model);
     let con_clone = connection_manager.clone();
     // let op_log_tx_clone = op_log_tx.clone();
     // let sop_log_tx_clone = sop_op_log_tx.clone();
@@ -95,7 +104,7 @@ pub async fn main_runner(
     });
 
     log::info!(target: &format!("{sp_id}_micro_sp"), "Spawning auto transition runner");
-    let model_clone = model.clone();
+    let model_clone = Arc::clone(&model);
     let con_clone = connection_manager.clone();
     // let op_log_tx_clone = op_log_tx.clone();
     tokio::task::spawn(async move {
@@ -105,7 +114,7 @@ pub async fn main_runner(
     });
 
     log::info!(target: &format!("{sp_id}_micro_sp"), "Spawning auto operation runner");
-    let model_clone = model.clone();
+    let model_clone = Arc::clone(&model);
     let con_clone = connection_manager.clone();
     // let op_log_tx_clone = op_log_tx.clone();
     // let sop_log_tx_clone = sop_op_log_tx.clone();

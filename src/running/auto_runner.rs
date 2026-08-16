@@ -73,14 +73,14 @@ async fn process_transition(
 }
 
 // PERF: this runner is already doing the right thing on the read side - it
-// precomputes `keys` once and uses `get_state_for_keys`. Two things left:
-//   - `let model = model.clone()` deep-copies the entire model into the task.
-//     `main_runner` already clones the model once per spawned runner; with five
-//     runners that is five full copies of every operation, transition and
-//     predicate held for the lifetime of the process. Pass `Arc<Model>` instead.
+// precomputes `keys` once and uses `get_state_for_keys`. One thing left:
 //   - the `keys` vector is not deduplicated, so transitions sharing variables
 //     make the per-tick `MGET` send the same key several times. `sort_unstable()
 //     + dedup()` once here shrinks every subsequent request.
+//
+// DONE: PERF: `let model = model.clone()` deep-copied the entire model into the
+// task on top of the copy `main_runner` already made for it. `main_runner` now
+// holds one `Arc<Model>` and this borrows from it.
 // PERF: at 50 ms this is the fastest-ticking runner and therefore the biggest
 // contributor to idle CPU. If the auto transitions only react to variables
 // written by other runners, a keyspace-notification subscription on `keys`
@@ -93,7 +93,6 @@ pub async fn auto_transition_runner(
 ) -> Result<(), Box<dyn std::error::Error>> {
     initialize_env_logger();
     let mut interval = interval(Duration::from_millis(TRANSITION_RUNNER_TICK_INTERVAL_MS));
-    let model = model.clone();
     let log_target = format!("{}_auto_transition_runner", name);
     let keys: Vec<String> = model
         .auto_transitions
@@ -146,8 +145,8 @@ pub async fn auto_transition_runner(
 //      `String` that is already owned - pass `&current_active_op.name`.
 //   5. The tail does `set_state` then `remove_sp_values` twice: three
 //      sequential round trips that should be one pipeline.
-//   6. `let model = model.clone()` - see the note on `auto_transition_runner`;
-//      use `Arc<Model>`.
+//   6. DONE: `let model = model.clone()` - see the note on
+//      `auto_transition_runner`; `main_runner` holds one `Arc<Model>` now.
 pub async fn auto_operation_runner(
     sp_id: &str,
     model: &Model,
@@ -156,7 +155,6 @@ pub async fn auto_operation_runner(
 ) -> Result<(), Box<dyn std::error::Error>> {
     initialize_env_logger();
     let mut interval = interval(Duration::from_millis(OPERAION_RUNNER_TICK_INTERVAL_MS));
-    let model = model.clone();
     let log_target = format!("{}_operation_runner", sp_id);
 
     let mut active_auto_ops: Vec<Operation> = vec![];
