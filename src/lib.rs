@@ -190,8 +190,67 @@
 //     precomputing would turn that into a one-tick delay, a behaviour change).
 //                          -> running/sop_runner.rs, modelling/sops.rs
 //
+// 14. The low-priority batch. Everything below was measured before and after,
+//     because several of these turned out not to be worth their complexity.
+//
+//     DONE:
+//       - `tf_interface` polled a 7-key `MGET` every 250 ms purely to read one
+//         boolean; its whole body sits inside `if request_trigger`. One `GET`
+//         now, with the rest fetched only when a request is actually pending.
+//       - `planner_ticker` polled the whole planning key set every 500 ms to
+//         discover that no replan was requested. It reads the two flags that
+//         decide that and fetches the rest only when there is work.
+//         Idle Redis server time across five runners: 1285 us -> 887 us per
+//         5 s window. Note the round-trip *count* is unchanged - these are
+//         still polls, just much smaller ones. Removing the polls needs the
+//         event-driven change (item 6).
+//       - `keys` deduplicated in `auto_transition_runner` and `planner_ticker`
+//         (`normalize_keys`); operations share most of their variables, so the
+//         `MGET` was sending the same key many times over.
+//       - `build_state`: `HashMap::with_capacity`, and a borrowing form so
+//         `get_state_for_keys` stops cloning its whole key list every tick for
+//         every runner. `StateManager::build_state` keeps its owned signature.
+//       - `StateManager::apply`: the runners' tail was `set_state` then one or
+//         two `remove_sp_values`, three sequential round trips each awaited
+//         before the next could be sent. One `redis::pipe()` now. Deliberately
+//         not `.atomic()` - the code it replaces had no atomicity either, and
+//         adding MULTI/EXEC under a perf fix would be a silent semantic change.
+//       - `OperationState::as_str()` plus an allocation-free `value_is`: the
+//         guard path compared with `value == OperationState::X.to_spvalue()`,
+//         which allocates a `String` per comparison - five of them per
+//         operation per tick in `can_be_cancelled` alone. 79 ns -> ~0.
+//         Careful: `to_spvalue()` collapses "UNKNOWN" to the UNKNOWN *variant*,
+//         so the replacement has to mirror that; a test pins every pairing.
+//       - TF `get_all_transforms`: `scan_match` used the Redis default COUNT of
+//         10, so a lookup over a 3000-key keyspace took ~294 sequential SCAN
+//         round trips. COUNT 1000 makes it 4. Measured per lookup: 9.33 ms ->
+//         1.21 ms. Dropping `into_par_iter()` for a plain iterator took it to
+//         855 us - rayon's hand-off cost more than the handful of small JSON
+//         parses, as suspected. That was the crate's last rayon use.
+//
+//     NOT done, with the measurement that decided it:
+//       - Single Redis HASH + `HGETALL`/`HMGET` instead of key-per-variable.
+//         This is a change to the on-disk layout: anything reading these keys
+//         directly (dashboards, other processes) breaks, and it needs a
+//         migration. Wants a deliberate decision, not a drive-by.
+//       - Key-string caching (an `OperationKeys` side table). Measured: the
+//         nine `format!("{}_...", name)` calls cost 580 ns per operation per
+//         tick - about 58 us/s with ten active operations. Not worth threading
+//         a cache through all three runners. The `to_spvalue()` half of that
+//         item, which was on the far hotter guard path, is done.
+//       - `build_state` skipping re-parses of unchanged values, and a prebuilt
+//         variable table. Measured: 82 us per call over 300 keys (274 ns per
+//         variable), so roughly 0.25% of a core across the runners. It needs a
+//         raw-string cache threaded through every runner's read path and a new
+//         public API to carry it; the ratio does not justify that yet.
+//       - Caching the TF buffer with a version counter. Correct only if *every*
+//         writer goes through `TransformsManager`; a process writing
+//         `TF_PREFIX` keys directly would leave the cache serving stale
+//         transforms - a correctness bug traded for a slow path. The SCAN fix
+//         above already took the dominant cost out.
+//
 // Smaller but cheap: hoist the per-tick `format!("{}_...", name)` key building
-// into cached key strings; dedup the `keys` vectors before `MGET`.
+// into cached key strings (see the measurement above before bothering).
 //
 // Note: `src/management/snapshot.rs` and `src/utils/op_logger.rs` were removed
 // from the module tree (their `pub use`/`pub mod` lines below and in

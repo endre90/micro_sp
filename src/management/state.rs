@@ -1,6 +1,7 @@
 use crate::*;
 use crate::SPConnection;
 
+mod apply;
 mod build_state;
 mod get_full_state;
 mod get_sp_value;
@@ -81,6 +82,21 @@ impl StateManager {
 
     pub async fn remove_sp_values(con: &mut SPConnection, keys: &[String]) {
         remove_sp_values::remove_sp_values(con, keys).await
+    }
+
+    /// Write a state delta and delete a set of keys in a single round trip.
+    ///
+    /// DONE: PERF: the runners' tail was `set_state` followed by one or two
+    /// `remove_sp_values` calls - three sequential round trips, each awaited
+    /// before the next could start, for what is one logical "publish this
+    /// tick's changes" step. `redis::pipe()` sends them together.
+    ///
+    /// Not `.atomic()` (no MULTI/EXEC): the previous code was three separate
+    /// commands with no atomicity either, so wrapping them in a transaction
+    /// here would be a semantic change smuggled in under a performance fix.
+    /// See the atomicity note on this module for the real fix.
+    pub async fn apply(con: &mut SPConnection, state: &State, deletes: &[&[String]]) {
+        apply::apply(con, state, deletes).await
     }
 
     pub fn build_state(keys: Vec<String>, values: Vec<Option<String>>) -> State {

@@ -73,10 +73,9 @@ async fn process_transition(
 }
 
 // PERF: this runner is already doing the right thing on the read side - it
-// precomputes `keys` once and uses `get_state_for_keys`. One thing left:
-//   - the `keys` vector is not deduplicated, so transitions sharing variables
-//     make the per-tick `MGET` send the same key several times. `sort_unstable()
-//     + dedup()` once here shrinks every subsequent request.
+// precomputes `keys` once and uses `get_state_for_keys`.
+// DONE: PERF: the `keys` vector was not deduplicated, so transitions sharing
+// variables made the per-tick `MGET` send the same key several times.
 //
 // DONE: PERF: `let model = model.clone()` deep-copied the entire model into the
 // task on top of the copy `main_runner` already made for it. `main_runner` now
@@ -94,11 +93,13 @@ pub async fn auto_transition_runner(
     initialize_env_logger();
     let mut interval = interval(Duration::from_millis(TRANSITION_RUNNER_TICK_INTERVAL_MS));
     let log_target = format!("{}_auto_transition_runner", name);
-    let keys: Vec<String> = model
-        .auto_transitions
-        .iter()
-        .flat_map(|t| t.get_all_var_keys())
-        .collect();
+    let keys: Vec<String> = normalize_keys(
+        model
+            .auto_transitions
+            .iter()
+            .flat_map(|t| t.get_all_var_keys())
+            .collect(),
+    );
 
     log::info!(target: &log_target, "Online.");
 
@@ -289,24 +290,26 @@ pub async fn auto_operation_runner(
         active_mutexed_op = next_active_mutexed_op;
 
         let modified_state = state.get_diff_partial_state_and_add_missing(&new_state);
-        StateManager::set_state(&mut con, &modified_state).await;
-
         let active_set_changed = !new_op_ids.is_empty() || !terminated_operations.is_empty();
 
-        if !terminated_operations.is_empty() {
-            let mut terminated_operations_meta = vec![];
-            for op in &terminated_operations {
-                terminated_operations_meta.push(format!("{}_information", op));
-                terminated_operations_meta.push(format!("{}_failure_retry_counter", op));
-                terminated_operations_meta.push(format!("{}_timeout_retry_counter", op));
-                terminated_operations_meta.push(format!("{}_elapsed_executing_ms", op));
-                terminated_operations_meta.push(format!("{}_elapsed_disabled_ms", op));
-            }
-            StateManager::remove_sp_values(&mut con, &terminated_operations).await;
-            StateManager::remove_sp_values(&mut con, &terminated_operations_meta).await;
-
-            terminated_operations.clear();
+        // DONE: PERF: this was `set_state` then two `remove_sp_values`, three
+        // sequential round trips each awaited before the next could be sent.
+        // One pipeline now.
+        let mut terminated_operations_meta = vec![];
+        for op in &terminated_operations {
+            terminated_operations_meta.push(format!("{}_information", op));
+            terminated_operations_meta.push(format!("{}_failure_retry_counter", op));
+            terminated_operations_meta.push(format!("{}_timeout_retry_counter", op));
+            terminated_operations_meta.push(format!("{}_elapsed_executing_ms", op));
+            terminated_operations_meta.push(format!("{}_elapsed_disabled_ms", op));
         }
+        StateManager::apply(
+            &mut con,
+            &modified_state,
+            &[&terminated_operations, &terminated_operations_meta],
+        )
+        .await;
+        terminated_operations.clear();
 
         // Operations were activated and/or terminated this tick, so the set of
         // bookkeeping variables to read from the next tick on has changed.

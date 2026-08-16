@@ -31,23 +31,33 @@ fn create_assignment(key: &str, value: SPValue) -> SPAssignment {
 // allocations) for every variable on every tick, even though the variable's
 // name and type never change. Suggested: build the variable table once at
 // startup and look up `&SPVariable`/`Arc<SPVariable>` by key here.
-pub(super) fn build_state(keys: Vec<String>, values: Vec<Option<String>>) -> State {
-    let mut state_map = HashMap::new();
+/// DONE: PERF: this took `keys: Vec<String>` by value, which forced
+/// `get_state_for_keys` to clone its whole key list on every tick just to call
+/// it. It borrows now, and `StateManager::build_state` still takes the owned
+/// `Vec` so the public API is unchanged.
+/// DONE: PERF: `HashMap::new()` then inserting n entries rehashed several times
+/// on the way; the capacity is known up front.
+pub(super) fn build_state_from_slice(keys: &[String], values: Vec<Option<String>>) -> State {
+    let mut state_map = HashMap::with_capacity(keys.len());
 
-    for (key, maybe_value) in keys.into_iter().zip(values.into_iter()) {
+    for (key, maybe_value) in keys.iter().zip(values.into_iter()) {
         let Some(value_str) = maybe_value else {
             continue;
         };
 
         if let Ok(sp_value) = serde_json::from_str::<SPValue>(&value_str) {
-            let assignment = create_assignment(&key, sp_value);
-            state_map.insert(key, assignment);
+            let assignment = create_assignment(key, sp_value);
+            state_map.insert(key.clone(), assignment);
         } else {
             log::warn!("Failed to deserialize value for key '{}'.", key);
         }
     }
 
     State { state: state_map }
+}
+
+pub(super) fn build_state(keys: Vec<String>, values: Vec<Option<String>>) -> State {
+    build_state_from_slice(&keys, values)
 }
 
 #[cfg(test)]

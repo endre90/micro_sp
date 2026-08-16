@@ -2,18 +2,19 @@ use crate::*;
 use std::sync::Arc;
 use tokio::time::{Duration, interval};
 
-// PERF: reads a fixed key set - good - but two things cost more than they need
-// to:
-//   - `keys` is built by concatenating `get_all_var_keys()` over every operation
-//     plus the operation names, with no `sort()/dedup()`. Operations typically
-//     share most of their variables, so the per-tick `MGET` sends the same key
-//     many times over. Deduplicating once here shrinks every request.
-//   - the tick runs at 500 ms and does a full `MGET` + `build_state` + diff
-//     even though the only thing it reacts to is `{sp_id}_replan_trigger`.
-//     Suggested: read just that flag (a single `GET`) and only fetch the full
-//     planning key set when it is set; or subscribe to a notification on it.
-//     Planning is rare and bursty - polling the whole operation model twice a
-//     second to discover that nothing is requested is most of this task's cost.
+// DONE: PERF: two things cost more than they needed to:
+//   - `keys` was built by concatenating `get_all_var_keys()` over every
+//     operation plus the operation names, with no `sort()/dedup()`. Operations
+//     typically share most of their variables, so the per-tick `MGET` sent the
+//     same key many times over.
+//   - the tick ran at 500 ms and did a full `MGET` + `build_state` + diff even
+//     though the only thing it reacts to is `{sp_id}_replan_trigger`. Planning
+//     is rare and bursty, so polling the whole operation model twice a second
+//     to discover that nothing is requested was most of this task's cost. It
+//     now reads the two flags that decide whether there is anything to do and
+//     fetches the planning key set only when there is.
+// PERF (still open): a notification on `{sp_id}_replan_trigger` would remove
+// the poll entirely.
 pub async fn planner_ticker(
     sp_id: &str,
     model: &Model,
@@ -56,9 +57,19 @@ pub async fn planner_ticker(
         model
             .operations
             .iter()
-            .flat_map(|op| vec![format!("{}", op.name)])
+            .map(|op| op.name.clone())
             .collect::<Vec<String>>(),
     );
+
+    // Operations share most of their variables, so without this the per-tick
+    // `MGET` sends the same key many times over.
+    keys.sort_unstable();
+    keys.dedup();
+
+    // The two flags that decide whether this tick has anything to do at all.
+    let trigger_key = format!("{}_replan_trigger", sp_id);
+    let replanned_key = format!("{}_replanned", sp_id);
+    let trigger_keys = vec![trigger_key.clone(), replanned_key.clone()];
 
     // PERF: one long-lived connection handle for the whole runner instead of
     // re-fetching one every tick, and no pre-flight PING before the real work.
@@ -75,6 +86,22 @@ pub async fn planner_ticker(
 
     loop {
         interval.tick().await;
+
+        // Fast path. With no replan requested, a full tick reads the planning
+        // key set, rebuilds a `State` from it, runs the tick (which only sets
+        // `_replanned` to the false it already holds) and diffs it back to
+        // nothing. Two booleans are enough to know that in advance.
+        let triggers =
+            match StateManager::get_state_for_keys(&mut con, &trigger_keys, &log_target).await {
+                Some(s) => s,
+                None => continue,
+            };
+        let replan_trigger = triggers.get_bool_or_default_to_false(&trigger_key, &log_target);
+        let replanned = triggers.get_bool_or_default_to_false(&replanned_key, &log_target);
+        if !replan_trigger && !replanned {
+            continue;
+        }
+
         let state = match StateManager::get_state_for_keys(&mut con, &keys, &log_target).await {
             Some(s) => s,
             None => continue,

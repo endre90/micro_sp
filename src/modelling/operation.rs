@@ -62,33 +62,59 @@ impl OperationState {
     pub fn to_spvalue(self) -> SPValue {
         self.to_string().to_spvalue()
     }
+
+    /// The same text `Display` produces, without allocating.
+    ///
+    /// DONE: PERF: the comparisons throughout `Operation` were written as
+    /// `value == OperationState::Initial.to_spvalue()`, and `to_spvalue` goes
+    /// through `to_string()` - so each one allocated a fresh `String`, wrapped
+    /// it in an `SPValue`, compared, and dropped it. `can_be_cancelled` alone
+    /// did that five times, for every operation, on every tick.
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            OperationState::Initial => "initial",
+            OperationState::Disabled => "disabled",
+            OperationState::Executing => "executing",
+            OperationState::Timedout => "timedout",
+            OperationState::Failed => "failed",
+            OperationState::Fatal => "fatal",
+            OperationState::Completed => "completed",
+            OperationState::Bypassed => "bypassed",
+            OperationState::Cancelled => "cancelled",
+            OperationState::Terminated(TerminationReason::Completed) => "terminated_completed",
+            OperationState::Terminated(TerminationReason::Bypassed) => "terminated_bypassed",
+            OperationState::Terminated(TerminationReason::Fatal) => "terminated_fatal",
+            OperationState::Terminated(TerminationReason::Cancelled) => "terminated_cancelled",
+            OperationState::UNKNOWN => "UNKNOWN",
+        }
+    }
+}
+
+/// Allocation-free equivalent of `value == expected.to_spvalue()`.
+///
+/// The subtlety worth spelling out: `to_spvalue()` does *not* always produce
+/// `SPValue::String(StringOrUnknown::String(..))`. `ToSPValue for String`
+/// collapses "UNKNOWN"/"unknown"/"Unknown" to `StringOrUnknown::UNKNOWN`, so
+/// `OperationState::UNKNOWN.to_spvalue()` is the UNKNOWN *variant*, not the
+/// string "UNKNOWN". Both sides have to be compared in that same shape or this
+/// silently disagrees with the comparison it replaced - which is exactly what
+/// `value_is_matches_the_old_spvalue_comparison` pins down.
+fn value_is(value: &SPValue, expected: OperationState) -> bool {
+    let expected_is_unknown = matches!(expected, OperationState::UNKNOWN);
+    match value {
+        SPValue::String(StringOrUnknown::UNKNOWN) => expected_is_unknown,
+        SPValue::String(StringOrUnknown::String(s)) => {
+            !expected_is_unknown && s == expected.as_str()
+        }
+        _ => false,
+    }
 }
 
 impl fmt::Display for OperationState {
+    /// Delegates to [`OperationState::as_str`] so the two cannot drift apart -
+    /// the allocation-free comparisons depend on them agreeing exactly.
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            OperationState::Initial => write!(f, "initial"),
-            OperationState::Disabled => write!(f, "disabled"),
-            OperationState::Executing => write!(f, "executing"),
-            OperationState::Timedout => write!(f, "timedout"),
-            OperationState::Failed => write!(f, "failed"),
-            OperationState::Fatal => write!(f, "fatal"),
-            OperationState::Completed => write!(f, "completed"),
-            OperationState::Bypassed => write!(f, "bypassed"),
-            OperationState::Cancelled => write!(f, "cancelled"),
-            OperationState::Terminated(TerminationReason::Completed) => {
-                write!(f, "terminated_completed")
-            }
-            OperationState::Terminated(TerminationReason::Bypassed) => {
-                write!(f, "terminated_bypassed")
-            }
-            OperationState::Terminated(TerminationReason::Fatal) => write!(f, "terminated_fatal"),
-            OperationState::Terminated(TerminationReason::Cancelled) => {
-                write!(f, "terminated_cancelled")
-            }
-            // OperationState::Void => write!(f, "void"),
-            OperationState::UNKNOWN => write!(f, "UNKNOWN"),
-        }
+        write!(f, "{}", self.as_str())
     }
 }
 
@@ -192,7 +218,7 @@ impl Operation {
     /// Check the guard of the planning precondidion transition.
     pub fn eval_planning(&self, state: &State, log_target: &str) -> bool {
         if let Some(value) = state.get_value(&self.name, &log_target) {
-            if value == OperationState::Initial.to_spvalue() {
+            if value_is(&value, OperationState::Initial) {
                 for precondition in &self.preconditions {
                     if precondition.eval_planning(state, &log_target) {
                         return true;
@@ -237,8 +263,8 @@ impl Operation {
     // transition method below.
     pub fn eval(&self, state: &State, log_target: &str) -> bool {
         if let Some(value) = state.get_value(&self.name, &log_target) {
-            if value == OperationState::Initial.to_spvalue()
-                || value == OperationState::Disabled.to_spvalue()
+            if value_is(&value, OperationState::Initial)
+                || value_is(&value, OperationState::Disabled)
             {
                 for precondition in &self.preconditions {
                     if precondition.eval(state, &log_target) {
@@ -253,7 +279,7 @@ impl Operation {
     /// Check the guard and return a tuple: (is_enabled, index_of_enabled_transition)
     pub fn evaluate_with_transition_index(&self, state: &State, log_target: &str) -> (bool, usize) {
         if let Some(value) = state.get_value(&self.name, &log_target) {
-            if value == OperationState::Initial.to_spvalue() {
+            if value_is(&value, OperationState::Initial) {
                 for (index, precondition) in self.preconditions.iter().enumerate() {
                     if precondition.eval(state, &log_target) {
                         return (true, index);
@@ -271,7 +297,7 @@ impl Operation {
         log_target: &str,
     ) -> (bool, usize) {
         if let Some(value) = state.get_value(&self.name, &log_target) {
-            if value == OperationState::Executing.to_spvalue() {
+            if value_is(&value, OperationState::Executing) {
                 for (index, postcondition) in self.postconditions.iter().enumerate() {
                     if postcondition.eval(state, &log_target) {
                         return (true, index);
@@ -285,7 +311,7 @@ impl Operation {
     /// Check the running postondition guard.
     pub fn can_be_completed(&self, state: &State, log_target: &str) -> bool {
         if let Some(value) = state.get_value(&self.name, &log_target) {
-            if value == OperationState::Executing.to_spvalue() {
+            if value_is(&value, OperationState::Executing) {
                 for postcondition in &self.postconditions {
                     if postcondition.eval(&state, &log_target) {
                         return true;
@@ -299,7 +325,7 @@ impl Operation {
     /// Check the running fail_transition guard.
     pub fn can_be_failed(&self, state: &State, log_target: &str) -> bool {
         if let Some(value) = state.get_value(&self.name, &log_target) {
-            if value == OperationState::Executing.to_spvalue() {
+            if value_is(&value, OperationState::Executing) {
                 for fail_transition in &self.failure_transitions {
                     if fail_transition.eval(&state, &log_target) {
                         return true;
@@ -315,7 +341,7 @@ impl Operation {
     // Cache the key strings; see the note on the `Operation` struct.
     pub fn can_be_timedout(&self, state: &State, log_target: &str) -> bool {
         if let Some(value) = state.get_value(&self.name, &log_target) {
-            if value == OperationState::Executing.to_spvalue() {
+            if value_is(&value, OperationState::Executing) {
                 if let Some(timeout_executing_ms) = self.timeout_executing_ms {
                     let elapased_ms = state.get_int_or_default_to_zero(
                         &format!("{}_elapsed_executing_ms", &self.name),
@@ -326,7 +352,7 @@ impl Operation {
                     }
                 }
             }
-            if value == OperationState::Disabled.to_spvalue() {
+            if value_is(&value, OperationState::Disabled) {
                 if let Some(timeout_disabled_ms) = self.timeout_disabled_ms {
                     let elapased_ms = state.get_int_or_default_to_zero(
                         &format!("{}_elapsed_disabled_ms", &self.name),
@@ -369,11 +395,11 @@ impl Operation {
     // happens unconditionally. Worth checking whether that was intended.
     pub fn can_be_cancelled(&self, sp_id: &str, state: &State, log_target: &str) -> bool {
         if let Some(value) = state.get_value(&self.name, &log_target) {
-            if value == OperationState::Initial.to_spvalue()
-                || value == OperationState::Executing.to_spvalue()
-                || value != OperationState::Disabled.to_spvalue()
-                || value != OperationState::Failed.to_spvalue()
-                || value != OperationState::Timedout.to_spvalue()
+            if value_is(&value, OperationState::Initial)
+                || value_is(&value, OperationState::Executing)
+                || !value_is(&value, OperationState::Disabled)
+                || !value_is(&value, OperationState::Failed)
+                || !value_is(&value, OperationState::Timedout)
             {
                 if let Some(dashboard_command) =
                     state.get_value(&format!("{}_dashboard_command", sp_id), &log_target)
@@ -393,7 +419,7 @@ impl Operation {
     /// Start executing the operation. Check for eval_running() first.
     pub fn disable(&self, state: &State, log_target: &str) -> State {
         let assignment = state.get_assignment(&self.name, &log_target);
-        if assignment.val == OperationState::Initial.to_spvalue() {
+        if value_is(&assignment.val, OperationState::Initial) {
             let action = Action::new(assignment.var, OperationState::Disabled.to_spvalue().wrap());
             action.assign(&state, &log_target)
         } else {
@@ -423,8 +449,8 @@ impl Operation {
     // the actions and the status write in place on a single copy.
     pub fn start(&self, state: &State, log_target: &str) -> State {
         let assignment = state.get_assignment(&self.name, &log_target);
-        if assignment.val == OperationState::Initial.to_spvalue()
-            || assignment.val == OperationState::Disabled.to_spvalue()
+        if value_is(&assignment.val, OperationState::Initial)
+            || value_is(&assignment.val, OperationState::Disabled)
         {
             for precondition in &self.preconditions {
                 if precondition.eval(state, &log_target) {
@@ -450,7 +476,7 @@ impl Operation {
     // repeats in `fail`, `bypass` and `timeout`.
     pub fn complete(&self, state: &State, log_target: &str) -> State {
         let assignment = state.get_assignment(&self.name, &log_target);
-        if assignment.val == OperationState::Executing.to_spvalue() {
+        if value_is(&assignment.val, OperationState::Executing) {
             for postcondition in &self.postconditions {
                 if postcondition.eval(&state, &log_target) {
                     let action = Action::new(
@@ -470,7 +496,7 @@ impl Operation {
     /// Fail the executing operation. Check for can_be_failed() first.
     pub fn fail(&self, state: &State, log_target: &str) -> State {
         let assignment = state.get_assignment(&self.name, &log_target);
-        if assignment.val == OperationState::Executing.to_spvalue() {
+        if value_is(&assignment.val, OperationState::Executing) {
             for fail_transition in &self.failure_transitions {
                 if fail_transition.eval(&state, &log_target) {
                     let action =
@@ -487,8 +513,8 @@ impl Operation {
 
     pub fn fatal(&self, state: &State, log_target: &str) -> State {
         let assignment = state.get_assignment(&self.name, &log_target);
-        if assignment.val == OperationState::Failed.to_spvalue()
-            || assignment.val == OperationState::Timedout.to_spvalue()
+        if value_is(&assignment.val, OperationState::Failed)
+            || value_is(&assignment.val, OperationState::Timedout)
         {
             let action = Action::new(assignment.var, OperationState::Fatal.to_spvalue().wrap());
             action.assign(&state, &log_target)
@@ -507,7 +533,7 @@ impl Operation {
         let assignment = state.get_assignment(&self.name, &log_target);
         match termination_reason {
             TerminationReason::Completed => {
-                if assignment.val == OperationState::Completed.to_spvalue() {
+                if value_is(&assignment.val, OperationState::Completed) {
                     let action = Action::new(
                         assignment.var,
                         OperationState::Terminated(TerminationReason::Completed)
@@ -542,8 +568,8 @@ impl Operation {
 
     pub fn bypass(&self, state: &State, log_target: &str) -> State {
         let assignment = state.get_assignment(&self.name, &log_target);
-        if assignment.val == OperationState::Failed.to_spvalue()
-            || assignment.val == OperationState::Timedout.to_spvalue()
+        if value_is(&assignment.val, OperationState::Failed)
+            || value_is(&assignment.val, OperationState::Timedout)
         {
             if self.bypass_transitions.len() > 0 {
                 for bypass_transition in &self.bypass_transitions {
@@ -572,8 +598,8 @@ impl Operation {
     /// Timeout an executing the operation.
     pub fn timeout(&self, state: &State, log_target: &str) -> State {
         let assignment = state.get_assignment(&self.name, &log_target);
-        if assignment.val == OperationState::Executing.to_spvalue()
-            || assignment.val == OperationState::Disabled.to_spvalue()
+        if value_is(&assignment.val, OperationState::Executing)
+            || value_is(&assignment.val, OperationState::Disabled)
         {
             if self.timeout_transitions.len() > 0 {
                 for timeout_transition in &self.timeout_transitions {
@@ -604,8 +630,8 @@ impl Operation {
     /// Otherwise we might end up in disabled? Let's try withthe emulation.
     pub fn retry(&self, state: &State, log_target: &str) -> State {
         let assignment = state.get_assignment(&self.name, &log_target);
-        if assignment.val == OperationState::Failed.to_spvalue()
-            || assignment.val == OperationState::Timedout.to_spvalue()
+        if value_is(&assignment.val, OperationState::Failed)
+            || value_is(&assignment.val, OperationState::Timedout)
         {
             let action = Action::new(assignment.var, OperationState::Initial.to_spvalue().wrap());
             action.assign(&state, &log_target)
@@ -622,8 +648,8 @@ impl Operation {
 
     pub fn reinitialize(&self, state: &State, log_target: &str) -> State {
         let assignment = state.get_assignment(&self.name, &log_target);
-        if assignment.val == OperationState::Completed.to_spvalue()
-            || assignment.val == OperationState::Fatal.to_spvalue()
+        if value_is(&assignment.val, OperationState::Completed)
+            || value_is(&assignment.val, OperationState::Fatal)
         {
             let action = Action::new(assignment.var, OperationState::Initial.to_spvalue().wrap());
             action.assign(&state, &log_target)
@@ -735,4 +761,75 @@ impl Operation {
     //     }
     //     state.clone()
     // }
+}
+#[cfg(test)]
+mod operation_state_tests {
+    use super::*;
+
+    fn all_states() -> Vec<OperationState> {
+        vec![
+            OperationState::Initial,
+            OperationState::Disabled,
+            OperationState::Executing,
+            OperationState::Completed,
+            OperationState::Bypassed,
+            OperationState::Timedout,
+            OperationState::Failed,
+            OperationState::Fatal,
+            OperationState::Cancelled,
+            OperationState::Terminated(TerminationReason::Completed),
+            OperationState::Terminated(TerminationReason::Bypassed),
+            OperationState::Terminated(TerminationReason::Fatal),
+            OperationState::Terminated(TerminationReason::Cancelled),
+            OperationState::UNKNOWN,
+        ]
+    }
+
+    /// The allocation-free comparisons rely on `as_str` producing exactly what
+    /// `Display`/`to_spvalue` produce, and on `from_str` round-tripping it.
+    #[test]
+    fn as_str_agrees_with_display_and_round_trips() {
+        for state in all_states() {
+            assert_eq!(state.as_str(), state.to_string(), "Display mismatch");
+            assert_eq!(
+                OperationState::from_str(state.as_str()),
+                state,
+                "from_str did not round-trip '{}'",
+                state.as_str()
+            );
+        }
+    }
+
+    /// `value_is` has to answer exactly what `value == expected.to_spvalue()`
+    /// used to, for every pairing - including the wrong-type case, which was
+    /// `false` before and must stay `false`.
+    #[test]
+    fn value_is_matches_the_old_spvalue_comparison() {
+        for expected in all_states() {
+            for actual in all_states() {
+                let old = actual.clone().to_spvalue() == expected.clone().to_spvalue();
+                let new = value_is(&actual.clone().to_spvalue(), expected.clone());
+                assert_eq!(new, old, "{:?} vs {:?}", actual, expected);
+            }
+
+            // Values that do not come from `to_spvalue()`: other types, the
+            // UNKNOWN variant, and the literal string "UNKNOWN" - which is a
+            // *different* value from the UNKNOWN variant and must stay so.
+            for wrong_type in [
+                SPValue::Bool(BoolOrUnknown::Bool(true)),
+                SPValue::Int64(IntOrUnknown::Int64(1)),
+                SPValue::String(StringOrUnknown::UNKNOWN),
+                SPValue::String(StringOrUnknown::String("UNKNOWN".to_string())),
+                SPValue::String(StringOrUnknown::String("".to_string())),
+            ] {
+                assert_eq!(
+                    value_is(&wrong_type, expected.clone()),
+                    wrong_type == expected.clone().to_spvalue(),
+                    "wrong-typed value {:?} vs {:?}",
+                    wrong_type,
+                    expected
+                );
+            }
+        }
+    }
 }

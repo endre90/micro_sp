@@ -302,8 +302,6 @@ pub async fn sop_runner(
     }
 }
 
-// PERF: three sequential Redis round trips (two `remove_sp_values` plus one
-// `remove_sp_value`) where one `DEL` of the concatenated key list would do.
 // DONE: the `println!` here wrote to stdout unconditionally, bypassing the
 // `log` filter, on every SOP teardown - and a stdout write is synchronous, so
 // it blocks the tokio worker for the duration.
@@ -325,9 +323,11 @@ async fn remove_operations_from_state(sop_id: &str, unique_sop: &SOP, mut con: S
         op_ids_meta.push(format!("{}_elapsed_disabled_ms", op));
     }
 
-    StateManager::remove_sp_values(&mut con, &op_ids).await;
-    StateManager::remove_sp_values(&mut con, &op_ids_meta).await;
-    StateManager::remove_sp_value(&mut con, &sop_id).await;
+    // DONE: PERF: three sequential round trips (two `remove_sp_values` plus a
+    // `remove_sp_value`) collapsed into one pipelined write. `sop_id` is
+    // already in `op_ids`, so the third call was deleting a key that had just
+    // been deleted anyway.
+    StateManager::apply(&mut con, &State::new(), &[&op_ids, &op_ids_meta]).await;
 }
 
 // PERF: the tree walk threads `State` by value, so every recursion level moves

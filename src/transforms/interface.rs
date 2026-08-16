@@ -3,12 +3,13 @@ use std::sync::Arc;
 use crate::*;
 use tokio::time::{Duration, interval};
 
-// PERF: polls every 250 ms (PING + MGET of 7 keys) purely to check a single
-// boolean trigger. Reading just `{sp_id}_tf_request_trigger` with one `GET` and
-// only fetching the rest when it is set would cut the steady-state cost of this
-// task by most of its current value; a keyspace notification on that one key
-// would remove it entirely and also drop the request latency from "up to 250 ms"
-// to "one round trip".
+// DONE: PERF: this polled every 250 ms with an `MGET` of 7 keys purely to check
+// a single boolean - the entire body below sits inside `if request_trigger`, so
+// an untriggered tick did all that work and then nothing. It now reads just
+// `{sp_id}_tf_request_trigger` with one `GET` and only fetches the rest once it
+// is set.
+// PERF (still open): a keyspace notification on that one key would remove the
+// poll entirely and drop request latency from "up to 250 ms" to one round trip.
 pub async fn tf_interface(
     sp_id: &str,
     connection_manager: &Arc<ConnectionManager>,
@@ -35,8 +36,20 @@ pub async fn tf_interface(
     // error on the command itself, which the callee already logs and skips.
     let mut con = connection_manager.get_connection().await;
 
+    let trigger_key = format!("{}_tf_request_trigger", sp_id);
+
     loop {
         interval.tick().await;
+
+        // Nothing below happens unless the trigger is set, so an idle tick
+        // costs one `GET` instead of an `MGET` of the whole request key set.
+        // Anything that is not exactly `true` means "no request", which is what
+        // `get_bool_or_default_to_false` used to decide after fetching all of it.
+        match StateManager::get_sp_value(&mut con, &trigger_key).await {
+            Some(SPValue::Bool(BoolOrUnknown::Bool(true))) => (),
+            _ => continue,
+        }
+
         let state = match StateManager::get_state_for_keys(&mut con, &keys, &log_target).await {
             Some(s) => s,
             None => continue,

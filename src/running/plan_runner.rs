@@ -219,7 +219,8 @@ async fn process_plan_tick(
     }
 
     // Guarded, like `auto_operation_runner` does it: on a tick with nothing
-    // terminated there is now no key-list building at all.
+    // terminated there is no key-list building at all. When there is something,
+    // both deletes go out in one pipelined round trip.
     if !terminated_operations.is_empty() {
         let mut terminated_operations_meta = vec![];
         for op in &terminated_operations {
@@ -229,8 +230,12 @@ async fn process_plan_tick(
             terminated_operations_meta.push(format!("{}_elapsed_executing_ms", op));
             terminated_operations_meta.push(format!("{}_elapsed_disabled_ms", op));
         }
-        StateManager::remove_sp_values(&mut con, &terminated_operations).await;
-        StateManager::remove_sp_values(&mut con, &terminated_operations_meta).await;
+        StateManager::apply(
+            &mut con,
+            &State::new(),
+            &[&terminated_operations, &terminated_operations_meta],
+        )
+        .await;
     }
 
     // DONE: PERF: this was a chain of six `.update(..)` calls, each cloning the
