@@ -41,22 +41,6 @@ impl SOP {
         operations
     }
 
-    // PERF (still open): `sop_runner` calls this repeatedly per tick - once for
-    // the root and once per child while searching for the active branch of each
-    // Sequence / Alternative - and each call re-walks the entire subtree below
-    // it. Evaluating the whole tree once per tick into a `Vec<SOPState>` indexed
-    // by pre-order position would make it a single O(n) pass. It is left alone
-    // deliberately: `process_sop_node_tick` threads the state through the walk,
-    // so a `Parallel` branch sees what the branch before it just did, and
-    // precomputing every node's state up front would quietly change that to a
-    // one-tick delay. The constant factor is what has been fixed instead.
-    //
-    // DONE: PERF: the leaf arm built `format!("{}", op.name)` - a heap
-    // allocation copying a `String` this already owns - on every leaf visit.
-    // DONE: PERF: the branch arms collected a `Vec<SOPState>` and then ran five
-    // separate `iter().any()/all()` passes over it. One pass accumulates the
-    // flags now, with no allocation. Children are still all evaluated (no
-    // short-circuit), exactly as before.
     pub fn get_state(&self, state: &State, log_target: &str) -> SOPState {
         match self {
             SOP::Operation(op) => {

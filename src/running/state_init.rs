@@ -129,58 +129,6 @@ pub fn generate_runner_state_variables(
         &log_target,
     );
 
-    // Logging:
-    // let empty_log: Vec<Vec<OperationLog>> = vec![vec![]];
-    // let empty_log_agg: Vec<Vec<Vec<OperationLog>>> = vec![vec![vec![]]];
-    // let logger_planned_operations = v!(&&format!("{}_logger_planned_operations", name));
-    // state.add_mut(
-    //     assign!(
-    //         logger_planned_operations,
-    //         SPValue::String(StringOrUnknown::String(
-    //             serde_json::to_string(&empty_log).unwrap()
-    //         ))
-    //     ),
-    //     &log_target,
-    // );
-
-    // let logger_automatic_operations = v!(&&format!("{}_logger_automatic_operations", name));
-    // state.add_mut(
-    //     assign!(
-    //         logger_automatic_operations,
-    //         SPValue::String(StringOrUnknown::String(
-    //             serde_json::to_string(&empty_log).unwrap()
-    //         ))
-    //     ),
-    //     &log_target,
-    // );
-
-    // let logger_automatic_operations_agg = v!(&&format!("{}_logger_automatic_operations_agg", name));
-    // state.add_mut(assign!(
-    //     logger_automatic_operations_agg,
-    //     SPValue::String(StringOrUnknown::String(
-    //         serde_json::to_string(&empty_log_agg).unwrap()
-    //     ))
-    // ));
-
-    // let logger_sop_operations = v!(&&format!("{}_logger_sop_operations", name));
-    // state.add_mut(
-    //     assign!(
-    //         logger_sop_operations,
-    //         SPValue::String(StringOrUnknown::String(
-    //             serde_json::to_string(&empty_log).unwrap()
-    //         ))
-    //     ),
-    //     &log_target,
-    // );
-
-    // let logger_sop_operations_agg = v!(&&format!("{}_logger_sop_operations_agg", name));
-    // state.add_mut(assign!(
-    //     logger_sop_operations_agg,
-    //     SPValue::String(StringOrUnknown::String(
-    //         serde_json::to_string(&empty_log_agg).unwrap()
-    //     ))
-    // ));
-
     // Initialize values
     state.add_mut(
         assign!(runner_state, SPValue::String(StringOrUnknown::UNKNOWN)),
@@ -378,29 +326,6 @@ pub fn generate_runner_state_variables(
         ),
         &log_target,
     );
-    // state.add_mut(
-    //     assign!(time_request_trigger, SPValue::Bool(BoolOrUnknown::UNKNOWN)),
-    //     &log_target,
-    // );
-    // state.add_mut(
-    //     assign!(
-    //         time_request_state,
-    //         SPValue::String(StringOrUnknown::String("initial".to_string()))
-    //     ),
-    //     &log_target,
-    // );
-    // state.add_mut(
-    //     assign!(time_command, SPValue::String(StringOrUnknown::UNKNOWN)),
-    //     &log_target,
-    // );
-    // state.add_mut(
-    //     assign!(time_duration_ms, SPValue::Int64(IntOrUnknown::UNKNOWN)),
-    //     &log_target,
-    // );
-    // state.add_mut(
-    //     assign!(time_elapsed_ms, SPValue::Int64(IntOrUnknown::UNKNOWN)),
-    //     &log_target,
-    // );
 
     // Define variables to keep track of the processes
     let state_manager_online = bv!(&&format!("state_manager_online"));

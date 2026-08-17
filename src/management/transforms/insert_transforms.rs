@@ -8,7 +8,6 @@ pub(super) async fn insert_transforms(
     transforms: &Vec<SPTransformStamped>,
 ) -> Result<(), Box<dyn Error>> {
     if transforms.is_empty() {
-        // return Err("There are no transforms to insert, vector is empty.".into());
         log::error!(target:  "insert_transforms", "There are no transforms to insert. Skipping, vector is empty.");
         return Ok(())
     }

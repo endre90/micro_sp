@@ -175,18 +175,6 @@ impl fmt::Display for GoalState {
 }
 
 /// Merge newly arrived goals into the queue, ordered by priority.
-///
-/// An id is assigned exactly once - to a goal as it is admitted from
-/// `_incoming_goals`, and to any already-queued goal that somehow has none -
-/// and is never regenerated afterwards.
-///
-/// That stability is not cosmetic. `_scheduled_goals` is written back to Redis
-/// through a diff against the previous tick, so if the ids change every tick
-/// the serialised value differs every tick, the diff is never empty, and an
-/// MSET goes out 10 times a second for as long as anything sits in the queue.
-/// That is exactly what this used to do. Keeping ids stable means an unchanged
-/// queue produces no write at all - and a goal keeps the id it was announced
-/// with, instead of having it change under it while it waits.
 pub fn admit_goals(mut scheduled: Vec<Goal>, incoming: Vec<Goal>) -> Vec<Goal> {
     scheduled.extend(incoming.into_iter().map(|goal| Goal {
         id: nanoid::nanoid!(10, &NANOID_ALPHABET),
@@ -207,23 +195,6 @@ pub fn admit_goals(mut scheduled: Vec<Goal>, incoming: Vec<Goal>) -> Vec<Goal> {
     scheduled
 }
 
-// DONE: PERF: this runner used to re-generate every scheduled goal's id with
-// `nanoid!` on *every* tick. The serialised `_scheduled_goals` value was
-// therefore different every time, so `get_diff_partial_state` never came back
-// empty and an MSET went out 10 times a second for as long as anything sat in
-// the queue. Measured with three goals queued: 50 MSETs per 5 seconds, i.e. one
-// on every single tick. It was also wrong - a goal's id changed under it while
-// it waited, so the id logged when a goal was queued never matched the one it
-// was eventually started with.
-// Ids are now assigned once, at the moment a goal is admitted from
-// `_incoming_goals`, which is the only point a goal actually needs one. A
-// queue that is not changing now serialises to the same value and produces no
-// write at all.
-// DONE: PERF: `state.clone()` per tick plus a chain of up to nine `.update(..)`
-// calls in the `Initial` arm, each cloning the whole state map. They are
-// `update_mut` now, so the tick costs one clone instead of ten.
-// DONE: PERF: `current_goal_state.to_string()` on a value that is already a
-// `String` allocated a copy for nothing.
 pub async fn goal_runner(
     sp_id: &str,
     connection_manager: &Arc<ConnectionManager>,
@@ -254,11 +225,6 @@ pub async fn goal_runner(
         format!("{}_replan_for_same_goal", sp_id),
     ];
 
-    // PERF: one long-lived connection handle for the whole runner instead of
-    // re-fetching one every tick, and no pre-flight PING before the real work.
-    // `SPConnection` is cheap to clone, multiplexed and self-healing, so this
-    // handle stays valid across reconnects; a dropped socket now surfaces as an
-    // error on the command itself, which the callee already logs and skips.
     let mut con = connection_manager.get_connection().await;
 
     loop {

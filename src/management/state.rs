@@ -11,72 +11,6 @@ mod set_state;
 mod remove_sp_value;
 mod remove_sp_values;
 mod flush_state;
-
-// PERF (storage layout): the state is currently one Redis top-level key per
-// variable, with the value as a JSON string. That forces `KEYS *` + `MGET` to
-// read the state and makes every read/write touch the global keyspace.
-// Suggested: store the whole state as a single Redis HASH, e.g.
-// `sp:{sp_id}:state`, with one field per variable. That gives you:
-//   - `HGETALL` instead of `KEYS *` + `MGET` (one O(n) command, no O(keyspace)
-//     scan, one round trip instead of two);
-//   - `HMGET key f1 f2 ..` for the partial reads the runners already do;
-//   - `HSET key f v f v ..` / `HDEL` for writes, all atomic per command;
-//   - clean namespacing, so transforms (`TF_PREFIX`) and logger blobs stop
-//     sharing a keyspace with state variables and `FLUSHDB` is no longer the
-//     only way to reset one runner's state.
-//
-// PERF (round trips): a single tick of e.g. `auto_operation_runner` currently
-// issues PING, KEYS, MGET, MSET, DEL, DEL - six sequential round trips, each of
-// which the tokio task awaits before doing anything else. Suggested: batch them
-// with `redis::pipe()` (`.atomic()` if you want MULTI/EXEC semantics). Reads
-// and writes cannot always be merged, but PING can go entirely, KEYS+MGET
-// collapse into HGETALL, and MSET+DEL+DEL collapse into one pipelined write -
-// taking six RTTs down to two.
-//
-// CORRECTNESS (open - needs a design decision, not a bug fix): read-modify-write
-// across runners is not atomic. Each runner reads a snapshot, computes a diff
-// against it, and writes the diff; two runners whose ticks overlap can both
-// decide what to write from the same stale read, and the later MSET wins. It
-// shows up as "the state change did not take" plus a tick of latency while it
-// is redone.
-//
-// Since each runner only writes keys whose value *changed* in its own tick,
-// this only bites where two runners genuinely write the same key. That set is
-// small and known:
-//
-//   {sp_id}_plan              planner_ticker, plan_runner, goal_runner
-//   {sp_id}_plan_state        plan_runner, goal_runner
-//   {sp_id}_planner_state     planner_ticker, plan_runner, goal_runner
-//   {sp_id}_plan_current_step plan_runner, goal_runner
-//   {sp_id}_current_goal_state plan_runner, goal_runner
-//   {sp_id}_replan_trigger    planner_ticker, goal_runner
-//   {sp_id}_replanned         planner_ticker, goal_runner
-//
-// Two ways out, both bigger than a fix:
-//
-//   1. Exclusive ownership per key. The natural split is planner_ticker owning
-//      `_planner_state`/`_plan`/`_plan_id`/`_plan_counter`, plan_runner owning
-//      `_plan_state`/`_plan_current_step`/`_terminated_operations`, and
-//      goal_runner owning the `_current_goal_*`/`_scheduled_goals`/`_replan_*`
-//      family. That does not work as a straight edit, because goal_runner
-//      currently *resets* the plan fields when it admits a new goal - the
-//      cross-writes are how the handover is implemented today. Doing this
-//      properly means reworking that handover so each runner resets its own
-//      fields when it observes a new `_current_goal_id`.
-//   2. Make the read-compute-write atomic with WATCH/MULTI/EXEC or a Lua
-//      script, and retry on conflict. Cheaper to implement, but it turns every
-//      tick into a transaction and needs a retry policy.
-//
-// Note `StateManager::apply` deliberately does *not* use `.atomic()`: batching
-// a runner's own writes into one MULTI/EXEC does nothing for this, because the
-// race is between the read and the write, not among the writes.
-//
-// PERF (serialisation): every value is `serde_json` encoded/decoded on every
-// hop. For `SPTransformStamped` and array/map values that is the dominant cost
-// of a tick. Suggested: skip re-deserialising values that did not change (see
-// the note in `get_full_state`), and consider a compact binary codec
-// (`rmp-serde`, `bincode`) for the transform/array-heavy keys - typically
-// 2-5x faster and smaller on the wire.
 pub struct StateManager {}
 
 impl StateManager {
@@ -113,11 +47,6 @@ impl StateManager {
     }
 
     /// Write a state delta and delete a set of keys in a single round trip.
-    ///
-    /// DONE: PERF: the runners' tail was `set_state` followed by one or two
-    /// `remove_sp_values` calls - three sequential round trips, each awaited
-    /// before the next could start, for what is one logical "publish this
-    /// tick's changes" step. `redis::pipe()` sends them together.
     ///
     /// Not `.atomic()` (no MULTI/EXEC): the previous code was three separate
     /// commands with no atomicity either, so wrapping them in a transaction

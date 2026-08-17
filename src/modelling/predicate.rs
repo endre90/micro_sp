@@ -25,28 +25,6 @@ pub enum Predicate {
 }
 
 impl Predicate {
-    // DONE: PERF: taking `self` by value was the root cause of a large fraction
-    // of the allocation traffic in this crate. Because `eval` consumed the
-    // predicate, every caller had to clone the whole tree first -
-    // `precondition.clone().eval(..)` in a loop in eight `Operation` methods,
-    // `transition.to_owned().eval(..)` in `process_transition`,
-    // `goal.clone().eval(..)` once per node in the BFS planner. Each clone
-    // deep-copied every `Predicate` node, every `SPWrapped` and every `SPValue`
-    // inside it, then dropped it microseconds later.
-    // `eval` now takes `&self` and uses `iter()` in the AND/OR arms, *and* all
-    // of those callers have had their `.clone()` / `.to_owned()` removed, so
-    // guard evaluation no longer allocates on any tick or planner node.
-
-
-    // PERF: `AND`/`OR` already short-circuit via `all`/`any`, which is good.
-    // Ordering conjuncts cheapest-first (e.g. literal comparisons before
-    // variable lookups) would help further, and is easy to do once at model
-    // build time rather than per evaluation.
-
-    // PERF: the comparison arms call `x.evaluate(..)` and `y.evaluate(..)`,
-    // each of which clones an `SPValue` out of the state (and, today, clones
-    // the whole state map first - see `State::get_value`). For the common
-    // "variable vs literal" case a borrowing comparison would allocate nothing.
     pub fn eval(&self, state: &State, log_target: &str) -> bool {
         match self {
             Predicate::TRUE => true,
@@ -147,14 +125,6 @@ impl Predicate {
         }
     }
 
-    // PERF: allocates a `Vec` per node during the recursion, then sorts and
-    // dedups. Only called when building key sets at startup, so it is not on the
-    // hot path - but `Transition::get_all_var_keys` and
-    // `Operation::get_all_var_keys` are called per operation when key sets are
-    // rebuilt, and they in turn call this twice per transition. If key sets ever
-    // move to being recomputed per tick (e.g. when the active operation set
-    // changes), pass a `&mut Vec`/`&mut HashSet` accumulator down the recursion
-    // instead of returning a fresh `Vec` at every level.
     pub fn get_predicate_vars(&self) -> Vec<SPVariable> {
         let mut vars = match self {
             Predicate::AND(preds) | Predicate::OR(preds) => {
@@ -327,37 +297,6 @@ impl Predicate {
             .collect()
     }
 
-    // let mut s = Vec::new();
-    // match self {
-    //     Predicate::TRUE => {}
-    //     Predicate::FALSE => {}
-    //     Predicate::AND(x) => s.extend(x.iter().flat_map(|p| self.get_predicate_vars(p))),
-    //     Predicate::OR(x) => s.extend(x.iter().flat_map(|p| get_predicate_vars(p))),
-    //     Predicate::NOT(x) => s.extend(get_predicate_vars(x)),
-    //     Predicate::EQ(x, y) => {
-    //         match x {
-    //             SPWrapped::SPVariable(vx) => s.push(vx.to_owned()),
-    //             _ => (),
-    //         }
-    //         match y {
-    //             SPWrapped::SPVariable(vy) => s.push(vy.to_owned()),
-    //             _ => (),
-    //         }
-    //     }
-    //     Predicate::NEQ(x, y) => {
-    //         match x {
-    //             SPWrapped::SPVariable(vx) => s.push(vx.to_owned()),
-    //             _ => (),
-    //         }
-    //         match y {
-    //             SPWrapped::SPVariable(vy) => s.push(vy.to_owned()),
-    //             _ => (),
-    //         }
-    //     }
-    // }
-    // s.sort();
-    // s.dedup();
-    // s
 }
 // }
 

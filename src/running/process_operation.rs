@@ -11,72 +11,6 @@ pub enum OperationProcessingType {
     Automatic,
 }
 
-// PERF: called once per active operation per tick by three different runners,
-// so everything in here is multiplied by the number of running operations.
-//
-// 1. Key building: the function opens with six `format!("{}_...", operation.name)`
-//    calls and closes with three more, plus more inside the match arms - about
-//    a dozen heap allocations per operation per tick purely to name variables
-//    that never change. Suggested: build these once when the operation becomes
-//    active and carry them in a small struct alongside the `Operation`.
-// 2. Each of those getters goes through `State::get_value`, which currently
-//    clones the entire state map (see the note there). Six clones of the whole
-//    state before any real work happens, per operation, per tick.
-// 3. DONE: the `format!` for `new_op_info` ran on every arm every tick, but the
-//    result is only used if it differs from `old_operation_information`. The
-//    `Disabled` arm was the expensive one: it clones every precondition's guard
-//    and runner guard into two `Predicate::OR` trees and renders both via
-//    `Display` - a full predicate-tree walk with string building - *every
-//    200 ms for every disabled operation*, and a disabled operation is exactly
-//    the one that stays disabled for a long time.
-//    Both steady-state messages (`Disabled` and the waiting branch of
-//    `Executing`) are pure functions of the operation, so they were rebuilt
-//    byte-identically every tick and then discarded by the `!=` check. They are
-//    now built once, when the operation first reports that state, and skipped
-//    afterwards via `info_already_reads_as` - an allocation-free prefix test
-//    against the message already in the state.
-//    The other arms fire on state transitions rather than every tick, so their
-//    `format!` calls are not on the steady-state path and are left alone.
-// 4. DONE: `operation.clone().cancel(..)` / `.timeout(..)` / `.fail(..)` /
-//    `.complete(..)` / `.retry(..)` deep-copied the whole `Operation` (all six
-//    transition vectors) just to call a `&self` method. All twelve `.clone()`
-//    calls are gone.
-// 5. DONE (correctness): `elapased_executing_ms += <the operation runner's tick
-//    constant>` assumed this is called exactly on a 200 ms cadence. `sop_runner` calls it
-//    at 100 ms, so every SOP operation accumulated elapsed time at *twice* real
-//    speed and timed out at half its configured deadline; and any runner whose
-//    tick slipped because Redis was slow under-counted in the other direction.
-//    The caller now passes the wall-clock time its own tick actually took, so
-//    the counters track real elapsed milliseconds in both cases.
-//    Note this deliberately keeps the accumulate-into-state design rather than
-//    stamping a start `SystemTime` per operation: a start stamp needs two new
-//    per-operation variables, and any state persisted by an older build would
-//    not have them - which, with `State::get_value` panicking on a missing
-//    variable, turns a version skew into a crash. Accumulating needs no new
-//    variables at all. (The separate latent issue that the counters are never
-//    reset when an operation re-enters Executing is untouched here.)
-// 6. DONE (partly): the three chained `.update(..)` calls at the end each
-//    cloned the whole state map; they are `update_mut` now.
-//    The rest of the original note was wrong and the correction matters:
-//    `_elapsed_executing_ms` / `_elapsed_disabled_ms` are only *incremented* in
-//    the Executing and Disabled arms, so in every other state they are written
-//    back unchanged and produce no diff - and an idle system has no active
-//    operations to call this with at all. Measured: eight runners idling for
-//    five seconds issue zero MSETs. The remaining per-tick write is for an
-//    operation that is genuinely running, where the elapsed counter really did
-//    change. Deriving it from a stored start time (point 5) would remove that
-//    write too, and would fix the tick-constant bug, but it is a timeout
-//    semantics change rather than an idle-load one.
-/// True when `info` already reads as `{before}{op_name}{after}...`.
-///
-/// The steady-state arms of `process_operation` build a message that is a pure
-/// function of the operation, so it is the *same string* on every tick for as
-/// long as the operation stays in that state. `new_op_info` starts out as the
-/// value already in the state, so when this returns true there is nothing to
-/// rebuild - the message, the logging decision and the write are all unchanged.
-///
-/// The check itself is allocation-free, which is the point: it has to be much
-/// cheaper than the message it avoids building.
 fn info_already_reads_as(info: &str, before: &str, op_name: &str, after: &str) -> bool {
     info.strip_prefix(before)
         .and_then(|rest| rest.strip_prefix(op_name))
@@ -90,9 +24,6 @@ pub(super) async fn process_operation(
     operation_processing_type: OperationProcessingType,
     plan_current_step: Option<&mut i64>,
     plan_state: Option<&mut String>,
-    // sop_state: Option<&mut String>,
-    // logging_tx: mpsc::Sender<LogMsg>,
-    // mut con: crate::SPConnection,
     // Wall-clock milliseconds the caller's tick actually took. The elapsed
     // counters advance by this, so they track real time no matter which runner
     // is driving the operation or how badly a tick slipped.

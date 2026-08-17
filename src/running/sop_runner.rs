@@ -2,50 +2,7 @@ use crate::*;
 use log::Level;
 use crate::SPConnection;
 use std::sync::Arc;
-use tokio::sync::mpsc;
 
-// PERF: this is the loop you feel when a SOP is running. Per 100 ms tick it
-// does: an `MGET` of its key set, a full `state.clone()`, a recursive walk of
-// the SOP tree that clones the tree several times and evaluates every operation
-// guard, a full-state diff, and an MSET. Concretely, the things worth changing
-// here:
-//
-// 1. DONE: `StateManager::get_full_state` -> `get_state_for_keys`. The key set
-//    is `SOP::get_all_var_keys()` unioned with the per-operation bookkeeping
-//    keys (`{op}`, `{op}_information`, `{op}_elapsed_*`, `{op}_*_retry_counter`)
-//    and the handful of `{sp_id}_sop_*` keys - see `running::runner_keys`. It
-//    is recomputed only when a SOP is activated or torn down, not per tick, so
-//    the blocking `KEYS *` is gone.
-// 2. DONE: `active_sop_container.clone().unwrap()` appeared three times and
-//    deep-copied the whole SOP tree (every `Operation`, every `Transition`,
-//    every `Predicate`) each time - twice per tick while a SOP was running.
-//    `visualize_sop` and `get_state` only need `&SOP`, and so does
-//    `process_sop_node_tick`, so all three are `as_ref()` now. A fourth copy
-//    per tick is gone too: the walk was handed `new_state.clone()` even though
-//    its result is assigned straight back over `new_state`.
-//    `sop_template.sop.clone()` in the activation path stays - that one is
-//    real, it is the tree that gets uniquified, and it runs once per SOP start.
-// 3. `let mut new_state = state.clone()` clones the entire state map every tick
-//    just so the diff at the bottom has something to compare against. With
-//    `update_mut` + a dirty-key list (see `State`) you can drop both the clone
-//    and the diff scan.
-// 4. The `format!` calls building `new_sop_info` run every tick even when the
-//    text is identical to `old_sop_information` and is then discarded; the
-//    `visualize_sop(..)` in the `Initial` arm renders the whole tree to a
-//    string. Suggested: compare cheap discriminants first and only format when
-//    something actually changed.
-// 5. `model.sops.iter().find(|s| s.id == sop_id)` is a linear scan of the model
-//    every tick; a `HashMap<String, &SOPStruct>` built once at startup is O(1).
-// 6. Tick rate vs. latency: at 100 ms, and with each operation step having to
-//    round-trip through Redis, a SOP of N sequential operations takes at least
-//    ~2-3 ticks per operation. Driving this loop off change notifications (see
-//    `ConnectionManager`) rather than a timer is what actually fixes the
-//    "state change doesn't occur as quickly as I want" symptom; lowering
-//    `MICRO_SP_TICK_INTERVAL_MS` only trades latency for more `KEYS *` storms.
-// 7. DONE: `process_operation` used to charge elapsed time from a per-runner
-//    tick constant, so SOP operations accumulated elapsed time at the wrong
-//    speed and timed out early. Real elapsed time is measured with `Instant`
-//    (see `running::tick::TickClock`) and passed in instead.
 pub async fn sop_runner(
     sp_id: &str,
     model: &Model,
@@ -76,11 +33,6 @@ pub async fn sop_runner(
         log::warn!(target: log_target, "MICRO_SP_READ_FULL_STATE is set: reading the whole keyspace every tick.");
     }
 
-    // PERF: one long-lived connection handle for the whole runner instead of
-    // re-fetching one every tick, and no pre-flight PING before the real work.
-    // `SPConnection` is cheap to clone, multiplexed and self-healing, so this
-    // handle stays valid across reconnects; a dropped socket now surfaces as an
-    // error on the command itself, which the callee already logs and skips.
     let mut con = connection_manager.get_connection().await;
 
     // Real time between ticks. `process_operation` advances the elapsed
@@ -123,16 +75,6 @@ pub async fn sop_runner(
         let mut new_sop_info: String; // = old_sop_information.clone();
         let mut sop_info_level: Level = log::Level::Info;
 
-        // let terminated_operations_sp_value = state.get_array_or_default_to_empty(
-        //     &format!("{}_terminated_operations", sp_id),
-        //     &log_target,
-        // );
-
-        // let terminated_operations: Vec<String> = terminated_operations_sp_value
-        //     .iter()
-        //     .filter(|val| val.is_string())
-        //     .map(|y| y.to_string())
-        //     .collect();
 
         // Snapshotted for the file log: the arms below drive
         // `active_unique_sop_state` forward, and comparing against this after
@@ -182,10 +124,6 @@ pub async fn sop_runner(
                     new_sop_info = format!(
                         "Initializing a new SOP '{}':\n{}",
                         active_sop,
-                        // DONE: PERF: `active_sop_container.clone().unwrap()`
-                        // deep-copied the whole SOP tree - every `Operation`,
-                        // every `Transition`, every `Predicate` - just to read
-                        // it. `visualize_sop` and `get_state` only need `&SOP`.
                         visualize_sop(active_sop_container.as_ref().unwrap())
                     );
                 }
@@ -195,11 +133,6 @@ pub async fn sop_runner(
                     let con_clone = con.clone();
                     new_sop_info = format!("Executing SOP '{active_sop}'.");
                     sop_info_level = log::Level::Info;
-                    // DONE: PERF: this arm ran on every tick of a running SOP
-                    // and cloned the whole SOP tree twice (once for the walk,
-                    // once for the root state check) plus the whole `State`
-                    // once - the `state.clone()` was pure waste, since the
-                    // result is assigned straight back over it.
                     new_state = process_sop_node_tick(
                         sp_id,
                         new_state,
@@ -342,9 +275,6 @@ pub async fn sop_runner(
     }
 }
 
-// DONE: the `println!` here wrote to stdout unconditionally, bypassing the
-// `log` filter, on every SOP teardown - and a stdout write is synchronous, so
-// it blocks the tokio worker for the duration.
 async fn remove_operations_from_state(sop_id: &str, unique_sop: &SOP, mut con: SPConnection) {
     let ops_in_sop = get_all_operations_from_sop(&unique_sop);
     let mut op_ids_meta = vec![];
@@ -363,33 +293,9 @@ async fn remove_operations_from_state(sop_id: &str, unique_sop: &SOP, mut con: S
         op_ids_meta.push(format!("{}_elapsed_disabled_ms", op));
     }
 
-    // DONE: PERF: three sequential round trips (two `remove_sp_values` plus a
-    // `remove_sp_value`) collapsed into one pipelined write. `sop_id` is
-    // already in `op_ids`, so the third call was deleting a key that had just
-    // been deleted anyway.
     StateManager::apply(&mut con, &State::new(), &[&op_ids, &op_ids_meta]).await;
 }
 
-// PERF: the tree walk threads `State` by value, so every recursion level moves
-// (and every `process_operation` call rebuilds) the whole state map. Taking
-// `&mut State` instead would let each node mutate in place with no copying.
-// PERF (still open, deliberately): `Box::pin(..)` on each recursive call
-// heap-allocates a future per node per tick. `process_operation` currently has
-// no live await point at all - the only one is the commented-out logging send -
-// so this whole walk could be synchronous and the boxing would vanish. It is
-// left as it is because making it sync means making `process_operation` sync
-// too, and that is exactly what has to be undone to re-enable the logging
-// channel. The cost is one allocation per *visited* node, and the walk visits
-// one child per Sequence/Alternative level plus every Parallel branch, so it is
-// a handful per tick - far smaller than the tree clones that were removed.
-// PERF (still open): `SOP::Sequence`/`Alternative` call `child.get_state(..)`
-// for each child while searching for the active branch, and `get_state`
-// recurses over that child's entire subtree. Precomputing every node's state
-// once per tick would make it a single O(n) pass - but note the walk threads
-// `State` through as it goes, so a `Parallel` branch sees what the branch
-// before it just did. Precomputing up front would turn that into a one-tick
-// delay, which is a behaviour change, not just an optimisation. The constant
-// factor has been cut instead (see `SOP::get_state`).
 async fn process_sop_node_tick(
     sp_id: &str,
     mut state: State,
@@ -499,12 +405,6 @@ fn can_sop_start(sp_id: &str, sop: &SOP, state: &State, log_target: &str) -> boo
     }
 }
 
-// PERF: fine as-is (runs once per SOP activation, not per tick), but note it
-// rebuilds every `Operation` - including cloning all its transition vectors -
-// only to change the `name`. If `Operation` held its transitions behind an
-// `Arc<[Transition]>`, uniquifying a large SOP would become almost free and
-// would also make the per-tick `operation.clone()` calls in `process_operation`
-// cheap.
 pub fn uniquify_sop_operations(sop: SOP) -> SOP {
     match sop {
         SOP::Operation(op) => {

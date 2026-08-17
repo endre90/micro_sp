@@ -64,12 +64,6 @@ impl OperationState {
     }
 
     /// The same text `Display` produces, without allocating.
-    ///
-    /// DONE: PERF: the comparisons throughout `Operation` were written as
-    /// `value == OperationState::Initial.to_spvalue()`, and `to_spvalue` goes
-    /// through `to_string()` - so each one allocated a fresh `String`, wrapped
-    /// it in an `SPValue`, compared, and dropped it. `can_be_cancelled` alone
-    /// did that five times, for every operation, on every tick.
     pub fn as_str(&self) -> &'static str {
         match self {
             OperationState::Initial => "initial",
@@ -118,22 +112,6 @@ impl fmt::Display for OperationState {
     }
 }
 
-// PERF: an `Operation` owns six `Vec<Transition>`, each transition owning two
-// predicate trees and two action vectors, so `Operation::clone()` is a deep
-// copy of a fairly large graph. It is still cloned on some hot paths:
-// `auto_operation_runner` clones a template per
-// activation and again per tick when rebuilding `active_auto_ops`, the BFS
-// planner clones one per node, and `Model::new` clones every transition vector
-// three times over. (The `operation.clone().cancel(..)` calls in
-// `process_operation` are gone - those methods take `&self`.)
-// Suggested: hold the transition vectors as
-// `Arc<[Transition]>` so cloning an `Operation` is a handful of refcount bumps,
-// and store active operations as `Arc<Operation>` in the runners.
-// PERF: the runners key everything off `operation.name` via `format!`. Caching
-// the derived key strings (`{name}`, `{name}_information`,
-// `{name}_elapsed_executing_ms`, ...) on the struct - or in a side table built
-// when the operation is activated - removes about a dozen allocations per
-// operation per tick.
 #[derive(Debug, PartialEq, Clone, Eq, Hash, Serialize, Deserialize)]
 pub struct Operation {
     pub name: String,
@@ -232,9 +210,6 @@ impl Operation {
 
     /// Execute the planing actions of both the pre and post conditions.
     /// Inex 0 taken as to indicate that the firstly defined transition should be taken when planning.
-    ///
-    /// DONE: this used to clone both transitions and build an intermediate
-    /// `State` between them; it now applies both in place on a single copy.
     pub fn take_planning(&self, state: &State, log_target: &str) -> State {
         let mut new_state = state.clone();
         self.preconditions[0].take_planning_mut(&mut new_state, &log_target);
@@ -242,25 +217,6 @@ impl Operation {
         new_state
     }
 
-    // DONE: PERF: this is evaluated for *every* auto operation on *every* tick
-    // of `auto_operation_runner`, so it is the single most frequently executed
-    // guard check in the system. Both of its old costs are gone:
-    //   - `state.get_value(&self.name, ..)` no longer clones the entire state
-    //     map before the cheap early-out runs (see `State::get_value`);
-    //   - `precondition.clone().eval(state, ..)` used to deep-copy the
-    //     transition for every precondition of every operation, including the
-    //     ones whose guard is immediately false. `Transition::eval` and
-    //     `Predicate::eval` take `&self`, so the guard walk is now a pure
-    //     borrow. The same clone removal was applied to `eval_planning`,
-    //     `evaluate_with_transition_index`, `can_be_completed(_with_index)`,
-    //     `can_be_failed`, `start`, `complete`, `fail`, `bypass` and `timeout`.
-    // PERF: `OperationState::Initial.to_spvalue()` allocates a fresh `String`
-    // ("initial") and wraps it in an `SPValue` twice per call just to compare.
-    // Comparing against `&'static str` (or matching on
-    // `OperationState::from_str`) avoids two allocations per operation per tick.
-    // The same pattern appears in `eval_planning`, `can_be_completed`,
-    // `can_be_failed`, `can_be_timedout`, `can_be_cancelled` and every state
-    // transition method below.
     pub fn eval(&self, state: &State, log_target: &str) -> bool {
         if let Some(value) = state.get_value(&self.name, &log_target) {
             if value_is(&value, OperationState::Initial)
@@ -336,9 +292,6 @@ impl Operation {
         false
     }
 
-    // PERF: builds `format!("{}_elapsed_executing_ms", self.name)` (and the
-    // disabled variant) on every call, i.e. per executing operation per tick.
-    // Cache the key strings; see the note on the `Operation` struct.
     pub fn can_be_timedout(&self, state: &State, log_target: &str) -> bool {
         if let Some(value) = state.get_value(&self.name, &log_target) {
             if value_is(&value, OperationState::Executing) {
@@ -367,46 +320,7 @@ impl Operation {
         false
     }
 
-    /// Check the running reset_transition guard.
-    // pub fn can_be_reset(&self, state: &State, log_target: &str) -> bool {
-    //     if let Some(value) = state.get_value(&self.name, &log_target) {
-    //         if value == OperationState::Completed.to_spvalue() {
-    //             for reset_transition in &self.reset_transitions {
-    //                 if reset_transition.clone().eval(&state, &log_target) {
-    //                     return true;
-    //                 }
-    //             }
-    //         }
-    //     }
-    //     false
-    // }
-
     /// Check if we can stop the execution and cancel the operations
-    // PERF: called first in almost every arm of `process_operation`, so it runs
-    // for every active operation on every tick. It does two `state.get_value`
-    // calls (each a full-map clone today), builds
-    // `format!("{}_dashboard_command", sp_id)` every time, and constructs five
-    // `OperationState::*.to_spvalue()` `String`s for the comparison. Since the
-    // dashboard command is a single per-runner variable, read it *once* per
-    // tick in the runner loop and pass the result in, rather than re-reading it
-    // per operation.
-    // DONE (correctness): the state guard read
-    //     Initial || Executing || != Disabled || != Failed || != Timedout
-    // Those last three are `!=`, almost certainly a typo for `==`, and they
-    // make the whole expression a tautology: any value that is not `Disabled`
-    // satisfies `!= Disabled`, and `Disabled` itself satisfies `!= Failed`. So
-    // the guard was true for *every* operation state and the method reduced to
-    // "is the dashboard command 'stop'".
-    //
-    // That is not harmless. `Operation::cancel` does not check the current
-    // state - it assigns `Cancelled` unconditionally - so pressing stop drove
-    // every operation to `Cancelled`, including ones that had already reached
-    // `Completed`, `Bypassed`, `Fatal` or a `Terminated(..)` state. A finished
-    // operation would be reported as cancelled.
-    //
-    // The guard now lists the states where cancelling an operation means
-    // something: it has been planned or is running, or it is stuck in a state
-    // it can still be recovered from. Terminal states are left alone.
     pub fn can_be_cancelled(&self, sp_id: &str, state: &State, log_target: &str) -> bool {
         if let Some(value) = state.get_value(&self.name, &log_target) {
             if value_is(&value, OperationState::Initial)
@@ -452,15 +366,6 @@ impl Operation {
     }
 
     /// Start executing the operation. Check for eval_running() first.
-    // PERF: re-evaluates every precondition guard that `Operation::eval` just
-    // evaluated a moment earlier in `process_operation` - the whole guard set is
-    // walked twice per start. `evaluate_with_transition_index` already exists
-    // and returns the matching index; using it (and passing the index into
-    // `start`) halves the guard work at the moment an operation starts.
-    // DONE: PERF: the guard walk used to clone every precondition to evaluate it
-    // and clone the matching one again to take it, and `take` + `assign` built
-    // two intermediate `State`s. It now borrows the transition and applies both
-    // the actions and the status write in place on a single copy.
     pub fn start(&self, state: &State, log_target: &str) -> State {
         let assignment = state.get_assignment(&self.name, &log_target);
         if value_is(&assignment.val, OperationState::Initial)
@@ -483,11 +388,6 @@ impl Operation {
     }
 
     /// Complete executing the operation. Check for can_be_completed() first.
-    // PERF: same double evaluation as `start` - `can_be_completed` walks all
-    // postcondition guards, then this walks them again to find the same one.
-    // `can_be_completed_with_transition_index` already returns the index; wiring
-    // it through `process_operation` removes the second walk. The same pattern
-    // repeats in `fail`, `bypass` and `timeout`.
     pub fn complete(&self, state: &State, log_target: &str) -> State {
         let assignment = state.get_assignment(&self.name, &log_target);
         if value_is(&assignment.val, OperationState::Executing) {
@@ -563,22 +463,6 @@ impl Operation {
             _ => state.clone(),
         }
     }
-
-    // pub fn void(&self, state: &State, log_target: &str) -> State {
-    //     let assignment = state.get_assignment(&self.name, &log_target);
-    //     if assignment.val == OperationState::Terminated(TerminationReason::Completed).to_spvalue() {
-    //         let action = Action::new(
-    //             assignment.var,
-    //             OperationState::Void
-    //                 .to_spvalue()
-    //                 .wrap(),
-    //         );
-    //         action.assign(&state, &log_target)
-    //     } else {
-    //         log::error!(target: &log_target, "Can't void an operation which is not terminated.");
-    //         state.clone()
-    //     }
-    // }
 
     pub fn bypass(&self, state: &State, log_target: &str) -> State {
         let assignment = state.get_assignment(&self.name, &log_target);
@@ -672,43 +556,6 @@ impl Operation {
         }
     }
 
-    /// Continue executing the next operation if this one has failed
-    // pub fn continue_running_next(&self, state: &State, log_target: &str) -> State {
-    //     let assignment = state.get_assignment(&self.name, &log_target);
-    //     if assignment.val == OperationState::Bypassed.to_spvalue()
-    //     {
-    //         for postcondition in &self.bypass_transitions {
-    //             if postcondition.clone().eval(&state, &log_target) {
-    //                 let action = Action::new(
-    //                     assignment.var,
-    //                     OperationState::Completed.to_spvalue().wrap(),
-    //                 );
-    //                 return postcondition
-    //                     .clone()
-    //                     .take(&action.assign(&state, &log_target), &log_target);
-    //             }
-    //         }
-    //     }
-    //     state.clone()
-    // }
-
-    // pub fn terminate(&self, state: &State, log_target: &str) -> State {
-    //     let assignment = state.get_assignment(&self.name, &log_target);
-    //     if assignment.val == OperationState::Unrecoverable.to_spvalue()
-    //         || assignment.val == OperationState::Bypassed.to_spvalue()
-    //         || assignment.val == OperationState::Completed.to_spvalue()
-    //     {
-    //         let action = Action::new(
-    //             assignment.var,
-    //             OperationState::Terminated.to_spvalue().wrap(),
-    //         );
-    //         action.assign(&state, &log_target)
-    //     } else {
-    //         log::error!(target: &log_target, "Can't terminate an operation which is not unrecoverable, bypassed, or completed.");
-    //         state.clone()
-    //     }
-    // }
-
     /// Every state variable read or written by any of this operation's
     /// transitions.
     ///
@@ -758,23 +605,6 @@ impl Operation {
         all_keys
     }
 
-    // Tricky, wait with this, maybe we want to resrt when it failed.
-    // Reset the completed operation. Check for can_be_reset() first.
-    // pub fn reset_running(&self, state: &State) -> State {
-    //     let assignment = state.get_assignment(&self.name);
-    //     if assignment.val == OperationState::Completed.to_spvalue() {
-    //         for reset_transition in &self.reset_transitions {
-    //             if reset_transition.clone().eval_running(&state) {
-    //                 let action =
-    //                     Action::new(assignment.var, OperationState::Initial.to_spvalue().wrap());
-    //                 return reset_transition
-    //                     .clone()
-    //                     .take_running(&action.assign(&state));
-    //             }
-    //         }
-    //     }
-    //     state.clone()
-    // }
 }
 #[cfg(test)]
 mod operation_state_tests {

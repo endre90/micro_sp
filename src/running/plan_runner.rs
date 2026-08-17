@@ -1,30 +1,7 @@
 use crate::{running::process_operation::OperationProcessingType, *};
 use crate::SPConnection;
 use std::sync::Arc;
-// use crate::SPConnection;
-use tokio::sync::mpsc;
 
-// DONE (correctness): this constant used to do double duty as both the tick
-// period *and* the assumed time increment in `process_operation`'s elapsed-time
-// accounting - even though `sop_runner` ticks at 100 ms, so its operations aged
-// at twice real speed. "How often do I poll" and "how much time has passed" are
-// separate now: each runner measures the latter with `Instant` and passes it in,
-// which also keeps the counters honest when a tick slips because Redis was slow.
-// DONE: PERF: this was the third caller of `StateManager::get_full_state`;
-// with `sop_runner` and `auto_operation_runner` that made ~20 blocking
-// `KEYS *` scans per second. The key set is `model.operations`
-// `get_all_var_keys()` plus the `{sp_id}_plan*` /
-// `{sp_id}_terminated_operations` keys (see `running::runner_keys`), plus the
-// bookkeeping variables of the steps of the current plan.
-//
-// Unlike the other two runners this one does not create its operations itself -
-// `planner_ticker` writes the plan and the step variables - so it cannot know
-// from a local event when the dynamic part of its key set changed. It watches
-// `{sp_id}_plan` instead and re-reads once when it changes, which costs one
-// extra `MGET` per new plan rather than a keyspace scan per tick.
-// PERF: `con.clone()` per tick to hand a second handle to `process_plan_tick`
-// - pass `&mut con` instead; `SPConnection` is multiplexed, so the
-// clone buys nothing.
 pub async fn planned_operation_runner(
     model: &Model,
     // logging_tx: mpsc::Sender<LogMsg>,
@@ -37,11 +14,6 @@ pub async fn planned_operation_runner(
     // Get only the relevant keys from the state
     log::info!(target: &log_target, "Online.");
 
-    // PERF: one long-lived connection handle for the whole runner instead of
-    // re-fetching one every tick, and no pre-flight PING before the real work.
-    // `SPConnection` is cheap to clone, multiplexed and self-healing, so this
-    // handle stays valid across reconnects; a dropped socket now surfaces as an
-    // error on the command itself, which the callee already logs and skips.
     let mut con = connection_manager.get_connection().await;
 
     let static_keys = plan_runner_static_keys(sp_id, &model);
@@ -109,19 +81,6 @@ pub async fn planned_operation_runner(
 const PLAN_STEP_SUFFIX_LEN: usize = 1 + 10;
 
 /// Find the model operation a plan step was instantiated from.
-///
-/// DONE (correctness): this was `operations.iter().find(|op| step.starts_with(&op.name))`,
-/// which matches *any* operation whose name is a prefix of the step. A model
-/// containing both `op_move` and `op_move_to_b` would resolve a
-/// `op_move_to_b_A1b2C3d4E5` step to whichever came first in the model - so the
-/// plan runner could silently drive the wrong operation's transitions, writing
-/// the wrong actions and waiting on the wrong postcondition.
-///
-/// Plan steps are `{operation name}_{nanoid}` with a fixed-length nanoid, so
-/// the step can be resolved exactly: strip the suffix, match the whole name.
-/// The prefix form is kept only as a fallback for step names that carry no
-/// nanoid suffix, and even then it takes the *longest* match so a shorter name
-/// can never shadow a longer one.
 fn find_step_operation<'a>(operations: &'a [Operation], step: &str) -> Option<&'a Operation> {
     if step.len() > PLAN_STEP_SUFFIX_LEN {
         let split_at = step.len() - PLAN_STEP_SUFFIX_LEN;
@@ -156,24 +115,6 @@ fn read_plan(state: &State, sp_id: &str, log_target: &str) -> Vec<String> {
         .collect()
 }
 
-// DONE: PERF: the two `remove_sp_values` calls near the end ran on every tick.
-// They do return early on an empty slice, so an idle tick never actually cost a
-// round trip - the correction to the original note - but the meta key list was
-// still built every time. The whole block is guarded now. Pipelining the two
-// DELs into one is still open.
-// DONE: PERF: the tail was a chain of six `.update(..)` calls, i.e. six full
-// state-map copies per tick. They are `update_mut` now. Note the original
-// claim that this made "an MSET go out even when nothing happened" was wrong:
-// five of the six write back the value just read, so they produce no diff -
-// measured idle traffic for this runner is zero writes.
-// DONE (correctness): the `starts_with` lookup let `op_move` match a
-// `op_move_to_b_...` step - see `find_step_operation`.
-// PERF (still open): the lookup is a linear scan per plan step per tick. That
-// is one scan of the model per tick, so it stays cheap until the model gets
-// large; a `HashMap<&str, &Operation>` built once at startup would make it O(1).
-// PERF: `let mut new_state = state.clone()` plus `state.get_diff_partial_state(
-// &new_state)` in the caller means a full map copy and a full map scan per
-// tick; see the dirty-key suggestion on `State::get_diff_partial_state`.
 async fn process_plan_tick(
     sp_id: &str,
     mut con: SPConnection,
@@ -275,10 +216,6 @@ async fn process_plan_tick(
         .await;
     }
 
-    // DONE: PERF: this was a chain of six `.update(..)` calls, each cloning the
-    // whole state map - six full copies per tick to write six values. Writing
-    // in place costs six map lookups.
-    //
     // Most of these write back the value that was just read, so they do not
     // show up in the diff and cost no Redis traffic; they are kept as-is so the
     // tick still has a single obvious place where its outputs are published.

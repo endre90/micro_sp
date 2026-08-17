@@ -2,23 +2,6 @@ use crate::State;
 use crate::SPConnection;
 use redis::{AsyncCommands, Value};
 
-// PERF: `state.state.clone().into_iter()` deep-copies the entire delta map -
-// keys, `SPVariable`s and values - purely to iterate it, and then throws the
-// copy away. `state.state.iter()` gives the same result with zero copying
-// (`serde_json::to_string` takes `&T`, and the key can be cloned once into the
-// tuple). Called on every write of every runner.
-// PERF: only `assignment.val` is ever persisted, so the `SPVariable` half of
-// every assignment is serialised nowhere and copied for nothing - another
-// argument for the diff functions to return `(&str, &SPValue)` pairs.
-// PERF: this issues its own `MSET` round trip. Several call sites do
-// `set_state` immediately followed by one or two `remove_sp_values` (see
-// `auto_operation_runner` and `plan_runner`), which is three sequential RTTs
-// where one pipeline would do. Suggested: expose a `StateManager::apply(&mut
-// con, writes, deletes)` that builds a single `redis::pipe()` with the MSET and
-// the DELs and sends it in one go.
-// PERF: with the HASH layout suggested in `state.rs` this becomes a single
-// `HSET key f v f v ..`, which is also atomic - unlike the current MSET+DEL
-// pair, which another runner can observe half-applied.
 pub(super) async fn set_state(con: &mut SPConnection, state: &State) {
     let items_to_set: Vec<(String, String)> = state
         .state

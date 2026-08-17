@@ -2,41 +2,6 @@ use crate::{State, StateManager};
 use crate::SPConnection;
 use redis::AsyncCommands;
 
-// PERF (worst offender on the Redis side): `KEYS *` is O(total keyspace) and,
-// because Redis is single-threaded, it *blocks the whole server* for the
-// duration - no other client makes progress meanwhile. This is called by
-// `sop_runner` (100 ms), `auto_operation_runner` (200 ms) and
-// `planned_operation_runner` (200 ms), i.e. roughly 20 full keyspace scans per
-// second, and the keyspace also holds every transform and every logger blob.
-// That is very likely a large part of the CPU you see when a SOP is running,
-// and it directly delays every other command - which is why state changes lag.
-// Suggested fixes, best first:
-//   1. Do not read the full state at all. Every one of these runners can
-//      compute its key set up front from `get_all_var_keys()` (the planner,
-//      goal, tf and timer runners already do exactly that) and use
-//      `get_state_for_keys`. The keys for dynamically created operations are
-//      known the moment the operation is instantiated, so they can be appended
-//      to the set instead of being discovered by scanning.
-//   2. If a whole-state read is genuinely needed, store the state in one Redis
-//      HASH and use `HGETALL` - one command, one round trip, no keyspace scan.
-//   3. As a stop-gap, replace `KEYS` with `SCAN` (non-blocking, cursored) or
-//      maintain the key list in a Redis SET updated on add/remove and read with
-//      `SMEMBERS`; and cache the key list in the runner, refreshing it only
-//      when variables are actually added or removed.
-// PERF: `MGET` on a large key list returns every value even if nothing changed,
-// and `build_state` then `serde_json`-parses all of them. Suggested: keep the
-// previous tick's raw strings and only re-parse entries whose string differs -
-// a byte compare is far cheaper than a JSON parse, and in steady state almost
-// nothing changes between ticks.
-// NOTE on test coverage: the `Err` arms below (`KEYS` failing, then `MGET`
-// failing) are not exercised by a test. Both commands accept any key type
-// without a WRONGTYPE check (`MGET` returns `nil` per key rather than erroring,
-// and `KEYS` never inspects value types at all), so - unlike `GET` in
-// `get_sp_value` - there is no real, non-mocked Redis state that makes either
-// of them return an error short of an actual network/IO failure or killing the
-// server mid-call. That is exactly the class of failure this task's
-// instructions call out as impractical to test without mocking, so it is left
-// uncovered deliberately rather than faked.
 pub(super) async fn get_full_state(con: &mut SPConnection) -> Option<State> {
     let keys: Vec<String> = match con.keys("*").await {
         Ok(k) => k,

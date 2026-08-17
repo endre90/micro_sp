@@ -7,37 +7,8 @@ use std::error::Error;
 use crate::{SPTransformStamped, SPValue, TF_PREFIX, TransformOrUnknown};
 
 /// How many keys Redis examines per SCAN round trip.
-///
-/// DONE: PERF: `scan_match` uses the Redis default of COUNT 10, so walking the
-/// keyspace took one round trip per 10 keys examined - with a few thousand keys
-/// that is hundreds of sequential round trips, on every single TF lookup. SCAN
-/// stays non-blocking (that is the whole point of it over `KEYS`); a larger
-/// COUNT just means each cursor step does more work server-side before
-/// replying. 1000 is a common choice: still a sub-millisecond slice of server
-/// time per step, but ~100x fewer round trips.
 const TF_SCAN_COUNT: usize = 1000;
 
-// PERF (still open): even with a large COUNT this walks the whole keyspace,
-// and every lookup then `MGET`s and JSON-parses every transform in the system
-// to resolve one parent/child pair. The two structural fixes:
-//   1. Store transforms in a single Redis HASH (`sp:tf`) and use `HGETALL` -
-//      one command, one round trip, no keyspace walk. The `TF_PREFIX` key
-//      naming already treats them as a namespace, so this is a small change -
-//      but it is a change to the on-disk layout, so it needs a deliberate
-//      decision and a migration, not a drive-by.
-//   2. Cache the transform buffer in the `tf_interface` task, invalidated by a
-//      version counter bumped on every write. That only holds if *every*
-//      writer goes through `TransformsManager`; a process writing `TF_PREFIX`
-//      keys directly would leave the cache serving stale transforms, which is
-//      a correctness bug rather than a slow path. Worth doing, worth doing
-//      carefully.
-//
-// DONE: PERF: the parse used `into_par_iter()`, spinning up rayon for what is
-// a handful of small JSON parses and competing with the tokio workers for
-// cores. Measured on a 40-transform tree: 1210 us per lookup with rayon, 855 us
-// sequential - the thread hand-off cost more than the work, as suspected. This
-// was the last rayon use in the crate, so the dependency can be dropped from
-// Cargo.toml if nothing downstream re-exports it.
 pub(super) async fn get_all_transforms(
     con: &mut SPConnection,
 ) -> Result<HashMap<String, SPTransformStamped>, Box<dyn Error>> {

@@ -4,13 +4,6 @@ use std::{
     time::{Duration, Instant},
 };
 
-/// One expanded node, as a link back to its parent plus the operation that got
-/// us here. The plan is reconstructed by walking these links once, at the end.
-///
-/// DONE: PERF: the search used to carry a `Vec<String>` plan prefix in the
-/// frontier and `path.clone()` it for every successor, so a plan of length d
-/// copied d strings per expansion and the copying grew with the depth. A node
-/// is now two `usize`s and no plan strings are touched during the search at all.
 struct PlanNode {
     parent: Option<usize>,
     operation: usize,
@@ -28,24 +21,6 @@ fn reconstruct_plan(nodes: &[PlanNode], from: Option<usize>, model: &[Operation]
 }
 
 /// The variables that make up a planning state's identity for the `visited` set.
-///
-/// DONE: PERF: `visited` used to be a `HashSet<State>`, so every expansion
-/// cloned the *whole* state into it and `impl Hash for State` allocated a `Vec`
-/// of every key and sorted it on every hash and every lookup. That was usually
-/// the single largest cost in a replan.
-///
-/// Only variables a planning action can write actually vary during a search -
-/// everything else is fixed by the initial state - and every such variable is
-/// an action target, so it is included in `Operation::get_all_var_keys()`. The
-/// union of those keys over the model is therefore a sufficient identity, and
-/// it is a small fixed list: hashing becomes O(keys) with no sort and no
-/// allocation of key strings.
-///
-/// To be clear about what this does *not* change: the old full-state identity
-/// was not wrong. Variables outside this set - runner bookkeeping like
-/// `{op}_elapsed_executing_ms`, interface variables, transforms - are fixed for
-/// the duration of one search, so including them never merged two states that
-/// should have stayed distinct. They only ever added cost.
 fn planning_identity_keys(model: &[Operation]) -> Vec<String> {
     let mut keys: Vec<String> = model
         .iter()
@@ -66,21 +41,6 @@ fn state_identity(state: &State, keys: &[String]) -> Vec<Option<SPValue>> {
 }
 
 /// Minimal Breadth First Search algorithm for sequencing operations.
-///
-/// DONE: PERF: `state` and `model` used to be taken by value, forcing the
-/// caller to deep-copy the entire state *and* the entire operation model (every
-/// operation, every transition, every predicate) on every replan request, even
-/// though nothing here mutates them.
-///
-/// DONE: PERF: the frontier used `stack.insert(0, ..)` with `Vec::pop`, which
-/// memmoved the whole frontier on every expansion - O(n) per node, O(n^2) over
-/// the search. It is a `VecDeque` now. The traversal order is unchanged: front
-/// insert + back pop was already FIFO, and `push_back` + `pop_front` visits
-/// nodes and siblings in exactly the same order.
-///
-/// Still open: this runs synchronously, so a search that reaches `deadline_ms`
-/// occupies its thread for that whole time. `planner_ticker` therefore calls it
-/// through `tokio::task::spawn_blocking` so it cannot stall the async runtime.
 pub fn bfs_operation_planner(
     state: &State,
     goal: &Predicate,
@@ -150,6 +110,8 @@ pub fn bfs_operation_planner(
         }
     }
 }
+
+
 // pub fn bfs_operation_planner(
 //     state: State,
 //     goal: Predicate,

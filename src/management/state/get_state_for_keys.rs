@@ -3,18 +3,6 @@ use redis::AsyncCommands;
 
 use crate::State;
 
-// PERF: this is the good path - one `MGET` for a fixed key set, no keyspace
-// scan - and every runner now uses it.
-// DONE: PERF: `keys.clone()` on the way into `build_state` copied every key
-// `String` on every tick, for every runner. It calls the borrowing form now.
-// PERF: for very large key sets, `MGET` sends the whole key list on every tick.
-// With a HASH layout this becomes `HMGET` on one key, and with keyspace
-// notifications you only need to fetch the keys that actually changed.
-// NOTE on test coverage: the `Err` arm of the `MGET` below is not exercised.
-// `MGET` returns `nil` for a key of the wrong type rather than erroring (see
-// the same note in `get_full_state.rs`), so hitting this branch would require
-// a genuine network/IO failure rather than a settable Redis state - not
-// practical to test without mocking the connection.
 pub(super) async fn get_state_for_keys(
     con: &mut SPConnection,
     keys: &Vec<String>,

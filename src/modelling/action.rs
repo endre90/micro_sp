@@ -53,17 +53,6 @@ impl Action {
     }
 
     // Apply this action to `state` in place.
-    //
-    // DONE: every arm used to finish with `state.update(..)`, which clones the
-    // entire state map. Because `Transition::take` applies its actions in a
-    // loop, a transition with k actions cost k full-state copies on top of the
-    // one `take` already made. Writing through `State::update_mut` makes the
-    // whole transition cost exactly one clone regardless of k - see
-    // `Transition::take_mut`.
-    //
-    // PERF (still open): the Increment/Decrement arms call `state.get_value(..)`,
-    // which clones the whole map to read one number - fix `State::get_value`
-    // and this becomes free too.
     pub fn assign_mut(&self, state: &mut State, log_target: &str) {
         match self.action_type {
             ActionType::Assign => {

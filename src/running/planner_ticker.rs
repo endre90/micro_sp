@@ -1,19 +1,6 @@
 use crate::*;
 use std::sync::Arc;
 
-// DONE: PERF: two things cost more than they needed to:
-//   - `keys` was built by concatenating `get_all_var_keys()` over every
-//     operation plus the operation names, with no `sort()/dedup()`. Operations
-//     typically share most of their variables, so the per-tick `MGET` sent the
-//     same key many times over.
-//   - the tick ran at 500 ms and did a full `MGET` + `build_state` + diff even
-//     though the only thing it reacts to is `{sp_id}_replan_trigger`. Planning
-//     is rare and bursty, so polling the whole operation model twice a second
-//     to discover that nothing is requested was most of this task's cost. It
-//     now reads the two flags that decide whether there is anything to do and
-//     fetches the planning key set only when there is.
-// PERF (still open): a notification on `{sp_id}_replan_trigger` would remove
-// the poll entirely.
 pub async fn planner_ticker(
     sp_id: &str,
     model: &Model,
@@ -70,11 +57,6 @@ pub async fn planner_ticker(
     let replanned_key = format!("{}_replanned", sp_id);
     let trigger_keys = vec![trigger_key.clone(), replanned_key.clone()];
 
-    // PERF: one long-lived connection handle for the whole runner instead of
-    // re-fetching one every tick, and no pre-flight PING before the real work.
-    // `SPConnection` is cheap to clone, multiplexed and self-healing, so this
-    // handle stays valid across reconnects; a dropped socket now surfaces as an
-    // error on the command itself, which the callee already logs and skips.
     let mut con = connection_manager.get_connection().await;
 
     // The operations the planner searches over never change, but every replan
@@ -229,19 +211,6 @@ async fn process_planner_tick(
 }
 
 // Returns a new state to add containing unique operations ad unique operation meta
-//
-// DONE: PERF: `bfs_operation_planner(state.clone(), goal, model.operations.clone(), ..)`
-// deep-copied the entire state *and* the entire operation model on every replan
-// request. The planner takes `&State` and `&[Operation]` now; the operations
-// live in an `Arc` built once before the runner loop, so a replan clones the
-// state once and nothing else.
-//
-// DONE: PERF: the call was synchronous and could run for up to `deadline_ms`
-// (5000 ms here) inside an async task, blocking that tokio worker for the whole
-// time - stalling every other runner scheduled on it, and a very likely cause
-// of the "state changes stop happening" symptom during planning. It now runs on
-// `tokio::task::spawn_blocking`, so the runtime stays responsive while the
-// search runs.
 async fn handle_replan_request(
     sp_id: &str,
     ctx: &mut PlannerContext,
@@ -258,15 +227,6 @@ async fn handle_replan_request(
         return;
     }
 
-    // Move this to the goal runner
-    // if ctx.replan_counter >= MAX_REPLAN_RETRIES {
-    //     ctx.planner_information = "Max allowed replan retries reached.".to_string();
-    //     ctx.replan_trigger = false;
-    //     return;
-    // }
-
-    // ctx.replan_counter += 1;
-    // ctx.replan_counter_total += 1;
 
     let goal = state.extract_goal(&sp_id);
 

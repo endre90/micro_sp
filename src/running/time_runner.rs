@@ -2,35 +2,6 @@ use std::sync::Arc;
 
 use crate::*;
 
-
-// DONE: PERF: the `set_state` call used to be *inside* the
-// `for timer_id in 1..=number_of_timers` loop, so a diff and a Redis round trip
-// went out per timer per tick. Measured with three timers running: 153 MSETs
-// per 5 seconds against 50 MGETs - three writes on every tick. All timers now
-// accumulate into one `new_state`, which is diffed once and written once, so a
-// tick costs at most one MSET no matter how many timers there are (and none at
-// all when nothing changed).
-// Note the ordering hazard this had to fix: each iteration used to build
-// `new_state` from `state`, the tick's original snapshot, so simply hoisting
-// the write would have kept only the last timer's changes. A single
-// `new_state` is threaded through the loop instead.
-// DONE: PERF: `request_state == ActionRequestState::Executing.to_string()`
-// allocated a fresh `String` for the comparison on every timer on every tick.
-//
-// DONE (correctness): `elapsed_ms += TICK_INTERVAL_MS` charged a compile-time
-// constant per tick, so a sleep timer only kept real time while the loop
-// happened to run at exactly that period. It made the tick period and the
-// timer's notion of a millisecond the same number - which is fine until the
-// period changes. With the period now configurable
-// (`MICRO_SP_TICK_INTERVAL_MS`) this was actively dangerous: at a 1 ms tick
-// every tick still charged 100 ms, so a 60 second sleep finished in 600
-// milliseconds. The loop measures the real time its tick took and advances by
-// that instead.
-//
-// PERF (still open): the counter is written for every executing timer on every
-// tick. Deriving it from a stored start `SystemTime` would remove that write,
-// at the cost of `_timer_N_elapsed_ms` no longer being readable as live
-// progress - left alone deliberately.
 pub async fn time_interface_runner(
     sp_id: &str,
     connection_manager: &Arc<ConnectionManager>,
@@ -50,11 +21,6 @@ pub async fn time_interface_runner(
         keys.push(format!("{}_timer_{}_elapsed_ms", sp_id, timer_id));
     }
 
-    // PERF: one long-lived connection handle for the whole runner instead of
-    // re-fetching one every tick, and no pre-flight PING before the real work.
-    // `SPConnection` is cheap to clone, multiplexed and self-healing, so this
-    // handle stays valid across reconnects; a dropped socket now surfaces as an
-    // error on the command itself, which the callee already logs and skips.
     let mut con = connection_manager.get_connection().await;
 
     // Real time between ticks. Timers count in milliseconds of wall clock, not

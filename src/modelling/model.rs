@@ -13,16 +13,6 @@ pub struct Model {
 }
 
 impl Model {
-    // PERF: rebuilds every operation field by field purely to prefix the name
-    // with "op_", deep-cloning all six transition vectors of every operation in
-    // the process - and it does this for `auto_operations`,
-    // `mutexed_auto_operations` and `operations`. Since the inputs are taken by
-    // value, this is avoidable: `operations.into_iter().map(|mut o| { o.name =
-    // format!("op_{}", o.name); o }).collect()` moves instead of copying, and
-    // will not silently drop a field if `Operation` gains one later.
-    // PERF: this only runs at startup, but the resulting `Model` is then cloned
-    // once per spawned runner in `main_runner` and again inside two of them -
-    // see the `Arc<Model>` note there.
     pub fn new(
         name: &str,
         auto_transitions: Vec<Transition>,
