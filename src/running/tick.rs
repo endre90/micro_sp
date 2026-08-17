@@ -333,4 +333,19 @@ mod tests {
         let ms = clock.elapsed_ms();
         assert!((4..=20).contains(&ms), "expected about 5 ms, got {ms}");
     }
+
+    /// `TickClock::default()` has to behave like `TickClock::new()` - a fresh
+    /// clock with no carry, so the very first `elapsed_ms()` call reports a
+    /// small, non-negative duration rather than replaying whatever `Instant`
+    /// happened to be at `0` or a stale carry from a previous run.
+    #[test]
+    fn default_builds_a_fresh_clock_like_new() {
+        let mut clock = TickClock::default();
+        std::thread::sleep(std::time::Duration::from_millis(5));
+        let ms = clock.elapsed_ms();
+        assert!(
+            (4..=20).contains(&ms),
+            "a freshly defaulted clock should measure about 5 ms, got {ms}"
+        );
+    }
 }

@@ -98,6 +98,7 @@ pub async fn planned_operation_runner(
         .await;
         let modified_state = state.get_diff_partial_state(&new_state);
         if !modified_state.state.is_empty() {
+            activity_log::log_state_diff(&log_target, &state, &modified_state);
             StateManager::set_state(&mut con, &modified_state).await;
         }
     }
@@ -718,6 +719,109 @@ mod plan_runner_tests {
             PlanState::Cancelled.to_string(),
             "and the plan must report it - even though nothing can read it back, \
              see plan_state_cancelled_does_not_survive_the_round_trip"
+        );
+    }
+
+    /// Once a step terminates, its five bookkeeping keys must be deleted from
+    /// Redis - not just cleared in memory - and `{sp_id}_terminated_operations`
+    /// itself must come back empty. A missed delete here would leak a
+    /// finished step's retry counters and elapsed-time keys into Redis forever,
+    /// and if a later plan happened to reuse the same operation name (same
+    /// nanoid alphabet, astronomically unlikely but not impossible) it would
+    /// inherit stale counters.
+    #[tokio::test]
+    #[serial]
+    async fn terminated_operations_meta_keys_are_deleted_from_redis() {
+        let (_container, manager) = redis().await;
+        let mut con = manager.get_connection().await;
+
+        let domain = domain();
+        let model = model(&domain);
+        let op = "op_a_to_b_AAAAAAAAAA".to_string();
+
+        let mut state = generate_runner_state_variables(SP, 0, TARGET);
+        state.extend_mut(generate_operation_state_variables(&model, false, TARGET), true);
+        state.extend_mut(domain, true);
+        state = state.update(&key("plan"), Vec::<SPValue>::new().to_spvalue());
+        state = state.update(&key("plan_state"), "initial".to_spvalue());
+        state = state.update(&key("plan_current_step"), 0.to_spvalue());
+        state = state.update(
+            &key("terminated_operations"),
+            vec![op.to_spvalue()].to_spvalue(),
+        );
+        state = add_operation_state_tracking_variable(&vec![op.clone()], &state, TARGET);
+        state = add_operation_meta_tracking_variables(&vec![op.clone()], &state, false, TARGET);
+        StateManager::set_state(&mut con, &state).await;
+
+        // Sanity check: the meta keys actually exist before the tick runs.
+        assert!(
+            StateManager::get_sp_value(&mut con, &format!("{op}_information")).await.is_some(),
+            "test setup should have written the meta keys"
+        );
+
+        let tick_con = manager.get_connection().await;
+        let _ = process_plan_tick(SP, tick_con, &model, &state, 100, TARGET).await;
+
+        // The tick's own DEL is pipelined but still awaited inside
+        // `process_plan_tick`, so no extra wait should be needed - but give it
+        // a small grace window since this is a real network round trip.
+        tokio::time::sleep(Duration::from_millis(100)).await;
+
+        for suffix in [
+            "_information",
+            "_failure_retry_counter",
+            "_timeout_retry_counter",
+            "_elapsed_executing_ms",
+            "_elapsed_disabled_ms",
+        ] {
+            let k = format!("{op}{suffix}");
+            assert_eq!(
+                StateManager::get_sp_value(&mut con, &k).await,
+                None,
+                "meta key '{k}' should have been deleted"
+            );
+        }
+        assert_eq!(
+            StateManager::get_sp_value(&mut con, &op).await,
+            None,
+            "the operation's own bare state key should have been deleted too"
+        );
+    }
+
+    /// `MICRO_SP_READ_FULL_STATE` sends the runner back to a full-keyspace read
+    /// every tick instead of its derived key set. This is the escape hatch, so
+    /// it has to actually still drive a plan to completion, not just avoid
+    /// panicking.
+    #[tokio::test]
+    #[serial]
+    async fn the_full_state_escape_hatch_still_executes_the_plan() {
+        struct EnvGuard;
+        impl Drop for EnvGuard {
+            fn drop(&mut self) {
+                unsafe { std::env::remove_var("MICRO_SP_READ_FULL_STATE") };
+            }
+        }
+        unsafe { std::env::set_var("MICRO_SP_READ_FULL_STATE", "true") };
+        let _guard = EnvGuard;
+
+        let (_container, manager) = redis().await;
+        let mut con = manager.get_connection().await;
+        let model = deploy(&manager, &steps()).await;
+
+        let runner = spawn_runner(&manager, model);
+        StateManager::set_sp_value(&mut con, &key("planner_state"), &"found".to_spvalue()).await;
+
+        let plan_state = wait_for(&mut con, "plan_state", "completed", 5000).await;
+        runner.abort();
+
+        assert_eq!(
+            plan_state, "completed",
+            "the plan must still complete when reading the whole keyspace every tick"
+        );
+        assert_eq!(
+            StateManager::get_sp_value(&mut con, "pos").await,
+            Some("c".to_spvalue()),
+            "both steps should have run under the full-state escape hatch too"
         );
     }
 

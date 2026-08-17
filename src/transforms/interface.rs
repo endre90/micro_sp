@@ -167,6 +167,7 @@ pub async fn tf_interface(
                     );
 
                 let modified_state = state.get_diff_partial_state(&new_state);
+                activity_log::log_state_diff(&log_target, &state, &modified_state);
                 StateManager::set_state(&mut con, &modified_state).await;
             }
         }

@@ -853,4 +853,45 @@ mod failure_tests {
         assert!(lookup_transform_with_root("world", "nope", "world", &buffer).is_none());
         assert!(lookup_transform_with_root("nope", "a", "world", &buffer).is_none());
     }
+
+    /// `lookup_transform_with_root` refuses outright, before walking anything,
+    /// when the buffer itself contains a cycle - a mutual parent/child pair
+    /// here, which `is_cyclic_all` flags regardless of which two frames are
+    /// actually being looked up.
+    #[test]
+    fn a_lookup_over_a_cyclic_buffer_fails() {
+        let buffer = buffer(&[("a", "b"), ("b", "a")]);
+        assert!(
+            lookup_transform_with_root("a", "b", "world", &buffer).is_none(),
+            "a cyclic buffer must short-circuit to None rather than walk"
+        );
+    }
+
+    /// `root_to_child`'s BFS has the same `MAX_TRANSFORM_CHAIN` bound as
+    /// `parent_to_root` - a straight chain longer than the limit must fail
+    /// rather than search forever, and a chain just inside it still resolves.
+    #[test]
+    fn root_to_child_is_stopped_by_the_chain_limit_rather_than_looping_forever() {
+        let mut buf = HashMap::new();
+        let depth = MAX_TRANSFORM_CHAIN + 5;
+        for i in 0..depth {
+            let parent = if i == 0 {
+                "world".to_string()
+            } else {
+                format!("f{}", i - 1)
+            };
+            let child = format!("f{}", i);
+            buf.insert(child.clone(), transform(&child, &parent, 1.0));
+        }
+
+        let deepest = format!("f{}", depth - 1);
+        assert_eq!(
+            root_to_child(&deepest, "world", &buf),
+            None,
+            "a chain of {depth} must hit the limit"
+        );
+
+        // And a chain just inside the limit still resolves.
+        assert!(root_to_child("f2", "world", &buf).is_some());
+    }
 }

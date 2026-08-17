@@ -757,6 +757,18 @@ mod tests {
         assert_eq!(vars, vars_init)
     }
 
+    /// `get_predicate_vars` recurses through `NOT` rather than stopping there -
+    /// the vars of a negated comparison still have to end up in the key set a
+    /// runner reads, or the negated guard would never be re-evaluated when its
+    /// variable changes.
+    #[test]
+    fn test_predicate_get_variables_through_not() {
+        let state = make_robot_initial_state();
+        let inner = pred_parser::pred("var:ur_current_pose == a", &state).unwrap();
+        let negated = Predicate::NOT(Box::new(inner));
+        assert_eq!(negated.get_predicate_vars(), vec![v!("ur_current_pose")]);
+    }
+
     #[test]
     fn test_predicate_keep_only() {
         let state = make_robot_initial_state();
@@ -903,6 +915,28 @@ mod projection_tests {
         assert_eq!(both.remove(&only(&["b"])), Some(about_a.clone()));
         assert_eq!(both.remove(&only(&["a"])), Some(about_b));
         assert_eq!(both.remove(&only(&[])), Some(both.clone()));
+    }
+
+    /// `OR` follows the same survivor-collapsing rule as `AND` for `remove`:
+    /// one survivor is unwrapped, more than one stays wrapped in an `OR`. The
+    /// `AND` side of this rule is already pinned above and elsewhere; this is
+    /// the `OR` arm of the same match statement.
+    #[test]
+    fn remove_on_an_or_collapses_a_single_survivor_but_keeps_the_or_otherwise() {
+        let state = state();
+        let about_a = eq("a", true.to_spvalue(), &state);
+        let about_b = eq("b", false.to_spvalue(), &state);
+        let about_n = eq("n", 5.to_spvalue(), &state);
+        let any = Predicate::OR(vec![about_a.clone(), about_b.clone(), about_n.clone()]);
+
+        // Removing "b" leaves two survivors - still an OR of both.
+        assert_eq!(
+            any.remove(&only(&["b"])),
+            Some(Predicate::OR(vec![about_a.clone(), about_n.clone()]))
+        );
+
+        // Removing "b" and "n" leaves exactly one survivor, unwrapped.
+        assert_eq!(any.remove(&only(&["b", "n"])), Some(about_a));
     }
 
     /// `NOT` follows its child: if the child projects away, so does the

@@ -229,6 +229,7 @@ pub async fn goal_runner(
     connection_manager: &Arc<ConnectionManager>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     initialize_env_logger();
+    activity_log::init_from_env();
     let mut interval = runner_interval();
     let log_target = &format!("{}_goal_runner", sp_id);
 
@@ -493,6 +494,7 @@ pub async fn goal_runner(
         );
         let modified_state = state.get_diff_partial_state(&new_state);
         if !modified_state.state.is_empty() {
+            activity_log::log_state_diff(&log_target, &state, &modified_state);
             StateManager::set_state(&mut con, &modified_state).await;
         }
     }
@@ -1241,6 +1243,87 @@ mod goal_runner_tests {
             before.get_diff_partial_state(&after).state.is_empty(),
             "a queue that is not changing must not be rewritten on every tick: {:?}",
             before.get_diff_partial_state(&after)
+        );
+    }
+
+    /// A malformed goal sitting directly in `_scheduled_goals` (not routed
+    /// through the inbox - e.g. written by hand, or left over from a version
+    /// that encoded goals differently) is dropped on the tick that reads it,
+    /// rather than wedging the runner or corrupting the well-formed goals
+    /// around it.
+    #[tokio::test]
+    #[serial]
+    async fn a_malformed_scheduled_goal_is_dropped() {
+        let (_container, manager) = redis().await;
+        let mut con = manager.get_connection().await;
+        StateManager::set_sp_value(&mut con, &key("current_goal_state"), &"executing".to_spvalue())
+            .await;
+        StateManager::set_sp_value(&mut con, &key("plan_state"), &"executing".to_spvalue()).await;
+        StateManager::set_sp_value(
+            &mut con,
+            &key("scheduled_goals"),
+            &vec![
+                goal_string_to_sp_value("good_one", &"var:good == true".to_string(), GoalPriority::Normal),
+                "not a goal".to_spvalue(),
+            ]
+            .to_spvalue(),
+        )
+        .await;
+
+        let runner = spawn_runner(&manager);
+        tokio::time::sleep(Duration::from_millis(200)).await;
+        assert!(!runner.is_finished(), "the runner must survive a malformed scheduled goal");
+        runner.abort();
+
+        let queue = scheduled(&mut con).await;
+        assert_eq!(queue.len(), 1, "only the well-formed goal should survive the tick");
+        assert_eq!(queue[0].predicate, "var:good == true");
+        assert_eq!(queue[0].id, "good_one", "its existing id must be preserved, not regenerated");
+    }
+
+    /// Setting `_current_goal_state` straight to "cancelled" (as opposed to
+    /// going through `_plan_state`, which has no working path to this arm - see
+    /// `a_cancelled_plan_is_never_reported_as_a_cancelled_goal`) does reach the
+    /// `GoalState::Cancelled` arm: it is logged as cancelled and the goal is
+    /// released back to `initial`.
+    #[tokio::test]
+    #[serial]
+    async fn a_directly_cancelled_goal_is_reported_and_released() {
+        let (_container, manager) = redis().await;
+        let mut con = manager.get_connection().await;
+        StateManager::set_sp_value(&mut con, &key("current_goal_state"), &"cancelled".to_spvalue())
+            .await;
+        StateManager::set_sp_value(
+            &mut con,
+            &key("current_goal_predicate"),
+            &"var:pos == c".to_spvalue(),
+        )
+        .await;
+        StateManager::set_sp_value(&mut con, &key("current_goal_id"), &"goal_one".to_spvalue())
+            .await;
+
+        let runner = spawn_runner(&manager);
+        // The `Cancelled` arm releases the goal to `initial` on the very same
+        // tick it reports it, so - as in
+        // `a_cancelled_plan_is_never_reported_as_a_cancelled_goal` - the
+        // information line has to be watched as it changes rather than read
+        // once after the fact.
+        let mut seen_information: Vec<String> = vec![];
+        let deadline = std::time::Instant::now() + Duration::from_millis(1000);
+        while std::time::Instant::now() < deadline {
+            let information = text(&mut con, "goal_runner_information").await;
+            if seen_information.last() != Some(&information) {
+                seen_information.push(information);
+            }
+            tokio::time::sleep(Duration::from_millis(2)).await;
+        }
+        let seen = text(&mut con, "current_goal_state").await;
+        runner.abort();
+
+        assert_eq!(seen, "initial", "the goal must be released");
+        assert!(
+            seen_information.iter().any(|i| i.contains("cancelled") && i.contains("goal_one")),
+            "unlike the plan_state route, this path must report the cancellation: {seen_information:?}"
         );
     }
 

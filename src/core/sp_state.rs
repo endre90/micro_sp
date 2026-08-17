@@ -1136,6 +1136,24 @@ mod accessor_tests {
         ));
     }
 
+    /// `get_string_or_unknown` has the same wrong-type fallback as every other
+    /// accessor, but none of the existing tests exercise it because the
+    /// `wrong` fixture variable already holds a string. Use an `i` (Int64)
+    /// variable instead, so the value really is the wrong type for a string
+    /// read.
+    #[test]
+    fn get_string_or_unknown_falls_back_on_a_non_string_value() {
+        let state = state();
+        assert_eq!(
+            state.get_string_or_unknown("i", TARGET),
+            StringOrUnknown::UNKNOWN
+        );
+        assert_eq!(
+            state.get_string_or_default_to_unknown("i", TARGET),
+            "UNKNOWN"
+        );
+    }
+
     /// Asking for the wrong type gives the type's sentinel, not a panic and not
     /// a coerced value.
     #[test]

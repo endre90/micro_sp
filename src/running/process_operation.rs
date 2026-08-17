@@ -476,6 +476,34 @@ pub(super) async fn process_operation(
             log::Level::Error => log::error!(target: &log_target, "{}", new_op_info),
             _ => (),
         }
+
+        // The file log's `OP` line. `logging_log` is the short tag each arm
+        // above already computes ("Starting", "Completing", "Retrying 2/3",
+        // ...); it was written and then thrown away for as long as the Redis
+        // op-logger was disconnected, which is what the "assigned but never
+        // read" warnings were about.
+        //
+        // Both guards matter. `new_op_info != old_operation_information` is the
+        // crate's own "this is news" check, and reusing it is what keeps a
+        // terminated operation - which re-enters the same arm on every tick
+        // until it is cleaned up - from emitting an identical line several
+        // times a second. The empty-tag check drops the arms that changed the
+        // message without taking a decision worth recording.
+        if !logging_log.is_empty() {
+            // Read the resulting state back rather than predicting it: the arms
+            // reach it through `start`/`complete`/`fail`/`terminate`/..., and a
+            // hand-maintained mapping here would be one more thing to keep in
+            // step with them.
+            let resulting_state = new_state
+                .get_string_or_default_to_unknown(&format!("{}", operation.name), &log_target);
+            activity_log::log_operation(
+                &log_target,
+                &operation.name,
+                &operation_state,
+                &resulting_state,
+                &logging_log,
+            );
+        }
         // No need to log terminated
         // if OperationState::from_str(&operation_state)
         //     != OperationState::Terminated(TerminationReason::Completed)

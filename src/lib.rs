@@ -361,6 +361,16 @@ pub use crate::utils::info_logger::*;
 pub use crate::utils::metadata::*;
 // pub use crate::utils::op_logger::*;
 
+/// The on-disk activity log. Deliberately re-exported as a *module* rather than
+/// glob-imported: its API is `init`, `flush`, `is_enabled`, `log_operation`,
+/// ... - names far too generic to put in the crate root, where they would
+/// collide with anything a consuming package defines. Call it as
+/// `micro_sp::activity_log::init_from_env()`.
+pub use crate::utils::activity_log;
+pub use crate::utils::activity_log::{
+    ActivityKind, ActivityLogConfig, ActivityRecord, ActivityWriter,
+};
+
 pub mod macros;
 #[allow(unused_imports)]
 pub use crate::macros::action::*;
@@ -372,3 +382,47 @@ pub use crate::macros::sp_assignment::*;
 pub use crate::macros::sp_variable::*;
 #[allow(unused_imports)]
 pub use crate::macros::transition::*;
+
+/// `NANOID_ALPHABET` backs every id generated with `nanoid::nanoid!(10,
+/// &NANOID_ALPHABET)` across the runners (`auto_runner`, `goal_runner`,
+/// `sop_runner`, `planner_ticker`, transform loading, ...), and
+/// `running/plan_runner.rs` separately relies on
+/// `NANOID_ALPHABET.contains(&c)` to recognise which suffix characters of a
+/// step name are a generated id versus part of the operation name. Both uses
+/// silently break the same way if the alphabet ever gained a duplicate
+/// character or shrank: nanoid's collision-resistance and plan_runner's
+/// suffix detection both assume every character in it is distinct.
+#[cfg(test)]
+mod lib_tests {
+    use super::*;
+    use std::collections::HashSet;
+
+    #[test]
+    fn nanoid_alphabet_is_62_distinct_alphanumeric_chars() {
+        assert_eq!(NANOID_ALPHABET.len(), 62);
+
+        let unique: HashSet<char> = NANOID_ALPHABET.iter().copied().collect();
+        assert_eq!(
+            unique.len(),
+            NANOID_ALPHABET.len(),
+            "every character in the alphabet must be distinct, or nanoid's \
+             collision-resistance and plan_runner's suffix detection both weaken"
+        );
+
+        assert!(
+            NANOID_ALPHABET.iter().all(|c| c.is_ascii_alphanumeric()),
+            "plan_runner strips id suffixes assuming this alphabet is plain alphanumeric"
+        );
+    }
+
+    /// These are read by `Operation::start`/friends as *defaults* that only
+    /// apply when an operation/config does not override them - pin the
+    /// documented values so a change here is a deliberate policy change, not
+    /// an accidental one.
+    #[test]
+    fn tunable_limits_hold_their_documented_defaults() {
+        assert_eq!(MAX_ALLOWED_OPERATION_DURATION_MS, 600_000);
+        assert_eq!(MAX_REPLAN_RETRIES, 3);
+        assert_eq!(MAX_RECURSION_DEPTH, 1000);
+    }
+}

@@ -270,7 +270,10 @@ mod tests {
     const TARGET: &str = "test";
 
     async fn redis() -> (ContainerAsync<Redis>, Arc<ConnectionManager>) {
+        // 7.2 rather than the crate default of 5.0: the ACL-based test below
+        // needs `ACL SETUSER`, which Redis 5 doesn't support.
         let container = Redis::default()
+            .with_tag("7.2")
             .with_mapped_port(6379, ContainerPort::Tcp(6379))
             .start()
             .await
@@ -386,6 +389,98 @@ mod tests {
             "the health monitor must not exit on its own"
         );
         monitor.abort();
+    }
+
+    /// The initial connect loop (`ConnectionManager::new`) must not give up
+    /// when Redis is unreachable: it logs the failure and retries rather than
+    /// panicking or returning an error. Point it at a port nothing listens on
+    /// and confirm it is still going after a while - not just that it didn't
+    /// crash on the very first poll.
+    #[tokio::test]
+    #[serial]
+    async fn new_keeps_retrying_without_panicking_when_redis_is_unreachable() {
+        // SAFETY: this test runs under `#[serial]`, which every Redis test in
+        // this crate uses, so nothing else observes these env vars while set.
+        unsafe {
+            std::env::set_var("REDIS_HOST", "127.0.0.1");
+            std::env::set_var("REDIS_PORT", "1"); // nothing listens here
+        }
+
+        let handle = tokio::spawn(ConnectionManager::new());
+        tokio::time::sleep(Duration::from_secs(7)).await;
+
+        assert!(
+            !handle.is_finished(),
+            "new() must keep retrying against an unreachable Redis rather than giving up"
+        );
+        handle.abort();
+
+        unsafe {
+            std::env::remove_var("REDIS_HOST");
+            std::env::remove_var("REDIS_PORT");
+        }
+    }
+
+    /// `check_redis_health` must classify a non-I/O Redis error (here: a
+    /// permission error from ACL, not a dropped socket) as "unexpected" rather
+    /// than as something the driver will silently reconnect from - and
+    /// `reconnect` must keep looping through its backoff while that error
+    /// persists, then actually return once the permission is restored.
+    #[tokio::test]
+    #[serial]
+    async fn reconnect_loops_through_a_persistent_non_io_error_then_recovers() {
+        let (_container, manager) = redis().await;
+        let mut con = manager.get_connection().await;
+
+        // Take PING away from the `default` user. The already-open connection
+        // is still using that user, so the very next PING fails with a
+        // permission error - a real Redis error that is not an I/O error.
+        let _: () = redis::cmd("ACL")
+            .arg("SETUSER")
+            .arg("default")
+            .arg("-ping")
+            .query_async(&mut con)
+            .await
+            .unwrap();
+
+        let health_err = manager
+            .check_redis_health(TARGET)
+            .await
+            .expect_err("PING must fail once the default user is denied it");
+        assert!(
+            !health_err.is_io_error(),
+            "a permission error is not an I/O error"
+        );
+
+        let manager_for_task = Arc::clone(&manager);
+        let reconnecting = tokio::spawn(async move {
+            manager_for_task.reconnect(TARGET).await;
+        });
+
+        // While PING is still denied, reconnect must keep sleeping and
+        // backing off rather than returning.
+        tokio::time::sleep(Duration::from_millis(400)).await;
+        assert!(
+            !reconnecting.is_finished(),
+            "reconnect must not return while the health check keeps failing"
+        );
+
+        // Restore the permission; the in-flight reconnect should now succeed
+        // on its own within a few backoff iterations.
+        let _: () = redis::cmd("ACL")
+            .arg("SETUSER")
+            .arg("default")
+            .arg("+ping")
+            .query_async(&mut con)
+            .await
+            .unwrap();
+
+        tokio::time::timeout(Duration::from_secs(10), reconnecting)
+            .await
+            .expect("reconnect must finish soon after health is restored")
+            .expect("reconnect task must not panic");
+
+        assert!(manager.check_redis_health(TARGET).await.is_ok());
     }
 
     /// The snapshot restore path: with a snapshot held, an empty Redis is

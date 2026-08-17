@@ -368,6 +368,11 @@ mod tests {
     fn plan_state_cancelled_does_not_survive_the_round_trip() {
         assert_eq!(PlanState::Cancelled.to_string(), "cancelled");
         assert_eq!(
+            PlanState::Cancelled.to_spvalue(),
+            "cancelled".to_spvalue(),
+            "to_spvalue must still produce the same wire string as Display"
+        );
+        assert_eq!(
             PlanState::from_str("cancelled"),
             PlanState::UNKNOWN,
             "if this now returns Cancelled the bug is fixed - see the doc comment"
@@ -398,6 +403,11 @@ mod tests {
     #[test]
     fn sop_state_cancelled_does_not_survive_the_round_trip() {
         assert_eq!(SOPState::Cancelled.to_string(), "cancelled");
+        assert_eq!(
+            SOPState::Cancelled.to_spvalue(),
+            "cancelled".to_spvalue(),
+            "to_spvalue must still produce the same wire string as Display"
+        );
         assert_eq!(SOPState::from_str("cancelled"), SOPState::UNKNOWN);
     }
 

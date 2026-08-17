@@ -184,6 +184,72 @@ mod tests {
     const SP_ID: &str = "sp";
     const TARGET: &str = "test";
 
+    /// `MICRO_SP_READ_FULL_STATE` is process-global, so these have to run one at
+    /// a time (like the `MICRO_SP_TICK_INTERVAL_MS` tests in `tick.rs`) and
+    /// clean up after themselves regardless of the assertion outcome.
+    struct EnvGuard;
+
+    impl EnvGuard {
+        fn set(value: &str) -> Self {
+            unsafe { std::env::set_var("MICRO_SP_READ_FULL_STATE", value) };
+            EnvGuard
+        }
+        fn unset() -> Self {
+            unsafe { std::env::remove_var("MICRO_SP_READ_FULL_STATE") };
+            EnvGuard
+        }
+    }
+
+    impl Drop for EnvGuard {
+        fn drop(&mut self) {
+            unsafe { std::env::remove_var("MICRO_SP_READ_FULL_STATE") };
+        }
+    }
+
+    #[test]
+    #[serial_test::serial(micro_sp_read_full_state)]
+    fn unset_means_key_sets_are_used() {
+        let _guard = EnvGuard::unset();
+        assert!(!read_full_state_enabled());
+    }
+
+    /// The two spellings the escape hatch actually honours, in either case.
+    #[test]
+    #[serial_test::serial(micro_sp_read_full_state)]
+    fn one_and_true_enable_the_full_scan_case_insensitively() {
+        for value in ["1", "true", "TRUE", "True"] {
+            let _guard = EnvGuard::set(value);
+            assert!(
+                read_full_state_enabled(),
+                "{value:?} should have enabled the full-state scan"
+            );
+        }
+    }
+
+    /// Anything else - a typo, "0", "yes", empty - must leave the runners on
+    /// their key sets. Falling back the wrong way here would silently turn
+    /// every runner back into a `KEYS *` scan in production.
+    #[test]
+    #[serial_test::serial(micro_sp_read_full_state)]
+    fn anything_else_leaves_key_sets_in_use() {
+        for value in ["0", "false", "yes", "", "  ", "2"] {
+            let _guard = EnvGuard::set(value);
+            assert!(
+                !read_full_state_enabled(),
+                "{value:?} must not enable the full-state scan"
+            );
+        }
+    }
+
+    /// Surrounding whitespace around a valid value is tolerated, the same way
+    /// `tick_interval_ms` tolerates it for its own environment variable.
+    #[test]
+    #[serial_test::serial(micro_sp_read_full_state)]
+    fn surrounding_whitespace_is_tolerated() {
+        let _guard = EnvGuard::set("  true\n");
+        assert!(read_full_state_enabled());
+    }
+
     /// The variables the model's guards and actions refer to.
     fn model_state() -> State {
         let mut state = State::new();

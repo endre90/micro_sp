@@ -110,6 +110,52 @@ mod tests {
         assert!(!exists);
     }
 
+    /// A pipeline error (here: the `default` user is denied `mset`, a real
+    /// permission error, not a mock) must be logged rather than panicking, and
+    /// - because the pipeline is not atomic and MSET itself is refused as a
+    /// whole - neither the write nor any preceding delete in the same pipeline
+    /// should appear to have landed from the caller's point of view.
+    #[tokio::test]
+    #[serial]
+    async fn a_pipeline_error_is_logged_and_does_not_panic() {
+        // ACL SETUSER requires Redis 6+; the crate's default test image is 5.0.
+        let _container = Redis::default()
+            .with_tag("7.2")
+            .with_mapped_port(6379, ContainerPort::Tcp(6379))
+            .start()
+            .await
+            .unwrap();
+
+        let mut con = ConnectionManager::new().await.get_connection().await;
+
+        let _: () = redis::cmd("ACL")
+            .arg("SETUSER")
+            .arg("default")
+            .arg("-mset")
+            .query_async(&mut con)
+            .await
+            .unwrap();
+
+        StateManager::apply(&mut con, &delta(), &[]).await;
+
+        // Restore permissions before asserting, so a failed assertion doesn't
+        // leave the shared, fixed-port Redis in a state that breaks later
+        // tests.
+        let _: () = redis::cmd("ACL")
+            .arg("SETUSER")
+            .arg("default")
+            .arg("+mset")
+            .query_async(&mut con)
+            .await
+            .unwrap();
+
+        let written: Option<String> = con.get("written").await.unwrap();
+        assert_eq!(
+            written, None,
+            "a denied MSET must not appear to have written anything"
+        );
+    }
+
     #[tokio::test]
     #[serial]
     async fn nothing_to_do_issues_no_command() {

@@ -146,6 +146,7 @@ pub async fn time_interface_runner(
 
         let modified_state = state.get_diff_partial_state(&new_state);
         if !modified_state.state.is_empty() {
+            activity_log::log_state_diff(&log_target, &state, &modified_state);
             StateManager::set_state(&mut con, &modified_state).await;
         }
     }

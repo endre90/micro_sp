@@ -211,6 +211,34 @@ mod tests {
         );
     }
 
+    /// A quoted string is a distinct alternative from the bare-word value rule
+    /// - it is what lets a value contain spaces or characters the bare-word
+    /// rule's character class excludes.
+    #[test]
+    fn parse_quoted_string_value() {
+        let s = State::new();
+        assert_eq!(
+            pred_parser::value("\"hello world\"", &s),
+            Ok(SPWrapped::SPValue("hello world".to_spvalue()))
+        );
+        assert_eq!(
+            pred_parser::value("\"\"", &s),
+            Ok(SPWrapped::SPValue("".to_spvalue()))
+        );
+    }
+
+    /// The `ip:[...]` rule is its own alternative, separate from both the
+    /// bare-word and quoted-string rules, and keeps the brackets' contents
+    /// verbatim as a plain string value.
+    #[test]
+    fn parse_ip_value() {
+        let s = State::new();
+        assert_eq!(
+            pred_parser::value("ip:[192.168.1.1]", &s),
+            Ok(SPWrapped::SPValue("192.168.1.1".to_spvalue()))
+        );
+    }
+
     #[test]
     fn parse_variables() {
         let s = State::from_vec(&john_doe());

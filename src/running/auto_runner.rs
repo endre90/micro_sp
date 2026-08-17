@@ -54,6 +54,9 @@ fn process_transition(
 
     transition.take_mut(state, &log_target);
     log::info!(target: &log_target, "Executed auto transition: '{}'.", unique_name);
+    // The per-firing id ties this line to the `VAR` lines the same tick
+    // produces: the transition's actions are what changed those variables.
+    activity_log::log_transition(&log_target, &transition.name, &unique_name);
 
     // let transition_msg = TransitionMsg {
     //     transition_name: transition.name.clone(),
@@ -87,6 +90,7 @@ pub async fn auto_transition_runner(
     // logging_tx: mpsc::Sender<LogMsg>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     initialize_env_logger();
+    activity_log::init_from_env();
     let mut interval = runner_interval();
     let log_target = format!("{}_auto_transition_runner", name);
     let keys: Vec<String> = normalize_keys(
@@ -122,6 +126,7 @@ pub async fn auto_transition_runner(
 
         let modified_state = state.get_diff_partial_state(&new_state);
         if !modified_state.state.is_empty() {
+            activity_log::log_state_diff(&log_target, &state, &modified_state);
             StateManager::set_state(&mut con, &modified_state).await;
         }
     }
@@ -159,6 +164,7 @@ pub async fn auto_operation_runner(
     connection_manager: &Arc<ConnectionManager>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     initialize_env_logger();
+    activity_log::init_from_env();
     let mut interval = runner_interval();
     let log_target = format!("{}_operation_runner", sp_id);
 
@@ -301,6 +307,7 @@ pub async fn auto_operation_runner(
         active_mutexed_op = next_active_mutexed_op;
 
         let modified_state = state.get_diff_partial_state_and_add_missing(&new_state);
+        activity_log::log_state_diff(&log_target, &state, &modified_state);
         let active_set_changed = !new_op_ids.is_empty() || !terminated_operations.is_empty();
 
         // DONE: PERF: this was `set_state` then two `remove_sp_values`, three
@@ -681,6 +688,72 @@ mod runner_tests {
             Some(false.to_spvalue()),
             "the second mutexed operation must wait for the first to finish"
         );
+    }
+
+    /// A mutexed auto operation that actually completes (as opposed to the
+    /// "stuck" ones used above, which never reach `Terminated`) must free the
+    /// mutex: the second operation, whose guard was blocked only by the first
+    /// holding the slot, gets to start once the first is cleaned up.
+    #[tokio::test]
+    #[serial]
+    async fn a_completed_mutexed_operation_frees_the_slot_for_the_next() {
+        let (_container, manager) = redis().await;
+        let mut con = manager.get_connection().await;
+        let domain = flags(&["a", "b"]);
+
+        let model = Model::new(
+            SP,
+            vec![],
+            vec![],
+            vec![auto_op("one", "a", &domain), auto_op("two", "b", &domain)],
+            vec![],
+            vec![],
+        );
+        deploy(&manager, &model, domain).await;
+
+        let runner = spawn_operations(&manager, model);
+        assert!(wait_true(&mut con, "a", 3000).await, "the first should start and complete");
+        assert!(
+            wait_true(&mut con, "b", 3000).await,
+            "the mutex must be released once the first operation terminates, letting the second run"
+        );
+        runner.abort();
+    }
+
+    /// The escape hatch: with `MICRO_SP_READ_FULL_STATE` set, the runner reads
+    /// the whole keyspace every tick with `get_full_state` instead of the
+    /// precomputed key set - and still drives auto operations correctly.
+    #[tokio::test]
+    #[serial]
+    async fn read_full_state_env_var_still_drives_operations() {
+        // SAFETY: serialized with the rest of this module's Redis tests via
+        // `#[serial]`, which uses a single global lock, so no other test in
+        // this crate observes this env var while it is set.
+        unsafe {
+            std::env::set_var("MICRO_SP_READ_FULL_STATE", "1");
+        }
+        let (_container, manager) = redis().await;
+        let mut con = manager.get_connection().await;
+        let domain = flags(&["a"]);
+
+        let model = Model::new(
+            SP,
+            vec![],
+            vec![auto_op("do_it", "a", &domain)],
+            vec![],
+            vec![],
+            vec![],
+        );
+        deploy(&manager, &model, domain).await;
+
+        let runner = spawn_operations(&manager, model);
+        let started = wait_true(&mut con, "a", 3000).await;
+        runner.abort();
+        unsafe {
+            std::env::remove_var("MICRO_SP_READ_FULL_STATE");
+        }
+
+        assert!(started, "the operation must still activate when reading full state every tick");
     }
 
     /// An auto operation whose guard never holds costs nothing.

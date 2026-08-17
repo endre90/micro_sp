@@ -123,6 +123,7 @@ pub async fn planner_ticker(
 
         let modified_state = state.get_diff_partial_state_and_add_missing(&new_state);
         if !modified_state.state.is_empty() {
+            activity_log::log_state_diff(&log_target, &state, &modified_state);
             StateManager::set_state(&mut con, &modified_state).await;
         }
     }

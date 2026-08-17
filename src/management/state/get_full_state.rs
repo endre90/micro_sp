@@ -28,6 +28,15 @@ use redis::AsyncCommands;
 // previous tick's raw strings and only re-parse entries whose string differs -
 // a byte compare is far cheaper than a JSON parse, and in steady state almost
 // nothing changes between ticks.
+// NOTE on test coverage: the `Err` arms below (`KEYS` failing, then `MGET`
+// failing) are not exercised by a test. Both commands accept any key type
+// without a WRONGTYPE check (`MGET` returns `nil` per key rather than erroring,
+// and `KEYS` never inspects value types at all), so - unlike `GET` in
+// `get_sp_value` - there is no real, non-mocked Redis state that makes either
+// of them return an error short of an actual network/IO failure or killing the
+// server mid-call. That is exactly the class of failure this task's
+// instructions call out as impractical to test without mocking, so it is left
+// uncovered deliberately rather than faked.
 pub(super) async fn get_full_state(con: &mut SPConnection) -> Option<State> {
     let keys: Vec<String> = match con.keys("*").await {
         Ok(k) => k,

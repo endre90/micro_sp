@@ -76,6 +76,35 @@ mod tests {
         assert_eq!(result, None);
     }
 
+    /// `GET` (unlike `MGET`) genuinely errors with WRONGTYPE when the key
+    /// holds a non-string value, so this is a real Redis error, not a mocked
+    /// one. It must be logged and treated the same as "not found".
+    #[tokio::test]
+    #[serial]
+    async fn test_get_sp_value_wrong_redis_type() {
+        let _container = Redis::default()
+            .with_mapped_port(6379, ContainerPort::Tcp(6379))
+            .start()
+            .await
+            .unwrap();
+
+        let mut con = ConnectionManager::new().await.get_connection().await;
+
+        let key = "test_key_wrong_type";
+        let _: () = con.rpush(key, "an_element").await.unwrap();
+
+        let result = get_sp_value(&mut con, key).await;
+
+        assert_eq!(
+            result, None,
+            "GET against a list key must fail with WRONGTYPE and surface as None"
+        );
+
+        // The list itself must be untouched by the failed read.
+        let list_len: usize = con.llen(key).await.unwrap();
+        assert_eq!(list_len, 1);
+    }
+
     #[tokio::test]
     #[serial]
     async fn test_get_sp_value_deserialization_error() {

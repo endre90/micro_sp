@@ -58,6 +58,11 @@ pub async fn main_runner(
     // let op_vars = generate_operation_state_variables(&model, coverability_tracking);
     // let state = state.extend(op_vars, true);
 
+    // Start the on-disk activity log if the environment asked for one. A no-op
+    // otherwise, so a consuming package that has not opted in never has files
+    // appear in its working directory. See `utils::activity_log`.
+    activity_log::init_from_env();
+
     // One deep copy of the model for the whole process; every task below holds
     // an `Arc::clone` of it.
     let model = Arc::new(model);

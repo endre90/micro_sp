@@ -53,6 +53,7 @@ pub async fn sop_runner(
     connection_manager: &Arc<ConnectionManager>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     initialize_env_logger();
+    activity_log::init_from_env();
     let mut interval = runner_interval();
     let log_target = &format!("{}_sop_runner", sp_id);
 
@@ -132,6 +133,13 @@ pub async fn sop_runner(
         //     .filter(|val| val.is_string())
         //     .map(|y| y.to_string())
         //     .collect();
+
+        // Snapshotted for the file log: the arms below drive
+        // `active_unique_sop_state` forward, and comparing against this after
+        // the match is what turns "the runner is in state X" into "the SOP
+        // moved from X to Y", which is the thing worth a line.
+        let sop_state_before = active_unique_sop_state.clone();
+        let sop_id_before = active_unique_sop_id.clone();
 
         // Check first if there is an active unique SOP already running
         match active_unique_sop_id {
@@ -289,6 +297,34 @@ pub async fn sop_runner(
             }
         }
 
+        // A `SOP` line whenever the runner actually moved: either the tracked
+        // state changed, or a new unique SOP was activated / an old one torn
+        // down (both of which change `active_unique_sop_id` while the state can
+        // stay put). Guarding on a real change is what keeps this off the
+        // per-tick path - `Executing` re-enters its arm every 100 ms.
+        if sop_state_before != active_unique_sop_state || sop_id_before != active_unique_sop_id {
+            let subject = active_unique_sop_id
+                .as_deref()
+                .or(sop_id_before.as_deref())
+                .unwrap_or(&sop_id);
+            // Activation and teardown both leave the tracked state untouched
+            // (a SOP is activated *into* `Initial`, and released back *to* it),
+            // so without this note those two lines would read as a meaningless
+            // "initial -> initial" and "completed -> initial".
+            let note = match (sop_id_before.is_some(), active_unique_sop_id.is_some()) {
+                (false, true) => "activated",
+                (true, false) => "released",
+                _ => "",
+            };
+            activity_log::log_sop(
+                &log_target,
+                subject,
+                &sop_state_before.to_string(),
+                &active_unique_sop_state.to_string(),
+                note,
+            );
+        }
+
         new_state = new_state
             .update(
                 &format!("{}_sop_information", sop_id),
@@ -299,6 +335,7 @@ pub async fn sop_runner(
         let modified_state = state.get_diff_partial_state_and_add_missing(&new_state);
 
         if !modified_state.state.is_empty() {
+            activity_log::log_state_diff(&log_target, &state, &modified_state);
             StateManager::set_state(&mut con, &modified_state).await;
         }
 
@@ -1075,6 +1112,217 @@ mod tests {
         assert!(!runner.is_finished());
         runner.abort();
         assert_eq!(after, before, "a cancelled SOP must clean up after itself");
+    }
+
+    /// The escape hatch: with `MICRO_SP_READ_FULL_STATE` set, the runner reads
+    /// the whole keyspace every tick with `get_full_state` instead of the
+    /// precomputed key set - and still drives a SOP to completion.
+    #[tokio::test]
+    #[serial]
+    async fn read_full_state_env_var_still_drives_a_sop() {
+        // SAFETY: serialized with the rest of this crate's Redis tests via
+        // `#[serial]`, which uses a single global lock, so no other test
+        // observes this env var while it is set.
+        unsafe {
+            std::env::set_var("MICRO_SP_READ_FULL_STATE", "1");
+        }
+        let (_container, manager) = redis().await;
+        let mut con = manager.get_connection().await;
+
+        let state = domain(&["a"]);
+        let sop = SOP::Sequence(vec![step("one", "a", &state)]);
+        let model = deploy(sop, &["a"], &manager).await;
+
+        let runner = spawn_runner(&manager, model);
+        enable_sop(&mut con).await;
+
+        let sop_state = wait_for(&mut con, &format!("{SP}_sop_state"), "completed", 5000).await;
+        runner.abort();
+        unsafe {
+            std::env::remove_var("MICRO_SP_READ_FULL_STATE");
+        }
+
+        assert_eq!(
+            sop_state, "completed",
+            "the SOP must still run to completion when reading the whole keyspace every tick"
+        );
+        assert_eq!(
+            StateManager::get_sp_value(&mut con, "a").await,
+            Some(true.to_spvalue())
+        );
+    }
+
+    /// `can_sop_start` recurses through every branch type while looking for an
+    /// `Alternative` path to start, not just bare operations. A top-level
+    /// `Alternative` whose branches are themselves a `Sequence`, a nested
+    /// `Alternative` and a `Parallel` exercises all three recursive arms: the
+    /// first two can never start (their operation's guard is unsatisfiable),
+    /// so the search has to walk past both before it reaches the `Parallel`
+    /// branch, finds every one of its children startable, and picks it.
+    #[tokio::test]
+    #[serial]
+    async fn an_alternative_finds_a_startable_path_through_nested_branch_types() {
+        let (_container, manager) = redis().await;
+        let mut con = manager.get_connection().await;
+
+        let state = domain(&["d", "e"]);
+
+        // Never satisfiable, so `can_sop_start` must reject both of these.
+        let never_startable = |name: &str| {
+            SOP::Operation(Box::new(Operation::new(
+                name,
+                Some(10_000),
+                Some(10_000),
+                None,
+                None,
+                false,
+                vec![Transition::parse(
+                    "start",
+                    "false",
+                    "true",
+                    Vec::<&str>::new(),
+                    Vec::<&str>::new(),
+                    &state,
+                )],
+                vec![Transition::parse(
+                    "complete",
+                    "true",
+                    "true",
+                    Vec::<&str>::new(),
+                    Vec::<&str>::new(),
+                    &state,
+                )],
+                vec![],
+                vec![],
+                vec![],
+                vec![],
+            )))
+        };
+
+        let sop = SOP::Alternative(vec![
+            SOP::Sequence(vec![never_startable("seq_op")]),
+            SOP::Alternative(vec![never_startable("nested_op")]),
+            SOP::Parallel(vec![step("par1", "d", &state), step("par2", "e", &state)]),
+        ]);
+        let model = deploy(sop, &["d", "e"], &manager).await;
+
+        let runner = spawn_runner(&manager, model);
+        enable_sop(&mut con).await;
+
+        let sop_state = wait_for(&mut con, &format!("{SP}_sop_state"), "completed", 5000).await;
+        runner.abort();
+
+        assert_eq!(sop_state, "completed");
+        assert_eq!(
+            StateManager::get_sp_value(&mut con, "d").await,
+            Some(true.to_spvalue()),
+            "the Parallel branch is the only startable one and must have run"
+        );
+        assert_eq!(
+            StateManager::get_sp_value(&mut con, "e").await,
+            Some(true.to_spvalue())
+        );
+    }
+
+    /// The `op_lone_*` keys that are an operation's own state variable, with
+    /// its five bookkeeping siblings filtered out.
+    async fn operation_state_keys(con: &mut crate::SPConnection) -> Vec<String> {
+        let keys: Vec<String> = redis::cmd("KEYS")
+            .arg("op_lone_*")
+            .query_async(con)
+            .await
+            .unwrap();
+        let mut own: Vec<String> = keys
+            .into_iter()
+            .filter(|k| {
+                !(k.ends_with("_information")
+                    || k.ends_with("_elapsed_executing_ms")
+                    || k.ends_with("_elapsed_disabled_ms")
+                    || k.ends_with("_failure_retry_counter")
+                    || k.ends_with("_timeout_retry_counter"))
+            })
+            .collect();
+        own.sort();
+        own
+    }
+
+    /// A corrupted operation state does **not** reach the runner's
+    /// `SOPState::UNKNOWN` arm, and this pins why - because the obvious reading
+    /// of the code says it should.
+    ///
+    /// `SOP::get_state` does map an unparseable operation state to
+    /// `SOPState::UNKNOWN`, and the runner has an arm for it that resets its
+    /// bookkeeping. But the `Executing` arm calls `process_sop_node_tick`
+    /// *before* it calls `get_state`, and `process_operation`'s own
+    /// `OperationState::UNKNOWN` arm repairs the variable back to `initial` in
+    /// that same tick. By the time the root state is computed the corruption is
+    /// gone, so `get_state` returns `Initial`, never `UNKNOWN`.
+    ///
+    /// Two consequences worth having written down:
+    ///   - the runner's `SOPState::UNKNOWN` arm is unreachable in this path,
+    ///     which is why it shows as uncovered;
+    ///   - the SOP does not tear down and does not release its unique id. It
+    ///     falls back to `Initial` and re-initialises *the same* unique SOP,
+    ///     whose operation can no longer satisfy its guard (the SOP already ran
+    ///     and its postcondition holds), so it sits there Disabled. A fresh SOP
+    ///     therefore cannot be started, and the operation variables are never
+    ///     cleaned up.
+    #[tokio::test]
+    #[serial]
+    async fn a_corrupted_operation_state_is_repaired_before_the_sop_can_see_it() {
+        let (_container, manager) = redis().await;
+        let mut con = manager.get_connection().await;
+
+        let state = domain(&["x"]);
+        // A bare top-level `Operation`, not wrapped in a `Sequence` - so the
+        // root's own state *is* this operation's state.
+        let sop = step("lone", "x", &state);
+        let model = deploy(sop, &["x"], &manager).await;
+
+        let runner = spawn_runner(&manager, model);
+        enable_sop(&mut con).await;
+
+        assert_eq!(
+            wait_for(&mut con, &format!("{SP}_sop_state"), "executing", 5000).await,
+            "executing",
+            "the operation should be running before we corrupt its state"
+        );
+
+        let before = operation_state_keys(&mut con).await;
+        let op_key = before
+            .first()
+            .expect("the operation's own state key must exist")
+            .clone();
+
+        StateManager::set_sp_value(&mut con, &op_key, &"totally_bogus".to_spvalue()).await;
+
+        // Several ticks, so the repair and the re-initialisation both happen.
+        tokio::time::sleep(Duration::from_millis(600)).await;
+
+        // The corruption is gone: `process_operation` initialised it back
+        // rather than leaving a value nothing can parse.
+        let repaired = StateManager::get_sp_value(&mut con, &op_key).await;
+        assert_ne!(
+            repaired,
+            Some("totally_bogus".to_spvalue()),
+            "process_operation must repair an unparseable operation state"
+        );
+
+        // Re-enabling does not start a fresh SOP: the old unique id was never
+        // released, so no second operation instance is ever created.
+        enable_sop(&mut con).await;
+        tokio::time::sleep(Duration::from_millis(600)).await;
+        runner.abort();
+
+        let after = operation_state_keys(&mut con).await;
+        assert_eq!(
+            after, before,
+            "no new operation instance appears - the wedged SOP keeps its own"
+        );
+        assert!(
+            StateManager::get_sp_value(&mut con, &op_key).await.is_some(),
+            "and the original operation's variables are never cleaned up"
+        );
     }
 
     /// BUG (consequence of `Operation::terminate` ignoring every reason except

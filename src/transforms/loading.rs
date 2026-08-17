@@ -444,6 +444,32 @@ mod tests {
         assert_eq!(list_frames_in_dir(dir.as_str()).unwrap(), Vec::<String>::new());
     }
 
+    /// A directory entry whose path is not valid UTF-8 cannot be turned into a
+    /// `String`, so `list_frames_in_dir` has to skip it (with a warning)
+    /// rather than fail the whole listing - it must still report every other,
+    /// well-formed entry.
+    #[cfg(unix)]
+    #[test]
+    fn a_non_utf8_path_entry_is_skipped_but_others_are_listed() {
+        use std::os::unix::ffi::OsStrExt;
+
+        let dir = ScratchDir::new();
+        dir.write("good.json", &frame_json("good", "world", 1.0, "{}"));
+
+        // A filename that is not valid UTF-8 (a lone continuation byte).
+        let bad_name = std::ffi::OsStr::from_bytes(&[0x66, 0x69, 0x6e, 0xff, 0x6e]);
+        let bad_path = dir.path.join(bad_name);
+        std::fs::write(&bad_path, "irrelevant").unwrap();
+
+        let frames = list_frames_in_dir(dir.as_str()).expect("listing must still succeed");
+        assert_eq!(
+            frames.len(),
+            1,
+            "the non-UTF8 entry must be skipped, not turned into a lossy string"
+        );
+        assert!(frames[0].ends_with("good.json"));
+    }
+
     /// `.json` files are collected recursively, and anything else is left
     /// alone - a README or a `.bak` next to the scene files must not break it.
     #[test]
@@ -625,6 +651,70 @@ mod tests {
             "/no/such/file.json".to_string(),
         ]);
         assert!(mixed.is_empty());
+    }
+
+    /// `load_new_scenario_no_check` reads `active_transform` from metadata the
+    /// same way the checked loader does - this pins that read for the
+    /// `_no_check` path specifically, since it has its own copy of the
+    /// `if let Some(Value::Bool(val)) = ...` check.
+    #[test]
+    fn load_new_scenario_no_check_honors_an_explicit_active_transform_flag() {
+        let dir = ScratchDir::new();
+        let active = dir.write(
+            "active.json",
+            &frame_json("active", "world", 1.0, r#"{"active_transform": true}"#),
+        );
+        let inactive = dir.write(
+            "inactive.json",
+            &frame_json("inactive", "world", 1.0, r#"{"active_transform": false}"#),
+        );
+
+        let scenario = load_new_scenario_no_check(&vec![active, inactive]);
+
+        assert!(scenario["active"].active_transform);
+        assert!(!scenario["inactive"].active_transform);
+    }
+
+    /// A `null` inside a *nested* metadata object goes through
+    /// `json_value_to_spvalue`'s own object arm (not `convert_metadata_value`'s
+    /// top level), which has to drop it the same way: skip the field, keep the
+    /// rest, and do not fail the whole frame.
+    #[test]
+    fn a_null_inside_nested_metadata_is_dropped_but_its_siblings_survive() {
+        let dir = ScratchDir::new();
+        dir.write(
+            "nested_null.json",
+            &frame_json(
+                "nested_null",
+                "world",
+                1.0,
+                r#"{"outer": {"a": 1, "bad": null}}"#,
+            ),
+        );
+
+        let scenario = load_new_scenario(&vec![dir.as_str().to_string()]);
+        let frame = &scenario["nested_null"];
+
+        let MapOrUnknown::Map(top) = &frame.metadata else {
+            panic!("expected a metadata map");
+        };
+        let outer = top
+            .iter()
+            .find(|(k, _)| k == &"outer".to_spvalue())
+            .map(|(_, v)| v)
+            .expect("'outer' must survive");
+
+        let SPValue::Map(MapOrUnknown::Map(inner)) = outer else {
+            panic!("expected 'outer' to convert to a nested map, got {outer:?}");
+        };
+        assert!(
+            inner.iter().any(|(k, _)| k == &"a".to_spvalue()),
+            "the sibling field must survive: {inner:?}"
+        );
+        assert!(
+            !inner.iter().any(|(k, _)| k == &"bad".to_spvalue()),
+            "the null field must be dropped, not kept as some placeholder: {inner:?}"
+        );
     }
 
     /// A later file wins when two declare the same child frame - the buffer is
