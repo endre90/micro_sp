@@ -1,9 +1,51 @@
-use tokio::sync::mpsc;
+//! The entry point that puts a model on the road.
+//!
+//! [`main_runner`] spawns every runner task of the stack - planner, plan runner,
+//! SOP runner, the two automatic runners, timers, goals and the transform
+//! interface - all sharing one Redis connection manager and one `Arc<Model>`.
+//! The runners never talk to each other directly; they hand off through keys in
+//! Redis.
+
 
 use crate::{running::goal_runner::goal_runner, transforms::interface::tf_interface, *};
 use std::sync::Arc;
 
-// Run everything and provide a model
+/// Spawn the whole runner stack for `model` and return immediately.
+///
+/// Initialises logging and the activity log, then spawns eight detached tokio
+/// tasks - planner ticker, SOP runner, plan runner, auto transition runner, auto
+/// operation runner, timer interface, goal runner and transform interface - each
+/// of which loops forever polling Redis. Every runner reads and writes
+/// `{sp_id}_*` keys plus the model's own variables; see the individual runners
+/// for their key sets.
+///
+/// * `sp_id` - the namespace every runner key is prefixed with.
+/// * `model` - the operations, automatic transitions and SOPs to execute. Moved
+///   in and shared between the tasks behind an `Arc`.
+/// * `number_of_timers` - how many `{sp_id}_timer_N_*` timers the timer
+///   interface should drive. Their variables must already exist in the state.
+/// * `connection_manager` - the Redis connection pool the tasks clone.
+///
+/// The caller has to keep the process alive; the spawned tasks are dropped when
+/// the runtime shuts down. The state must be seeded first (see
+/// [`generate_runner_state_variables`] and
+/// [`generate_operation_state_variables`]), because reading a variable that is
+/// not in the state panics.
+///
+/// ```no_run
+/// use micro_sp::*;
+/// use std::sync::Arc;
+///
+/// # async fn example(model: Model) {
+/// let connection_manager = Arc::new(ConnectionManager::new().await);
+///
+/// // Seed Redis with the model's variables, then hand it to the runners.
+/// main_runner(&"sp".to_string(), model, 3, &connection_manager).await;
+///
+/// // The runners are detached; keep the process alive.
+/// std::future::pending::<()>().await;
+/// # }
+/// ```
 pub async fn main_runner(
     sp_id: &String,
     model: Model,
@@ -97,10 +139,9 @@ pub async fn main_runner(
 /// hand off to each other through Redis until the world is in the goal state.
 ///
 /// That handover is the part nobody can test any other way - it is implemented
-/// entirely through shared keys written by different tasks on different timers,
-/// which is exactly the arrangement the module note above flags as the
-/// architectural risk. If a key name, a state string or a handshake order drifts
-/// on one side only, this is the test that notices.
+/// entirely through shared keys written by different tasks on different timers.
+/// If a key name, a state string or a handshake order drifts on one side only,
+/// this is the test that notices.
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -419,8 +460,7 @@ mod tests {
     }
 
     /// With all eight runners up and nothing asked of them, the process must be
-    /// quiet. This is the idle-load property the whole `PERF` write-up is about,
-    /// measured the only way that actually settles it: watch the keyspace.
+    /// quiet, measured the only way that actually settles it: watch the keyspace.
     #[tokio::test]
     #[serial]
     async fn a_fully_booted_but_idle_stack_writes_nothing() {

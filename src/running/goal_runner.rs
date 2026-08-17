@@ -1,22 +1,60 @@
+//! Goal admission and scheduling.
+//!
+//! Whatever wants something done writes a [`Goal`](crate::running::goal_runner::Goal) into `{sp_id}_incoming_goals`.
+//! [`goal_runner`] admits it to the priority-ordered queue in
+//! `{sp_id}_scheduled_goals`, promotes one goal at a time to the current goal,
+//! triggers the planner for it, and then watches `{sp_id}_plan_state` to decide
+//! whether the goal completed, failed or was cancelled.
+
 use crate::*;
 use serde::{Deserialize, Serialize};
 use std::{fmt, sync::Arc};
 
+/// How urgent a goal is. The queue is sorted by this, `Top` first.
+///
+/// The declaration order *is* the ordering - reordering the variants inverts the
+/// scheduler.
 #[derive(Debug, PartialEq, Copy, Clone, Hash, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum GoalPriority {
-    Top, // Useful to schedule housekeeping for example every 5 minutes
+    /// Runs before everything else. Useful for periodic housekeeping goals.
+    Top,
+    /// Runs before `Normal` and `Low`.
     High,
+    /// The usual priority for ordinary work.
     Normal,
+    /// Runs last. Also where an unrecognised priority ends up.
     Low,
 }
 
+/// One request for the system to reach a state.
+///
+/// Crosses the process boundary as a three-element `SPValue::Array`; see
+/// [`goal_to_sp_value`] and [`sp_value_to_goal`].
+///
+/// ```
+/// use micro_sp::running::goal_runner::{Goal, GoalPriority, goal_to_sp_value, sp_value_to_goal};
+///
+/// let goal = Goal {
+///     id: "abc123".to_string(),
+///     priority: GoalPriority::High,
+///     predicate: "var:pos == c".to_string(),
+/// };
+///
+/// // This is exactly what is written into `{sp_id}_incoming_goals`.
+/// let encoded = goal_to_sp_value(&goal);
+/// assert_eq!(sp_value_to_goal(&encoded), Ok(goal));
+/// ```
 #[derive(Debug, PartialEq, Clone, Hash, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct Goal {
-    pub id: String, // use nanoid(10)
+    /// Unique id, a 10-character nanoid assigned when the goal is admitted.
+    pub id: String,
+    /// Where the goal sits in the queue.
     pub priority: GoalPriority,
+    /// The goal itself, as a predicate string the planner parses.
     pub predicate: String,
 }
 
+/// Encodes a goal as the `[id, priority, predicate]` array stored in the state.
 pub fn goal_to_sp_value(goal: &Goal) -> SPValue {
     let id_val = SPValue::String(StringOrUnknown::String(goal.id.clone()));
     let priority_val = SPValue::Int64(IntOrUnknown::Int64(goal.priority.to_int()));
@@ -29,6 +67,7 @@ pub fn goal_to_sp_value(goal: &Goal) -> SPValue {
     ]))
 }
 
+/// Encodes a bare predicate string as a goal array, using the given id and priority.
 pub fn goal_string_to_sp_value(unique_id: &str, goal: &String, priority: GoalPriority) -> SPValue {
     let id_val = SPValue::String(StringOrUnknown::String(unique_id.to_string()));
     let priority_val = SPValue::Int64(IntOrUnknown::Int64(priority.to_int()));
@@ -41,6 +80,10 @@ pub fn goal_string_to_sp_value(unique_id: &str, goal: &String, priority: GoalPri
     ]))
 }
 
+/// Decodes an `[id, priority, predicate]` array back into a [`Goal`].
+///
+/// Returns `Err` with a description if the value is not a three-element array of
+/// the expected types.
 pub fn sp_value_to_goal(sp_value: &SPValue) -> Result<Goal, String> {
     let arr = match sp_value {
         SPValue::Array(ArrayOrUnknown::Array(a)) => a,
@@ -74,19 +117,25 @@ pub fn sp_value_to_goal(sp_value: &SPValue) -> Result<Goal, String> {
     })
 }
 
+/// Lifecycle of the current goal, mirrored in `{sp_id}_current_goal_state`.
 #[derive(Debug, PartialEq, Clone, Hash, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum GoalState {
-    // Empty,
+    /// Promoted from the queue, not yet planned for.
     Initial,
+    /// A plan exists and the plan runner is working through it.
     Executing,
-    // Paused,
+    /// Planning or execution gave up on this goal.
     Failed,
+    /// Aborted before it could complete.
     Cancelled,
+    /// The goal predicate holds.
     Completed,
+    /// No goal, or a state string that could not be parsed.
     UNKNOWN,
 }
 
 impl GoalPriority {
+    /// Decodes the stored integer encoding. Out-of-range values become `Low`.
     pub fn from_int(x: &i64) -> GoalPriority {
         match x {
             0 => GoalPriority::Top,
@@ -101,6 +150,7 @@ impl GoalPriority {
         }
     }
 
+    /// Encodes the priority as the integer stored in the state, `Top` being `0`.
     pub fn to_int(&self) -> i64 {
         match self {
             GoalPriority::Top => 0,
@@ -110,6 +160,7 @@ impl GoalPriority {
         }
     }
 
+    /// Parses `"top"`, `"high"`, `"normal"` or `"low"`. Anything else becomes `Low`.
     pub fn from_str(x: &str) -> GoalPriority {
         match x {
             "top" => GoalPriority::Top,
@@ -137,23 +188,20 @@ impl fmt::Display for GoalPriority {
 }
 
 impl GoalState {
+    /// Parses the state string stored in Redis. Unknown strings become `UNKNOWN`.
     pub fn from_str(x: &str) -> GoalState {
         match x {
-            // "empty" => CurrentGoalState::Empty,
             "initial" => GoalState::Initial,
             "executing" => GoalState::Executing,
             "failed" => GoalState::Failed,
-            // "paused" => CurrentGoalState::Paused,
             "cancelled" => GoalState::Cancelled,
             "completed" => GoalState::Completed,
             "unknown" => GoalState::UNKNOWN,
-            _ => {
-                // log::error!(target: &&format!("goal_priority"),
-                //     "Unknown goal state {}, defaulting to empty.", x);
-                GoalState::UNKNOWN
-            }
+            _ => GoalState::UNKNOWN,
         }
     }
+
+    /// Encodes the state as the lowercase string [`SPValue`] stored in Redis.
     pub fn to_spvalue(self) -> SPValue {
         self.to_string().to_spvalue()
     }
@@ -162,11 +210,9 @@ impl GoalState {
 impl fmt::Display for GoalState {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            // GoalState::Empty => write!(f, "empty"),
             GoalState::Initial => write!(f, "initial"),
             GoalState::Executing => write!(f, "executing"),
             GoalState::Cancelled => write!(f, "cancelled"),
-            // GoalState::Paused => write!(f, "paused"),
             GoalState::Failed => write!(f, "failed"),
             GoalState::Completed => write!(f, "completed"),
             GoalState::UNKNOWN => write!(f, "unknown"),
@@ -195,6 +241,27 @@ pub fn admit_goals(mut scheduled: Vec<Goal>, incoming: Vec<Goal>) -> Vec<Goal> {
     scheduled
 }
 
+/// Runs the goal scheduler until the process ends.
+///
+/// On every tick it reads the goal keys for `sp_id` from Redis, moves goals from
+/// `{sp_id}_incoming_goals` into the priority-sorted `{sp_id}_scheduled_goals`,
+/// promotes the first one into `{sp_id}_current_goal_*`, triggers a replan, and
+/// writes back the resulting goal state. `connection_manager` is the shared Redis
+/// connection; log output goes to the `{sp_id}_goal_runner` target.
+///
+/// ```no_run
+/// use micro_sp::*;
+/// use micro_sp::running::goal_runner::goal_runner;
+/// use std::sync::Arc;
+///
+/// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+/// let connection_manager = Arc::new(ConnectionManager::new().await);
+///
+/// // Loops forever, so this is normally the whole body of its own task.
+/// goal_runner("sp", &connection_manager).await?;
+/// # Ok(())
+/// # }
+/// ```
 pub async fn goal_runner(
     sp_id: &str,
     connection_manager: &Arc<ConnectionManager>,

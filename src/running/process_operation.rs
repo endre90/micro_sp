@@ -1,13 +1,25 @@
-use chrono::Utc;
+//! The shared operation state machine.
+//!
+//! Every runner that owns operations - the plan runner, the SOP runner and the
+//! automatic runners - hands each of its operations to [`process_operation`] on
+//! every tick. It advances the operation's lifecycle, ages its timers, writes the
+//! resulting information string and records the transition in the activity log.
+
 use serde::{Deserialize, Serialize};
-use tokio::sync::mpsc;
 
 use crate::*;
 
+/// Which runner an operation is being processed on behalf of.
+///
+/// It decides what happens on termination: only a planned operation advances the
+/// plan step and reports failure back into the plan state.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum OperationProcessingType {
+    /// Part of a plan the planner produced, executed by the plan runner.
     Planned,
+    /// Part of a [`SOPStruct`], executed by the SOP runner.
     SOP,
+    /// An automatic operation, fired whenever its guard holds.
     Automatic,
 }
 
@@ -17,6 +29,13 @@ fn info_already_reads_as(info: &str, before: &str, op_name: &str, after: &str) -
         .map_or(false, |rest| rest.starts_with(after))
 }
 
+/// Advances one operation by a single tick and returns the updated state.
+///
+/// Dispatches on the operation's current lifecycle state: starts it when it is
+/// enabled, ages the executing and disabled timers by `tick_elapsed_ms`, applies
+/// timeouts and retries, and terminates it when it reaches an end state. For
+/// [`OperationProcessingType::Planned`] it also advances `plan_current_step` and
+/// pushes failures and cancellations into `plan_state`.
 pub(super) async fn process_operation(
     sp_id: &str,
     mut new_state: State,
@@ -29,7 +48,6 @@ pub(super) async fn process_operation(
     // is driving the operation or how badly a tick slipped.
     tick_elapsed_ms: i64,
     log_target: &str,
-    // terminated_operations: &mut Vec<String>
 ) -> State {
     let operation_state =
         new_state.get_string_or_default_to_unknown(&format!("{}", operation.name), &log_target);
@@ -58,11 +76,6 @@ pub(super) async fn process_operation(
         &format!("{}_elapsed_disabled_ms", operation.name),
         &log_target,
     );
-
-
-    // Test if this can be done, removing ops once they are terminated
-    // let mut terminated_operations = new_state
-    //     .get_array_or_default_to_empty(&format!("{}_terminated_operations", sp_id), &log_target);
 
     let mut logging_log = "".to_string();
     let mut op_info_level = log::Level::Info;
@@ -106,16 +119,9 @@ pub(super) async fn process_operation(
             } else {
                 op_info_level = log::Level::Warn;
 
-                // DONE: PERF: this is the expensive arm, and it is the one an
-                // operation sits in for minutes at a time. Building the message
-                // clones every precondition's guard *and* runner guard, wraps
-                // them in two `Predicate::OR` trees and renders both through
-                // `Display` - a full recursive tree walk with string building,
-                // for every disabled operation on every tick. The result is a
-                // pure function of the operation, so it was byte-identical
-                // every time and thrown away again by the `!=` below.
-                // Now it is built once, when the operation first reports as
-                // disabled, and skipped for as long as that message stands.
+                // Rendering the guards is a recursive tree walk, and an
+                // operation can sit here for minutes, so the message is built
+                // once and skipped for as long as it still stands.
                 if !info_already_reads_as(
                     &old_operation_information,
                     "Operation '",
@@ -196,21 +202,11 @@ pub(super) async fn process_operation(
                     *plan_current_step += 1;
                 }
             }
-            // if let OperationProcessingType::Automatic = operation_processing_type {
-            //     new_state = operation.initialize(&new_state, &log_target);
-            // }
-            
             new_op_info = format!("Operation '{}' completed.", operation.name);
             logging_log = format!("Completed");
             op_info_level = log::Level::Info;
 
-            // commentout
-            // match operation_processing_type {
-            // OperationProcessingType::SOP | OperationProcessingType::Automatic => {
             new_state = operation.terminate(&new_state, TerminationReason::Completed, &log_target);
-            // }
-            // _ => (),
-            // }
         }
         OperationState::Bypassed => {
             if operation.can_be_cancelled(&sp_id, &new_state, &log_target) {
@@ -230,12 +226,7 @@ pub(super) async fn process_operation(
                 }
             }
             op_info_level = log::Level::Warn;
-            // match operation_processing_type {
-            // OperationProcessingType::SOP => {
             new_state = operation.terminate(&new_state, TerminationReason::Bypassed, &log_target);
-            // }
-            // _ => (),
-            // }
         }
         OperationState::Timedout => {
             if operation.can_be_cancelled(&sp_id, &new_state, &log_target) {
@@ -332,14 +323,8 @@ pub(super) async fn process_operation(
                         *plan_state = PlanState::Failed.to_string();
                     }
                 }
-
-                // OperationProcessingType::SOP => {
-                //     new_state =
-                //         operation.terminate(&new_state, TerminationReason::Fatal, &log_target);
-                // }
                 _ => (),
             }
-            // newly added
             new_state = operation.terminate(&new_state, TerminationReason::Fatal, &log_target);
         }
         OperationState::Cancelled => {
@@ -355,10 +340,6 @@ pub(super) async fn process_operation(
                         *plan_state = PlanState::Cancelled.to_string();
                     }
                 }
-                // OperationProcessingType::SOP => {
-                //     new_state =
-                //         operation.terminate(&new_state, TerminationReason::Cancelled, &log_target);
-                // }
                 _ => (),
             }
             new_state = operation.terminate(&new_state, TerminationReason::Cancelled, &log_target);
@@ -366,9 +347,8 @@ pub(super) async fn process_operation(
         OperationState::UNKNOWN => {
             new_state = operation.initialize(&new_state, &log_target);
         }
-        
+
         OperationState::Terminated(termination_reason) => {
-            // terminated_operations.push(operation.name.to_spvalue());
             match termination_reason {
                 TerminationReason::Bypassed => {
                     logging_log = format!("Bypassed");
@@ -408,17 +388,9 @@ pub(super) async fn process_operation(
             _ => (),
         }
 
-        // The file log's `OP` line. `logging_log` is the short tag each arm
-        // above already computes ("Starting", "Completing", "Retrying 2/3",
-        // ...); it was written and then thrown away for as long as the Redis
-        // op-logger was disconnected, which is what the "assigned but never
-        // read" warnings were about.
-        //
-        // Both guards matter. `new_op_info != old_operation_information` is the
-        // crate's own "this is news" check, and reusing it is what keeps a
-        // terminated operation - which re-enters the same arm on every tick
-        // until it is cleaned up - from emitting an identical line several
-        // times a second. The empty-tag check drops the arms that changed the
+        // The file log's `OP` line. Both guards matter: the outer "this is
+        // news" check keeps a terminated operation from emitting the same line
+        // every tick, and the empty-tag check drops arms that changed the
         // message without taking a decision worth recording.
         if !logging_log.is_empty() {
             // Read the resulting state back rather than predicting it: the arms
@@ -435,31 +407,8 @@ pub(super) async fn process_operation(
                 &logging_log,
             );
         }
-        // No need to log terminated
-        // if OperationState::from_str(&operation_state)
-        //     != OperationState::Terminated(TerminationReason::Completed)
-        // {
-        // let operation_msg = OperationMsg {
-        //     operation_name: operation.name.clone(),
-        //     operation_processing_type: operation_processing_type,
-        //     timestamp: Utc::now(),
-        //     severity: op_info_level,
-        //     state: OperationState::from_str(&operation_state),
-        //     log: logging_log.to_string(),
-        // };
-        // let log_msg = LogMsg::OperationMsg(operation_msg);
-        // match logging_tx.send(log_msg).await {
-        //     Ok(()) => (),
-        //     Err(e) => {
-        //         log::error!(target: &log_target, "Failed to send logging with: {e}.")
-        //     }
-        // }
-        // }
     }
 
-    // DONE: this used to be three chained `.update(..)` calls, each cloning the
-    // whole state map, for every active operation on every tick. Writing in
-    // place costs nothing beyond the three map lookups.
     new_state.update_mut(
         &format!("{}_information", operation.name),
         new_op_info.to_spvalue(),
@@ -474,10 +423,6 @@ pub(super) async fn process_operation(
     );
 
     new_state
-        // .update(
-        //     &format!("{}_terminated_operations", sp_id),
-        //     terminated_operations.to_spvalue(),
-        // )
 }
 
 #[cfg(test)]

@@ -1,3 +1,11 @@
+//! Loading a transform scenario off disk.
+//!
+//! A scenario is a directory of JSON files, one per frame, each naming its
+//! `parent_frame_id`, `child_frame_id`, `transform` and optional `metadata`.
+//! This is the crate's only file-system input path, so it is also where a typo
+//! in a scene file gets caught. Failure is always partial: a malformed file
+//! costs that one frame, never the scenario.
+
 use serde_json::Value;
 use std::{
     collections::HashMap, fs::{self, File}, io::BufReader, path::Path, time::SystemTime
@@ -7,12 +15,14 @@ use crate::*;
 use std::error::Error;
 use std::fmt;
 
+/// A plain string error, for the failures this module reports to its caller.
 #[derive(Debug, Clone)]
 pub struct ErrorMsg {
     info: String,
 }
 
 impl ErrorMsg {
+    /// Wrap a message as an [`ErrorMsg`].
     pub fn new(info: &str) -> ErrorMsg {
         ErrorMsg {
             info: info.to_string(),
@@ -32,6 +42,11 @@ impl Error for ErrorMsg {
     }
 }
 
+/// List the entries of a scenario directory, one path per entry.
+///
+/// Entries whose path is not valid UTF-8 are skipped with a warning; only a
+/// directory that cannot be read at all is an `Err`. Does not recurse - that is
+/// [`load_new_scenario`]'s job.
 pub fn list_frames_in_dir(path: &str) -> Result<Vec<String>, Box<dyn std::error::Error>> {
     let mut scenario = vec![];
     match fs::read_dir(path) {
@@ -133,6 +148,14 @@ fn collect_json_files(path: &Path, file_paths: &mut Vec<String>) {
     }
 }
 
+/// Load a scenario into a transform buffer, keyed by child frame id.
+///
+/// Each entry of `scenario` may be a file or a directory; directories are walked
+/// recursively and only `.json` files are read. A file that cannot be opened,
+/// parsed or is missing a required field is skipped with a warning. Both
+/// metadata flags default to `true` when absent, and a frame declaring
+/// `enable_transform: false` is left out of the buffer entirely - that is how a
+/// scene file is commented out.
 pub fn load_new_scenario(scenario: &Vec<String>) -> HashMap<String, SPTransformStamped> {
     let mut transforms_stamped = HashMap::new();
     let mut all_paths = Vec::new();
@@ -197,6 +220,12 @@ pub fn load_new_scenario(scenario: &Vec<String>) -> HashMap<String, SPTransformS
     transforms_stamped
 }
 
+/// Like [`load_new_scenario`], but takes explicit file paths and loads disabled
+/// frames too.
+///
+/// No directory walking and no `.json` filtering, so a directory or a missing
+/// path in `scenario` is simply skipped; `enable_transform: false` frames are
+/// kept rather than dropped.
 pub fn load_new_scenario_no_check(scenario: &Vec<String>) -> HashMap<String, SPTransformStamped> {
     let mut transforms_stamped = HashMap::new();
 
@@ -345,7 +374,6 @@ fn extract_transform(json: &Value) -> Option<SPTransform> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::*;
 
     /// A scratch directory that cleans itself up. `tempfile` is not a
     /// dependency, and adding one for this would be more machinery than the
@@ -739,60 +767,27 @@ mod tests {
         let boxed: Box<dyn std::error::Error> = Box::new(error);
         assert_eq!(boxed.to_string(), "something went wrong");
     }
+
+    /// `ErrorMsg` also implements the (deprecated) `Error::description`, which
+    /// some older callers still read - it has to report the same message the
+    /// `Display` impl does, not an empty or placeholder string.
+    #[test]
+    #[allow(deprecated)]
+    fn the_error_type_reports_its_message_through_the_error_impl() {
+        let error = ErrorMsg::new("scenario directory is gone");
+        assert_eq!(
+            std::error::Error::description(&error),
+            error.to_string(),
+            "description() and Display must agree"
+        );
+
+        // And the same message survives the real failure path.
+        let boxed = list_frames_in_dir("/definitely/not/a/real/directory")
+            .expect_err("a missing directory must be an error");
+        let concrete = boxed
+            .downcast_ref::<ErrorMsg>()
+            .expect("list_frames_in_dir reports its failures as ErrorMsg");
+        assert_eq!(std::error::Error::description(concrete), concrete.to_string());
+        assert!(concrete.to_string().contains("Empty scenario is loaded."));
+    }
 }
-
-// pub fn load_overlay_scenario
-
-// pub async fn reload_scenario(
-//     message: &r2r::scene_manipulation_msgs::srv::ManipulateExtras::Request,
-//     broadcasted_frames: &Arc<Mutex<HashMap<String, FrameData>>>,
-//     node_id: &str,
-// ) -> ManipulateExtras::Response {
-//     match list_frames_in_dir(&message.scenario_path, node_id).await {
-//         Ok(scenario) => {
-//             let loaded = load_scenario(&scenario, node_id);
-//             let mut local_broadcasted_frames = broadcasted_frames.lock().unwrap().clone();
-//             for x in &loaded {
-//                 local_broadcasted_frames.insert(x.0.clone(), x.1.clone());
-//             }
-//             *broadcasted_frames.lock().unwrap() = local_broadcasted_frames;
-//             extra_success_response(&format!(
-//                 "Reloaded frames in the scene: '{:?}'.",
-//                 loaded.keys()
-//             ))
-//         }
-//         Err(e) => extra_error_response(&format!("Reloading the scenario failed with: '{:?}'.", e)),
-//     }
-// }
-
-// async fn persist_frame_change(path: &str, frame: FrameData) -> bool {
-//     match fs::read_dir(path) {
-//         Ok(dir) => dir.for_each(|file| match file {
-//             Ok(entry) => match entry.path().to_str() {
-//                 Some(valid) => match valid.to_string() == format!("{}{}", path, frame.child_frame_id.clone()) {
-//                     true => {
-//                         println!("Changing existing frame {} permanently", frame.child_frame_id.clone());
-//                         match File::open(valid.clone()) {
-//                             Ok(file) =>
-//                         }
-//                         let writer = BufWriter::;
-//                     // }
-//                     },
-//                     false => {}
-//                 }
-//                 None => r2r::log_warn!(NODE_ID, "Path is not valid unicode."),
-//             },
-//             Err(e) => r2r::log_warn!(NODE_ID, "Reading entry failed with '{}'.", e),
-//         }),
-//         Err(e) => {
-//             r2r::log_warn!(
-//                 NODE_ID,
-//                 "Reading the scenario directory failed with: '{}'.",
-//                 e
-//             );
-//             r2r::log_warn!(NODE_ID, "Empty scenario is loaded/reloaded.");
-//             return false
-//         }
-//     }
-//     true
-// }

@@ -1,10 +1,23 @@
+//! Executing the plan the planner produced.
+//!
+//! The plan runner walks `{sp_id}_plan` one step at a time, driving each
+//! operation through [`process_operation`](crate::running::process_operation)
+//! and advancing `{sp_id}_plan_current_step` when it terminates.
+
 use crate::{running::process_operation::OperationProcessingType, *};
 use crate::SPConnection;
 use std::sync::Arc;
 
+/// Runs the plan executor until the process ends.
+///
+/// On every tick it reads the plan keys - and the variables of the operations in
+/// the current plan - from Redis, advances the operation at
+/// `{sp_id}_plan_current_step`, and writes back the step, `{sp_id}_plan_state`
+/// and the per-operation state. The `sp_id` and the operations to look up both
+/// come from `model`, the Redis connection from `connection_manager`; log output
+/// goes to the `{sp_id}_op_runner` target.
 pub async fn planned_operation_runner(
     model: &Model,
-    // logging_tx: mpsc::Sender<LogMsg>,
     connection_manager: &Arc<ConnectionManager>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let sp_id = &model.name;
@@ -63,7 +76,6 @@ pub async fn planned_operation_runner(
             con_clone,
             &model,
             &state,
-            // logging_tx.clone(),
             tick_elapsed_ms,
             &log_target,
         )
@@ -120,7 +132,6 @@ async fn process_plan_tick(
     mut con: SPConnection,
     model: &Model,
     state: &State,
-    // logging_tx: mpsc::Sender<LogMsg>,
     tick_elapsed_ms: i64,
     log_target: &str,
 ) -> State {
@@ -170,16 +181,11 @@ async fn process_plan_tick(
                             OperationProcessingType::Planned,
                             Some(&mut plan_current_step),
                             Some(&mut plan_state_str),
-                            // logging_tx,
                             tick_elapsed_ms,
                             log_target,
                         )
                         .await;
 
-                        // let operation_state = new_state.get_string_or_default_to_unknown(
-                        //     &format!("{}", uq_operation.name),
-                        //     &log_target,
-                        // );
                     }
                     None => {
                         log::error!("Operation '{}' not found in model!", op_name);
@@ -190,10 +196,7 @@ async fn process_plan_tick(
                 plan_state_str = PlanState::Completed.to_string();
             }
         }
-        // Maybe I also have to reset all operation here...?
-        _ => {
-            // new_state = reset_all_operations(&new_state, model);
-        }
+        _ => {}
     }
 
     // Guarded, like `auto_operation_runner` does it: on a tick with nothing

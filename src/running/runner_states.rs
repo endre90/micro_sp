@@ -1,47 +1,101 @@
+//! The lifecycle state enums the runners share.
+//!
+//! Each enum here is a wire format: a runner writes it into Redis as the string
+//! its [`Display`](std::fmt::Display) / `to_spvalue` produces, and another runner - usually in
+//! another process - reads it back with `from_str`. Anything unrecognised parses
+//! to `UNKNOWN`, which is also every enum's [`Default`], so a key that was never
+//! initialised is never mistaken for a real state.
+//!
+//! ```
+//! use micro_sp::*;
+//!
+//! let state = PlanState::Executing;
+//! assert_eq!(state.to_string(), "executing");
+//! assert_eq!(PlanState::from_str("executing"), PlanState::Executing);
+//!
+//! // A value nothing recognises is UNKNOWN rather than a guess.
+//! assert_eq!(PlanState::from_str("nonsense"), PlanState::UNKNOWN);
+//! ```
+
 use std::fmt;
 
 use serde::{Deserialize, Serialize};
 
 use crate::*;
 
+/// A plan: the operation sequence the planner found for one goal.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Plan {
+    /// Name of the plan, normally the model's name.
     pub name: String,
+    /// The goal predicate this plan was found for.
     pub goal: Predicate,
+    /// The operations to execute, in order.
     pub plan: Vec<Operation>,
+    /// Index of the operation currently being executed.
     pub time_step: u32,
+    /// How far the plan has got.
     pub state: PlanState,
+    /// How long the planner took to find it.
     pub time: std::time::Duration,
 }
 
+/// How far the currently executing plan has got.
+///
+/// Written to `{sp_id}_plan_state` by `plan_runner` and read by `goal_runner`.
 #[derive(Debug, Clone, PartialEq)]
 pub enum PlanState {
-    // Empty,
+    /// A plan exists but no step has been taken yet; serialises to `"initial"`.
     Initial,
+    /// The plan runner is driving the plan's operations; `"executing"`.
     Executing,
-    // Paused,
+    /// An operation became unrecoverable, so the plan cannot finish; `"failed"`.
     Failed,
-    // NotFound,
+    /// Every operation in the plan reached a terminal success; `"completed"`.
     Completed,
+    /// An operation was cancelled, normally by the dashboard stop command.
+    ///
+    /// Serialises to `"cancelled"`, but `from_str` has no arm for it, so it
+    /// reads back as [`PlanState::UNKNOWN`] and `goal_runner`'s `Cancelled` arm
+    /// is never reached. A cancelled goal is still released, but it is reported
+    /// as unknown rather than as cancelled.
     Cancelled,
+    /// Nothing recognisable was read; `"UNKNOWN"`. Also the [`Default`].
     UNKNOWN,
 }
 
+/// How far the currently enabled SOP has got.
+///
+/// Written to `{sp_id}_sop_state` by `sop_runner`.
 #[derive(Debug, Clone, PartialEq)]
 pub enum SOPState {
+    /// The SOP is enabled but has not started; serialises to `"initial"`.
     Initial,
+    /// At least one of the SOP's operations is running; `"executing"`.
     Executing,
+    /// An operation in the SOP is unrecoverable; `"fatal"`.
     Fatal,
+    /// The whole SOP tree reached a terminal success; `"completed"`.
     Completed,
+    /// A branch of the SOP was cancelled.
+    ///
+    /// Serialises to `"cancelled"`, but - as for [`PlanState::Cancelled`] -
+    /// `from_str` has no arm for it, so readers see `UNKNOWN`.
     Cancelled,
+    /// Nothing recognisable was read; `"UNKNOWN"`. Also the [`Default`].
     UNKNOWN,
 }
 
+/// The planner handshake, written to `{sp_id}_planner_state`.
 #[derive(Debug, Clone, PartialEq)]
 pub enum PlannerState {
+    /// A plan was found for the current goal; serialises to `"found"`.
     Found,
+    /// No plan reaches the current goal; `"not_found"`.
     NotFound,
+    /// The planner may be triggered for the current goal; `"ready"`.
     Ready,
+    /// Nothing recognisable was read; `"UNKNOWN"`. Also the [`Default`].
     UNKNOWN,
 }
 
@@ -64,27 +118,27 @@ impl Default for PlannerState {
 }
 
 impl PlanState {
+    /// Parses the string form written to `{sp_id}_plan_state`.
+    ///
+    /// Anything unrecognised becomes [`PlanState::UNKNOWN`] - including
+    /// `"cancelled"`, which has no arm here even though `Display` produces it.
     pub fn from_str(x: &str) -> PlanState {
         match x {
-            // "empty" => PlanState::Empty,
             "initial" => PlanState::Initial,
             "executing" => PlanState::Executing,
-            // "paused" => PlanState::Paused,
             "failed" => PlanState::Failed,
-            // "not_found" => PlanState::NotFound,
             "completed" => PlanState::Completed,
-            // "cancelled" => PlanState::Cancelled,
             _ => PlanState::UNKNOWN,
         }
     }
+
+    /// The state as the [`SPValue`] stored in the shared state, matching
+    /// [`Display`](std::fmt::Display).
     pub fn to_spvalue(self) -> SPValue {
         match self {
-            // PlanState::Empty => "empty".to_spvalue(),
             PlanState::Initial => "initial".to_spvalue(),
             PlanState::Executing => "executing".to_spvalue(),
-            // PlanState::Paused => "paused".to_spvalue(),
             PlanState::Failed => "failed".to_spvalue(),
-            // PlanState::NotFound => "not_found".to_spvalue(),
             PlanState::Completed => "completed".to_spvalue(),
             PlanState::Cancelled => "cancelled".to_spvalue(),
             PlanState::UNKNOWN => "UNKNOWN".to_spvalue(),
@@ -93,30 +147,28 @@ impl PlanState {
 }
 
 impl SOPState {
+    /// Parses the string form written to `{sp_id}_sop_state`.
+    ///
+    /// Anything unrecognised becomes [`SOPState::UNKNOWN`] - including
+    /// `"cancelled"`, which has no arm here even though `Display` produces it.
     pub fn from_str(x: &str) -> SOPState {
         match x {
-            // "empty" => SOPState::Empty,
             "initial" => SOPState::Initial,
             "executing" => SOPState::Executing,
-            // "paused" => SOPState::Paused,
             "fatal" => SOPState::Fatal,
-            // "not_found" => SOPState::NotFound,
             "completed" => SOPState::Completed,
-            // "advanceable" => SOPState::Advanceable,
-            // "cancelled" => SOPState::Cancelled,
             _ => SOPState::UNKNOWN,
         }
     }
+
+    /// The state as the [`SPValue`] stored in the shared state, matching
+    /// [`Display`](std::fmt::Display).
     pub fn to_spvalue(self) -> SPValue {
         match self {
-            // SOPState::Empty => "empty".to_spvalue(),
             SOPState::Initial => "initial".to_spvalue(),
             SOPState::Executing => "executing".to_spvalue(),
-            // SOPState::Paused => "paused".to_spvalue(),
             SOPState::Fatal => "fatal".to_spvalue(),
-            // SOPState::NotFound => "not_found".to_spvalue(),
             SOPState::Completed => "completed".to_spvalue(),
-            // SOPState::Terminated => "terminated".to_spvalue(),
             SOPState::Cancelled => "cancelled".to_spvalue(),
             SOPState::UNKNOWN => "UNKNOWN".to_spvalue(),
         }
@@ -124,6 +176,8 @@ impl SOPState {
 }
 
 impl PlannerState {
+    /// Parses the string form written to `{sp_id}_planner_state`; anything
+    /// unrecognised becomes [`PlannerState::UNKNOWN`].
     pub fn from_str(x: &str) -> PlannerState {
         match x {
             "found" => PlannerState::Found,
@@ -132,6 +186,9 @@ impl PlannerState {
             _ => PlannerState::UNKNOWN,
         }
     }
+
+    /// The state as the [`SPValue`] stored in the shared state, matching
+    /// [`Display`](std::fmt::Display).
     pub fn to_spvalue(self) -> SPValue {
         match self {
             PlannerState::Found => "found".to_spvalue(),
@@ -146,12 +203,9 @@ impl fmt::Display for PlanState {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             PlanState::UNKNOWN => write!(f, "UNKNOWN"),
-            // PlanState::Empty => write!(f, "empty"),
             PlanState::Initial => write!(f, "initial"),
             PlanState::Executing => write!(f, "executing"),
-            // PlanState::Paused => write!(f, "paused"),
             PlanState::Failed => write!(f, "failed"),
-            // PlanState::NotFound => write!(f, "not_found"),
             PlanState::Completed => write!(f, "completed"),
             PlanState::Cancelled => write!(f, "cancelled"),
         }
@@ -162,14 +216,10 @@ impl fmt::Display for SOPState {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             SOPState::UNKNOWN => write!(f, "UNKNOWN"),
-            // SOPState::Empty => write!(f, "empty"),
             SOPState::Initial => write!(f, "initial"),
             SOPState::Executing => write!(f, "executing"),
-            // SOPState::Paused => write!(f, "paused"),
             SOPState::Fatal => write!(f, "fatal"),
-            // SOPState::NotFound => write!(f, "not_found"),
             SOPState::Completed => write!(f, "completed"),
-            // SOPState::Terminated => write!(f, "terminated"),
             SOPState::Cancelled => write!(f, "cancelled"),
         }
     }
@@ -186,12 +236,16 @@ impl fmt::Display for PlannerState {
     }
 }
 
-
-
+/// The lifecycle of a one-shot request to a service interface, such as the
+/// transform interface's `{sp_id}_tf_request_state`.
 pub enum ServiceRequestState {
+    /// Nothing recognisable was read; serialises to `"UNKNOWN"`. The [`Default`].
     UNKNOWN,
+    /// Idle and ready to accept a request; `"initial"`.
     Initial,
+    /// The request was served; `"succeeded"`.
     Succeeded,
+    /// The request could not be served; `"failed"`.
     Failed,
 }
 
@@ -202,6 +256,8 @@ impl Default for ServiceRequestState {
 }
 
 impl ServiceRequestState {
+    /// Parses the string form; anything unrecognised becomes
+    /// [`ServiceRequestState::UNKNOWN`].
     pub fn from_str(x: &str) -> ServiceRequestState {
         match x {
             "initial" => ServiceRequestState::Initial,
@@ -222,13 +278,21 @@ impl fmt::Display for ServiceRequestState {
         }
     }
 }
-
-
+/// The lifecycle of a long-running request to an interface, such as a timer's
+/// `{sp_id}_timer_{n}_request_state`.
+///
+/// Unlike [`ServiceRequestState`] it has an in-progress state, so a caller can
+/// tell "started" from "finished".
 pub enum ActionRequestState {
+    /// Nothing recognisable was read; serialises to `"UNKNOWN"`. The [`Default`].
     UNKNOWN,
+    /// Idle and ready to accept a request; `"initial"`.
     Initial,
+    /// The request was accepted and is still running; `"executing"`.
     Executing,
+    /// The request ran to completion; `"succeeded"`.
     Succeeded,
+    /// The request could not be served, or was aborted; `"failed"`.
     Failed,
 }
 
@@ -239,6 +303,8 @@ impl Default for ActionRequestState {
 }
 
 impl ActionRequestState {
+    /// Parses the string form; anything unrecognised becomes
+    /// [`ActionRequestState::UNKNOWN`].
     pub fn from_str(x: &str) -> ActionRequestState {
         match x {
             "initial" => ActionRequestState::Initial,
@@ -261,14 +327,20 @@ impl fmt::Display for ActionRequestState {
         }
     }
 }
-
-
+/// The overall mode of a runner, held in `{sp_id}_runner_state`.
+///
+/// The only enum here that also goes through serde.
 #[derive(Debug, PartialEq, Eq, Clone, Hash, Serialize, Deserialize)]
 pub enum RunnerState {
+    /// Online with nothing to do; serialises to `"idle"`.
     Idle,
+    /// Executing normally; `"running"`.
     Running,
+    /// Halted and not accepting work; `"stopped"`.
     Stopped,
+    /// Temporarily suspended, expected to resume; `"paused"`.
     Paused,
+    /// Nothing recognisable was read; `"UNKNOWN"`. Also the [`Default`].
     UNKNOWN,
 }
 
@@ -279,6 +351,8 @@ impl Default for RunnerState {
 }
 
 impl RunnerState {
+    /// Parses the string form; anything unrecognised becomes
+    /// [`RunnerState::UNKNOWN`].
     pub fn from_str(x: &str) -> RunnerState {
         match x {
             "idle" => RunnerState::Idle,
@@ -288,6 +362,9 @@ impl RunnerState {
             _ => RunnerState::UNKNOWN,
         }
     }
+
+    /// The state as the [`SPValue`] stored in the shared state, matching
+    /// [`Display`](std::fmt::Display).
     pub fn to_spvalue(self) -> SPValue {
         match self {
             RunnerState::Running => "running".to_spvalue(),

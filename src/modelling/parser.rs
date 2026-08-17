@@ -1,19 +1,53 @@
-// use crate::{Action, Predicate, SPValue, SPVariable, SPWrapped, State, ToSPValue, ToSPWrapped};
+//! The string DSL for guards and assignments.
+//!
+//! [`pred_parser`] turns text like `"var:pos == a && var:ok == true"` into a
+//! [`Predicate`], and `"var:pos <- b"` into an [`Action`]. This is what
+//! [`Transition::parse`] uses, and it is how models are normally written.
+//! Variables are looked up in the [`State`] passed in, so they must already
+//! exist there.
+
 use crate::*;
 
-peg::parser!(pub grammar pred_parser() for str {
+peg::parser!(
+/// The grammar itself. Each `rule` below is exposed as a function taking the
+/// input string and the [`State`] to resolve `var:` names against, and
+/// returning `Result<_, ParseError>`.
+///
+/// # Example
+///
+/// ```
+/// use micro_sp::*;
+///
+/// let state = State::from_vec(&vec![
+///     (SPVariable::new("pos", SPValueType::String), "a".to_spvalue()),
+///     (SPVariable::new("n", SPValueType::Int64), 1.to_spvalue()),
+/// ]);
+///
+/// let guard = pred_parser::pred("var:pos == a && var:n < 5", &state).unwrap();
+/// assert!(guard.eval(&state, "docs"));
+///
+/// let action = pred_parser::action("var:n += 2", &state).unwrap();
+/// let next = action.assign(&state, "docs");
+/// assert_eq!(next.get_value("n", "docs"), Some(3.to_spvalue()));
+/// ```
+pub grammar pred_parser() for str {
 
     rule _() =  quiet!{[' ' | '\t']*}
 
-
+    /// A state variable reference, written `var:name`. The name is looked up in
+    /// `state`, and looking up a name that is not there panics.
     pub rule variable(state: &State) -> SPVariable =
         "var:" _ n:$(['a'..='z' | 'A'..='Z' | '0'..='9' | '_' | '/']+) !(['a'..='z' | 'A'..='Z' | '0'..='9' | '_']) {
         state.get_assignment(n, "parser").var
     }
 
+    /// One element inside an array literal; the same syntax as [`value`].
     pub rule array_element(state: &State) -> SPWrapped =
     v:value(state) { v }
 
+    /// Anything that can stand on either side of a comparison or assignment:
+    /// a `var:` reference, a literal (bare word, quoted string, number, bool,
+    /// `ip:[...]`, array) or a typed unknown such as `UNKNOWN_int`.
     pub rule value(state: &State) -> SPWrapped
         = _ var:variable(&state) _ { SPWrapped::SPVariable(var) }
         / _ "UNKNOWN_bool" _ { SPWrapped::SPValue(SPValue::Bool(BoolOrUnknown::UNKNOWN)) }
@@ -47,6 +81,7 @@ peg::parser!(pub grammar pred_parser() for str {
             SPWrapped::SPValue(n.to_spvalue())
         }
 
+    /// A single comparison between two values: `==`, `!=`, `<=`, `<`, `>=`, `>`.
     pub rule eq(state: &State) -> Predicate
         = p1:value(&state) _ "==" _ p2:value(&state) { Predicate::EQ(p1,p2) }
         / p1:value(&state) _ "!=" _ p2:value(&state) { Predicate::NEQ(p1,p2) }
@@ -55,6 +90,9 @@ peg::parser!(pub grammar pred_parser() for str {
         / p1:value(&state) _ ">=" _ p2:value(&state) { Predicate::GTEQ(p1,p2) }
         / p1:value(&state) _ ">" _ p2:value(&state) { Predicate::GT(p1,p2) }
 
+    /// A full predicate: comparisons combined with `&&`, `||`, `!`, `->` and
+    /// parentheses, plus the constants `true`/`TRUE` and `false`/`FALSE`.
+    /// Binding is tightest first: `!`, then `&&`, then `||`, then `->`.
     pub rule pred(state: &State) -> Predicate = precedence!{
         _ p:eq(&state) { p }
         --
@@ -92,10 +130,11 @@ peg::parser!(pub grammar pred_parser() for str {
         _ "false" _ { Predicate::FALSE }
     }
 
+    /// An assignment: `var:x <- value`, or `var:x += value` / `var:x -= value`
+    /// for numeric variables.
     pub rule action(state: &State) -> Action
         = p1:variable(&state) _ "+=" _ p2:value(&state) { Action::inc(p1, p2) }
         / p1:variable(&state) _ "-=" _ p2:value(&state) { Action::dec(p1, p2) }
-        // / p1:variable(&state) _ "<-" _ p2:value(&state) _ "+" _ p3:value(&state) { Action::new(p1, p2) }
         / p1:variable(&state) _ "<-" _ p2:variable(&state) { Action::new(p1, p2.wrap()) }
         / p1:variable(&state) _ "<-" _ p2:value(&state) { Action::new(p1, p2) }
     }
@@ -103,9 +142,6 @@ peg::parser!(pub grammar pred_parser() for str {
 
 #[cfg(test)]
 mod tests {
-
-    // use ordered_float::OrderedFloat;
-
     use crate::{Predicate::*, *};
 
     fn john_doe() -> Vec<(SPVariable, SPValue)> {

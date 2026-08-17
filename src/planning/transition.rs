@@ -1,3 +1,9 @@
+//! Breadth-first planning over bare [`Transition`]s.
+//!
+//! The transition-level counterpart of [`crate::planning::operation`]: it
+//! searches the same way but over transitions rather than whole operation
+//! lifecycles. Also the home of [`PlanningResult`], which both planners return.
+
 use std::{
     collections::HashSet,
     time::{Duration, Instant},
@@ -5,16 +11,43 @@ use std::{
 
 use crate::*;
 
-/// Information about result of a planning attempt.
+/// The outcome of a planning attempt.
+///
+/// A failed search returns [`PlanningResult::default()`], so `plan` is empty and
+/// `length` is `0` whenever `found` is `false` - never a truncated plan.
 #[derive(PartialEq, Eq, Clone, Debug, PartialOrd, Ord, Default)]
 pub struct PlanningResult {
+    /// Whether a sequence reaching the goal was found.
     pub found: bool,
+    /// Number of steps in `plan`.
     pub length: usize,
+    /// The transition or operation names to execute, in order.
     pub plan: Vec<String>,
+    /// Wall-clock time the search took.
     pub time: Duration,
 }
 
-/// Minimal Breadth First Search algorithm for sequencing transitions.
+/// Breadth-first search for a sequence of transitions that reaches `goal`.
+///
+/// Explores from `state`, taking any transition whose planning guard holds, and
+/// returns the shortest sequence of transition names to the first state
+/// satisfying `goal`. Gives up once a path exceeds `max_depth`; a `visited` set
+/// keeps a cyclic model from searching forever. `log_target` is the log target
+/// used for guard evaluation diagnostics.
+///
+/// ```
+/// use micro_sp::*;
+///
+/// let state = State::from_vec(&vec![(v!("pos"), "a".to_spvalue())]);
+/// let a_to_b = t_plan!("a_to_b", eq!(v!("pos").wrap(), "a".wrap()), vec!(a!(v!("pos"), "b".wrap())));
+/// let b_to_c = t_plan!("b_to_c", eq!(v!("pos").wrap(), "b".wrap()), vec!(a!(v!("pos"), "c".wrap())));
+///
+/// let goal = eq!(v!("pos").wrap(), "c".wrap());
+/// let result = bfs_transition_planner(state, goal, vec![a_to_b, b_to_c], 10, "docs");
+///
+/// assert!(result.found);
+/// assert_eq!(result.plan, vec!["a_to_b", "b_to_c"]);
+/// ```
 pub fn bfs_transition_planner(
     state: State,
     goal: Predicate,

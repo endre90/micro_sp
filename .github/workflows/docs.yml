@@ -1,0 +1,89 @@
+name: Docs
+
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+# Start from zero and grant per job, so the build job - which runs third-party
+# actions and the build scripts of ~200 crates - never holds the Pages
+# deployment token.
+permissions: {}
+
+# GitHub's recommended setting for Pages: queue pushes, never cancel a deploy
+# that is already in flight.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+
+      # `cargo doc` never prunes target/doc and rust-cache restores it, so
+      # without this the artifact accumulates docs for every dependency ever
+      # built plus HTML for items that no longer exist. Measured locally:
+      # 794 MB across 200 crate directories, despite --no-deps.
+      - name: Drop stale doc output
+        run: cargo clean --doc
+
+      # Tests are deliberately not run here: they need Docker + Redis on a
+      # fixed port. Those crates are dev-dependencies, so `cargo doc` does not
+      # build them.
+      - name: Build rustdoc
+        run: cargo doc --no-deps
+        env:
+          # A broken intra-doc link fails the build rather than silently
+          # publishing. A failed build leaves the previous docs live, so the
+          # worst case is stale docs, not a dead site.
+          RUSTDOCFLAGS: -D warnings
+
+      - name: Prepare Pages artifact
+        run: |
+          # Fail loudly if the crate is ever renamed, instead of deploying a
+          # redirect to a 404 and going green.
+          test -f target/doc/micro_sp/index.html
+          # Cargo's lock file is mode 0600 and would otherwise be tarred into
+          # the artifact.
+          rm -f target/doc/.lock
+          # rustdoc emits no index at the doc root, so without this the Pages
+          # root 404s. The visible link is the no-JS / refresh-blocked path.
+          printf '%s\n' \
+            '<!DOCTYPE html>' \
+            '<html lang="en">' \
+            '<head>' \
+            '<meta charset="utf-8">' \
+            '<meta http-equiv="refresh" content="0; url=micro_sp/index.html">' \
+            '<title>micro_sp documentation</title>' \
+            '</head>' \
+            '<body><a href="micro_sp/index.html">Redirecting to the micro_sp documentation…</a></body>' \
+            '</html>' \
+            > target/doc/index.html
+
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: target/doc
+          retention-days: 1
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v5

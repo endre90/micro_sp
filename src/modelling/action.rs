@@ -1,25 +1,56 @@
+//! [`Action`]s: the assignments a [`Transition`] performs when it is taken.
+//!
+//! An action writes one state variable, either replacing its value or adding to
+//! / subtracting from it. The right-hand side may itself be a variable, in which
+//! case it is read from the state at the moment the action is applied.
+
 use serde::{Deserialize, Serialize};
 
-// use crate::{SPVariable, SPWrapped, State};
 use crate::*;
 use std::fmt;
 
+/// How an [`Action`] combines its right-hand side with the variable it writes.
 #[derive(Debug, PartialEq, Eq, Clone, Hash, Serialize, Deserialize)]
 pub enum ActionType {
+    /// Replace the variable's value.
     Assign,
+    /// Add the right-hand side to the variable's current value.
     Increment,
+    /// Subtract the right-hand side from the variable's current value.
     Decrement,
 }
 
 /// Actions update the assignments of the state variables.
+///
+/// # Example
+///
+/// ```
+/// use micro_sp::*;
+///
+/// let weight = SPVariable::new("weight", SPValueType::Float64);
+/// let state = State::from_vec(&vec![(weight.clone(), 80.0.to_spvalue())]);
+///
+/// let gain = Action::inc(weight, 5.0.wrap());
+/// let after = gain.assign(&state, "docs");
+/// assert_eq!(after.get_value("weight", "docs"), Some(85.0.to_spvalue()));
+/// ```
 #[derive(Debug, PartialEq, Eq, Clone, Hash, Serialize, Deserialize)]
 pub struct Action {
+    /// The state variable this action writes.
     pub var: SPVariable,
+    /// The right-hand side: a literal value, or another variable read from the
+    /// state when the action is applied.
     pub var_or_val: SPWrapped,
+    /// Whether the right-hand side replaces, adds to, or subtracts from `var`.
     pub action_type: ActionType,
 }
 
 impl Action {
+    /// The placeholder action an unparseable action string becomes.
+    ///
+    /// Assigns `false` to a variable literally named `empty`, which no real
+    /// state declares - so applying it panics, which is how the model error
+    /// eventually surfaces. See [`Transition::parse`].
     pub fn empty() -> Action {
         Action {
             var: SPVariable::new("empty", SPValueType::Bool),
@@ -28,6 +59,7 @@ impl Action {
         }
     }
 
+    /// An assignment: `var` takes the value of `var_or_val`.
     pub fn new(var: SPVariable, var_or_val: SPWrapped) -> Action {
         Action {
             var,
@@ -36,6 +68,8 @@ impl Action {
         }
     }
 
+    /// An increment: `var` grows by `var_or_val`. Both must be numeric and of
+    /// the same type; see [`Action::assign_mut`] for the panics.
     pub fn inc(var: SPVariable, var_or_val: SPWrapped) -> Action {
         Action {
             var,
@@ -44,6 +78,8 @@ impl Action {
         }
     }
 
+    /// A decrement: `var` shrinks by `var_or_val`. Same typing rules as
+    /// [`Action::inc`].
     pub fn dec(var: SPVariable, var_or_val: SPWrapped) -> Action {
         Action {
             var,
@@ -52,7 +88,15 @@ impl Action {
         }
     }
 
-    // Apply this action to `state` in place.
+    /// Apply this action to `state` in place.
+    ///
+    /// `log_target` is the `log::` target the state lookups report under.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the variable is not in the state, if an increment/decrement
+    /// targets a non-numeric variable, or if it mixes an integer with a float.
+    /// A type mismatch is a model error, not something to coerce silently.
     pub fn assign_mut(&self, state: &mut State, log_target: &str) {
         match self.action_type {
             ActionType::Assign => {
@@ -167,6 +211,7 @@ impl Action {
 }
 
 impl fmt::Display for Action {
+    /// Renders as `var <= value`, `var += value` or `var -= value`.
     fn fmt(&self, fmtr: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self.action_type {
             ActionType::Assign => {

@@ -1,20 +1,32 @@
+//! Resolving the transform between two frames.
+//!
+//! A buffer of frames is a tree of parent-child poses. To get from any frame to
+//! any other, walk up from the parent to the root and back down to the child,
+//! then multiply the poses along the way -
+//! [`lookup_transform_with_root`] is that walk. Poses are converted to
+//! `nalgebra` isometries to do the maths and back again.
+
 use crate::{
     is_cyclic_all, MapOrUnknown, SPRotation, SPTransform, SPTransformStamped, SPTranslation,
 };
 use nalgebra::{Isometry3, Quaternion, UnitQuaternion, Vector3};
 use ordered_float::OrderedFloat;
-// use serde_sp_transform::Value;
 use std::collections::HashMap;
 use std::time::SystemTime;
 
-// use tokio::time::Instant;
-
+/// Hard ceiling on how many frames a lookup may traverse.
+///
+/// A bound, not a cycle detector: a well-formed chain longer than this is
+/// refused too. It is what stops a malformed buffer from walking forever.
 pub static MAX_TRANSFORM_CHAIN: u64 = 1000;
 
+/// Compose a chain of isometries, in order, into a single one. An empty chain
+/// gives the identity.
 pub fn isometry_chain_product(vec: Vec<Isometry3<f64>>) -> Isometry3<f64> {
     vec.iter().fold(Isometry3::identity(), |a, &b| a * b)
 }
 
+/// Convert a stored [`SPTransform`] into the `nalgebra` isometry the maths runs on.
 pub fn sp_transform_to_isometry(sp_transform: SPTransform) -> Isometry3<f64> {
     let translation = Vector3::new(
         sp_transform.translation.x.into_inner(),
@@ -31,6 +43,7 @@ pub fn sp_transform_to_isometry(sp_transform: SPTransform) -> Isometry3<f64> {
     Isometry3::from_parts(translation.into(), rotation)
 }
 
+/// Convert a `nalgebra` isometry back into the storable [`SPTransform`] form.
 pub fn isometry_to_sp_transform(isometry: Isometry3<f64>) -> SPTransform {
     let translation_vector: &Vector3<f64> = &isometry.translation.vector;
     let rotation_quaternion: &Quaternion<f64> = isometry.rotation.quaternion();
@@ -54,13 +67,48 @@ pub fn isometry_to_sp_transform(isometry: Isometry3<f64>) -> SPTransform {
     }
 }
 
+/// Resolve the pose of `child_frame_id` expressed in `parent_frame_id`.
+///
+/// Goes up from the parent to `root_frame_id` and down again to the child, so
+/// the two frames need not be directly related. Returns `None` if `buffer`
+/// contains a cycle, if either leg of the walk cannot reach the root, or if the
+/// walk exceeds [`MAX_TRANSFORM_CHAIN`]. The result is stamped with the current
+/// time and carries no metadata.
+///
+/// ```
+/// use micro_sp::*;
+/// use std::collections::HashMap;
+/// use std::time::SystemTime;
+///
+/// fn frame(child: &str, parent: &str, x: f64) -> SPTransformStamped {
+///     let mut transform = SPTransform::default();
+///     transform.translation.x = ordered_float::OrderedFloat(x);
+///     SPTransformStamped {
+///         active_transform: true,
+///         enable_transform: true,
+///         time_stamp: SystemTime::now(),
+///         parent_frame_id: parent.to_string(),
+///         child_frame_id: child.to_string(),
+///         transform,
+///         metadata: MapOrUnknown::UNKNOWN,
+///     }
+/// }
+///
+/// // world -> base (1 m along x) -> tool (another 2 m along x)
+/// let mut buffer = HashMap::new();
+/// buffer.insert("base".to_string(), frame("base", "world", 1.0));
+/// buffer.insert("tool".to_string(), frame("tool", "base", 2.0));
+///
+/// let tool_in_world =
+///     lookup_transform_with_root("world", "tool", "world", &buffer).unwrap();
+/// assert_eq!(tool_in_world.transform.translation.x.into_inner(), 3.0);
+/// ```
 pub fn lookup_transform_with_root(
     parent_frame_id: &str,
     child_frame_id: &str,
     root_frame_id: &str,
     buffer: &HashMap<String, SPTransformStamped>,
 ) -> Option<SPTransformStamped> {
-    // let buffer_local = buffer.lock().unwrap().clone();
     let buffer_local = buffer.clone();
     let mut chain = vec![];
     if !is_cyclic_all(&buffer_local) {
@@ -89,7 +137,12 @@ pub fn lookup_transform_with_root(
     }
 }
 
-// Go upstream to the root
+/// Walk upstream from `parent_frame_id` to `root_frame_id`, composing the
+/// *inverse* of each pose along the way.
+///
+/// The identity when the two ids are equal. `None` if a link in the chain is
+/// missing from `buffer`, or if the walk exceeds [`MAX_TRANSFORM_CHAIN`]; both
+/// are logged.
 pub fn parent_to_root(
     parent_frame_id: &str,
     root_frame_id: &str,
@@ -132,7 +185,11 @@ pub fn parent_to_root(
     }
 }
 
-// BFS to get the path to the child
+/// Breadth-first search downstream from `root_frame_id` to `child_frame_id`,
+/// composing the poses along the path.
+///
+/// `None` if the child is not reachable from the root, or if the search exceeds
+/// [`MAX_TRANSFORM_CHAIN`]; both are logged.
 pub fn root_to_child(
     child_frame_id: &str,
     root_frame_id: &str,
@@ -195,7 +252,10 @@ pub fn root_to_child(
     }
 }
 
-// The frame whose children we are searching for don't have to exist in the transform buffer
+/// Every `(child_id, frame)` in `buffer` whose parent is `frame`.
+///
+/// `frame` itself need not exist in the buffer - the root of a tree usually does
+/// not, since nothing declares it as a child.
 pub fn get_frame_children(
     frame: &str,
     buffer: &HashMap<String, SPTransformStamped>,
@@ -211,7 +271,6 @@ pub fn get_frame_children(
 mod tests {
 
     use nalgebra::{Isometry3, Quaternion, Translation, UnitQuaternion, Vector3};
-    // use serde_sp_transform::Value;
     use std::collections::HashMap;
     use std::time::SystemTime;
 

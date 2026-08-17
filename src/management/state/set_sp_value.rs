@@ -113,4 +113,88 @@ mod tests_for_get_state_for_keys {
 
         assert_eq!(result, expected_json);
     }
+
+    /// A value that cannot be serialised (serde refuses a `SystemTime` before
+    /// the UNIX epoch) must be dropped with a log rather than panicking, and
+    /// crucially must not clobber whatever is already stored under that key.
+    #[tokio::test]
+    #[serial]
+    async fn an_unserializable_value_is_skipped_and_leaves_the_key_alone() {
+        let _container = Redis::default()
+            .with_mapped_port(6379, ContainerPort::Tcp(6379))
+            .start()
+            .await
+            .unwrap();
+
+        let mut con = ConnectionManager::new().await.get_connection().await;
+        let key = "unserializable";
+
+        let good = SPValue::Int64(IntOrUnknown::Int64(5));
+        set_sp_value(&mut con, key, &good).await;
+
+        let pre_epoch = SPValue::Time(TimeOrUnknown::Time(
+            std::time::SystemTime::UNIX_EPOCH - std::time::Duration::from_secs(1),
+        ));
+        assert!(
+            serde_json::to_string(&pre_epoch).is_err(),
+            "test premise: a pre-epoch SystemTime must be unserializable"
+        );
+
+        set_sp_value(&mut con, key, &pre_epoch).await;
+
+        let result: String = con.get(key).await.unwrap();
+        assert_eq!(
+            result,
+            serde_json::to_string(&good).unwrap(),
+            "the failed write must leave the previous value in place"
+        );
+    }
+
+    /// A refused `SET` (here a real ACL permission error) is logged and
+    /// swallowed - the caller does not panic - and nothing is written.
+    #[tokio::test]
+    #[serial]
+    async fn a_refused_set_is_logged_and_writes_nothing() {
+        // ACL SETUSER needs Redis 6+; the crate's default test image is 5.0.
+        let _container = Redis::default()
+            .with_tag("7.2")
+            .with_mapped_port(6379, ContainerPort::Tcp(6379))
+            .start()
+            .await
+            .unwrap();
+
+        let mut con = ConnectionManager::new().await.get_connection().await;
+        let key = "denied_key";
+
+        let _: () = redis::cmd("ACL")
+            .arg("SETUSER")
+            .arg("default")
+            .arg("-set")
+            .query_async(&mut con)
+            .await
+            .unwrap();
+
+        set_sp_value(&mut con, key, &SPValue::Int64(IntOrUnknown::Int64(1))).await;
+
+        // Restore before asserting so a failure cannot leave the shared,
+        // fixed-port Redis unusable for later tests.
+        let _: () = redis::cmd("ACL")
+            .arg("SETUSER")
+            .arg("default")
+            .arg("+set")
+            .query_async(&mut con)
+            .await
+            .unwrap();
+
+        let stored: Option<String> = con.get(key).await.unwrap();
+        assert_eq!(stored, None, "a denied SET must not write anything");
+
+        // And the manager is still usable once the permission comes back.
+        set_sp_value(&mut con, key, &SPValue::Int64(IntOrUnknown::Int64(2))).await;
+        let stored: Option<String> = con.get(key).await.unwrap();
+        assert_eq!(
+            stored,
+            Some(serde_json::to_string(&SPValue::Int64(IntOrUnknown::Int64(2))).unwrap())
+        );
+    }
 }

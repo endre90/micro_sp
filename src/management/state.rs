@@ -1,3 +1,9 @@
+//! Reading and writing state variables in Redis.
+//!
+//! One Redis top-level key per variable, holding the variable's [`SPValue`] as
+//! a JSON string. [`StateManager`] is the only door onto that layout; every
+//! runner reads and writes its slice of the state through it.
+
 use crate::*;
 use crate::SPConnection;
 
@@ -11,13 +17,68 @@ mod set_state;
 mod remove_sp_value;
 mod remove_sp_values;
 mod flush_state;
+/// Reads and writes [`State`] through a Redis connection.
+///
+/// A stateless namespace of associated functions: every call takes the
+/// connection (`con`) to work on, so a runner can hold one long-lived
+/// [`SPConnection`] and call these from anywhere. Reads return `None` on
+/// failure, writes log and continue - nothing here panics or propagates a
+/// Redis error, because a runner must survive a blip rather than die on it.
+///
+/// # Caveats
+///
+/// Read-modify-write across runners is **not** atomic. Each runner reads a
+/// snapshot, computes a diff against it and writes that diff back, so two
+/// runners whose ticks overlap can both decide from the same stale read and the
+/// later write wins. It only bites on the handful of keys two runners genuinely
+/// share (the `_plan*`, `_planner_state` and `_replan*` families, written by
+/// `planner_ticker`, `plan_runner` and `goal_runner`), where it shows up as "the
+/// state change did not take" plus a tick of latency while it is redone. Fixing
+/// it properly means either giving each key a single owning runner or making the
+/// read-compute-write one WATCH/MULTI/EXEC transaction with a retry policy -
+/// both design changes rather than patches. Note that [`StateManager::apply`] is
+/// deliberately non-atomic for the same reason: the race is between the read and
+/// the write, not among the writes.
+///
+/// ```no_run
+/// use micro_sp::*;
+///
+/// # async fn example() {
+/// let connection_manager = ConnectionManager::new().await;
+/// let mut con = connection_manager.get_connection().await;
+///
+/// let mut state = State::new();
+/// state.add_mut(
+///     SPAssignment::new(SPVariable::new("pos", SPValueType::String), "a".to_spvalue()),
+///     "docs",
+/// );
+/// StateManager::set_state(&mut con, &state).await;
+///
+/// let read = StateManager::get_state_for_keys(&mut con, &vec!["pos".to_string()], "docs")
+///     .await
+///     .expect("the read failed");
+/// assert_eq!(read.get_value("pos", "docs"), Some("a".to_spvalue()));
+/// # }
+/// ```
 pub struct StateManager {}
 
 impl StateManager {
+    /// Read every key in the Redis database into a [`State`].
+    ///
+    /// A `KEYS *` followed by an `MGET`, so it scales with the whole keyspace -
+    /// prefer [`StateManager::get_state_for_keys`] on a hot path. An empty
+    /// database yields an empty `State`; only a failed command yields `None`.
+    /// Keys whose value does not deserialise are skipped with a warning.
     pub async fn get_full_state(con: &mut SPConnection) -> Option<State> {
         get_full_state::get_full_state(con).await
     }
 
+    /// Read just `keys` into a [`State`], in one `MGET`.
+    ///
+    /// Keys that do not exist, or whose value fails to deserialise, simply
+    /// contribute no variable - so the result may be smaller than `keys`, and an
+    /// empty `keys` never reaches Redis. Returns `None` only if the command
+    /// itself failed; `log_target` is the `log` target errors are reported under.
     pub async fn get_state_for_keys(
         con: &mut SPConnection,
         keys: &Vec<String>,
@@ -26,40 +87,64 @@ impl StateManager {
         get_state_for_keys::get_state_for_keys(con, keys, &log_target).await
     }
 
+    /// Read a single variable's value.
+    ///
+    /// `None` covers all three of "the key is not set", "the command failed" and
+    /// "the stored value did not deserialise"; the latter two are logged.
     pub async fn get_sp_value(con: &mut SPConnection, var: &str) -> Option<SPValue> {
         get_sp_value::get_sp_value(con, var).await
     }
 
+    /// Write every assignment in `state` in one `MSET`.
+    ///
+    /// This is a merge, not a replace: keys absent from `state` are left alone.
+    /// Values that fail to serialise are dropped with an error, and a failed
+    /// `MSET` is logged rather than returned.
     pub async fn set_state(con: &mut SPConnection, state: &State) {
         set_state::set_state(con, state).await
     }
 
+    /// Write a single variable's value. Serialisation and command failures are
+    /// logged and swallowed.
     pub async fn set_sp_value(con: &mut SPConnection, key: &str, value: &SPValue) {
         set_sp_value::set_sp_value(con, key, value).await
     }
 
+    /// Delete a single key. Idempotent - deleting a key that was never there is
+    /// not an error - and a failed `DEL` is logged rather than returned.
     pub async fn remove_sp_value(con: &mut SPConnection, key: &str) {
         remove_sp_value::remove_sp_value(con, key).await
     }
 
+    /// Delete `keys` in one `DEL`. An empty list is a no-op that never reaches
+    /// Redis; failures are logged rather than returned.
     pub async fn remove_sp_values(con: &mut SPConnection, keys: &[String]) {
         remove_sp_values::remove_sp_values(con, keys).await
     }
 
-    /// Write a state delta and delete a set of keys in a single round trip.
+    /// Write a state delta and delete several key sets in a single round trip.
     ///
-    /// Not `.atomic()` (no MULTI/EXEC): the previous code was three separate
-    /// commands with no atomicity either, so wrapping them in a transaction
-    /// here would be a semantic change smuggled in under a performance fix.
-    /// See the atomicity note on this module for the real fix.
+    /// The "publish this tick" call: pipelines the `MSET` and the `DEL`s
+    /// together, and issues nothing at all when there is nothing to do.
+    /// Deliberately not `.atomic()` (no MULTI/EXEC) - see the caveat on
+    /// [`StateManager`]. Failures are logged rather than returned.
     pub async fn apply(con: &mut SPConnection, state: &State, deletes: &[&[String]]) {
         apply::apply(con, state, deletes).await
     }
 
+    /// Pair `keys` with the raw JSON `values` an `MGET` returned into a [`State`].
+    ///
+    /// Positional: `values[i]` belongs to `keys[i]`. A `None` value, or one that
+    /// fails to deserialise, contributes no variable. The variable's type is
+    /// inferred from the value it decoded to.
     pub fn build_state(keys: Vec<String>, values: Vec<Option<String>>) -> State {
         build_state::build_state(keys, values)
     }
 
+    /// `FLUSHDB` - erase the entire Redis database.
+    ///
+    /// State variables *and* transform keys share one keyspace, so this takes
+    /// the transform tree with it. Failures are logged rather than returned.
     pub async fn flush_state(con: &mut SPConnection) {
         flush_state::flush_state(con).await
     }
@@ -283,8 +368,7 @@ mod facade_tests {
     }
 
     /// `flush_state` clears everything, including the transform keys that share
-    /// the keyspace - which is the reason the module note calls it "the only way
-    /// to reset one runner's state".
+    /// the keyspace - so it is a whole-database reset, not a state-only one.
     #[tokio::test]
     #[serial]
     async fn flush_state_clears_the_whole_keyspace() {

@@ -1,14 +1,19 @@
+//! Automatic behaviour: transitions and operations that fire on their own.
+//!
+//! Automatic transitions are taken the instant their guard holds, which is how a
+//! model reacts to measurements. Automatic operations are full operations with a
+//! lifecycle, run without being planned for; the mutexed ones are additionally
+//! limited to one at a time.
+
 use crate::{
     running::process_operation::{OperationProcessingType, process_operation},
     *,
 };
 use std::sync::Arc;
 
-// Add automatic operations here as well that finish immediatelly, god for setting some values, triggering robot moves etc.
 fn process_transition(
     transition: &Transition,
     state: &mut State,
-    // logging_tx: mpsc::Sender<LogMsg>,
     log_target: &str,
 ) {
     if !transition.eval(state, &log_target) {
@@ -25,11 +30,17 @@ fn process_transition(
     activity_log::log_transition(&log_target, &transition.name, &unique_name);
 }
 
+/// Runs the automatic transition executor until the process ends.
+///
+/// On every tick it reads the variables the model's automatic transitions
+/// mention from Redis, takes every transition whose guard holds - threading one
+/// state through them so each sees the previous one's effects - and writes back
+/// the diff. `name` is the `sp_id` prefix, `connection_manager` the shared Redis
+/// connection; log output goes to the `{name}_auto_transition_runner` target.
 pub async fn auto_transition_runner(
     name: &str,
     model: &Model,
     connection_manager: &Arc<ConnectionManager>,
-    // logging_tx: mpsc::Sender<LogMsg>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     initialize_env_logger();
     activity_log::init_from_env();
@@ -69,10 +80,16 @@ pub async fn auto_transition_runner(
     }
 }
 
+/// Runs the automatic operation executor until the process ends.
+///
+/// On every tick it reads the operation keys for `sp_id` from Redis, advances
+/// every enabled automatic operation in `model`, holds the mutexed ones to one at
+/// a time, and writes back the state diff while deleting the bookkeeping keys of
+/// operations that terminated. `connection_manager` is the shared Redis
+/// connection; log output goes to the `{sp_id}_auto_operation_runner` target.
 pub async fn auto_operation_runner(
     sp_id: &str,
     model: &Model,
-    // logging_tx: mpsc::Sender<LogMsg>,
     connection_manager: &Arc<ConnectionManager>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     initialize_env_logger();
@@ -158,7 +175,6 @@ pub async fn auto_operation_runner(
                 OperationProcessingType::Automatic,
                 None,
                 None,
-                // logging_tx.clone(),
                 tick_elapsed_ms,
                 &log_target,
             )
@@ -187,7 +203,6 @@ pub async fn auto_operation_runner(
                 OperationProcessingType::Automatic,
                 None,
                 None,
-                // logging_tx.clone(),
                 tick_elapsed_ms,
                 &log_target,
             )
@@ -213,9 +228,6 @@ pub async fn auto_operation_runner(
         activity_log::log_state_diff(&log_target, &state, &modified_state);
         let active_set_changed = !new_op_ids.is_empty() || !terminated_operations.is_empty();
 
-        // DONE: PERF: this was `set_state` then two `remove_sp_values`, three
-        // sequential round trips each awaited before the next could be sent.
-        // One pipeline now.
         let mut terminated_operations_meta = vec![];
         for op in &terminated_operations {
             terminated_operations_meta.push(format!("{}_information", op));

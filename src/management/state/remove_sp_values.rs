@@ -1,11 +1,6 @@
 use redis::AsyncCommands;
 use crate::SPConnection;
 
-// PERF: correct as a single `DEL` of many keys, but the call sites invoke it
-// two or three times in a row (`op_ids`, then `op_ids_meta`, then a separate
-// `remove_sp_value`), each a separate round trip. Suggested: concatenate the
-// key lists at the call site, or pipeline the DELs together with the preceding
-// MSET so operation cleanup costs one round trip instead of three.
 pub(super) async fn remove_sp_values(con: &mut SPConnection, keys: &[String]) {
     if keys.is_empty() {
         return;
@@ -97,5 +92,52 @@ mod tests_for_remove_sp_values {
 
         let control_exists: bool = con.exists(control_key).await.unwrap();
         assert!(control_exists, "The control key should remain untouched.");
+    }
+
+    /// A refused bulk `DEL` (a real ACL permission error) is logged and
+    /// swallowed rather than panicking, and none of the keys are removed - the
+    /// batch fails as a whole, it is not partially applied.
+    #[tokio::test]
+    #[serial]
+    async fn a_refused_bulk_del_is_logged_and_removes_nothing() {
+        // ACL SETUSER needs Redis 6+; the crate's default test image is 5.0.
+        let _container = Redis::default()
+            .with_tag("7.2")
+            .with_mapped_port(6379, ContainerPort::Tcp(6379))
+            .start()
+            .await
+            .unwrap();
+
+        let mut con = ConnectionManager::new().await.get_connection().await;
+        let keys = vec!["batch_1".to_string(), "batch_2".to_string()];
+        for key in &keys {
+            let _: () = con.set(key, "value").await.unwrap();
+        }
+
+        let _: () = redis::cmd("ACL")
+            .arg("SETUSER")
+            .arg("default")
+            .arg("-del")
+            .query_async(&mut con)
+            .await
+            .unwrap();
+
+        remove_sp_values(&mut con, &keys).await;
+
+        // Restore before asserting so the shared Redis is left clean.
+        let _: () = redis::cmd("ACL")
+            .arg("SETUSER")
+            .arg("default")
+            .arg("+del")
+            .query_async(&mut con)
+            .await
+            .unwrap();
+
+        let remaining: usize = con.exists(&keys).await.unwrap();
+        assert_eq!(remaining, 2, "a denied DEL must not remove any of the keys");
+
+        remove_sp_values(&mut con, &keys).await;
+        let remaining: usize = con.exists(&keys).await.unwrap();
+        assert_eq!(remaining, 0, "the batch delete works once allowed again");
     }
 }

@@ -154,4 +154,33 @@ mod tests_for_move_transform {
             "Function should not modify invalid data."
         );
     }
+
+    /// When the frame's key holds a different Redis type the `GET` fails with a
+    /// real `WRONGTYPE` error. The move must report `Err` rather than silently
+    /// treating the failure as a frame it can overwrite - the key must survive
+    /// untouched, still a list.
+    #[tokio::test]
+    #[serial]
+    async fn a_failed_get_aborts_the_move_without_writing() {
+        let _container = Redis::default()
+            .with_mapped_port(6379, ContainerPort::Tcp(6379))
+            .start()
+            .await
+            .unwrap();
+
+        let mut con = ConnectionManager::new().await.get_connection().await;
+        let child_id = "list_shaped_frame";
+        let redis_key = tf_key(child_id);
+        let _: () = con.lpush(&redis_key, "not_a_string").await.unwrap();
+
+        let result = move_transform(&mut con, child_id, SPTransform::default()).await;
+        assert!(result.is_err(), "a WRONGTYPE GET must abort the move");
+
+        let key_type: String = redis::cmd("TYPE")
+            .arg(&redis_key)
+            .query_async(&mut con)
+            .await
+            .unwrap();
+        assert_eq!(key_type, "list", "the key must not have been overwritten");
+    }
 }

@@ -129,4 +129,50 @@ mod tests_for_reparent_transform {
         let result = reparent_transform(&mut con, "parent1", "non_existent_child").await;
         assert!(result.is_err());
     }
+
+    /// Reparenting keeps the frame where it is in space, which means the pose
+    /// relative to the new parent has to be resolvable. If the new parent sits
+    /// in a segment that does not reach the `world` root, that maths cannot be
+    /// done - and rather than writing a bogus pose the call must fail and leave
+    /// the frame exactly as it was.
+    #[tokio::test]
+    #[serial]
+    async fn an_unresolvable_new_pose_aborts_the_reparent() {
+        let _container = Redis::default()
+            .with_mapped_port(6379, ContainerPort::Tcp(6379))
+            .start()
+            .await
+            .unwrap();
+
+        let mut con = ConnectionManager::new().await.get_connection().await;
+
+        // `child` hangs off the world root; `orphan` hangs off a parent that is
+        // not in the buffer at all, so nothing under it can be resolved.
+        let child = create_dummy_transform("world", "child");
+        let orphan = create_dummy_transform("detached_root", "orphan");
+        for tf in [&child, &orphan] {
+            let _: () = con
+                .set(
+                    tf_key(&tf.child_frame_id),
+                    serde_json::to_string(&tf.to_spvalue()).unwrap(),
+                )
+                .await
+                .unwrap();
+        }
+
+        let result = reparent_transform(&mut con, "orphan", "child").await;
+        assert!(
+            result.is_err(),
+            "reparenting under an unreachable parent must fail"
+        );
+
+        let stored = TransformsManager::get_transform(&mut con, "child")
+            .await
+            .unwrap();
+        assert_eq!(
+            stored.parent_frame_id, "world",
+            "the frame must keep its original parent when the reparent aborts"
+        );
+        assert_eq!(stored.transform, child.transform);
+    }
 }

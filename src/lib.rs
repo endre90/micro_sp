@@ -1,7 +1,108 @@
+//! `micro_sp` is a Sequence Planner runtime for controlling automation systems.
+//!
+//! You describe *what the system can do* as a [`Model`] of guarded operations,
+//! and the runtime figures out and executes *what it should do now*. The whole
+//! system state lives in Redis, so several processes - and any external tool -
+//! can observe and drive the same system.
+//!
+//! # The pieces
+//!
+//! - **State.** [`State`] maps variable names to [`SPValue`]s. Every value is
+//!   also allowed to be `UNKNOWN`, which is what a freshly started system reads
+//!   before anything has measured it.
+//! - **Behaviour.** A [`Transition`] is a guard plus a set of assignments. An
+//!   [`Operation`] wraps transitions into a lifecycle (initial → executing →
+//!   completed, with timeouts, retries and cancellation). A [`SOPStruct`]
+//!   sequences operations into a procedure.
+//! - **A [`Model`]** collects the operations, automatic transitions and SOPs a
+//!   system has.
+//! - **Runners.** [`main_runner`] spawns the tasks that actually execute a
+//!   model: a planner, a plan runner, a SOP runner, automatic operation and
+//!   transition runners, timers and a transform interface.
+//! - **Persistence.** [`StateManager`] reads and writes state through a
+//!   [`ConnectionManager`], and [`TransformsManager`] does the same for 3D
+//!   frames.
+//!
+//! # Modelling, without a runtime
+//!
+//! The modelling layer is pure and needs no Redis, which makes it easy to test:
+//!
+//! ```
+//! use micro_sp::*;
+//!
+//! // A domain with one variable: where the robot is.
+//! let mut state = State::new();
+//! state.add_mut(
+//!     SPAssignment::new(SPVariable::new("pos", SPValueType::String), "a".to_spvalue()),
+//!     "docs",
+//! );
+//!
+//! // "When pos is a, set it to b."
+//! let move_to_b = Transition::parse(
+//!     "move_to_b",
+//!     "var:pos == a",        // guard: when this holds ...
+//!     "true",                // runner guard: ... and the operator allows it
+//!     vec!["var:pos <- b"],  // effects
+//!     Vec::<&str>::new(),
+//!     &state,
+//! );
+//!
+//! assert!(move_to_b.eval(&state, "docs"));
+//! let state = move_to_b.take(&state, "docs");
+//! assert_eq!(state.get_value("pos", "docs"), Some("b".to_spvalue()));
+//! ```
+//!
+//! # Running a model
+//!
+//! [`main_runner`] needs a Redis instance (`docker run -p 6379:6379 -d redis`):
+//!
+//! ```no_run
+//! use micro_sp::*;
+//! use std::sync::Arc;
+//!
+//! # async fn example(model: Model) {
+//! let connection_manager = Arc::new(ConnectionManager::new().await);
+//!
+//! // Seed Redis with the model's variables, then hand it to the runners.
+//! main_runner(&"sp".to_string(), model, 3, &connection_manager).await;
+//! # }
+//! ```
+//!
+//! Ask the system for something by writing a goal predicate into the state; the
+//! planner finds a sequence of operations that reaches it and the plan runner
+//! executes them. See [`running`] for the individual runners.
+//!
+//! # Environment variables
+//!
+//! | Variable | Effect |
+//! |---|---|
+//! | `REDIS_HOST` / `REDIS_PORT` | Where to reach Redis (default `127.0.0.1:6379`). |
+//! | `MICRO_SP_TICK_INTERVAL_MS` | Overrides the runners' tick period. |
+//! | `MICRO_SP_READ_FULL_STATE` | Makes runners read the whole keyspace each tick. Debugging escape hatch; slow. |
+//! | `MICRO_SP_ACTIVITY_LOG_DIR` | Turns on the on-disk [`activity_log`] and says where to write it. |
+//! | `RUST_LOG` / `LOG_SHOW_TIME` | Console logging, via [`initialize_env_logger`]. |
+
+/// Default execution deadline for an operation, in milliseconds.
+///
+/// Applies only to operations created without an explicit
+/// `timeout_executing_ms`; see [`Operation::new`].
 pub static MAX_ALLOWED_OPERATION_DURATION_MS: i64 = 600000; // milliseconds
+
+/// How many times the planner may replan for one goal before giving up.
 pub static MAX_REPLAN_RETRIES: i64 = 3;
+
+/// Recursion depth ceiling for the SOP tree walk, guarding against a
+/// pathological or cyclic model.
 pub static MAX_RECURSION_DEPTH: u64 = 1000;
 
+/// The alphabet behind every generated id in the crate.
+///
+/// Used as `nanoid::nanoid!(10, &NANOID_ALPHABET)` to give each activated
+/// operation, SOP and plan a unique instance name. [`running::plan_runner`]
+/// additionally relies on `NANOID_ALPHABET.contains(&c)` to tell which trailing
+/// characters of a step name are a generated suffix rather than part of the
+/// operation's name - so every character in it must stay distinct and
+/// alphanumeric, or both uses break silently.
 pub const NANOID_ALPHABET: [char; 62] = [
     '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i',
     'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z', 'A', 'B',
@@ -31,9 +132,6 @@ pub use crate::planning::transition::*;
 
 pub mod running;
 pub use crate::running::auto_runner::*;
-// pub use crate::running::goal_runner::*;
-// tests
-// pub use crate::running::goal_scheduler::*;
 pub use crate::running::main_runner::*;
 pub use crate::running::plan_runner::*;
 pub use crate::running::planner_ticker::*;
@@ -46,7 +144,6 @@ pub use crate::running::time_runner::*;
 
 pub mod management;
 pub use crate::management::connection::*;
-// pub use crate::management::snapshot::*;
 pub use crate::management::state::*;
 pub use crate::management::transforms::*;
 
@@ -59,7 +156,6 @@ pub use crate::transforms::treeviz::*;
 pub mod utils;
 pub use crate::utils::info_logger::*;
 pub use crate::utils::metadata::*;
-// pub use crate::utils::op_logger::*;
 
 /// The on-disk activity log. Deliberately re-exported as a *module* rather than
 /// glob-imported: its API is `init`, `flush`, `is_enabled`, `log_operation`,
@@ -83,15 +179,6 @@ pub use crate::macros::sp_variable::*;
 #[allow(unused_imports)]
 pub use crate::macros::transition::*;
 
-/// `NANOID_ALPHABET` backs every id generated with `nanoid::nanoid!(10,
-/// &NANOID_ALPHABET)` across the runners (`auto_runner`, `goal_runner`,
-/// `sop_runner`, `planner_ticker`, transform loading, ...), and
-/// `running/plan_runner.rs` separately relies on
-/// `NANOID_ALPHABET.contains(&c)` to recognise which suffix characters of a
-/// step name are a generated id versus part of the operation name. Both uses
-/// silently break the same way if the alphabet ever gained a duplicate
-/// character or shrank: nanoid's collision-resistance and plan_runner's
-/// suffix detection both assume every character in it is distinct.
 #[cfg(test)]
 mod lib_tests {
     use super::*;

@@ -1,89 +1,94 @@
+//! Shorthand constructors for [`SPVariable`](crate::SPVariable)s.
+//!
+//! Each macro is sugar for `SPVariable::new(name, SPValueType::X)`, one per
+//! value type, so a model declaration reads as a list of names rather than as a
+//! wall of repeated constructor calls.
+
+/// Declares a `String`-typed variable.
+///
+/// `v!("pos")` is `SPVariable::new("pos", SPValueType::String)`.
+///
+/// ```
+/// use micro_sp::*;
+///
+/// let pos = v!("pos");
+/// assert_eq!(pos.name, "pos");
+/// assert_eq!(pos.has_type(), SPValueType::String);
+/// ```
 #[macro_export]
 macro_rules! v {
     ($a:expr) => {
-        SPVariable::new(
-            $a.clone(),
-            SPValueType::String,
-            // vec![],
-        )
+        SPVariable::new($a.clone(), SPValueType::String)
     };
 }
 
+/// Declares a `Bool`-typed variable.
+///
+/// `bv!("done")` is `SPVariable::new("done", SPValueType::Bool)`.
 #[macro_export]
 macro_rules! bv {
     ($a:expr) => {
-        SPVariable::new(
-            $a.clone(),
-            SPValueType::Bool,
-            // vec![true.to_spvalue(), false.to_spvalue()],
-        )
+        SPVariable::new($a.clone(), SPValueType::Bool)
     };
 }
 
+/// Declares an `Int64`-typed variable.
+///
+/// `iv!("retries")` is `SPVariable::new("retries", SPValueType::Int64)`.
 #[macro_export]
 macro_rules! iv {
     ($a:expr) => {
-        SPVariable::new(
-            $a.clone(),
-            SPValueType::Int64,
-            // vec![],
-            // $b.iter().map(|x| x.clone().to_spvalue()).collect(),
-        )
+        SPVariable::new($a.clone(), SPValueType::Int64)
     };
 }
 
+/// Declares a `Float64`-typed variable.
+///
+/// `fv!("weight")` is `SPVariable::new("weight", SPValueType::Float64)`.
 #[macro_export]
 macro_rules! fv {
     ($a:expr) => {
-        SPVariable::new(
-            $a.clone(),
-            SPValueType::Float64,
-            // vec![]
-        )
+        SPVariable::new($a.clone(), SPValueType::Float64)
     };
 }
 
+/// Declares an `Array`-typed variable.
+///
+/// `av!("queue")` is `SPVariable::new("queue", SPValueType::Array)`.
 #[macro_export]
 macro_rules! av {
     ($a:expr) => {
-        SPVariable::new(
-            $a.clone(),
-            SPValueType::Array,
-            // vec![],
-        )
+        SPVariable::new($a.clone(), SPValueType::Array)
     };
 }
 
+/// Declares a `Time`-typed variable.
+///
+/// `tv!("started_at")` is `SPVariable::new("started_at", SPValueType::Time)`.
 #[macro_export]
 macro_rules! tv {
     ($a:expr) => {
-        SPVariable::new(
-            $a.clone(),
-            SPValueType::Time,
-            // vec![],
-        )
+        SPVariable::new($a.clone(), SPValueType::Time)
     };
 }
 
+/// Declares a `Map`-typed variable.
+///
+/// `mv!("metadata")` is `SPVariable::new("metadata", SPValueType::Map)`.
 #[macro_export]
 macro_rules! mv {
     ($a:expr) => {
-        SPVariable::new(
-            $a.clone(),
-            SPValueType::Map,
-            // vec![],
-        )
+        SPVariable::new($a.clone(), SPValueType::Map)
     };
 }
 
+/// Declares a `Transform`-typed variable.
+///
+/// `tfv!("tool_frame")` is `SPVariable::new("tool_frame", SPValueType::Transform)`.
 #[macro_export]
 macro_rules! tfv {
     ($a:expr) => {
-        SPVariable::new(
-            $a.clone(),
-            SPValueType::Transform,
-            // vec![],
-        )
+        SPVariable::new($a.clone(), SPValueType::Transform)
     };
 }
 

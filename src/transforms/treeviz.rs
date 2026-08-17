@@ -1,8 +1,20 @@
+//! Rendering the transform tree for a terminal.
+//!
+//! [`update_tree_visualization_once`] turns a transform buffer into the
+//! familiar `├──` ASCII tree. Purely for looking at - nothing in the runtime
+//! reads it back.
+
 use std::collections::HashMap;
 use crate::*;
 
 use termtree::Tree;
 
+/// Build the subtree rooted at `node_id`.
+///
+/// `parent_map` maps a parent frame id to its children. Children are sorted, so
+/// the same buffer always renders identically. Recursion stops at
+/// [`MAX_RECURSION_DEPTH`], leaving a `(depth limit reached)` marker in the
+/// output instead of overflowing the stack.
 pub fn build_tree_recursive(
     node_id: &str,
     transforms: &HashMap<String, SPTransformStamped>,
@@ -28,6 +40,11 @@ pub fn build_tree_recursive(
     tree
 }
 
+/// Find the tree's root: the first frame id named as a parent that is not
+/// itself a frame in `buffer`.
+///
+/// `None` for an empty buffer. A buffer containing a cycle has no such frame
+/// and would loop, so check with [`is_cyclic_all`] first.
 pub fn get_tree_root(buffer: &HashMap<String, SPTransformStamped>) -> Option<String> {
     if let Some(start_frame) = buffer.keys().next() {
         let mut current_frame = start_frame.clone();
@@ -41,17 +58,37 @@ pub fn get_tree_root(buffer: &HashMap<String, SPTransformStamped>) -> Option<Str
     None
 }
 
-// pub async fn update_tree_visualization(
-//     buffer: &HashMap<String, SPTransformStamped>,
-//     refresh_rate: u64,
-// ) -> Result<(), Box<dyn std::error::Error>> {
-//     loop {
-//         let tree_data = update_tree_visualization_once(buffer);
-
-//         tokio::time::sleep(Duration::from_millis(refresh_rate)).await;
-//     }
-// }
-
+/// Render a whole transform buffer as an ASCII tree.
+///
+/// Returns `"No tree root."` when the buffer is empty. Frames not reachable
+/// from the root are not drawn.
+///
+/// ```
+/// use micro_sp::*;
+/// use std::collections::HashMap;
+/// use std::time::SystemTime;
+///
+/// let mut buffer = HashMap::new();
+/// for (child, parent) in [("base", "world"), ("arm", "base"), ("tool", "arm")] {
+///     buffer.insert(
+///         child.to_string(),
+///         SPTransformStamped {
+///             active_transform: true,
+///             enable_transform: true,
+///             time_stamp: SystemTime::now(),
+///             parent_frame_id: parent.to_string(),
+///             child_frame_id: child.to_string(),
+///             transform: SPTransform::default(),
+///             metadata: MapOrUnknown::UNKNOWN,
+///         },
+///     );
+/// }
+///
+/// assert_eq!(
+///     update_tree_visualization_once(&buffer),
+///     "world\n└── base\n    └── arm\n        └── tool\n"
+/// );
+/// ```
 pub fn update_tree_visualization_once(
     buffer: &HashMap<String, SPTransformStamped>,
 ) -> String {
@@ -244,190 +281,3 @@ mod tests {
         assert_eq!(get_tree_root(&buffer), Some("world".to_string()));
     }
 }
-
-// #[cfg(test)]
-// mod old_tests {
-
-//     use nalgebra::Isometry3;
-//     use serde_json::Value;
-//     use std::collections::HashMap;
-//     use tokio::time::Instant;
-
-//     use rand::distributions::{Distribution, Uniform};
-//     use rand::{thread_rng, Rng};
-//     use termtree::Tree;
-
-//     use crate::*;
-
-//     #[test]
-//     fn test_build_tree_recursive() {
-//         let mut transforms: HashMap<String, SPTransformStamped> = HashMap::new();
-//         transforms.insert(
-//             "child1".to_string(),
-//             SPTransformStamped {
-//                 active: true,
-//                 time_stamp: Instant::now(),
-//                 parent_frame_id: "root".to_string(),
-//                 child_frame_id: "child1".to_string(),
-//                 transform: Isometry3::default(),
-//                 metadata: Value::default()
-//             },
-//         );
-//         transforms.insert(
-//             "child2".to_string(),
-//             SPTransformStamped {
-//                 active: true,
-//                 time_stamp: Instant::now(),
-//                 parent_frame_id: "child1".to_string(),
-//                 child_frame_id: "child2".to_string(),
-//                 transform: Isometry3::default(),
-//                 metadata: Value::default()
-//             },
-//         );
-//         transforms.insert(
-//             "child3".to_string(),
-//             SPTransformStamped {
-//                 active: true,
-//                 time_stamp: Instant::now(),
-//                 parent_frame_id: "child1".to_string(),
-//                 child_frame_id: "child3".to_string(),
-//                 transform: Isometry3::default(),
-//                 metadata: Value::default()
-//             },
-//         );
-//         transforms.insert(
-//             "child5".to_string(),
-//             SPTransformStamped {
-//                 active: true,
-//                 time_stamp: Instant::now(),
-//                 parent_frame_id: "child3".to_string(),
-//                 child_frame_id: "child5".to_string(),
-//                 transform: Isometry3::default(),
-//                 metadata: Value::default()
-//             },
-//         );
-
-//         transforms.insert(
-//             "child4".to_string(),
-//             SPTransformStamped {
-//                 active: true,
-//                 time_stamp: Instant::now(),
-//                 parent_frame_id: "root".to_string(),
-//                 child_frame_id: "child4".to_string(),
-//                 transform: Isometry3::default(),
-//                 metadata: Value::default()
-//             },
-//         );
-
-//         let mut parent_map: HashMap<String, Vec<String>> = HashMap::new();
-//         for transform in transforms.values() {
-//             parent_map
-//                 .entry(transform.parent_frame_id.clone())
-//                 .or_default()
-//                 .push(transform.child_frame_id.clone());
-//         }
-
-//         if let Some(_) = parent_map.get("root") {
-//             let tree = build_tree_recursive("root", &transforms, &parent_map, 0);
-//             assert_eq!(tree.to_string(), "root\n├── child1\n│   ├── child2\n│   └── child3\n│       └── child5\n└── child4\n")
-//         }
-//     }
-
-//     #[test]
-//     fn test_tree_maximum_recursion_depth() {
-//         let mut transforms: HashMap<String, SPTransformStamped> = HashMap::new();
-//         let max_depth = MAX_RECURSION_DEPTH + 1; // We exceed MAX_DEPTH to trigger the limit
-//         let parent_id_base = "node";
-
-//         // Create a linear hierarchy of nodes exceeding the maximum depth
-//         for i in 0..max_depth {
-//             let parent_id = if i == 0 {
-//                 "root".to_string()
-//             } else {
-//                 format!("{}{}", parent_id_base, i - 1)
-//             };
-//             let child_id = format!("{}{}", parent_id_base, i);
-
-//             transforms.insert(
-//                 child_id.clone(),
-//                 SPTransformStamped {
-//                     active: true,
-//                     time_stamp: Instant::now(),
-//                     parent_frame_id: parent_id,
-//                     child_frame_id: child_id.clone(),
-//                     transform: Isometry3::default(),
-//                     metadata: Value::default()
-//                 },
-//             );
-//         }
-
-//         let mut parent_map: HashMap<String, Vec<String>> = HashMap::new();
-//         for transform in transforms.values() {
-//             parent_map
-//                 .entry(transform.parent_frame_id.clone())
-//                 .or_default()
-//                 .push(transform.child_frame_id.clone());
-//         }
-
-//         // Start the tree building from the root, which is the start of our chain
-//         let tree = build_tree_recursive("root", &transforms, &parent_map, 0);
-
-//         // Check for depth limit indication in the output
-//         let output = format!("{}", tree);
-//         assert!(
-//             output.contains("(depth limit reached)"),
-//             "Tree should indicate that the maximum depth was reached"
-//         );
-//     }
-
-//     fn generate_random_tree(depth: usize, num_nodes: usize) -> Tree<String> {
-//         let mut rng = rand::thread_rng();
-//         let current_depth = 1; // We start at depth 1 with the root node
-//         build_random_tree(&mut rng, depth, &mut (num_nodes - 1), current_depth)
-//     }
-
-//     fn build_random_tree<R: Rng + ?Sized>(
-//         rng: &mut R,
-//         max_depth: usize,
-//         remaining_nodes: &mut usize,
-//         current_depth: usize,
-//     ) -> Tree<String> {
-//         // Create a root node for this subtree
-//         let node_label = format!("Node {}", rng.gen::<u32>());
-//         let mut tree = Tree::new(node_label);
-
-//         if *remaining_nodes > 0 && current_depth < max_depth {
-//             let num_children = if *remaining_nodes < max_depth - current_depth {
-//                 rng.gen_range(0..=*remaining_nodes)
-//             } else {
-//                 // Decide how many children this node should have
-//                 let dist = Uniform::from(0..=(max_depth - current_depth));
-//                 dist.sample(rng)
-//             };
-
-//             for _ in 0..num_children {
-//                 if *remaining_nodes > 0 {
-//                     let subtree =
-//                         build_random_tree(rng, max_depth, remaining_nodes, current_depth + 1);
-//                     tree.push(subtree);
-//                     if *remaining_nodes != 0 {
-//                         *remaining_nodes -= 1;
-//                     }
-//                 }
-//             }
-//         }
-
-//         tree
-//     }
-
-//     #[test]
-//     fn test_visualize_random_tree() {
-//         let mut rng = thread_rng();
-//         let depth = rng.gen_range(1..20);
-//         let num_nodes = rng.gen_range(1..20);
-//         let tree = generate_random_tree(depth as usize, num_nodes as usize);
-//         println!("{}", tree);
-//     }
-
-//     // TODO: need a test for the async function
-// }

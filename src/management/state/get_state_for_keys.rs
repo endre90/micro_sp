@@ -176,4 +176,50 @@ mod tests_for_get_state_for_keys {
 
         assert_eq!(result_state.state, expected_state_map);
     }
+
+    /// A failed `MGET` (a real ACL permission error) must surface as `None`
+    /// rather than as an empty state: callers treat an empty read as "Redis was
+    /// flushed" and would restore a snapshot over live data.
+    #[tokio::test]
+    #[serial]
+    async fn a_failed_mget_yields_none_rather_than_an_empty_state() {
+        // ACL SETUSER needs Redis 6+; the crate's default test image is 5.0.
+        let _container = Redis::default()
+            .with_tag("7.2")
+            .with_mapped_port(6379, ContainerPort::Tcp(6379))
+            .start()
+            .await
+            .unwrap();
+
+        let mut con = ConnectionManager::new().await.get_connection().await;
+        let val = SPValue::Int64(IntOrUnknown::Int64(1));
+        let _: () = con.set("x", serde_json::to_string(&val).unwrap()).await.unwrap();
+
+        let _: () = redis::cmd("ACL")
+            .arg("SETUSER")
+            .arg("default")
+            .arg("-mget")
+            .query_async(&mut con)
+            .await
+            .unwrap();
+
+        let keys = vec!["x".to_string()];
+        let denied = get_state_for_keys(&mut con, &keys, "test").await;
+
+        // Restore before asserting so the shared Redis is left clean.
+        let _: () = redis::cmd("ACL")
+            .arg("SETUSER")
+            .arg("default")
+            .arg("+mget")
+            .query_async(&mut con)
+            .await
+            .unwrap();
+
+        assert!(denied.is_none(), "a failed MGET must report failure");
+
+        let recovered = get_state_for_keys(&mut con, &keys, "test")
+            .await
+            .expect("the read must work again once the permission is back");
+        assert_eq!(recovered.get_value("x", "test"), Some(val));
+    }
 }

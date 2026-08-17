@@ -1,12 +1,26 @@
+//! Executing [`SOPStruct`](crate::SOPStruct)s - the scripted procedures a model ships with.
+//!
+//! The SOP runner picks up whichever SOP the state points at, walks its
+//! sequence/parallel/alternative tree, and drives the operations it contains
+//! through [`process_operation`](crate::running::process_operation) until the
+//! whole procedure completes, fails or is cancelled.
+
 use crate::*;
 use log::Level;
 use crate::SPConnection;
 use std::sync::Arc;
 
+/// Runs the SOP executor until the process ends.
+///
+/// On every tick it reads the SOP keys for `sp_id` from Redis, starts the SOP
+/// named in `{sp_id}_sop_id` once `{sp_id}_sop_enabled` is set, advances its
+/// operations, and writes back `{sp_id}_sop_state`, `{sp_id}_sop_current_step`
+/// and the per-operation state. `model` supplies the SOPs to look up,
+/// `connection_manager` the shared Redis connection; log output goes to the
+/// `{sp_id}_sop_runner` target.
 pub async fn sop_runner(
     sp_id: &str,
     model: &Model,
-    // logging_tx: mpsc::Sender<LogMsg>,
     connection_manager: &Arc<ConnectionManager>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     initialize_env_logger();
@@ -19,7 +33,6 @@ pub async fn sop_runner(
     let mut active_unique_sop_id: Option<String> = None;
     let mut active_unique_sop_state: SOPState = SOPState::Initial;
     let mut active_sop_container: Option<SOP> = None;
-    // let mut terminated_operations: Vec<String> = vec!();
 
     // The variables read every tick no matter what is running, and the set
     // actually requested from Redis. The latter grows with the bookkeeping
@@ -138,7 +151,6 @@ pub async fn sop_runner(
                         new_state,
                         active_sop_container.as_ref().unwrap(),
                         con_clone,
-                        // logging_tx.clone(),
                         tick_elapsed_ms,
                         &log_target,
                     )
@@ -301,7 +313,6 @@ async fn process_sop_node_tick(
     mut state: State,
     sop: &SOP,
     con: crate::SPConnection,
-    // logging_tx: mpsc::Sender<LogMsg>,
     tick_elapsed_ms: i64,
     log_target: &str,
 ) -> State {
@@ -314,10 +325,8 @@ async fn process_sop_node_tick(
                 running::process_operation::OperationProcessingType::SOP,
                 None,
                 None,
-                // logging_tx,
                 tick_elapsed_ms,
                 log_target,
-                // &mut terminated_operations
             )
             .await;
         }
@@ -342,7 +351,6 @@ async fn process_sop_node_tick(
                     state,
                     child,
                     con.clone(),
-                    // logging_tx.clone(),
                     tick_elapsed_ms,
                     log_target,
                 ))
@@ -374,7 +382,6 @@ async fn process_sop_node_tick(
                         state,
                         path_to_start,
                         con,
-                        // logging_tx,
                         tick_elapsed_ms,
                         log_target,
                     ))
@@ -405,6 +412,10 @@ fn can_sop_start(sp_id: &str, sop: &SOP, state: &State, log_target: &str) -> boo
     }
 }
 
+/// Renames every operation in a SOP tree to `op_{name}_{nanoid}`.
+///
+/// Each run of a SOP gets its own operation instances, so two runs of the same
+/// procedure never share lifecycle variables.
 pub fn uniquify_sop_operations(sop: SOP) -> SOP {
     match sop {
         SOP::Operation(op) => {

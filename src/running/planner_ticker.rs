@@ -1,6 +1,20 @@
+//! Driving the planner.
+//!
+//! The goal runner asks for a plan by setting `{sp_id}_replan_trigger`. This
+//! runner picks that up, plans from the current state to the current goal
+//! predicate, and publishes the result as `{sp_id}_plan`.
+
 use crate::*;
 use std::sync::Arc;
 
+/// Runs the planner until the process ends.
+///
+/// On every tick it reads the planner keys for `sp_id` from Redis and, when
+/// `{sp_id}_replan_trigger` is set, plans from the current state to
+/// `{sp_id}_current_goal_predicate`, writing back `{sp_id}_plan`,
+/// `{sp_id}_plan_state`, `{sp_id}_planner_state` and the replan counters.
+/// `model` supplies the operations to plan with and `connection_manager` the
+/// shared Redis connection; log output goes to the `{sp_id}_planner` target.
 pub async fn planner_ticker(
     sp_id: &str,
     model: &Model,
@@ -156,10 +170,8 @@ async fn process_planner_tick(
     };
 
     let mut new_state = state.clone();
-    // let mut state_to_add = State::new();
 
     if !ctx.replan_trigger {
-        // ctx.planner_information = "Planner is not triggered".to_string();
         ctx.replanned = false;
     } else if ctx.replanned {
         ctx.replan_trigger = false;
@@ -186,15 +198,7 @@ async fn process_planner_tick(
             &format!("{}_plan_counter", sp_id),
             ctx.plan_counter.to_spvalue(),
         )
-        // Move this to the goal runner
-        // .update(
-        //     &format!("{}_replan_counter", sp_id),
-        //     ctx.replan_counter.to_spvalue(),
-        // )
-        // .update(
-        //     &format!("{}_replan_counter_total", sp_id),
-        //     ctx.replan_counter_total.to_spvalue(),
-        // )
+        // The replan counters are owned by the goal runner, not written here.
         .update(
             &format!("{}_planner_state", sp_id),
             ctx.planner_state.to_spvalue(),
@@ -288,10 +292,8 @@ async fn handle_replan_request(
                     .collect::<Vec<String>>()
                     .join("\n")
             );
-            // state_to_add
         } else {
             ctx.planner_information = "We are already in the goal. No action needed.".to_string();
-            // State::new()
         }
     }
 }

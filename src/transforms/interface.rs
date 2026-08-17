@@ -1,14 +1,25 @@
+//! The transform tree as a request/response service.
+//!
+//! A consumer writes a command and its arguments into the `{sp_id}_tf_*` state
+//! keys, sets the trigger, and reads the request state back - the same protocol
+//! every other service in the runtime uses, so transforms can be manipulated
+//! from a model without any direct Redis access.
+
 use std::sync::Arc;
 
 use crate::*;
 
-// DONE: PERF: this polled every 250 ms with an `MGET` of 7 keys purely to check
-// a single boolean - the entire body below sits inside `if request_trigger`, so
-// an untriggered tick did all that work and then nothing. It now reads just
-// `{sp_id}_tf_request_trigger` with one `GET` and only fetches the rest once it
-// is set.
-// PERF (still open): a keyspace notification on that one key would remove the
-// poll entirely and drop request latency from "up to 250 ms" to one round trip.
+/// The transform service runner: serves transform requests posted into the state.
+///
+/// Polls `{sp_id}_tf_request_trigger` and, when it is set, reads the rest of the
+/// `{sp_id}_tf_*` request keys and runs the named command - `lookup`,
+/// `reparent`, `snap_to_parent` or `insert` - against [`TransformsManager`]. It
+/// then clears the trigger and writes the outcome back as
+/// `{sp_id}_tf_request_state`, so a request is served exactly once. Loops
+/// forever; a failed read logs and skips the tick.
+///
+/// PERF (open): a Redis keyspace notification on the trigger key would remove
+/// the poll entirely and cut request latency from one tick to one round trip.
 pub async fn tf_interface(
     sp_id: &str,
     connection_manager: &Arc<ConnectionManager>,

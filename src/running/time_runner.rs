@@ -1,7 +1,20 @@
+//! Timers a model can start, stop and read from the state.
+//!
+//! A model asks for a timer by writing a command and a duration into the
+//! `{sp_id}_timer_{n}_*` variables; this runner keeps their elapsed times up to
+//! date so guards can refer to them like any other variable.
+
 use std::sync::Arc;
 
 use crate::*;
 
+/// Runs the timer interface until the process ends.
+///
+/// On every tick it reads the `{sp_id}_timer_{n}_*` keys for `n` in
+/// `1..=number_of_timers` from Redis, applies any pending command
+/// (`start`/`stop`/`reset`), ages the running timers, and writes back the
+/// elapsed times and request states. `connection_manager` is the shared Redis
+/// connection; log output goes to the `{sp_id}_timer_interface` target.
 pub async fn time_interface_runner(
     sp_id: &str,
     connection_manager: &Arc<ConnectionManager>,

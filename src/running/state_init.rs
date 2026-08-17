@@ -1,9 +1,28 @@
+//! Building the initial [`State`](crate::State) a model needs before the runners start.
+//!
+//! The runners coordinate purely through named variables in Redis, so every key
+//! they will ever read has to exist first. These helpers generate that set: the
+//! runner's own bookkeeping variables, one lifecycle variable per operation, and
+//! the per-operation timers and retry counters.
+
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use crate::*;
 
-// If coverability_tracking is true, generate variables to track how many
-// times an operation has entered its different running states
+/// Builds the bookkeeping variables the runners share, all set to `UNKNOWN`.
+///
+/// Covers the goal queue, plan, planner and per-runner information keys, plus
+/// `number_of_timers` timer variables, each prefixed with `name` (the `sp_id`).
+///
+/// ```
+/// use micro_sp::*;
+///
+/// let state = generate_runner_state_variables("sp", 2, "docs");
+///
+/// // Everything the runners read has to exist before they start.
+/// assert!(state.state.contains_key("sp_current_goal_predicate"));
+/// assert!(state.state.contains_key("sp_timer_2_elapsed_ms"));
+/// ```
 pub fn generate_runner_state_variables(
     name: &str,
     number_of_timers: u64,
@@ -40,7 +59,6 @@ pub fn generate_runner_state_variables(
     let incoming_goals = av!(&&format!("{}_incoming_goals", name));
     let scheduled_goals = av!(&&format!("{}_scheduled_goals", name));
     let sop_enabled = bv!(&&format!("{}_sop_enabled", name));
-    // let sop_request_state = v!(&&format!("{}_sop_request_state", name));
     let sop_current_step = iv!(&&format!("{}_sop_current_step", name));
     let sop_id = v!(&&format!("{}_sop_id", name));
     let sop_state = v!(&&format!("{}_sop_state", name));
@@ -53,11 +71,6 @@ pub fn generate_runner_state_variables(
     let tf_child = v!(&&format!("{}_tf_child", name));
     let tf_lookup_result = tfv!(&&format!("{}_tf_lookup_result", name));
     let tf_insert_transforms = av!(&&format!("{}_tf_insert_transforms", name));
-    // let time_request_trigger = bv!(&&format!("{}_time_request_trigger", name));
-    // let time_request_state = v!(&&format!("{}_time_request_state", name));
-    // let time_command = v!(&&format!("{}_time_command", name));
-    // let time_duration_ms = iv!(&&format!("{}_time_duration_ms", name));
-    // let time_elapsed_ms = iv!(&&format!("{}_time_elapsed_ms", name));
 
     let empty = bv!(&&format!("empty"));
     state.add_mut(
@@ -366,6 +379,8 @@ pub fn generate_runner_state_variables(
     state
 }
 
+/// Returns a copy of `state` with every value replaced by the `UNKNOWN` of its
+/// own type, keeping the variables and their types intact.
 pub fn all_values_to_unknown(state: &State) -> State {
     let mut new_state = state.clone();
     for (key, value) in &state.state {
@@ -384,6 +399,8 @@ pub fn all_values_to_unknown(state: &State) -> State {
     new_state
 }
 
+/// Collects every [`Operation`] in a [`SOP`] tree, descending into sequences,
+/// parallels and alternatives.
 pub fn get_all_operations_from_sop(sop: &SOP) -> Vec<Operation> {
     let mut operations = Vec::new();
     get_all_operations_recursive(sop, &mut operations);
@@ -406,6 +423,11 @@ fn get_all_operations_recursive(sop: &SOP, operations: &mut Vec<Operation>) {
     }
 }
 
+/// Builds one `initial` lifecycle variable per operation in the model, including
+/// the operations nested in its SOPs, plus an information variable per SOP.
+///
+/// With `coverability_tracking` set, also adds a counter per automatic transition
+/// recording how many times it has been taken.
 pub fn generate_operation_state_variables(
     model: &Model,
     coverability_tracking: bool,
@@ -434,9 +456,7 @@ pub fn generate_operation_state_variables(
         &operation_trackers,
         &state,
         &log_target,
-    ); // remove later for unique on the fly
-
-
+    );
 
     for transition in &model.auto_transitions {
         if coverability_tracking {
@@ -445,29 +465,14 @@ pub fn generate_operation_state_variables(
         }
     }
 
-    // for operation in &model.auto_operations {
-    //     let operation_state = v!(&&format!("{}", operation.name));
-    //     state.add_mut(assign!(operation_state, "initial".to_spvalue()));
-    //     if coverability_tracking {
-    //         let taken = iv!(&&format!("{}_taken", operation.name));
-    //         state.add_mut(assign!(taken, 0.to_spvalue()))
-    //     }
-    // }
-
     state
 }
 
-// pub fn reset_all_operations(state: &State) -> State {
-//     let state = state.clone();
-//     let mut mut_state = state.clone();
-//     state.state.iter().for_each(|(k, _)| {
-//         if k.starts_with("operation_") && k.ends_with("_state") {
-//             mut_state = mut_state.update(&k, "initial".to_spvalue());
-//         }
-//     });
-//     mut_state
-// }
-
+/// Returns a copy of `state` with every operation in `model` - and every state
+/// variable derived from one - put back to `initial`.
+///
+/// Also clears request handshakes: `*_request_state` back to `initial` and
+/// `*_request_trigger` back to `false`. Used when a plan is abandoned.
 pub fn reset_all_operations(state: &State, model: &Model) -> State {
     let state = state.clone();
     let mut mut_state = state.clone();
@@ -516,31 +521,13 @@ pub fn reset_all_operations(state: &State, model: &Model) -> State {
     mut_state
 }
 
+/// Wall-clock milliseconds since the Unix epoch, or `0` if the clock is before it.
 pub fn now_as_millis_i64() -> i64 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .map(|d| d.as_millis() as i64)
         .unwrap_or(0)
 }
-
-// If an operation has to be generated per item or per order
-// fn fill_operation_parameters(op: Operation, parameter: &str, replacement: &str) -> Operation {
-//     let mut mut_op = op.clone();
-//     mut_op.name = op.name.replace(parameter, replacement);
-//     mut_op.precondition.actions = op
-//         .precondition
-//         .actions
-//         .iter()
-//         .map(|x| {
-//             if x.var_or_val == parameter.wrap() {
-//                 Action::new(x.var.clone(), replacement.wrap())
-//             } else {
-//                 x.to_owned()
-//             }
-//         })
-//         .collect();
-//     mut_op
-// }
 
 #[cfg(test)]
 mod tests {
@@ -549,7 +536,6 @@ mod tests {
 
     #[test]
     fn test_model() {
-        // let model = Model::new("ASDF", vec![], vec![]);
         let _ = generate_runner_state_variables("asdf", 1, "test");
     }
 }
@@ -924,6 +910,82 @@ mod state_init_tests {
         );
     }
 
+    /// The other half of the SOP loop in `reset_all_operations`: a bare
+    /// `SOP::Operation` is the one shape `get_all_operation_names` does report
+    /// (see the bug above), so its operation *is* put back to `initial` - and
+    /// alongside it every variable named after the SOP itself, except the four
+    /// bookkeeping suffixes, which have to survive the reset.
+    #[test]
+    fn reset_all_operations_resets_a_bare_sop_operation_and_its_variables() {
+        let domain = domain();
+        let model = Model::new(
+            SP,
+            vec![],
+            vec![],
+            vec![],
+            vec![SOPStruct {
+                id: "lone_sop".to_string(),
+                sop: SOP::Operation(Box::new(operation("in_lone_sop", "a", &domain))),
+            }],
+            vec![],
+        );
+
+        let mut state = State::new();
+        let add_string = |state: &mut State, name: &str, value: &str| {
+            state.add_mut(
+                SPAssignment::new(
+                    SPVariable::new(name, SPValueType::String),
+                    value.to_spvalue(),
+                ),
+                TARGET,
+            );
+        };
+        add_string(&mut state, "in_lone_sop", "terminated_completed");
+        add_string(&mut state, "lone_sop_sop_state", "completed");
+        add_string(&mut state, "lone_sop_sop_information", "keep me");
+        for (name, value) in [
+            ("lone_sop_failure_retry_counter", 3),
+            ("lone_sop_timeout_retry_counter", 2),
+            ("lone_sop_elapsed_executing_ms", 1200),
+            ("lone_sop_elapsed_disabled_ms", 7),
+        ] {
+            state.add_mut(
+                SPAssignment::new(SPVariable::new(name, SPValueType::Int64), value.to_spvalue()),
+                TARGET,
+            );
+        }
+
+        let reset = reset_all_operations(&state, &model);
+
+        assert_eq!(
+            reset.get_value("in_lone_sop", TARGET),
+            Some("initial".to_spvalue()),
+            "the SOP's own operation must be reset"
+        );
+        assert_eq!(
+            reset.get_value("lone_sop_sop_state", TARGET),
+            Some("initial".to_spvalue()),
+            "variables named after the SOP are reset with it"
+        );
+        assert_eq!(
+            reset.get_value("lone_sop_sop_information", TARGET),
+            Some("keep me".to_spvalue()),
+            "the information line is excluded by suffix"
+        );
+        for (name, value) in [
+            ("lone_sop_failure_retry_counter", 3),
+            ("lone_sop_timeout_retry_counter", 2),
+            ("lone_sop_elapsed_executing_ms", 1200),
+            ("lone_sop_elapsed_disabled_ms", 7),
+        ] {
+            assert_eq!(
+                reset.get_value(name, TARGET),
+                Some(value.to_spvalue()),
+                "{name} is a counter or timer and must survive the reset"
+            );
+        }
+    }
+
     /// `now_as_millis_i64` is used for the runner start time; the only thing
     /// worth pinning is that it is a real, monotonically-sane wall clock rather
     /// than the `0` its error path falls back to.
@@ -940,13 +1002,15 @@ mod state_init_tests {
     }
 }
 
-// PERF: calls `State::add` five times per operation, and `add` currently clones
-// the entire state map *twice* per call (see the note there). Registering a
-// 20-operation SOP therefore performs ~200 full-state copies inside a single
-// tick - a latency spike at exactly the moment the SOP starts, which is when it
-// is most visible. Called again from `handle_replan_request` for every step of
-// a new plan. Suggested: build the new assignments into a small `State` (or a
-// `Vec<SPAssignment>`) and merge once, or use an in-place `add_mut`.
+/// Adds the per-operation timers and counters: information, elapsed executing and
+/// disabled milliseconds, and the failure and timeout retry counters.
+///
+/// With `coverability_tracking` set, also adds a `_visited_*` counter per
+/// lifecycle state.
+///
+/// PERF: this adds five variables per operation one at a time, so registering a
+/// large SOP does a lot of work in the tick that starts it. Batching the
+/// assignments into one merge would remove that spike.
 pub fn add_operation_meta_tracking_variables(
     ops: &Vec<String>,
     state: &State,
@@ -1013,6 +1077,7 @@ pub fn add_operation_meta_tracking_variables(
     state
 }
 
+/// Adds one lifecycle variable per operation name, initialised to `initial`.
 pub fn add_operation_state_tracking_variable(
     ops: &Vec<String>,
     state: &State,

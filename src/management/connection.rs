@@ -1,3 +1,10 @@
+//! The process-wide Redis connection.
+//!
+//! [`ConnectionManager`] establishes it once at startup and hands out cheap
+//! clones of [`SPConnection`] to every runner. The underlying driver is
+//! multiplexed and self-healing, so a dropped socket is repaired underneath the
+//! caller rather than being something this crate has to detect.
+
 use redis::aio::{ConnectionManager as RedisConnectionManager, ConnectionManagerConfig};
 use redis::{Client, RedisResult};
 use std::env;
@@ -62,6 +69,21 @@ pub struct ConnectionManager {
 impl ConnectionManager {
     /// Connect to Redis, retrying forever. Intended to be called once at
     /// startup, before any runner is spawned.
+    ///
+    /// The address comes from `REDIS_HOST` / `REDIS_PORT`, defaulting to
+    /// `127.0.0.1:6379`.
+    ///
+    /// ```no_run
+    /// use micro_sp::*;
+    /// use std::sync::Arc;
+    ///
+    /// # async fn example() {
+    /// let connection_manager = Arc::new(ConnectionManager::new().await);
+    /// let mut con = connection_manager.get_connection().await;
+    ///
+    /// StateManager::set_sp_value(&mut con, "greeting", &"hello".to_spvalue()).await;
+    /// # }
+    /// ```
     pub async fn new() -> Self {
         let redis_host = env::var("REDIS_HOST").unwrap_or_else(|_| "127.0.0.1".to_string());
         let redis_port = env::var("REDIS_PORT").unwrap_or_else(|_| "6379".to_string());
@@ -230,6 +252,11 @@ impl ConnectionManager {
     }
 }
 
+/// Repopulate an empty Redis from the last state a runner saw.
+///
+/// Called when a read comes back empty, which usually means Redis was restarted
+/// or flushed under a running system. If no snapshot has been taken yet this
+/// logs and does nothing, leaving the system to wait for its initial state.
 pub async fn restore_state_from_snapshot(
     con: &mut SPConnection,
     last_known_state: &Arc<RwLock<Option<State>>>,
@@ -370,6 +397,71 @@ mod tests {
 
         assert!(!error.is_io_error(), "this is a type error, not an I/O error");
         manager.handle_redis_error(&error, TARGET).await;
+
+        // The other side of the classification: a dropped-socket style error is
+        // recognised as an I/O error, which is the case where a runner is meant
+        // to skip its tick and let the driver reconnect underneath it.
+        let io_error = redis::RedisError::from(std::io::Error::new(
+            std::io::ErrorKind::ConnectionReset,
+            "connection reset by peer",
+        ));
+        assert!(
+            io_error.is_io_error(),
+            "a socket error must classify as an I/O error"
+        );
+        manager.handle_redis_error(&io_error, TARGET).await;
+
+        // Neither classification may disturb the connection itself.
+        assert!(manager.check_redis_health(TARGET).await.is_ok());
+    }
+
+    /// The monitor is only useful if it notices a change: it must log the
+    /// transition to unhealthy while Redis refuses `PING` (a real ACL
+    /// permission error), and the transition back once it is allowed again -
+    /// all without ever exiting, since nothing restarts it.
+    #[tokio::test]
+    #[serial]
+    async fn the_health_monitor_survives_and_reports_a_round_trip_to_unhealthy() {
+        let (_container, manager) = redis().await;
+        let mut con = manager.get_connection().await;
+
+        let monitor = manager.spawn_health_monitor(TARGET, Duration::from_millis(50));
+
+        // Healthy for a few ticks first, so the monitor has a baseline.
+        tokio::time::sleep(Duration::from_millis(200)).await;
+        assert!(!monitor.is_finished());
+
+        let _: () = redis::cmd("ACL")
+            .arg("SETUSER")
+            .arg("default")
+            .arg("-ping")
+            .query_async(&mut con)
+            .await
+            .unwrap();
+        tokio::time::sleep(Duration::from_millis(300)).await;
+        let alive_while_unhealthy = !monitor.is_finished();
+
+        // Restore before asserting so the shared, fixed-port Redis is left
+        // usable for the tests that follow.
+        let _: () = redis::cmd("ACL")
+            .arg("SETUSER")
+            .arg("default")
+            .arg("+ping")
+            .query_async(&mut con)
+            .await
+            .unwrap();
+        tokio::time::sleep(Duration::from_millis(300)).await;
+
+        assert!(
+            alive_while_unhealthy,
+            "the monitor must keep polling while Redis is unhealthy"
+        );
+        assert!(
+            !monitor.is_finished(),
+            "the monitor must still be running after Redis recovers"
+        );
+        assert!(manager.check_redis_health(TARGET).await.is_ok());
+        monitor.abort();
     }
 
     /// The health monitor replaces the old per-runner, per-tick PING with one

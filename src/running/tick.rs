@@ -135,6 +135,8 @@ pub struct TickClock {
 }
 
 impl TickClock {
+    /// Starts a clock whose first [`elapsed_ms`](TickClock::elapsed_ms) measures
+    /// from now.
     pub fn new() -> Self {
         Self {
             last: std::time::Instant::now(),

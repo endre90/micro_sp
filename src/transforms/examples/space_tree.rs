@@ -7,13 +7,6 @@ pub static VISUALIZE_TREE_REFRESH_RATE: u64 = 100; // milliseconds
 
 #[tokio::main]
 async fn main() -> () {
-    // fn initialize_logging() {
-    //     std::env::set_var("RUST_LOG", "warn");
-    //     let _ = env_logger::builder().is_test(true).try_init();
-    // }
-
-    // initialize_logging();
-
     log::info!("Starting the r2r_transforms example...");
 
     let buffer = SpaceTreeServer::new("test");
@@ -35,7 +28,6 @@ async fn main() -> () {
 
 pub async fn space_tree_manipulation_example(
     buffer: &SpaceTreeServer,
-    // refresh_rate: u64,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let manifest_dir = std::env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR is not set");
 
@@ -43,7 +35,6 @@ pub async fn space_tree_manipulation_example(
 
     let _ = visualize_tree_once(&buffer);
 
-    // loop {
     tokio::time::sleep(Duration::from_millis(500)).await;
     buffer.load_scenario(&path, false);
     buffer.apply_changes();

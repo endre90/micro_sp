@@ -1,14 +1,40 @@
+//! Pairing a variable with a value.
+//!
+//! An [`SPAssignment`] binds an [`SPVariable`] to an [`SPValue`] of the
+//! variable's declared type. A [`State`] is a map of these, keyed by variable
+//! name.
+
 use crate::*;
 use serde::{Deserialize, Serialize};
 
-/// Represents assigning a value to a variable.
+/// A variable bound to a value of its declared type.
+///
+/// ```
+/// use micro_sp::*;
+///
+/// let mut state = State::new();
+/// state.add_mut(
+///     SPAssignment::new(SPVariable::new("pos", SPValueType::String), "a".to_spvalue()),
+///     "docs",
+/// );
+/// assert_eq!(state.get_value("pos", "docs"), Some("a".to_spvalue()));
+/// ```
 #[derive(Debug, PartialEq, Clone, Hash, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct SPAssignment {
+    /// The variable being assigned to.
     pub var: SPVariable,
+    /// The value assigned, of `var`'s type.
     pub val: SPValue,
 }
 
 impl SPAssignment {
+    /// Creates an assignment, checking that the value matches the variable's
+    /// type.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `val`'s [`SPValueType`] differs from `var`'s. An `UNKNOWN`
+    /// value of the right type is accepted.
     pub fn new(var: SPVariable, val: SPValue) -> SPAssignment {
         match var.has_type() == val.has_type() {
             true => SPAssignment { var, val },

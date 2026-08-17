@@ -1,25 +1,50 @@
+//! The optional, visualisation-oriented fields a transform may carry.
+//!
+//! A transform's `metadata` is an untyped [`MapOrUnknown`] because it comes from
+//! a JSON file or from another process writing Redis directly.
+//! [`decode_metadata`] turns it into the typed
+//! [`PotentialTransformMetadata`] the visualisation code reads.
+
 use crate::*;
 use ordered_float::OrderedFloat;
 use serde::{Deserialize, Serialize};
 
 use std::collections::HashSet;
 
+/// The typed view of a transform's metadata map, with a default for every
+/// field. Produced by [`decode_metadata`].
 #[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
 pub struct PotentialTransformMetadata {
-    pub next_frame: Option<HashSet<String>>, // next frame, good for visualizing path plans
-    pub frame_type: Option<String>,          // can be used separate waypoint, tag, human, etc.
+    /// Frames that follow this one, useful for visualizing path plans.
+    pub next_frame: Option<HashSet<String>>,
+    /// A free-form category: waypoint, tag, human, etc.
+    pub frame_type: Option<String>,
+    /// Whether to draw the mesh for this frame.
     pub visualize_mesh: bool,
+    /// Whether to draw the [`zone`](Self::zone) sphere for this frame.
     pub visualize_zone: bool,
-    pub zone: f64,      // when are you "at" the frame, threshold, in meters
-    pub mesh_type: i32, // 1 - cube, 2 - sphere, 3 - cylinder or 10 - mesh (provide path)
-    pub override_meshes_dir: Option<String>, // To privide custom meshes dir for more publishers
+    /// Distance in meters within which you count as being "at" the frame.
+    pub zone: f64,
+    /// Marker shape: 1 cube, 2 sphere, 3 cylinder, 10 mesh (needs
+    /// [`mesh_file`](Self::mesh_file)).
+    pub mesh_type: i32,
+    /// A custom meshes directory, for setups with several publishers.
+    pub override_meshes_dir: Option<String>,
+    /// Path to the mesh, relative to the meshes directory.
     pub mesh_file: Option<String>,
+    /// Uniform scale applied to the mesh.
     pub mesh_scale: f32,
+    /// Marker colour, red channel, 0.0 to 1.0.
     pub mesh_r: f32,
+    /// Marker colour, green channel, 0.0 to 1.0.
     pub mesh_g: f32,
+    /// Marker colour, blue channel, 0.0 to 1.0.
     pub mesh_b: f32,
+    /// Marker opacity, 0.0 to 1.0.
     pub mesh_a: f32,
+    /// Extra transforms drawn relative to this frame.
     pub secondary_transforms: Vec<SPTransform>,
+    /// Whether the mesh's own materials are used instead of the colour above.
     pub mesh_use_embedded_materials: bool
 }
 
@@ -150,6 +175,11 @@ fn parse_secondary_transforms(value: &SPValue) -> Vec<SPTransform> {
         .collect()
 }
 
+/// Decode a transform's metadata map into [`PotentialTransformMetadata`].
+///
+/// Tolerant by design: an unknown key, a missing field or a field of the wrong
+/// type is skipped and keeps its default, so malformed metadata degrades the
+/// visualisation rather than failing.
 pub fn decode_metadata(map_value: &MapOrUnknown) -> PotentialTransformMetadata {
     let mut metadata = PotentialTransformMetadata::default();
 
@@ -572,6 +602,41 @@ mod tests {
             assert!(
                 metadata.secondary_transforms.is_empty(),
                 "{label} should have produced no secondary transforms"
+            );
+        }
+    }
+
+    /// A nested `translation` or `rotation` that is *present but not a map*
+    /// (as opposed to simply missing) is undecodable, so the whole secondary
+    /// transform is dropped rather than silently collapsing to the origin or
+    /// to the identity rotation.
+    #[test]
+    fn a_translation_or_rotation_of_the_wrong_type_drops_the_transform() {
+        let cases: Vec<(&str, SPValue)> = vec![
+            (
+                "a translation that is a string",
+                map_value(vec![
+                    ("translation", text("not a map")),
+                    ("rotation", map_value(vec![("w", float(1.0))])),
+                ]),
+            ),
+            (
+                "a rotation that is an int",
+                map_value(vec![
+                    ("translation", map_value(vec![("x", float(1.0))])),
+                    ("rotation", int(7)),
+                ]),
+            ),
+        ];
+
+        for (label, transform) in cases {
+            let metadata = decode_metadata(&map(vec![(
+                "secondary_transforms",
+                array(vec![map_value(vec![("transform", transform)])]),
+            )]));
+            assert!(
+                metadata.secondary_transforms.is_empty(),
+                "{label} should have dropped the secondary transform"
             );
         }
     }

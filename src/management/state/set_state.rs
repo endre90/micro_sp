@@ -161,4 +161,96 @@ mod tests_for_set_state {
         assert_eq!(result[2], Some("3".to_string()));
         assert_eq!(result[3], Some(serde_json::to_string(&val_d).unwrap()));
     }
+
+    /// One unserialisable value (serde refuses a `SystemTime` before the UNIX
+    /// epoch) must not cost the rest of the state: the bad key is dropped with
+    /// a log and every other key in the same write still lands.
+    #[tokio::test]
+    #[serial]
+    async fn an_unserializable_value_is_dropped_but_the_rest_of_the_state_is_written() {
+        let _container = Redis::default()
+            .with_mapped_port(6379, ContainerPort::Tcp(6379))
+            .start()
+            .await
+            .unwrap();
+
+        let mut con = ConnectionManager::new().await.get_connection().await;
+
+        let good_val = SPValue::Int64(IntOrUnknown::Int64(7));
+        let bad_val = SPValue::Time(TimeOrUnknown::Time(
+            std::time::SystemTime::UNIX_EPOCH - std::time::Duration::from_secs(1),
+        ));
+        assert!(
+            serde_json::to_string(&bad_val).is_err(),
+            "test premise: a pre-epoch SystemTime must be unserializable"
+        );
+
+        let mut state_map = HashMap::new();
+        state_map.insert(
+            "good".to_string(),
+            SPAssignment::new(iv!("good"), good_val.clone()),
+        );
+        state_map.insert(
+            "bad".to_string(),
+            SPAssignment::new(tv!("bad"), bad_val),
+        );
+
+        set_state(&mut con, &State { state: state_map }).await;
+
+        let result: Vec<Option<String>> = con.mget(&["good", "bad"]).await.unwrap();
+        assert_eq!(
+            result[0],
+            Some(serde_json::to_string(&good_val).unwrap()),
+            "the serialisable half of the state must still be written"
+        );
+        assert_eq!(result[1], None, "the unserialisable key must be skipped");
+    }
+
+    /// A refused `MSET` (a real ACL permission error) is logged rather than
+    /// panicking, and leaves the keyspace exactly as it was.
+    #[tokio::test]
+    #[serial]
+    async fn a_refused_mset_is_logged_and_changes_nothing() {
+        // ACL SETUSER needs Redis 6+; the crate's default test image is 5.0.
+        let _container = Redis::default()
+            .with_tag("7.2")
+            .with_mapped_port(6379, ContainerPort::Tcp(6379))
+            .start()
+            .await
+            .unwrap();
+
+        let mut con = ConnectionManager::new().await.get_connection().await;
+        let _: () = con.set("untouched", "original").await.unwrap();
+
+        let _: () = redis::cmd("ACL")
+            .arg("SETUSER")
+            .arg("default")
+            .arg("-mset")
+            .query_async(&mut con)
+            .await
+            .unwrap();
+
+        let mut state_map = HashMap::new();
+        state_map.insert(
+            "untouched".to_string(),
+            SPAssignment::new(v!("untouched"), "overwritten".to_spvalue()),
+        );
+        set_state(&mut con, &State { state: state_map }).await;
+
+        // Restore before asserting so the shared Redis is left clean.
+        let _: () = redis::cmd("ACL")
+            .arg("SETUSER")
+            .arg("default")
+            .arg("+mset")
+            .query_async(&mut con)
+            .await
+            .unwrap();
+
+        let stored: Option<String> = con.get("untouched").await.unwrap();
+        assert_eq!(
+            stored,
+            Some("original".to_string()),
+            "a denied MSET must not have modified anything"
+        );
+    }
 }

@@ -113,7 +113,9 @@ impl ActivityKind {
 /// drifted with writer latency would be useless for reconstructing an ordering.
 #[derive(Debug, Clone)]
 pub struct ActivityRecord {
+    /// When the event happened, not when the line was written.
     pub at: DateTime<Local>,
+    /// Which of the four kinds of event this is.
     pub kind: ActivityKind,
     /// Which runner produced this - the `log_target` the runners already carry,
     /// e.g. `sp_operation_runner`.
@@ -126,6 +128,7 @@ pub struct ActivityRecord {
 }
 
 impl ActivityRecord {
+    /// A record stamped with the current local time.
     pub fn new(kind: ActivityKind, source: &str, subject: &str, detail: String) -> Self {
         Self {
             at: Local::now(),
@@ -364,6 +367,7 @@ impl ActivityWriter {
         active_path(&self.config)
     }
 
+    /// The configuration this writer was created with.
     pub fn config(&self) -> &ActivityLogConfig {
         &self.config
     }
@@ -1506,6 +1510,373 @@ mod tests {
         );
 
         fs::remove_dir_all(&dir).ok();
+    }
+
+    // -- the writer thread, driven directly -------------------------------
+    //
+    // `writer_loop` is a plain synchronous function over a channel, which is
+    // what makes the background thread testable without installing anything
+    // process-wide: build a writer, feed it a `Receiver`, and read the file
+    // back. Everything in this section drives it that way.
+
+    /// Collect every log line in `dir`, active file and rotated files alike.
+    fn all_text_in(dir: &Path) -> String {
+        let mut out = String::new();
+        let mut paths: Vec<PathBuf> = fs::read_dir(dir)
+            .unwrap()
+            .filter_map(|e| e.ok())
+            .map(|e| e.path())
+            .collect();
+        paths.sort();
+        for path in paths {
+            out.push_str(&fs::read_to_string(&path).unwrap());
+        }
+        out
+    }
+
+    /// The loop's contract in one test: everything queued reaches the file, in
+    /// the order it was sent, and the loop *terminates* once the last sender is
+    /// gone. The termination half matters as much as the writing half - a loop
+    /// that outlived its senders would keep a thread and an open file forever.
+    #[test]
+    fn the_writer_loop_writes_queued_records_in_order_and_then_exits() {
+        let dir = temp_dir("loop_order");
+        let writer = ActivityWriter::new(config_in(&dir)).unwrap();
+        let path = writer.current_path();
+
+        let (tx, rx) = sync_channel::<Msg>(16);
+        for name in ["op_first", "op_second", "op_third"] {
+            tx.send(Msg::Record(Box::new(record(
+                ActivityKind::Operation,
+                name,
+                "Initial -> Executing",
+            ))))
+            .unwrap();
+        }
+        // Dropping the last sender is the only shutdown signal there is.
+        drop(tx);
+
+        // If this returned, the loop noticed the disconnect. If it did not, the
+        // test would hang rather than fail, which is the honest outcome for a
+        // loop that never exits.
+        writer_loop(writer, rx);
+
+        let text = fs::read_to_string(&path).unwrap();
+        let first = text.find("op_first").expect("op_first was never written");
+        let second = text.find("op_second").expect("op_second was never written");
+        let third = text.find("op_third").expect("op_third was never written");
+        assert!(first < second && second < third, "FIFO order:\n{text}");
+        // The loop flushes before returning, so nothing is left in the
+        // `BufWriter` when the thread ends.
+        assert!(text.ends_with('\n'));
+
+        fs::remove_dir_all(&dir).ok();
+    }
+
+    /// The batching path: one blocking `recv` followed by a greedy `try_recv`
+    /// drain. With the whole burst already queued before the loop starts, the
+    /// first `recv` takes one record and the inner drain has to pick up the
+    /// other ninety-nine - if the drain were wrong, the loop would still write
+    /// them, but this pins that none are lost or reordered by the batching.
+    #[test]
+    fn a_whole_burst_queued_at_once_is_drained_in_one_batch() {
+        let dir = temp_dir("loop_batch");
+        let writer = ActivityWriter::new(config_in(&dir)).unwrap();
+        let path = writer.current_path();
+
+        let (tx, rx) = sync_channel::<Msg>(256);
+        for i in 0..100 {
+            tx.send(Msg::Record(Box::new(record(
+                ActivityKind::Variable,
+                &format!("burst_{i:03}"),
+                "a -> b",
+            ))))
+            .unwrap();
+        }
+        drop(tx);
+        writer_loop(writer, rx);
+
+        let text = fs::read_to_string(&path).unwrap();
+        for i in 0..100 {
+            assert!(
+                text.contains(&format!("burst_{i:03} ")),
+                "burst_{i:03} was dropped by the batch drain"
+            );
+        }
+        let mut previous = 0;
+        for i in 0..100 {
+            let at = text.find(&format!("burst_{i:03} ")).unwrap();
+            assert!(at >= previous, "batching must not reorder records");
+            previous = at;
+        }
+
+        fs::remove_dir_all(&dir).ok();
+    }
+
+    /// The flush handshake is what makes [`flush`] meaningful: when the ack
+    /// arrives, everything sent *before* the flush is already on disk. This
+    /// reads the file while the writer thread is still alive and still holds the
+    /// channel open, so a passing assertion can only come from the handshake and
+    /// not from the loop's final flush on shutdown.
+    #[test]
+    fn a_flush_message_is_acked_only_after_the_queue_reached_the_file() {
+        let dir = temp_dir("loop_flush");
+        let writer = ActivityWriter::new(config_in(&dir)).unwrap();
+        let path = writer.current_path();
+
+        let (tx, rx) = sync_channel::<Msg>(16);
+        let thread = std::thread::spawn(move || writer_loop(writer, rx));
+
+        tx.send(Msg::Record(Box::new(record(
+            ActivityKind::Sop,
+            "sop_before_flush",
+            "Initial -> Executing",
+        ))))
+        .unwrap();
+        let (ack_tx, ack_rx) = sync_channel::<()>(1);
+        tx.send(Msg::Flush(ack_tx)).unwrap();
+        ack_rx.recv().expect("the writer must answer the handshake");
+
+        let text = fs::read_to_string(&path).unwrap();
+        assert!(
+            text.contains("sop_before_flush"),
+            "the ack promised the file was current:\n{text}"
+        );
+
+        drop(tx);
+        thread.join().unwrap();
+        fs::remove_dir_all(&dir).ok();
+    }
+
+    /// A gap in the file must never be silent: once events have been dropped,
+    /// the writer records how many as soon as it catches up. And it must report
+    /// each gap exactly once - a notice repeated on every subsequent batch would
+    /// itself become the noise it is warning about.
+    #[test]
+    #[serial_test::serial(micro_sp_activity_log_global)]
+    fn a_dropped_event_gap_is_reported_once_and_not_repeated() {
+        let dir = temp_dir("loop_dropped");
+        let writer = ActivityWriter::new(config_in(&dir)).unwrap();
+        let path = writer.current_path();
+
+        // Stand in for a full queue: `emit` bumps exactly this counter when
+        // `try_send` fails, and the writer reads it as an absolute total.
+        DROPPED.fetch_add(3, Ordering::Relaxed);
+
+        let (tx, rx) = sync_channel::<Msg>(16);
+        let thread = std::thread::spawn(move || writer_loop(writer, rx));
+
+        let flush = |tx: &SyncSender<Msg>| {
+            let (ack_tx, ack_rx) = sync_channel::<()>(1);
+            tx.send(Msg::Flush(ack_tx)).unwrap();
+            ack_rx.recv().unwrap();
+        };
+
+        tx.send(Msg::Record(Box::new(record(
+            ActivityKind::Operation,
+            "op_after_the_gap",
+            "x -> y",
+        ))))
+        .unwrap();
+        flush(&tx);
+
+        let after_first = fs::read_to_string(&path).unwrap();
+        assert_eq!(
+            after_first.matches("events dropped (queue full)").count(),
+            1,
+            "the gap must be recorded next to the events around it:\n{after_first}"
+        );
+
+        // A second batch with no new drops must stay quiet.
+        tx.send(Msg::Record(Box::new(record(
+            ActivityKind::Operation,
+            "op_later_still",
+            "x -> y",
+        ))))
+        .unwrap();
+        flush(&tx);
+
+        let after_second = fs::read_to_string(&path).unwrap();
+        assert!(after_second.contains("op_later_still"), "{after_second}");
+        assert_eq!(
+            after_second.matches("events dropped (queue full)").count(),
+            1,
+            "the same gap must not be re-reported on every later batch:\n{after_second}"
+        );
+
+        drop(tx);
+        thread.join().unwrap();
+        fs::remove_dir_all(&dir).ok();
+    }
+
+    /// Rotation has to work from inside the writer thread too, not only when a
+    /// test drives the writer by hand - a long-running process rotates while the
+    /// loop is draining, and nothing may be lost across the boundary.
+    #[test]
+    fn the_writer_loop_rotates_mid_stream_without_losing_records() {
+        let dir = temp_dir("loop_rotate");
+        let config = ActivityLogConfig {
+            max_bytes: 900,
+            max_files: 0,
+            ..config_in(&dir)
+        };
+        let writer = ActivityWriter::new(config).unwrap();
+        let active = writer.current_path();
+
+        let (tx, rx) = sync_channel::<Msg>(512);
+        for i in 0..120 {
+            tx.send(Msg::Record(Box::new(record(
+                ActivityKind::Variable,
+                &format!("rot_{i:03}"),
+                "a -> b",
+            ))))
+            .unwrap();
+        }
+        drop(tx);
+        writer_loop(writer, rx);
+
+        let files: Vec<PathBuf> = fs::read_dir(&dir)
+            .unwrap()
+            .filter_map(|e| e.ok())
+            .map(|e| e.path())
+            .collect();
+        assert!(
+            files.len() > 1,
+            "120 records over a 900 byte budget must have rotated"
+        );
+        assert!(
+            fs::metadata(&active).unwrap().len() <= 900,
+            "the active file is over its budget"
+        );
+
+        let text = all_text_in(&dir);
+        for i in 0..120 {
+            assert!(
+                text.contains(&format!("rot_{i:03} ")),
+                "rot_{i:03} vanished across a rotation inside the writer thread"
+            );
+        }
+
+        fs::remove_dir_all(&dir).ok();
+    }
+
+    // -- the installed log, in this process -------------------------------
+
+    /// The emission helpers in one go, against a real installed log.
+    ///
+    /// This is the only test in the binary that calls [`init`] in-process: the
+    /// handle is a `OnceLock`, so whoever calls it first wins for the whole
+    /// binary. Everything downstream of that install is checked here - the
+    /// filter recorded by `install_filter`, the `try_send` in `emit`, the
+    /// per-kind `detail` shapes, and the flush handshake - by reading the bytes
+    /// the writer thread actually put on disk.
+    #[test]
+    #[serial_test::serial(micro_sp_activity_log_global)]
+    fn the_installed_log_renders_every_emission_helper_onto_disk() {
+        let dir = temp_dir("inprocess");
+        let config = ActivityLogConfig {
+            // A short value limit, so `filter_settings` demonstrably feeds the
+            // emission path rather than the default being used by accident.
+            max_value_len: 12,
+            skip_suffixes: vec!["_elapsed_executing_ms".to_string(), "_secret".to_string()],
+            ..config_in(&dir)
+        };
+        assert!(init(config), "the first install in this process must win");
+        assert!(is_enabled(), "emission sites now have work to do");
+        assert!(
+            !init(ActivityLogConfig::default()),
+            "a second install is refused, so the first one's directory stands"
+        );
+
+        let dropped_before = dropped_count();
+
+        // An operation and a SOP: the note is parenthesised when there is one
+        // and omitted entirely when there is not.
+        log_operation("runner_a", "op_with_note", "Initial", "Executing", "Starting");
+        log_operation("runner_a", "op_without_note", "Executing", "Completed", "");
+        log_sop("runner_b", "sop_with_note", "Initial", "Executing", "Step 1/3");
+        log_sop("runner_b", "sop_without_note", "Executing", "Completed", "");
+        log_transition("runner_c", "t_open", "t_open_aB3");
+        log_variable("runner_d", "changed_var", Some(&"home".to_spvalue()), &"at_b".to_spvalue());
+        log_variable("runner_d", "brand_new_var", None, &7.to_spvalue());
+        log_variable(
+            "runner_d",
+            "direct_long_var",
+            None,
+            &"0123456789abcdefghij".to_spvalue(),
+        );
+
+        let old = state_of(&[("diff_pose", "home".to_spvalue())]);
+        let delta = state_of(&[
+            ("diff_pose", "at_b".to_spvalue()),
+            ("diff_added", true.to_spvalue()),
+            ("diff_long", "0123456789abcdefghij".to_spvalue()),
+            // Both of these match the installed skip list and must not appear.
+            ("op_x_elapsed_executing_ms", 200.to_spvalue()),
+            ("thing_secret", "hunter2".to_spvalue()),
+        ]);
+        log_state_diff("runner_e", &old, &delta);
+
+        assert!(flush(), "flush must confirm the queue reached the file");
+        assert_eq!(
+            dropped_count(),
+            dropped_before,
+            "an 8192-deep queue must not drop a dozen events"
+        );
+
+        let text = fs::read_to_string(dir.join("micro_sp.log")).unwrap();
+        let line = |needle: &str| {
+            text.lines()
+                .find(|l| l.contains(needle))
+                .unwrap_or_else(|| panic!("no line mentioning {needle} in:\n{text}"))
+                .to_string()
+        };
+
+        let with_note = line("op_with_note");
+        assert!(with_note.contains("| OP    |"), "{with_note}");
+        assert!(with_note.contains("Initial -> Executing  (Starting)"), "{with_note}");
+        let without_note = line("op_without_note");
+        assert!(
+            without_note.ends_with("Executing -> Completed"),
+            "an empty note leaves no empty parentheses behind: {without_note}"
+        );
+
+        assert!(line("sop_with_note").contains("Initial -> Executing  (Step 1/3)"));
+        assert!(line("sop_without_note").ends_with("Executing -> Completed"));
+
+        let transition = line("t_open ");
+        assert!(transition.contains("| TRANS |"), "{transition}");
+        assert!(
+            transition.contains("taken as 't_open_aB3'"),
+            "the per-firing id ties the transition to its variable changes: {transition}"
+        );
+
+        assert!(line("changed_var").contains("home -> at_b"));
+        assert!(
+            line("brand_new_var").contains("(new) -> 7"),
+            "a variable with no previous value is marked new, not given a fake old one"
+        );
+        assert!(
+            line("direct_long_var").contains("(new) -> 0123456789abcdefghij"),
+            "a direct log_variable call renders at the default limit, not the \
+             installed one: {}",
+            line("direct_long_var")
+        );
+
+        assert!(line("diff_pose").contains("home -> at_b"));
+        assert!(line("diff_added").contains("(new) -> true"));
+        assert!(
+            line("diff_long").contains("(new) -> 0123456789a…"),
+            "the diff path renders through the installed max_value_len: {}",
+            line("diff_long")
+        );
+        assert!(
+            !text.contains("op_x_elapsed_executing_ms") && !text.contains("thing_secret"),
+            "the installed skip list must filter the live diff:\n{text}"
+        );
+
+        // The writer thread outlives this test and keeps the file open, so the
+        // directory is left in place rather than pulled out from under it.
     }
 
     /// Restores the environment when it drops, so these tests cannot leak into

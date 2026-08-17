@@ -1,36 +1,57 @@
+//! [`Operation`]s: a [`Transition`] wrapped in a lifecycle.
+//!
+//! An operation is the unit the planner schedules and the runners execute. It
+//! goes from `initial` through `executing` to `completed`, with branches for
+//! failure, timeout, bypass and cancellation, and each branch carries its own
+//! transitions. The current state lives in the [`State`] under the operation's
+//! own name, which is why every method here takes a state and returns a new one.
+
 use serde::{Deserialize, Serialize};
 use std::fmt;
 
 use crate::*;
 
-/// Initial:   The operation planned and ready to be executed.
-/// Blocked:   Can't move to executing stet because the precondition guard is false.
-/// Executing: The precondition guard is enabled and the actions of the precondition are taken.
-/// Completed: The postcondition guard is enabled and the actions of the postcondition are taken.
-///            The operation is successfully completed.
-/// Timedout:  The operation was in the executing state for more time than its deadline allows.
-/// Failed:    The operations has failed due to an error.
+/// Where an [`Operation`] is in its lifecycle.
+///
+/// Stored in the [`State`] as a lowercase string under the operation's name;
+/// see [`OperationState::as_str`] and [`OperationState::from_str`].
 #[derive(Debug, PartialEq, Clone, Eq, Hash, Serialize, Deserialize)]
 pub enum OperationState {
+    /// Planned and ready to start, waiting for a precondition to hold.
     Initial,
+    /// Cannot start yet: no precondition guard is true.
     Disabled,
+    /// A precondition fired and its actions were taken; the operation is running.
     Executing,
+    /// A postcondition fired and its actions were taken; the operation succeeded.
     Completed,
+    /// A failed or timed-out operation was waved through instead of retried.
     Bypassed,
+    /// The operation stayed in `Executing` (or `Disabled`) past its deadline.
     Timedout,
+    /// A failure transition fired.
     Failed,
+    /// Failed or timed out with no retries left; unrecoverable without a replan.
     Fatal,
+    /// Stopped on request, e.g. a `stop` dashboard command.
     Cancelled,
+    /// Finished for good, with the reason it finished. This is the state a SOP
+    /// or plan runner waits for before moving on.
     Terminated(TerminationReason),
-    // Paused,
+    /// Not yet initialized, or a value that does not parse as any of the above.
     UNKNOWN,
 }
 
+/// Why an [`Operation`] reached [`OperationState::Terminated`].
 #[derive(Debug, PartialEq, Clone, Eq, Hash, Serialize, Deserialize)]
 pub enum TerminationReason {
+    /// Terminated after completing successfully.
     Completed,
+    /// Terminated after being bypassed.
     Bypassed,
+    /// Terminated after becoming fatal.
     Fatal,
+    /// Terminated after being cancelled.
     Cancelled,
 }
 
@@ -41,6 +62,10 @@ impl Default for OperationState {
 }
 
 impl OperationState {
+    /// Parse the lowercase name produced by [`OperationState::as_str`].
+    ///
+    /// Anything unrecognised becomes [`OperationState::UNKNOWN`] rather than an
+    /// error, so a garbled state value degrades instead of panicking.
     pub fn from_str(x: &str) -> OperationState {
         match x {
             "initial" => OperationState::Initial,
@@ -59,6 +84,10 @@ impl OperationState {
             _ => OperationState::UNKNOWN,
         }
     }
+    /// The value as written into the [`State`].
+    ///
+    /// Note [`OperationState::UNKNOWN`] becomes `SPValue::String(UNKNOWN)`, the
+    /// unknown *variant*, not the literal string `"UNKNOWN"`.
     pub fn to_spvalue(self) -> SPValue {
         self.to_string().to_spvalue()
     }
@@ -112,20 +141,44 @@ impl fmt::Display for OperationState {
     }
 }
 
+/// A [`Transition`] wrapped in a lifecycle: something the system can be asked
+/// to do, with preconditions, postconditions and failure handling.
+///
+/// The operation's live state is *not* the `state` field but the value stored
+/// in the [`State`] under `name`; the methods here read and write that. Build
+/// one with [`Operation::new`].
 #[derive(Debug, PartialEq, Clone, Eq, Hash, Serialize, Deserialize)]
 pub struct Operation {
+    /// Unique name; also the state variable holding this operation's state.
     pub name: String,
+    /// Initial state stamped into the model. The authoritative state at runtime
+    /// is the value stored under [`Operation::name`] in the [`State`].
     pub state: OperationState,
+    /// Deadline in `executing`, in milliseconds. `None` disables the timeout.
     pub timeout_executing_ms: Option<i64>,
+    /// Deadline in `disabled`, in milliseconds. `None` disables the timeout.
     pub timeout_disabled_ms: Option<i64>,
+    /// How many times a failed operation may be retried before going fatal.
     pub failure_retries: i64,
+    /// How many times a timed-out operation may be retried before going fatal.
     pub timeout_retries: i64,
+    /// Whether a failed or timed-out operation may be bypassed and the plan
+    /// carried on regardless.
     pub can_be_bypassed: bool,
+    /// Guards that start the operation; the first one that holds is taken.
     pub preconditions: Vec<Transition>,
+    /// Guards that complete the operation; the first one that holds is taken.
     pub postconditions: Vec<Transition>,
+    /// Guards that fail the operation while it is executing.
     pub failure_transitions: Vec<Transition>,
+    /// Guards checked before bypassing. If any are declared, one must hold or
+    /// the operation cannot be bypassed at all; if none are, bypass is
+    /// unconditional.
     pub bypass_transitions: Vec<Transition>,
+    /// Guards checked before timing out, with the same all-or-nothing rule as
+    /// [`Operation::bypass_transitions`].
     pub timeout_transitions: Vec<Transition>,
+    /// Extra assignments to make when the operation is cancelled.
     pub cancel_transitions: Vec<Transition>,
 }
 
@@ -150,6 +203,74 @@ impl Default for Operation {
 }
 
 impl Operation {
+    /// Define an operation.
+    ///
+    /// The state is set to [`OperationState::UNKNOWN`]; the runners call
+    /// [`Operation::initialize`] to put it in `initial`.
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - unique, and also the name of the state variable that will
+    ///   hold this operation's state.
+    /// * `timeout_executing_ms` - deadline while executing. `None` means
+    ///   [`MAX_ALLOWED_OPERATION_DURATION_MS`] (10 minutes), *not* "no timeout".
+    /// * `timeout_disabled_ms` - deadline while disabled, same `None` default.
+    /// * `fail_retries` - retries allowed after a failure; `None` means 0.
+    /// * `timeout_retries` - retries allowed after a timeout; `None` means 0.
+    /// * `can_be_bypassed` - whether a failed or timed-out operation may be
+    ///   waved through instead of turning fatal.
+    /// * `preconditions` / `postconditions` - guards that start and complete
+    ///   the operation; the first one that holds is taken.
+    /// * `failure_transitions`, `timeout_transitions`, `bypass_transitions`,
+    ///   `cancel_transitions` - the off-nominal branches. An empty
+    ///   `timeout_transitions` or `bypass_transitions` makes that branch
+    ///   unconditional; a non-empty one can *prevent* it.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use micro_sp::*;
+    ///
+    /// let mut state = State::new();
+    /// state.add_mut(
+    ///     SPAssignment::new(SPVariable::new("gripper", SPValueType::String), "open".to_spvalue()),
+    ///     "docs",
+    /// );
+    /// // Every operation needs a variable of its own to hold its state.
+    /// state.add_mut(
+    ///     SPAssignment::new(SPVariable::new("op_close", SPValueType::String), "initial".to_spvalue()),
+    ///     "docs",
+    /// );
+    ///
+    /// let close = Operation::new(
+    ///     "op_close",
+    ///     Some(5000), // give up after 5s of executing
+    ///     None,       // disabled timeout defaults to MAX_ALLOWED_OPERATION_DURATION_MS
+    ///     Some(2),    // two retries after a failure
+    ///     None,       // no retries after a timeout
+    ///     false,      // may not be bypassed
+    ///     vec![Transition::parse(
+    ///         "start", "var:gripper == open", "true",
+    ///         vec!["var:gripper <- closing"], Vec::<&str>::new(), &state,
+    ///     )],
+    ///     vec![Transition::parse(
+    ///         "finish", "var:gripper == closing", "true",
+    ///         vec!["var:gripper <- closed"], Vec::<&str>::new(), &state,
+    ///     )],
+    ///     vec![], // failure
+    ///     vec![], // timeout
+    ///     vec![], // bypass
+    ///     vec![], // cancel
+    /// );
+    ///
+    /// assert!(close.eval(&state, "docs"));
+    /// let state = close.start(&state, "docs");
+    /// assert_eq!(state.get_value("op_close", "docs"), Some("executing".to_spvalue()));
+    ///
+    /// assert!(close.can_be_completed(&state, "docs"));
+    /// let state = close.complete(&state, "docs");
+    /// assert_eq!(state.get_value("gripper", "docs"), Some("closed".to_spvalue()));
+    /// ```
     pub fn new(
         name: &str,
         timeout_executing_ms: Option<i64>,
@@ -217,6 +338,11 @@ impl Operation {
         new_state
     }
 
+    /// Whether the operation can start right now.
+    ///
+    /// True when it is `initial` or `disabled` and some precondition's full
+    /// running guard holds. `log_target` is only the `log` crate target used
+    /// for warnings.
     pub fn eval(&self, state: &State, log_target: &str) -> bool {
         if let Some(value) = state.get_value(&self.name, &log_target) {
             if value_is(&value, OperationState::Initial)
@@ -292,6 +418,12 @@ impl Operation {
         false
     }
 
+    /// Whether the operation has outstayed its deadline.
+    ///
+    /// Compares the `{name}_elapsed_executing_ms` / `{name}_elapsed_disabled_ms`
+    /// counters, maintained by the time runner, against
+    /// [`Operation::timeout_executing_ms`] and
+    /// [`Operation::timeout_disabled_ms`].
     pub fn can_be_timedout(&self, state: &State, log_target: &str) -> bool {
         if let Some(value) = state.get_value(&self.name, &log_target) {
             if value_is(&value, OperationState::Executing) {
@@ -356,6 +488,10 @@ impl Operation {
         }
     }
 
+    /// Move the operation to `cancelled`.
+    ///
+    /// Unguarded: it cancels from any state, including terminal ones. Check
+    /// [`Operation::can_be_cancelled`] first.
     pub fn cancel(&self, state: &State, log_target: &str) -> State {
         let assignment = state.get_assignment(&self.name, &log_target);
         let action = Action::new(
@@ -425,6 +561,9 @@ impl Operation {
         state.clone()
     }
 
+    /// Move a failed or timed-out operation to `fatal`, out of retries.
+    ///
+    /// From any other state this logs an error and returns the state unchanged.
     pub fn fatal(&self, state: &State, log_target: &str) -> State {
         let assignment = state.get_assignment(&self.name, &log_target);
         if value_is(&assignment.val, OperationState::Failed)
@@ -438,6 +577,11 @@ impl Operation {
         }
     }
 
+    /// Move a finished operation to `terminated_*`, the state runners wait for
+    /// before advancing a plan or SOP.
+    ///
+    /// Only [`TerminationReason::Completed`] is implemented, and only from
+    /// `completed`; every other reason currently returns the state unchanged.
     pub fn terminate(
         &self,
         state: &State,
@@ -464,6 +608,12 @@ impl Operation {
         }
     }
 
+    /// Move a failed or timed-out operation to `bypassed`, carrying on despite
+    /// the problem.
+    ///
+    /// With no [`Operation::bypass_transitions`] declared this is
+    /// unconditional; with them, one must have a guard that holds, so a bypass
+    /// transition can also *forbid* the bypass.
     pub fn bypass(&self, state: &State, log_target: &str) -> State {
         let assignment = state.get_assignment(&self.name, &log_target);
         if value_is(&assignment.val, OperationState::Failed)
@@ -538,12 +688,18 @@ impl Operation {
         }
     }
 
+    /// Force the operation to `initial` from any state.
+    ///
+    /// Unguarded on purpose: this is the recovery path for an operation found
+    /// in an unrecognised state.
     pub fn initialize(&self, state: &State, log_target: &str) -> State {
         let assignment = state.get_assignment(&self.name, &log_target);
         let action = Action::new(assignment.var, OperationState::Initial.to_spvalue().wrap());
         action.assign(&state, &log_target)
     }
 
+    /// Put a `completed` or `fatal` operation back to `initial` so it can run
+    /// again. From any other state the state is returned unchanged.
     pub fn reinitialize(&self, state: &State, log_target: &str) -> State {
         let assignment = state.get_assignment(&self.name, &log_target);
         if value_is(&assignment.val, OperationState::Completed)

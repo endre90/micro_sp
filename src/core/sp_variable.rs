@@ -1,69 +1,105 @@
+//! Named, typed variables.
+//!
+//! An [`SPVariable`] is a name plus an [`SPValueType`]; pairing one with a
+//! value of that type gives an [`SPAssignment`], and a set of assignments is a
+//! [`State`]. [`SPVariableFormal`] adds an explicit domain, used where the
+//! planner needs to enumerate a variable's possible values.
+
 use serde::{Deserialize, Serialize};
 
 use crate::*;
 use std::fmt;
 
-// A SPVariable is a named unit of data of type SPValueType that can be assigned a value.
+/// A named unit of data with a declared [`SPValueType`].
+///
+/// The name is the key the variable has in a [`State`] and in Redis, so it must
+/// be unique across the model.
+///
+/// ```
+/// use micro_sp::*;
+///
+/// let pos = SPVariable::new("pos", SPValueType::String);
+/// assert_eq!(pos.has_type(), SPValueType::String);
+///
+/// // Type-specific constructors say the same thing more briefly.
+/// assert_eq!(SPVariable::new_integer_var("count"), SPVariable::new("count", SPValueType::Int64));
+/// ```
 #[derive(Debug, PartialEq, Clone, Hash, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct SPVariable {
+    /// The variable's unique name, used as its state and Redis key.
     pub name: String,
+    /// The type of value the variable may hold.
     pub value_type: SPValueType,
 }
 
+/// An [`SPVariable`] with an explicit domain of allowed values.
 #[derive(Debug, PartialEq, Clone, Hash, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct SPVariableFormal {
+    /// The variable's unique name.
     pub name: String,
+    /// The type of value the variable may hold.
     pub value_type: SPValueType,
+    /// The values the variable is allowed to take.
     pub domain: Vec<SPValue>,
 }
 
 impl SPVariable {
+    /// Creates a variable with the given name and type.
     pub fn new(name: &str, value_type: SPValueType) -> SPVariable {
         SPVariable {
             name: name.to_owned(),
             value_type,
         }
     }
-    // Use the macro bv! instead.
+
+    /// Creates a [`SPValueType::Bool`] variable. The `bv!` macro is shorter.
     pub fn new_boolean_var(name: &str) -> SPVariable {
         SPVariable::new(name, SPValueType::Bool)
     }
-    // Use the macro iv! instead.
+
+    /// Creates a [`SPValueType::Int64`] variable. The `iv!` macro is shorter.
     pub fn new_integer_var(name: &str) -> SPVariable {
         SPVariable::new(name, SPValueType::Int64)
     }
-    // Use the macro fv! instead.
+
+    /// Creates a [`SPValueType::Float64`] variable. The `fv!` macro is shorter.
     pub fn new_float_var(name: &str) -> SPVariable {
         SPVariable::new(name, SPValueType::Float64)
     }
-    // Use the macro v! instead.
+
+    /// Creates a [`SPValueType::String`] variable. The `v!` macro is shorter.
     pub fn new_string_var(name: &str) -> SPVariable {
         SPVariable::new(name, SPValueType::String)
     }
-    // Use the macro av! instead.
+
+    /// Creates a [`SPValueType::Array`] variable. The `av!` macro is shorter.
     pub fn new_array_var(name: &str) -> SPVariable {
         SPVariable::new(name, SPValueType::Array)
     }
-    // Use the macro mv! instead.
+
+    /// Creates a [`SPValueType::Map`] variable. The `mv!` macro is shorter.
     pub fn new_map_var(name: &str) -> SPVariable {
         SPVariable::new(name, SPValueType::Map)
     }
-    // Use the macro tv! instead.
+
+    /// Creates a [`SPValueType::Time`] variable. The `tv!` macro is shorter.
     pub fn new_time_var(name: &str) -> SPVariable {
         SPVariable::new(name, SPValueType::Time)
     }
-    // Use the macro tfv! instead.
+
+    /// Creates a [`SPValueType::Transform`] variable. The `tfv!` macro is
+    /// shorter.
     pub fn new_transform_var(name: &str) -> SPVariable {
         SPVariable::new(name, SPValueType::Transform)
     }
 
-    // This is used to retrieve information about the type of the variable.
+    /// Returns the variable's declared [`SPValueType`].
     pub fn has_type(&self) -> SPValueType {
         self.value_type
     }
 }
 
-// Displaying the variable name in a user-friendly way.
+/// Renders the variable's name.
 impl fmt::Display for SPVariable {
     fn fmt(&self, fmtr: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(fmtr, "{}", self.name.to_owned())

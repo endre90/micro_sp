@@ -10,8 +10,8 @@ use crate::{SPConnection, State};
 ///
 /// Deliberately *not* `.atomic()`. The three separate commands it replaces had
 /// no atomicity either, so adding MULTI/EXEC here would change behaviour under
-/// the cover of a performance fix - see the atomicity note in `state.rs` for
-/// what actually needs doing there.
+/// the cover of a performance fix - see the caveat on [`crate::StateManager`]
+/// for what actually needs doing there.
 pub(super) async fn apply(con: &mut SPConnection, state: &State, deletes: &[&[String]]) {
     let items_to_set: Vec<(&str, String)> = state
         .state
@@ -154,6 +154,50 @@ mod tests {
             written, None,
             "a denied MSET must not appear to have written anything"
         );
+    }
+
+    /// A value the delta cannot serialise (serde refuses a `SystemTime` before
+    /// the UNIX epoch) is dropped from the pipeline with a log. The rest of the
+    /// tick must still be published: the other writes land and the deletes are
+    /// still applied.
+    #[tokio::test]
+    #[serial]
+    async fn an_unserializable_value_is_dropped_from_the_pipeline() {
+        let _container = Redis::default()
+            .with_mapped_port(6379, ContainerPort::Tcp(6379))
+            .start()
+            .await
+            .unwrap();
+
+        let mut con = ConnectionManager::new().await.get_connection().await;
+        let _: () = con.set("doomed", "x").await.unwrap();
+
+        let bad_val = SPValue::Time(TimeOrUnknown::Time(
+            std::time::SystemTime::UNIX_EPOCH - std::time::Duration::from_secs(1),
+        ));
+        assert!(
+            serde_json::to_string(&bad_val).is_err(),
+            "test premise: a pre-epoch SystemTime must be unserializable"
+        );
+
+        let mut state = delta();
+        state
+            .state
+            .insert("bad".to_string(), assign!(tv!("bad"), bad_val));
+
+        let doomed = vec!["doomed".to_string()];
+        StateManager::apply(&mut con, &state, &[&doomed]).await;
+
+        let written: Option<String> = con.get("written").await.unwrap();
+        assert_eq!(
+            written,
+            Some(serde_json::to_string(&7.to_spvalue()).unwrap()),
+            "the serialisable part of the delta must still be published"
+        );
+        let bad: Option<String> = con.get("bad").await.unwrap();
+        assert_eq!(bad, None, "the unserialisable key must be skipped");
+        let exists: bool = con.exists("doomed").await.unwrap();
+        assert!(!exists, "the deletes in the same tick must still be applied");
     }
 
     #[tokio::test]

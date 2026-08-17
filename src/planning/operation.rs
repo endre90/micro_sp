@@ -1,9 +1,18 @@
+//! Breadth-first planning over [`Operation`]s.
+//!
+//! This is the planner `planner_ticker` calls: it searches over operation
+//! guards and effects and returns the operation names to execute. The search
+//! keeps only parent links rather than a copy of the path per frontier node, and
+//! compares states by the model's own variables so unrelated state (transforms,
+//! interface variables) cannot make two equivalent states look different.
+
 use crate::*;
 use std::{
     collections::{HashSet, VecDeque},
     time::{Duration, Instant},
 };
 
+/// One expanded search node: the operation taken, and where it was taken from.
 struct PlanNode {
     parent: Option<usize>,
     operation: usize,
@@ -40,7 +49,16 @@ fn state_identity(state: &State, keys: &[String]) -> Vec<Option<SPValue>> {
         .collect()
 }
 
-/// Minimal Breadth First Search algorithm for sequencing operations.
+/// Breadth-first search for a sequence of operations that reaches `goal`.
+///
+/// Explores from `state`, applying any operation in `model` whose planning guard
+/// holds, and returns the shortest sequence of operation names to the first
+/// state satisfying `goal`. The search stops at `max_depth` steps or after
+/// `deadline_ms` milliseconds, reporting `found: false` either way; `log_target`
+/// is the log target used for guard evaluation diagnostics.
+///
+/// Pure - no Redis, no async - so it can be called from `spawn_blocking`, which
+/// is what `planner_ticker` does.
 pub fn bfs_operation_planner(
     state: &State,
     goal: &Predicate,
@@ -111,78 +129,6 @@ pub fn bfs_operation_planner(
     }
 }
 
-
-// pub fn bfs_operation_planner(
-//     state: State,
-//     goal: Predicate,
-//     model: Vec<Operation>,
-//     max_depth: usize,
-//     log_target: &str
-// ) -> PlanningResult {
-//     let now = Instant::now();
-//     let mut visited: HashSet<State> = HashSet::new();
-//     let mut stack: Vec<(State, Vec<String>)> = vec![(state, vec![])];
-//     loop {
-//         match stack.len() {
-//             0 => {
-//                 break PlanningResult {
-//                     found: false,
-//                     ..Default::default()
-//                 }
-//             }
-//             _ => {
-//                 let (s, path) = match stack.pop() {
-//                     Some(popped) => popped,
-//                     None => {
-//                         log::error!(target: &&format!("operation_planner"), 
-//                             "Failed to pop value from stack? This shouldn't happen.");
-//                         log::error!(target: &&format!("operation_planner"), 
-//                             "Breaking the search with empty planning result.");
-//                         break PlanningResult {
-//                             found: false,
-//                             ..Default::default()
-//                         };
-//                     }
-//                 };
-//                 match goal.clone().eval(&s, &log_target) {
-//                     true => {
-//                         break PlanningResult {
-//                             found: true,
-//                             length: path.len(),
-//                             plan: path,
-//                             time: now.elapsed(),
-//                         }
-//                     }
-//                     false => match path.len() > max_depth {
-//                         true => {
-//                             break PlanningResult {
-//                                 found: false,
-//                                 ..Default::default()
-//                             }
-//                         }
-//                         false => match visited.contains(&s) {
-//                             true => continue,
-//                             false => {
-//                                 visited.insert(s.clone());
-//                                 model
-//                                     .iter()
-//                                     .for_each(|o| match o.clone().eval_planning(&s, &log_target) {
-//                                         false => (),
-//                                         true => {
-//                                             let next_s = o.clone().take_planning(&s, &log_target);
-//                                             let mut next_p = path.clone();
-//                                             next_p.push(o.name.clone());
-//                                             stack.insert(0, (next_s, next_p));
-//                                         }
-//                                     })
-//                             }
-//                         },
-//                     },
-//                 }
-//             }
-//         }
-//     }
-// }
 
 #[cfg(test)]
 mod tests {

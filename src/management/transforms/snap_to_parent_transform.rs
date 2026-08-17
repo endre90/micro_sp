@@ -125,4 +125,45 @@ mod tests_for_reparent_transform {
         let result = snap_to_parent_transform(&mut con, "parent1", "non_existent_child").await;
         assert!(result.is_err());
     }
+
+    /// Snapping a frame onto one of its own descendants would close a loop in
+    /// the tree and make every later lookup walk forever. The cycle guard must
+    /// refuse it and leave the frame's stored parent untouched.
+    #[tokio::test]
+    #[serial]
+    async fn snapping_onto_a_descendant_is_refused_as_a_cycle() {
+        let _container = Redis::default()
+            .with_mapped_port(6379, ContainerPort::Tcp(6379))
+            .start()
+            .await
+            .unwrap();
+
+        let mut con = ConnectionManager::new().await.get_connection().await;
+
+        let parent = create_dummy_transform("world", "arm");
+        let child = create_dummy_transform("arm", "gripper");
+        for tf in [&parent, &child] {
+            let _: () = con
+                .set(
+                    tf_key(&tf.child_frame_id),
+                    serde_json::to_string(&tf.to_spvalue()).unwrap(),
+                )
+                .await
+                .unwrap();
+        }
+
+        let result = snap_to_parent_transform(&mut con, "gripper", "arm").await;
+        assert!(
+            result.is_err(),
+            "snapping a frame onto its own child must be refused"
+        );
+
+        let stored = TransformsManager::get_transform(&mut con, "arm")
+            .await
+            .unwrap();
+        assert_eq!(
+            stored.parent_frame_id, "world",
+            "the refused snap must not have changed the parent"
+        );
+    }
 }

@@ -129,4 +129,31 @@ mod tests_for_get_transform {
             err_msg
         );
     }
+
+    /// A `tf:` key holding a different Redis type makes the `GET` itself fail
+    /// with a real `WRONGTYPE` error. That must come back as an `Err` - never
+    /// as an accidental `Ok` - and must not disturb the stored key.
+    #[tokio::test]
+    #[serial]
+    async fn a_failed_get_is_reported_as_an_error() {
+        let _container = Redis::default()
+            .with_mapped_port(6379, ContainerPort::Tcp(6379))
+            .start()
+            .await
+            .unwrap();
+
+        let mut con = ConnectionManager::new().await.get_connection().await;
+
+        let frame_id = "list_shaped_frame";
+        let _: () = con.lpush(tf_key(frame_id), "not_a_string").await.unwrap();
+
+        let result = get_transform(&mut con, frame_id).await;
+        assert!(
+            result.is_err(),
+            "a WRONGTYPE GET must not produce a transform"
+        );
+
+        let still_a_list: usize = con.llen(tf_key(frame_id)).await.unwrap();
+        assert_eq!(still_a_list, 1, "the key must be left as it was");
+    }
 }

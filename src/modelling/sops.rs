@@ -1,24 +1,76 @@
+//! SOPs (Standard Operating Procedures): [`Operation`]s arranged into a tree.
+//!
+//! Where the planner works out a sequence for itself, a SOP is a sequence
+//! someone wrote down: a tree of [`SOP`] nodes combining operations in series,
+//! in parallel, or as alternatives. A [`SOPStruct`] gives one such tree a name
+//! so a runner can be asked to execute it.
+
 use crate::{Operation, OperationState, SOPState, State, TerminationReason};
 use serde::{Deserialize, Serialize};
 use termtree::Tree;
 
-// I look at SOPS as function blocks with a rigid structure, sort of as a high level operation
-// Maybe, just maybe, we can also have a "Planned" variant that should use a planner within a certain domain to get a sequence???
+/// One node of a SOP tree - a high-level operation with a rigid structure,
+/// rather than something the planner has to derive.
 #[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
 pub enum SOP {
+    /// A leaf: a single [`Operation`].
     Operation(Box<Operation>),
+    /// Children run one after another, in order.
     Sequence(Vec<SOP>),
+    /// Children run concurrently; the node finishes when all of them have.
     Parallel(Vec<SOP>),
+    /// Branches offered as alternatives; the node finishes when any one has.
     Alternative(Vec<SOP>),
 }
 
+/// A named SOP tree, as stored in a [`Model`](crate::Model) and executed by the
+/// SOP runner.
+///
+/// # Example
+///
+/// ```
+/// use micro_sp::*;
+///
+/// let procedure = SOPStruct {
+///     id: "pick_and_place".to_string(),
+///     sop: SOP::Sequence(vec![
+///         SOP::Operation(Box::new(Operation {
+///             name: "op_pick".to_string(),
+///             ..Default::default()
+///         })),
+///         SOP::Operation(Box::new(Operation {
+///             name: "op_place".to_string(),
+///             ..Default::default()
+///         })),
+///     ]),
+/// };
+///
+/// // The tree's state is derived from its operations' states.
+/// let mut state = State::new();
+/// for name in ["op_pick", "op_place"] {
+///     state.add_mut(
+///         SPAssignment::new(
+///             SPVariable::new(name, SPValueType::String),
+///             "initial".to_spvalue(),
+///         ),
+///         "docs",
+///     );
+/// }
+/// assert_eq!(procedure.sop.get_state(&state, "docs"), SOPState::Initial);
+/// ```
 #[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
 pub struct SOPStruct {
+    /// Unique name of the procedure, used to refer to it at runtime.
     pub id: String,
+    /// The root of the tree.
     pub sop: SOP,
 }
 
 impl SOP {
+    /// Every state variable read or written anywhere in this subtree.
+    ///
+    /// Feeds the runners' key sets; a variable missing here is one the runner
+    /// never reads, and reading a missing variable panics.
     pub fn get_all_var_keys(&self) -> Vec<String> {
         match self {
             SOP::Operation(op) => op.get_all_var_keys(),
@@ -28,6 +80,12 @@ impl SOP {
         }
     }
 
+    /// The names of the operations in this subtree.
+    ///
+    /// Only a bare [`SOP::Operation`] reports a name: the branch arms recurse
+    /// but discard the result, so any tree with a branch reports nothing. Use
+    /// [`get_all_operations_from_sop`](crate::get_all_operations_from_sop)
+    /// instead, which traverses correctly.
     pub fn get_all_operation_names(&self) -> Vec<String> {
         let mut operations: Vec<String> = vec![];
         match self {
@@ -41,6 +99,13 @@ impl SOP {
         operations
     }
 
+    /// Derive this node's [`SOPState`] from the states of the operations below
+    /// it.
+    ///
+    /// `Fatal` and `Cancelled` in any child win over everything else.
+    /// Otherwise `Sequence` and `Parallel` complete only when every child has,
+    /// while `Alternative` completes as soon as one has. An empty branch counts
+    /// as completed.
     pub fn get_state(&self, state: &State, log_target: &str) -> SOPState {
         match self {
             SOP::Operation(op) => {
@@ -163,27 +228,22 @@ impl SOP {
     }
 }
 
-/// Creates a visual representation of a SOP tree and prints it to the console.
+/// Render a SOP tree as indented text, for logging or debugging.
 ///
-/// This is the main entry point for visualizing a SOP.
-///
-/// # Arguments
-/// * `root_sop`: The root of the SOP structure you want to visualize.
-/// * `title`: A title to print above the tree.
+/// Each line is indented by seven spaces so the tree lines up under a log
+/// prefix; blank lines are dropped.
 pub fn visualize_sop(root_sop: &SOP) -> String {
     let tree = build_sop_tree(root_sop);
     let mut output = String::new();
 
     for line in tree.to_string().lines() {
-        // Instead of printing, we format the string and append it to our variable
-        // using the same 7-space indentation you had before.
-        use std::fmt::Write; // Allows using write! macro on String
+        use std::fmt::Write;
         if !line.is_empty() {
             let _ = writeln!(output, "       {}", line);
         }
     }
 
-    output // Return the accumulated string
+    output
 }
 
 fn build_sop_tree(sop: &SOP) -> Tree<String> {
@@ -225,12 +285,10 @@ fn build_sop_tree(sop: &SOP) -> Tree<String> {
 
 #[cfg(test)]
 mod tests {
-    use super::*; // Import everything from the parent module
-    // use nanoid::nanoid;
+    use super::*;
 
     #[test]
     fn test_visualize_sop() {
-        // 1. Create a complex SOP structure for demonstration.
         let example_sop = SOP::Sequence(vec![
             SOP::Operation(Box::new(Operation {
                 name: "StartGripper".to_string(),
@@ -276,8 +334,6 @@ mod tests {
             })),
         ]);
 
-        // 2. Call the visualization function.
-        //    When you run `cargo test -- --nocapture`, this tree will be printed.
         visualize_sop(&example_sop);
     }
 }

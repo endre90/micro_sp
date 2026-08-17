@@ -1,3 +1,11 @@
+//! The planners: breadth-first search over a model.
+//!
+//! Given a [`State`](crate::State) and a goal [`Predicate`](crate::Predicate),
+//! these find the shortest sequence that reaches the goal.
+//! [`operation`] plans over [`Operation`](crate::Operation)s and is what
+//! `planner_ticker` calls; [`transition`] plans over bare
+//! [`Transition`](crate::Transition)s. Both are pure and need no Redis.
+
 pub mod operation;
 pub mod transition;
 
@@ -155,7 +163,6 @@ mod tests {
                 "start_moving_to_b",
                 "var:ur_action_trigger == false && var:ur_action_state == initial && var:ur_current_pose != b",
                 "true",
-                // 0,
                 vec!(
                     "var:ur_command <- movej",
                     "var:ur_action_trigger <- true",
@@ -169,7 +176,6 @@ mod tests {
                 "complete_moving_to_b",
                 "var:ur_action_state == done",
                 "true",
-                // 0,
                 vec!("var:ur_action_trigger <- false", "var:ur_current_pose <- b"),
                 Vec::<&str>::new(),
                 &state
@@ -191,7 +197,6 @@ mod tests {
                 "start_moving_to_c",
                 "var:ur_action_trigger == false && var:ur_action_state == initial && var:ur_current_pose == b",
                 "true",
-                // 0,
                 vec!(
                     "var:ur_command <- movej",
                     "var:ur_action_trigger <- true",
@@ -201,12 +206,10 @@ mod tests {
                 Vec::<&str>::new(),
                 &state
             )],
-            // None,
             vec![t!(
                 "complete_moving_to_c",
                 "var:ur_action_state == done",
                 "true",
-                // 0,
                 vec!("var:ur_action_trigger <- false", "var:ur_current_pose <- c"),
                 Vec::<&str>::new(),
                 &state
@@ -228,7 +231,6 @@ mod tests {
                 "start_moving_to_d",
                 "var:ur_action_trigger == false && var:ur_action_state == initial && var:ur_current_pose == c",
                 "true",
-                // 0,
                 vec!(
                     "var:ur_command <- movej",
                     "var:ur_action_trigger <- true",
@@ -238,12 +240,10 @@ mod tests {
                 Vec::<&str>::new(),
                 &state
             )],
-            // None,
             vec![t!(
                 "complete_moving_to_d",
                 "var:ur_action_state == done",
                 "true",
-                // 0,
                 vec!("var:ur_action_trigger <- false", "var:ur_current_pose <- d"),
                 Vec::<&str>::new(),
                 &state

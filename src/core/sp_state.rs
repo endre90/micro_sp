@@ -1,3 +1,14 @@
+//! The system state: a name-keyed map of [`SPAssignment`]s.
+//!
+//! Everything the runtime reasons about lives in a [`State`] - guards are
+//! evaluated against it, actions produce a new one, and [`StateManager`] mirrors
+//! it to and from Redis. Every method takes a `log_target`, the `log` crate
+//! target that misuse is reported under (typically the runner's name).
+//!
+//! The typed `get_*` accessors share one contract: a value of the wrong type is
+//! logged and replaced by `UNKNOWN` or a default, but a variable that is *not in
+//! the state at all* panics - see [`State::get_value`].
+
 use crate::*;
 use serde::{Deserialize, Serialize};
 use std::hash::{Hash, Hasher};
@@ -5,8 +16,31 @@ use std::time::SystemTime;
 use std::{collections::HashMap, fmt};
 
 /// Represents the current state of the system.
+///
+/// Maps a variable name to its [`SPAssignment`] (the [`SPVariable`] and its
+/// current [`SPValue`]). Most methods come in an owned form returning a new
+/// `State` and a `_mut` form modifying in place.
+///
+/// ```
+/// use micro_sp::*;
+///
+/// let mut state = State::new();
+/// state.add_mut(
+///     SPAssignment::new(SPVariable::new("pos", SPValueType::String), "a".to_spvalue()),
+///     "docs",
+/// );
+///
+/// assert!(state.contains("pos"));
+/// assert_eq!(state.get_value("pos", "docs"), Some("a".to_spvalue()));
+///
+/// // The owned form leaves the original alone.
+/// let moved = state.update("pos", "b".to_spvalue());
+/// assert_eq!(moved.get_value("pos", "docs"), Some("b".to_spvalue()));
+/// assert_eq!(state.get_value("pos", "docs"), Some("a".to_spvalue()));
+/// ```
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub struct State {
+    /// The assignments, keyed by variable name.
     pub state: HashMap<String, SPAssignment>,
 }
 
@@ -27,11 +61,13 @@ impl Hash for State {
 }
 
 impl State {
+    /// An empty state.
     pub fn new() -> State {
         let state = HashMap::new();
         State { state }
     }
 
+    /// Build a state from variable/value pairs. Later duplicates of a name win.
     pub fn from_vec(vec: &Vec<(SPVariable, SPValue)>) -> State {
         let mut state = HashMap::new();
         vec.iter().for_each(|(var, val)| {
@@ -46,8 +82,9 @@ impl State {
         State { state }
     }
 
-    /// Get the updated values between two states.
-    /// pub fn get_changed_values(&self, other_state: &State) -> HashMap<SPVariable, (SPValue, SPValue)> {
+    /// The values that differ between two states, as `var -> (mine, theirs)`.
+    ///
+    /// Only variables present in both states are considered.
     pub fn get_diff_values(&self, other_state: &State) -> HashMap<SPVariable, (SPValue, SPValue)> {
         let mut changed_values = HashMap::new();
 
@@ -65,6 +102,7 @@ impl State {
         changed_values
     }
 
+    /// The variables that exist in one of the two states but not the other.
     pub fn get_diff_variables(&self, other_state: &State) -> Vec<SPVariable> {
         let mut uncommon_vars = Vec::new();
 
@@ -83,7 +121,27 @@ impl State {
         uncommon_vars
     }
 
-    // Make a new partial state that only consists of updates.
+    /// A partial state holding only the variables `new_state` changed.
+    ///
+    /// Variables `self` does not know about are ignored, which is what the
+    /// runners want when writing back a diff of keys they already own. Use
+    /// [`State::get_diff_partial_state_and_add_missing`] to keep them.
+    ///
+    /// ```
+    /// use micro_sp::*;
+    ///
+    /// let a = SPVariable::new("a", SPValueType::Int64);
+    /// let b = SPVariable::new("b", SPValueType::Int64);
+    /// let old = State::from_vec(&vec![(a.clone(), 1.to_spvalue())]);
+    /// let new = State::from_vec(&vec![
+    ///     (a, 2.to_spvalue()), // changed
+    ///     (b, 3.to_spvalue()), // unknown to `old`, dropped
+    /// ]);
+    ///
+    /// let diff = old.get_diff_partial_state(&new);
+    /// assert_eq!(diff.state.len(), 1);
+    /// assert_eq!(diff.get_value("a", "docs"), Some(2.to_spvalue()));
+    /// ```
     pub fn get_diff_partial_state(&self, new_state: &State) -> State {
         let mut updated_assignments = HashMap::new();
         for (key, new_assignment) in &new_state.state {
@@ -99,9 +157,25 @@ impl State {
         }
     }
 
-    // Make a new partial state that only consists of updates.
+    /// Like [`State::get_diff_partial_state`], but variables that `self` does
+    /// not have at all are treated as changes and included.
+    ///
+    /// ```
+    /// use micro_sp::*;
+    ///
+    /// let a = SPVariable::new("a", SPValueType::Int64);
+    /// let b = SPVariable::new("b", SPValueType::Int64);
+    /// let old = State::from_vec(&vec![(a.clone(), 1.to_spvalue())]);
+    /// let new = State::from_vec(&vec![
+    ///     (a, 1.to_spvalue()), // unchanged, dropped
+    ///     (b, 3.to_spvalue()), // new, kept
+    /// ]);
+    ///
+    /// let diff = old.get_diff_partial_state_and_add_missing(&new);
+    /// assert_eq!(diff.state.len(), 1);
+    /// assert_eq!(diff.get_value("b", "docs"), Some(3.to_spvalue()));
+    /// ```
     pub fn get_diff_partial_state_and_add_missing(&self, new_state: &State) -> State {
-        // let mut updated_assignments = HashMap::new();
         let mut updated_state = State::new();
         for (key, new_assignment) in &new_state.state {
             if let Some(old_assignment) = self.state.get(key) {
@@ -165,19 +239,41 @@ impl State {
         }
     }
 
+    /// A copy of this state with `assignment` inserted.
+    ///
+    /// Logs and returns an unchanged copy if the variable already exists.
     pub fn add(&self, assignment: SPAssignment, log_target: &str) -> State {
         let mut new_state = self.clone();
         new_state.add_mut(assignment, log_target);
         new_state
     }
 
+    /// A copy of this state without `var`.
+    ///
+    /// Logs and returns an unchanged copy if it was not there.
     pub fn remove(&self, var: &str, log_target: &str) -> State {
         let mut new_state = self.clone();
         new_state.remove_mut(var, log_target);
         new_state
     }
 
-    // Panics if the variable is not in the state. Should remain panicking.
+    /// The value of a variable, always as `Some`.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the variable is not in the state - deliberately, since a
+    /// missing key means the model and the state disagree. Guard with
+    /// [`State::contains`] if the variable may be absent.
+    ///
+    /// ```
+    /// use micro_sp::*;
+    ///
+    /// let state = State::from_vec(&vec![
+    ///     (SPVariable::new("height", SPValueType::Int64), 185.to_spvalue()),
+    /// ]);
+    /// assert_eq!(state.get_value("height", "docs"), Some(185.to_spvalue()));
+    /// assert!(!state.contains("width")); // reading "width" would panic
+    /// ```
     pub fn get_value(&self, name: &str, log_target: &str) -> Option<SPValue> {
         match self.state.get(name) {
             None => {
@@ -188,6 +284,7 @@ impl State {
         }
     }
 
+    /// The variable as a [`BoolOrUnknown`]; `UNKNOWN` if it holds another type.
     pub fn get_bool_or_unknown(&self, name: &str, log_target: &str) -> BoolOrUnknown {
         match self.get_value(name, &log_target) {
             Some(value) => match value {
@@ -201,6 +298,7 @@ impl State {
         }
     }
 
+    /// The variable as a `bool`, defaulting to `false` when it is not a bool.
     pub fn get_bool_or_default_to_false(&self, name: &str, log_target: &str) -> bool {
         match self.get_bool_or_unknown(name, &log_target) {
             BoolOrUnknown::Bool(b) => b,
@@ -208,6 +306,7 @@ impl State {
         }
     }
 
+    /// The variable as a `bool`, falling back to `value` when it is not a bool.
     pub fn get_bool_or_value(&self, name: &str, value: bool, log_target: &str) -> bool {
         match self.get_bool_or_unknown(name, &log_target) {
             BoolOrUnknown::Bool(b) => b,
@@ -215,6 +314,7 @@ impl State {
         }
     }
 
+    /// The variable as an [`IntOrUnknown`]; `UNKNOWN` if it holds another type.
     pub fn get_int_or_unknown(&self, name: &str, log_target: &str) -> IntOrUnknown {
         match self.get_value(name, &log_target) {
             Some(value) => match value {
@@ -228,6 +328,22 @@ impl State {
         }
     }
 
+    /// The variable as an `i64`, defaulting to `0` when it is not an int.
+    ///
+    /// ```
+    /// use micro_sp::*;
+    ///
+    /// let state = State::from_vec(&vec![
+    ///     (SPVariable::new("n", SPValueType::Int64), 7.to_spvalue()),
+    ///     (SPVariable::new("s", SPValueType::String), "text".to_spvalue()),
+    /// ]);
+    ///
+    /// assert_eq!(state.get_int_or_default_to_zero("n", "docs"), 7);
+    /// // Wrong type: logged, then the default.
+    /// assert_eq!(state.get_int_or_default_to_zero("s", "docs"), 0);
+    /// // Or supply the fallback yourself.
+    /// assert_eq!(state.get_int_or_value("s", 42, "docs"), 42);
+    /// ```
     pub fn get_int_or_default_to_zero(&self, name: &str, log_target: &str) -> i64 {
         match self.get_int_or_unknown(name, &log_target) {
             IntOrUnknown::Int64(i) => i,
@@ -235,6 +351,7 @@ impl State {
         }
     }
 
+    /// The variable as an `i64`, falling back to `value` when it is not an int.
     pub fn get_int_or_value(&self, name: &str, value: i64, log_target: &str) -> i64 {
         match self.get_int_or_unknown(name, &log_target) {
             IntOrUnknown::Int64(i) => i,
@@ -242,6 +359,7 @@ impl State {
         }
     }
 
+    /// The variable as a [`FloatOrUnknown`]; `UNKNOWN` if it holds another type.
     pub fn get_float_or_unknown(&self, name: &str, log_target: &str) -> FloatOrUnknown {
         match self.get_value(name, &log_target) {
             Some(value) => match value {
@@ -255,6 +373,8 @@ impl State {
         }
     }
 
+    /// The variable as a [`TransformOrUnknown`]; `UNKNOWN` if it holds another
+    /// type.
     pub fn get_transform_or_unknown(&self, name: &str, log_target: &str) -> TransformOrUnknown {
         match self.get_value(name, &log_target) {
             Some(value) => match value {
@@ -268,6 +388,8 @@ impl State {
         }
     }
 
+    /// The variable as an [`SPTransformStamped`], defaulting to an inactive
+    /// `world -> failed_lookup` transform when it is not a transform.
     pub fn get_transform_or_default_to_default(
         &self,
         name: &str,
@@ -287,6 +409,7 @@ impl State {
         }
     }
 
+    /// The variable as an `f64`, defaulting to `0.0` when it is not a float.
     pub fn get_float_or_default_to_zero(&self, name: &str, log_target: &str) -> f64 {
         match self.get_float_or_unknown(name, &log_target) {
             FloatOrUnknown::Float64(f) => f.into_inner(),
@@ -294,6 +417,7 @@ impl State {
         }
     }
 
+    /// The variable as an `f64`, falling back to `value` when it is not a float.
     pub fn get_float_or_value(&self, name: &str, value: f64, log_target: &str) -> f64 {
         match self.get_float_or_unknown(name, &log_target) {
             FloatOrUnknown::Float64(f) => f.into_inner(),
@@ -301,6 +425,7 @@ impl State {
         }
     }
 
+    /// The variable as a [`StringOrUnknown`]; `UNKNOWN` if it holds another type.
     pub fn get_string_or_unknown(&self, name: &str, log_target: &str) -> StringOrUnknown {
         match self.get_value(name, &log_target) {
             Some(value) => match value {
@@ -314,6 +439,8 @@ impl State {
         }
     }
 
+    /// The variable as a `String`, defaulting to the literal `"UNKNOWN"` when it
+    /// is not a string.
     pub fn get_string_or_default_to_unknown(&self, name: &str, log_target: &str) -> String {
         match self.get_string_or_unknown(name, &log_target) {
             StringOrUnknown::String(s) => s,
@@ -321,6 +448,8 @@ impl State {
         }
     }
 
+    /// The variable as a `String`, falling back to `value` when it is not a
+    /// string.
     pub fn get_string_or_value(&self, name: &str, value: String, log_target: &str) -> String {
         match self.get_string_or_unknown(name, &log_target) {
             StringOrUnknown::String(s) => s,
@@ -328,6 +457,7 @@ impl State {
         }
     }
 
+    /// The variable as an [`ArrayOrUnknown`]; `UNKNOWN` if it holds another type.
     pub fn get_array_or_unknown(&self, name: &str, log_target: &str) -> ArrayOrUnknown {
         match self.get_value(name, &log_target) {
             Some(value) => match value {
@@ -341,6 +471,8 @@ impl State {
         }
     }
 
+    /// The variable's elements, defaulting to an empty vector when it is not an
+    /// array.
     pub fn get_array_or_default_to_empty(&self, name: &str, log_target: &str) -> Vec<SPValue> {
         match self.get_array_or_unknown(name, &log_target) {
             ArrayOrUnknown::Array(a) => a,
@@ -350,6 +482,7 @@ impl State {
         }
     }
 
+    /// The variable's elements, falling back to `value` when it is not an array.
     pub fn get_array_or_value(
         &self,
         name: &str,
@@ -362,6 +495,7 @@ impl State {
         }
     }
 
+    /// The variable as a [`MapOrUnknown`]; `UNKNOWN` if it holds another type.
     pub fn get_map_or_unknown(&self, name: &str, log_target: &str) -> MapOrUnknown {
         match self.get_value(name, &log_target) {
             Some(value) => match value {
@@ -375,6 +509,8 @@ impl State {
         }
     }
 
+    /// The variable's key/value pairs, defaulting to an empty vector when it is
+    /// not a map.
     pub fn get_map_or_default_to_empty(
         &self,
         name: &str,
@@ -388,6 +524,8 @@ impl State {
         }
     }
 
+    /// The variable's key/value pairs, falling back to `value` when it is not a
+    /// map.
     pub fn get_map_or_value(
         &self,
         name: &str,
@@ -400,6 +538,7 @@ impl State {
         }
     }
 
+    /// The variable as a [`TimeOrUnknown`]; `UNKNOWN` if it holds another type.
     pub fn get_time_or_unknown(&self, name: &str, log_target: &str) -> TimeOrUnknown {
         match self.get_value(name, &log_target) {
             Some(value) => match value {
@@ -413,6 +552,11 @@ impl State {
         }
     }
 
+    /// The full [`SPAssignment`] - variable and value - for `name`.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the variable is not in the state, like [`State::get_value`].
     pub fn get_assignment(&self, name: &str, log_target: &str) -> SPAssignment {
         match self.state.get(name) {
             None => {
@@ -423,6 +567,7 @@ impl State {
         }
     }
 
+    /// Every [`SPVariable`] in the state, in unspecified order.
     pub fn get_all_vars(&self) -> Vec<SPVariable> {
         self.state
             .iter()
@@ -430,22 +575,35 @@ impl State {
             .collect()
     }
 
+    /// Whether a variable of this name is in the state.
     pub fn contains(&self, name: &str) -> bool {
         self.state.contains_key(name)
     }
 
+    /// A copy of this state with `name` set to `val`.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the variable is not in the state; `update` replaces, it does
+    /// not declare. Use [`State::add`] for that.
     pub fn update(&self, name: &str, val: SPValue) -> State {
         let mut new_state = self.clone();
         new_state.update_mut(name, val);
         new_state
     }
 
+    /// A copy of this state merged with `other`; see [`State::extend_mut`].
     pub fn extend(&self, other: State, overwrite_existing: bool) -> State {
         let mut new_state = self.clone();
         new_state.extend_mut(other, overwrite_existing);
         new_state
     }
 
+    /// The goal predicate a runner named `name` currently has, read from
+    /// `{name}_current_goal_predicate`.
+    ///
+    /// A missing, mistyped or unparseable goal yields [`Predicate::TRUE`], i.e.
+    /// "nothing to do" rather than an error.
     pub fn extract_goal(&self, name: &str) -> Predicate {
         match self.state.get(&format!("{}_current_goal_predicate", name)) {
             Some(g_spvalue) => match &g_spvalue.val {

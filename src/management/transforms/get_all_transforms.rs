@@ -183,4 +183,42 @@ mod tests {
         assert_eq!(transforms.get("child1"), Some(&tf1));
         assert!(transforms.get("child2_bad").is_none());
     }
+
+    /// A `tf:` key holding a perfectly valid `SPValue` that simply is not a
+    /// transform (state and transforms share one keyspace, so this is a name
+    /// collision rather than corruption) is warned about and skipped, without
+    /// costing the real frames scanned alongside it.
+    #[tokio::test]
+    #[serial]
+    async fn a_tf_key_holding_a_non_transform_spvalue_is_skipped() {
+        let _container = Redis::default()
+            .with_mapped_port(6379, ContainerPort::Tcp(6379))
+            .start()
+            .await
+            .unwrap();
+
+        let mut con = ConnectionManager::new().await.get_connection().await;
+
+        let tf1 = create_dummy_transform("child1");
+        let _: () = con
+            .mset(&[
+                (
+                    format!("{}{}", TF_PREFIX, "child1"),
+                    serde_json::to_string(&tf1.to_spvalue()).unwrap(),
+                ),
+                (
+                    format!("{}{}", TF_PREFIX, "not_a_transform"),
+                    // Valid SPValue JSON, wrong variant.
+                    serde_json::to_string(&42.to_spvalue()).unwrap(),
+                ),
+            ])
+            .await
+            .unwrap();
+
+        let transforms = get_all_transforms(&mut con).await.unwrap();
+
+        assert_eq!(transforms.len(), 1, "only the real frame may be returned");
+        assert_eq!(transforms.get("child1"), Some(&tf1));
+        assert!(transforms.get("not_a_transform").is_none());
+    }
 }

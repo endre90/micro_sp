@@ -1,14 +1,24 @@
+//! Console logging setup.
+//!
+//! One function, [`initialize_env_logger`], which installs the `env_logger`
+//! format the runners' `log::info!`/`log::error!` calls are printed with. For
+//! the on-disk record of what the system did, see
+//! [`activity_log`](crate::activity_log).
+
 use log::Level;
 
+/// Install the crate's `env_logger` format as the global logger.
+///
+/// Idempotent: every runner calls it on startup and later calls are no-ops.
+/// `RUST_LOG` selects the level (default `info`), and setting `LOG_SHOW_TIME` to
+/// `true` prepends a local timestamp to each line.
 pub fn initialize_env_logger() {
     let env = env_logger::Env::default().filter_or("RUST_LOG", "info");
     let _ = env_logger::Builder::from_env(env)
         .format(|buf, record| {
             use chrono::Local;
-            // use env_logger::fmt::style::{AnsiColor, Style};
             use std::io::Write;
 
-            // let subtle = Style::new().fg_color(Some(AnsiColor::BrightBlack.into()));
             let level_style = buf.default_level_style(record.level());
 
             // Check environment variable to see if time should be included

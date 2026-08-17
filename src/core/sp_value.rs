@@ -1,101 +1,164 @@
+//! The value type of the whole crate.
+//!
+//! [`SPValue`] is what a variable in a [`State`](crate::State) holds. Every type it can take
+//! is *also* allowed to be `UNKNOWN`, which is what a freshly started system
+//! reads before anything has measured it. [`ToSPValue`] converts ordinary Rust
+//! values into `SPValue`s, and [`SPValueType`] is the type tag an
+//! [`SPVariable`](crate::SPVariable) declares.
+
 use ordered_float::OrderedFloat;
 use serde::{Deserialize, Serialize};
 use std::{fmt, time::SystemTime};
 
-// Represents a value of a specific type.
+/// A value held by a variable in a [`State`](crate::State).
+///
+/// Each variant wraps an `...OrUnknown` enum, so any value can also be
+/// `UNKNOWN` - "this exists, but nothing has told us what it is yet".
+///
+/// ```
+/// use micro_sp::*;
+///
+/// let v = 42.to_spvalue();
+/// assert_eq!(v.has_type(), SPValueType::Int64);
+/// assert_eq!(v.to_string(), "42");
+///
+/// // Every type has an UNKNOWN inhabitant, and it keeps its type.
+/// let unknown = SPValue::Int64(IntOrUnknown::UNKNOWN);
+/// assert!(unknown.is_type(SPValueType::Int64));
+/// assert_eq!(unknown.to_string(), "UNKNOWN");
+/// ```
 #[derive(Debug, PartialEq, Clone, Hash, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(tag = "type", content = "value")]
 pub enum SPValue {
+    /// A boolean, or `UNKNOWN`.
     Bool(BoolOrUnknown),
+    /// A 64-bit float, or `UNKNOWN`.
     Float64(FloatOrUnknown),
+    /// A 64-bit signed integer, or `UNKNOWN`.
     Int64(IntOrUnknown),
+    /// A string, or `UNKNOWN`.
     String(StringOrUnknown),
+    /// A [`SystemTime`] timestamp, or `UNKNOWN`.
     Time(TimeOrUnknown),
+    /// A list of values, or `UNKNOWN`.
     Array(ArrayOrUnknown),
-    Map(MapOrUnknown), // The map is ordered
+    /// An ordered key-value list, or `UNKNOWN`.
+    ///
+    /// Stored as a `Vec` of pairs rather than a `HashMap` so that iteration
+    /// order, hashing and equality are all deterministic.
+    Map(MapOrUnknown),
+    /// A stamped 3D transform, or `UNKNOWN`.
     Transform(TransformOrUnknown),
 }
 
-
-
+/// A 64-bit float value, or `UNKNOWN`.
+///
+/// Wraps [`OrderedFloat`] so that [`SPValue`] can stay `Ord`, `Eq` and `Hash`.
 #[derive(Debug, PartialEq, Clone, Hash, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum FloatOrUnknown {
-    Float64(
-        // #[serde(serialize_with = "strictly_serialize_ordered_float")] 
-        OrderedFloat<f64>
-    ),
+    /// A known float.
+    Float64(OrderedFloat<f64>),
+    /// The value is not known.
     UNKNOWN,
 }
 
+/// A boolean value, or `UNKNOWN`.
 #[derive(Debug, PartialEq, Clone, Hash, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum BoolOrUnknown {
+    /// A known boolean.
     Bool(bool),
+    /// The value is not known.
     UNKNOWN,
 }
 
+/// A 64-bit signed integer value, or `UNKNOWN`.
 #[derive(Debug, PartialEq, Clone, Hash, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum IntOrUnknown {
+    /// A known integer.
     Int64(i64),
+    /// The value is not known.
     UNKNOWN,
 }
 
+/// A string value, or `UNKNOWN`.
 #[derive(Debug, PartialEq, Clone, Hash, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum StringOrUnknown {
+    /// A known string.
     String(String),
+    /// The value is not known.
     UNKNOWN,
 }
 
+/// A timestamp value, or `UNKNOWN`.
 #[derive(Debug, PartialEq, Clone, Hash, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum TimeOrUnknown {
+    /// A known timestamp.
     Time(SystemTime),
+    /// The value is not known.
     UNKNOWN,
 }
 
+/// A list of [`SPValue`]s, or `UNKNOWN`.
 #[derive(Debug, PartialEq, Clone, Hash, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum ArrayOrUnknown {
+    /// A known array. Elements need not share a type.
     Array(Vec<SPValue>),
+    /// The array is not known.
     UNKNOWN,
 }
 
+/// An ordered list of key-value pairs, or `UNKNOWN`.
 #[derive(Debug, PartialEq, Clone, Hash, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum MapOrUnknown {
+    /// A known map, in insertion order.
     Map(Vec<(SPValue, SPValue)>),
+    /// The map is not known.
     UNKNOWN,
 }
 
-// #[derive(Debug, PartialEq, Clone, Hash, Eq, PartialOrd, Ord, Serialize, Deserialize)]
-// pub enum MapOrUnknown {
-//     Map(Vec<(SPWrapped, SPWrapped)>),
-//     UNKNOWN,
-// }
-
+/// A stamped 3D transform, or `UNKNOWN`.
 #[derive(Debug, PartialEq, Clone, Hash, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum TransformOrUnknown {
+    /// A known transform.
     Transform(SPTransformStamped),
+    /// The transform is not known.
     UNKNOWN,
 }
 
+/// A rigid-body transform: a translation plus a rotation.
 #[derive(Debug, PartialEq, Clone, Hash, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct SPTransform {
+    /// Position offset from the parent frame, in metres.
     pub translation: SPTranslation,
+    /// Orientation relative to the parent frame, as a quaternion.
     pub rotation: SPRotation,
 }
 
+/// A 3D position offset, in metres.
 #[derive(Debug, PartialEq, Clone, Hash, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct SPTranslation {
+    /// Offset along the x axis.
     pub x: OrderedFloat<f64>,
+    /// Offset along the y axis.
     pub y: OrderedFloat<f64>,
+    /// Offset along the z axis.
     pub z: OrderedFloat<f64>,
 }
 
+/// A 3D orientation, as a quaternion.
 #[derive(Debug, PartialEq, Clone, Hash, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct SPRotation {
+    /// The `x` (i) component.
     pub x: OrderedFloat<f64>,
+    /// The `y` (j) component.
     pub y: OrderedFloat<f64>,
+    /// The `z` (k) component.
     pub z: OrderedFloat<f64>,
+    /// The `w` (scalar) component.
     pub w: OrderedFloat<f64>,
 }
 
+/// The identity transform: no translation, unit quaternion.
 impl Default for SPTransform {
     fn default() -> Self {
         SPTransform {
@@ -114,18 +177,29 @@ impl Default for SPTransform {
     }
 }
 
+/// A [`SPTransform`] with the frames it relates, a timestamp and metadata.
+///
+/// This is the crate's equivalent of a TF frame: `transform` positions
+/// `child_frame_id` relative to `parent_frame_id`.
 #[derive(Debug, PartialEq, Clone, Hash, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct SPTransformStamped {
+    /// Whether the transform is actively maintained rather than static.
     pub active_transform: bool,
+    /// Whether the transform should be published at all.
     pub enable_transform: bool,
+    /// When the transform was last updated.
     pub time_stamp: SystemTime,
+    /// The frame the transform is expressed in.
     pub parent_frame_id: String,
+    /// The frame the transform positions.
     pub child_frame_id: String,
+    /// The pose of the child frame in the parent frame.
     pub transform: SPTransform,
+    /// Free-form extra data attached to the frame.
     pub metadata: MapOrUnknown,
 }
 
-/// Displaying the value of an SPValue instance in a user-friendly way.
+/// Renders the value in a compact, human-readable form; `UNKNOWN` for unknowns.
 impl fmt::Display for SPValue {
     fn fmt(&self, fmtr: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
@@ -172,7 +246,6 @@ impl fmt::Display for SPValue {
                         .map(|(k, v)| format!("({}, {})", k, v))
                         .collect::<Vec<_>>()
                         .join(", ");
-                    // write!(fmtr, "[{}]", items_str)
                     write!(fmtr, "{{{}}}", items_str)
                 }
                 MapOrUnknown::UNKNOWN => write!(fmtr, "UNKNOWN"),
@@ -221,20 +294,39 @@ impl fmt::Display for SPValue {
     }
 }
 
-/// Used by SPVariables for defining their type. Must be the same as SPValue.
+/// The type tag an [`SPVariable`](crate::SPVariable) declares. Mirrors [`SPValue`]'s variants.
+///
+/// [`SPAssignment::new`](crate::SPAssignment::new) refuses to pair a variable with a value whose
+/// `SPValueType` differs.
 #[derive(Debug, PartialEq, Copy, Clone, Hash, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum SPValueType {
+    /// Matches [`SPValue::Bool`].
     Bool,
+    /// Matches [`SPValue::Float64`].
     Float64,
+    /// Matches [`SPValue::Int64`].
     Int64,
+    /// Matches [`SPValue::String`].
     String,
+    /// Matches [`SPValue::Time`].
     Time,
+    /// Matches [`SPValue::Array`].
     Array,
+    /// Matches [`SPValue::Map`].
     Map,
+    /// Matches [`SPValue::Transform`].
     Transform,
 }
 
 impl SPValueType {
+    /// Parses a type name as written in a model file.
+    ///
+    /// Accepts `bool`, `f64`, `i64`, `string`, `time`, `array`, `map` and
+    /// `transform` - the same spellings [`SPValueType`]'s `Display` produces.
+    ///
+    /// # Panics
+    ///
+    /// Panics on any other string.
     pub fn from_str(x: &str) -> SPValueType {
         match x {
             "bool" => SPValueType::Bool,
@@ -250,6 +342,7 @@ impl SPValueType {
     }
 }
 
+/// Renders the type name, in the spelling [`SPValueType::from_str`] accepts.
 impl fmt::Display for SPValueType {
     fn fmt(&self, fmtr: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
@@ -266,6 +359,9 @@ impl fmt::Display for SPValueType {
 }
 
 impl SPValue {
+    /// Returns `true` if the value has type `t`.
+    ///
+    /// An `UNKNOWN` value still has its type, so this holds for it too.
     pub fn is_type(&self, t: SPValueType) -> bool {
         match self {
             SPValue::Bool(_) => SPValueType::Bool == t,
@@ -279,6 +375,7 @@ impl SPValue {
         }
     }
 
+    /// Returns the value's [`SPValueType`], `UNKNOWN` or not.
     pub fn has_type(&self) -> SPValueType {
         match self {
             SPValue::Bool(_) => SPValueType::Bool,
@@ -292,6 +389,7 @@ impl SPValue {
         }
     }
 
+    /// Returns `true` for [`SPValue::Array`], including the `UNKNOWN` array.
     pub fn is_array(&self) -> bool {
         match self {
             SPValue::Array(_) => true,
@@ -299,6 +397,7 @@ impl SPValue {
         }
     }
 
+    /// Returns `true` for [`SPValue::String`], including the `UNKNOWN` string.
     pub fn is_string(&self) -> bool {
         match self {
             SPValue::String(_) => true,
@@ -306,6 +405,7 @@ impl SPValue {
         }
     }
 
+    /// Returns `true` for [`SPValue::Transform`], including the `UNKNOWN` one.
     pub fn is_transform(&self) -> bool {
         match self {
             SPValue::Transform(_) => true,
@@ -313,6 +413,10 @@ impl SPValue {
         }
     }
 
+    /// Renders the value as a string; `"UNKNOWN"` for an unknown value.
+    ///
+    /// Equivalent to the `Display` implementation. A `Time` renders as the
+    /// duration *elapsed since* the timestamp, not as an absolute time.
     pub fn to_string(&self) -> String {
         match self {
             SPValue::Bool(b) => match b {
@@ -353,7 +457,6 @@ impl SPValue {
                         .map(|(k, v)| format!("({}, {})", k.to_string(), v.to_string()))
                         .collect::<Vec<_>>()
                         .join(", ");
-                    // format!("[{}]", items_str)
                     format!("{{{}}}", items_str)
                 }
                 MapOrUnknown::UNKNOWN => "UNKNOWN".to_string(),
@@ -401,7 +504,29 @@ impl SPValue {
     }
 }
 
+/// Converts an ordinary Rust value into an [`SPValue`].
+///
+/// Implemented for `bool`, `i64`, `f64`, `String`/`&str`, [`SystemTime`],
+/// [`SPTransformStamped`], their `Option`s (where `None` becomes the type's
+/// `UNKNOWN`), and `Vec`s of those (arrays) and of pairs (maps).
+///
+/// The string impls treat `"unknown"`, `"Unknown"` and `"UNKNOWN"` as the
+/// unknown string rather than as literal text, so a model file can write
+/// "not measured yet" the same way for every type.
+///
+/// ```
+/// use micro_sp::*;
+///
+/// assert_eq!(42.to_spvalue(), SPValue::Int64(IntOrUnknown::Int64(42)));
+/// assert_eq!(None::<f64>.to_spvalue(), SPValue::Float64(FloatOrUnknown::UNKNOWN));
+/// assert_eq!("UNKNOWN".to_spvalue(), SPValue::String(StringOrUnknown::UNKNOWN));
+///
+/// // Vecs become arrays, Vecs of pairs become maps.
+/// assert_eq!(vec![1, 2].to_spvalue().to_string(), "[1, 2]");
+/// assert_eq!(vec![("a", 1)].to_spvalue().to_string(), "{(a, 1)}");
+/// ```
 pub trait ToSPValue {
+    /// Converts `self` into an [`SPValue`].
     fn to_spvalue(&self) -> SPValue;
 }
 

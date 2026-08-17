@@ -1,25 +1,62 @@
+//! Operands that are either a literal or a variable reference.
+//!
+//! Predicates and actions are written over [`SPWrapped`]: each side of a
+//! comparison, and each right-hand side of an assignment, is either a literal
+//! [`SPValue`] or a reference to an [`SPVariable`] that is looked up in the
+//! [`State`] at evaluation time. The `Array` and `Map` variants build composite
+//! values out of other operands.
+
 use crate::*;
 use ordered_float::OrderedFloat;
 use serde::{Deserialize, Serialize};
 use std::fmt;
 
+/// An operand in a predicate or action: a literal, a variable, or a composite
+/// of those.
+///
+/// ```
+/// use micro_sp::*;
+///
+/// let state = State::from_vec(&vec![
+///     (SPVariable::new("count", SPValueType::Int64), 7.to_spvalue()),
+/// ]);
+///
+/// // A literal evaluates to itself; a variable is read from the state.
+/// assert_eq!(1.to_spvalue().wrap().evaluate(&state, "docs"), 1.to_spvalue());
+/// let count = SPVariable::new("count", SPValueType::Int64);
+/// assert_eq!(count.wrap().evaluate(&state, "docs"), 7.to_spvalue());
+/// assert_eq!(count.wrap().get_variables(), vec![count]);
+/// ```
 #[derive(Debug, PartialEq, PartialOrd, Ord, Eq, Clone, Hash, Serialize, Deserialize)]
 pub enum SPWrapped {
+    /// A reference to a variable, resolved against the state when evaluated.
     SPVariable(SPVariable),
+    /// A literal value.
     SPValue(SPValue),
+    /// An array built from other operands, evaluated element by element.
     Array(Vec<SPWrapped>),
+    /// A map built from other operands; both keys and values are evaluated.
     Map(Vec<(SPWrapped, SPWrapped)>),
 }
 
 impl SPWrapped {
+    /// Resolves the operand against `state`, producing a concrete [`SPValue`].
+    ///
+    /// Composites recurse. `log_target` is the logging target used for the
+    /// underlying state reads.
+    ///
+    /// # Panics
+    ///
+    /// Panics if a referenced variable is not in the state, like every other
+    /// state read in the crate.
     pub fn evaluate(&self, state: &State, log_target: &str) -> SPValue {
         match self {
             SPWrapped::SPVariable(var) => state
                 .get_value(&var.name, log_target)
                 .unwrap_or_else(|| panic!("Variable '{}' not in state.", var.name)),
-            
+
             SPWrapped::SPValue(val) => val.clone(),
-            
+
             SPWrapped::Array(arr) => {
                 let evaluated_items: Vec<SPValue> = arr
                     .iter()
@@ -38,6 +75,11 @@ impl SPWrapped {
         }
     }
 
+    /// Collects every variable this operand refers to, in order.
+    ///
+    /// Recurses through composites, including map *keys*. The runners build
+    /// their key sets from this, so a variable missed here is a key that never
+    /// gets read.
     pub fn get_variables(&self) -> Vec<SPVariable> {
         match self {
             SPWrapped::SPVariable(v) => vec![v.clone()],
@@ -55,7 +97,12 @@ impl SPWrapped {
     }
 }
 
+/// Wraps a literal value as an [`SPWrapped`] operand.
+///
+/// Implemented for [`SPValue`] and for the same primitives as [`ToSPValue`].
+/// The variable counterpart is [`ToSPWrappedVar`].
 pub trait ToSPWrapped {
+    /// Wraps `self` as a literal [`SPWrapped::SPValue`].
     fn wrap(&self) -> SPWrapped;
 }
 
@@ -131,6 +178,7 @@ impl ToSPWrapped for Vec<(SPValue, SPValue)> {
 
 /// This trait defines a set of conversions from `SPVariable` to `SPWrapped`.
 pub trait ToSPWrappedVar {
+    /// Wrap this variable as an [`SPWrapped::SPVariable`] operand.
     fn wrap(&self) -> SPWrapped;
 }
 

@@ -1,9 +1,12 @@
+//! [`Transition`]s: a guard plus the assignments to make when it is taken.
+//!
+//! A transition has two halves. The *planning* half (`guard`, `actions`) is all
+//! the planner sees; the *runner* half (`runner_guard`, `runner_actions`) is
+//! added on top when the plan is actually executed. [`Transition::parse`] builds
+//! one from strings, which is how models are normally written.
+
 use crate::*;
 use serde::{Deserialize, Serialize};
-// use crate::{
-//     get_predicate_vars_all, Action,
-//     Predicate, SPVariable, State,
-// };
 use std::{fmt, hash::Hash};
 
 /// A planning transition T contains a guard predicate G : S → {false, true},
@@ -23,23 +26,33 @@ use std::{fmt, hash::Hash};
 /// When the execution engine is running the plan, it is considering all
 /// components of Tr, i.e. the running transition guard becomes G ∧ Gr and the
 /// set of transition actions becomes A ∪ Ar.
+///
+/// Two transitions compare equal when their guards and actions match, *ignoring
+/// the name*.
 #[derive(Debug, Clone, Eq, Hash, Serialize, Deserialize)]
 pub struct Transition {
+    /// Name of the transition, used for logging and plan steps.
     pub name: String,
+    /// The planning guard: the condition the planner reasons about.
     pub guard: Predicate,
+    /// The extra guard that must also hold while actually executing. Invisible
+    /// to the planner - typically feedback from the real system, or an operator
+    /// interlock.
     pub runner_guard: Predicate,
-    // pub sleep_ms: u64,
+    /// The planning effects: what the planner assumes this transition changes.
     pub actions: Vec<Action>,
+    /// Extra assignments applied only when executing, not when planning.
     pub runner_actions: Vec<Action>,
 }
 
 impl Transition {
-    /// Define a new transition. Use parse() instead.
+    /// Define a new transition from already-built parts.
+    ///
+    /// Prefer [`Transition::parse`], which takes the same thing as strings.
     pub fn new(
         name: &str,
         guard: Predicate,
         runner_guard: Predicate,
-        // sleep_ms: u64,
         actions: Vec<Action>,
         runner_actions: Vec<Action>,
     ) -> Transition {
@@ -47,18 +60,82 @@ impl Transition {
             name: name.to_string(),
             guard,
             runner_guard,
-            // sleep_ms,
             actions,
             runner_actions,
         }
     }
 
-    /// Define a new transition using strings.
+    /// Define a new transition using the string DSL. This is how models are
+    /// normally written.
+    ///
+    /// # Syntax
+    ///
+    /// Guards (`guard`, `runner_guard`) are predicates:
+    ///
+    /// | Form | Meaning |
+    /// |---|---|
+    /// | `true` / `false` | the constant predicate |
+    /// | `var:name == value` | equality; also `!=`, `<`, `<=`, `>`, `>=` |
+    /// | `var:a == var:b` | compare two variables |
+    /// | `a && b`, `a \|\| b` | conjunction, disjunction |
+    /// | `!a`, `(a)` | negation, grouping |
+    /// | `a -> b` | implication, sugar for `!a \|\| b` |
+    ///
+    /// Actions (`actions`, `runner_actions`) are assignments:
+    ///
+    /// | Form | Meaning |
+    /// |---|---|
+    /// | `var:name <- value` | assign a literal |
+    /// | `var:a <- var:b` | assign another variable's value |
+    /// | `var:n += 1`, `var:n -= 1` | increment / decrement a numeric variable |
+    ///
+    /// Values are bare words (`a`, `moving`), numbers (`5`, `-1.5`), `true` /
+    /// `false`, `"quoted strings"`, arrays (`[1, 2, 3]`), or the typed unknowns
+    /// (`UNKNOWN_bool`, `UNKNOWN_int`, ...).
+    ///
+    /// `state` is only used to look the variables up, so every `var:name` must
+    /// already exist in it.
+    ///
+    /// # Errors
+    ///
+    /// Parse failures are non-fatal and only logged: an unparseable guard
+    /// becomes [`Predicate::FALSE`] (the transition can never fire) and an
+    /// unparseable action becomes [`Action::empty`] (which panics if applied).
+    /// A typo in a model disables one transition rather than stopping the
+    /// process.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use micro_sp::*;
+    ///
+    /// let mut state = State::new();
+    /// state.add_mut(
+    ///     SPAssignment::new(SPVariable::new("pos", SPValueType::String), "a".to_spvalue()),
+    ///     "docs",
+    /// );
+    /// state.add_mut(
+    ///     SPAssignment::new(SPVariable::new("enabled", SPValueType::Bool), true.to_spvalue()),
+    ///     "docs",
+    /// );
+    ///
+    /// let move_to_b = Transition::parse(
+    ///     "move_to_b",
+    ///     "var:pos == a || var:pos == c",  // planning guard
+    ///     "var:enabled == true",           // runner guard
+    ///     vec!["var:pos <- b"],            // planning actions
+    ///     Vec::<&str>::new(),              // runner actions
+    ///     &state,
+    /// );
+    ///
+    /// assert!(move_to_b.eval(&state, "docs"));
+    /// let state = move_to_b.take(&state, "docs");
+    /// assert_eq!(state.get_value("pos", "docs"), Some("b".to_spvalue()));
+    /// ```
     pub fn parse(
         name: &str,
         guard: &str,
         runner_guard: &str,
-        // sleep_ms: u64,
         actions: Vec<&str>,
         runner_actions: Vec<&str>,
         state: &State,
@@ -85,7 +162,6 @@ impl Transition {
                     Predicate::FALSE
                 }
             },
-            // sleep_ms,
             actions
                 .iter()
                 .map(|action| match pred_parser::action(action, state) {
@@ -115,43 +191,33 @@ impl Transition {
         )
     }
 
+    /// A placeholder transition named `"empty"` that can never be taken.
     ///
+    /// Both guards are [`Predicate::FALSE`] and it has no actions.
     pub fn empty() -> Transition {
         Transition::new(
             "empty",
             Predicate::FALSE,
             Predicate::FALSE,
-            // 0,
             vec![],
             vec![],
         )
     }
 
-    // DONE: PERF: takes `self` by value, so every caller clones the whole transition
-    // (name, two predicate trees, two action vectors) just to read a boolean.
-    // `Operation::eval_planning` does this per precondition per BFS node.
-    // Change to `&self` once `Predicate::eval` takes `&self`.
+    /// Evaluate only the planning guard, as the planner does.
+    ///
+    /// `log_target` is the `log` crate target that any warning is reported
+    /// under; it does not affect the result.
     pub fn eval_planning(&self, state: &State, log_target: &str) -> bool {
         self.guard.eval(state, &log_target)
     }
 
-    // DONE: PERF: same by-value problem, and this one is on the hottest path in
-    // the system - `Operation::eval` / `can_be_completed` / `can_be_failed` /
-    // `start` / `complete` / `fail` / `timeout` / `bypass` all used to call
-    // `transition.clone().eval(..)` inside a loop, for every active operation,
-    // on every tick of three different runners. This and `Predicate::eval` take
-    // `&self` and every one of those call sites now borrows, so a deep clone of
-    // the entire guard structure is gone from each of them.
+    /// Evaluate the full running guard: `guard && runner_guard`.
     pub fn eval(&self, state: &State, log_target: &str) -> bool {
         self.guard.eval(state, &log_target) && self.runner_guard.eval(state, &log_target)
     }
 
     /// Apply this transition's planning actions to `state` in place.
-    ///
-    /// DONE: this used to `state.clone()` up front and then clone the whole
-    /// state again for every action, so a 4-action transition copied the
-    /// system state 5 times. Actions now write through `Action::assign_mut`,
-    /// so applying a transition is O(actions) map writes and no copying at all.
     pub fn take_planning_mut(&self, state: &mut State, log_target: &str) {
         for a in &self.actions {
             a.assign_mut(state, &log_target);
@@ -167,15 +233,6 @@ impl Transition {
 
     /// Apply this transition's planning *and* runner actions to `state` in
     /// place.
-    ///
-    /// DONE: same fix as `take_planning_mut` - previously one full-state clone
-    /// here plus one per action and per runner action.
-    ///
-    /// DONE: `Operation::start` / `complete` / `fail` / `timeout` / `bypass`
-    /// used to call `precondition.clone().take(state, ..)` and then apply the
-    /// status write with a second `Action::assign`, i.e. one transition clone
-    /// plus two full `State` copies per operation step. They now use `take_mut`
-    /// + `assign_mut` on a single owned `State`.
     pub fn take_mut(&self, state: &mut State, log_target: &str) {
         for a in &self.actions {
             a.assign_mut(state, &log_target);
@@ -191,49 +248,6 @@ impl Transition {
         self.take_mut(&mut new_state, &log_target);
         new_state
     }
-
-    // pub fn relax(self, vars: &Vec<String>) -> Transition {
-    //     let r_guard = self.guard.remove(vars);
-    //     let r_runner_guard = self.runner_guard.remove(vars);
-    //     let mut r_actions = vec![];
-    //     let mut r_runner_actions = vec![];
-    //     self.actions
-    //         .iter()
-    //         .for_each(|x| match vars.contains(&x.var.name) {
-    //             false => r_actions.push(x.clone()),
-    //             true => (),
-    //         });
-    //     self.runner_actions
-    //         .iter()
-    //         .for_each(|x| match vars.contains(&x.var.name) {
-    //             false => r_runner_actions.push(x.clone()),
-    //             true => (),
-    //         });
-    //     Transition {
-    //         name: self.name,
-    //         guard: match r_guard {
-    //             Some(x) => x,
-    //             None => Predicate::TRUE,
-    //         },
-    //         runner_guard: match r_runner_guard {
-    //             Some(x) => x,
-    //             None => Predicate::TRUE,
-    //         },
-    //         // sleep_ms: self.sleep_ms,
-    //         actions: r_actions,
-    //         runner_actions: r_runner_actions,
-    //     }
-    // }
-
-    // TODO: test...
-    // pub fn contains_planning(self, var: &String) -> bool {
-    //     let guard_vars: Vec<String> = self.guard.get_predicate_var_keys();
-    //     let actions_vars: Vec<String> =
-    //         self.actions.iter().map(|a| a.var.name.to_owned()).collect();
-    //     guard_vars.contains(var) || actions_vars.contains(var)
-    // }
-
-        // TODO: test...
     /// Every state variable this transition reads or writes.
     ///
     /// This feeds the runners' `get_state_for_keys` key sets, so anything
@@ -286,24 +300,11 @@ impl Default for Transition {
             name: "unknown".to_string(),
             guard: Predicate::TRUE,
             runner_guard: Predicate::TRUE,
-            // sleep_ms: 0,
             actions: vec![],
             runner_actions: vec![],
         }
     }
 }
-
-// TODO: test
-// pub fn get_transition_model_vars_all(model: &Vec<Transition>) -> Vec<SPVariable> {
-//     let mut s = Vec::new();
-//     model
-//         .iter()
-//         .for_each(|x| s.extend(get_transition_vars_all(x)));
-//     s.sort();
-//     s.dedup();
-//     s
-// }
-
 impl fmt::Display for Transition {
     fn fmt(&self, fmtr: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut action_string = "".to_string();
@@ -354,7 +355,6 @@ mod tests {
             "gains_weight",
             Predicate::TRUE,
             Predicate::TRUE,
-            // 0,
             vec![a1.clone()],
             vec![],
         );
@@ -362,7 +362,6 @@ mod tests {
             "gains_weight",
             Predicate::TRUE,
             Predicate::TRUE,
-            // 0,
             vec![a1],
             vec![],
         );
@@ -396,7 +395,6 @@ mod tests {
             "gains_weight",
             "true",
             "true",
-            // 0,
             vec!("var:weight <- 85.0", "var:height <- 190"),
             Vec::<&str>::new(),
             &s
@@ -405,7 +403,6 @@ mod tests {
             "gains_weight",
             "true",
             "false",
-            // 0,
             vec!("var:weight <- 85.0"),
             Vec::<&str>::new(),
             &s
@@ -422,58 +419,12 @@ mod tests {
             "gains_weight",
             "true",
             "var:weight == 85.0",
-            // 0,
             vec!("var:weight <- 85.0", "var:height <- 190"),
             Vec::<&str>::new(),
             &s
         );
         assert!(t1.eval(&s, "t"));
     }
-
-    // #[test]
-    // #[should_panic]
-    // fn test_transition_runner_var_in_planner_guard_panic() {
-    //     let s = State::from_vec(&john_doe());
-    //     let t1 = t!(
-    //         "gains_weight",
-    //         "var:alive == true",
-    //         "true",
-    //         vec!("var:weight <- 85.0", "var:height <- 190"),
-    //         Vec::<&str>::new(),
-    //         &s
-    //     );
-    //     assert!(t1.eval_running(&s));
-    // }
-
-    // #[test]
-    // #[should_panic]
-    // fn test_transition_planner_var_in_runner_action_panic() {
-    //     let s = State::from_vec(&john_doe());
-    //     let t1 = t!(
-    //         "gains_weight",
-    //         "true",
-    //         "true",
-    //         Vec::<&str>::new(),
-    //         vec!("var:weight <- 85.0", "var:height <- 190"),
-    //         &s
-    //     );
-    //     assert!(t1.eval_running(&s));
-    // }
-
-    // #[test]
-    // #[should_panic]
-    // fn test_transition_runner_var_in_planner_action_panic() {
-    //     let s = State::from_vec(&john_doe());
-    //     let t1 = t!(
-    //         "gains_weight",
-    //         "true",
-    //         "true",
-    //         vec!("var:alive <- false", "var:height <- 190"),
-    //         Vec::<&str>::new(),
-    //         &s
-    //     );
-    //     assert!(t1.eval_running(&s));
-    // }
 
     #[test]
     fn test_transition_take_planning() {
@@ -494,26 +445,6 @@ mod tests {
             .update("weight", 85.0.to_spvalue()); // Pushes 82.5 to history
         assert_eq!(s_next_2, new_state);
     }
-
-    // #[test]
-    // #[should_panic]
-    // fn test_transition_take_planning_panic() {
-    //     let s = State::from_vec(&john_doe());
-    //     let weight = fv!("weight");
-    //     let a1 = a!(weight.clone(), 87.0.wrap());
-    //     let t1 = t_plan!("gains_weight", eq!(weight.wrap(), 80.0.wrap()), vec!(a1));
-    //     t1.take_planning(&s);
-    // }
-
-    // #[test]
-    // fn test_transition_take_planning_fail() {
-    //     let s = State::from_vec(&john_doe());
-    //     let weight = fv!("weight");
-    //     let a1 = a!(weight.clone(), 87.0.wrap());
-    //     let t1 = t_plan!("gains_weight", eq!(weight.wrap(), 82.5.wrap()), vec!(a1));
-    //     let next = t1.take_planning(&s);
-    //     assert_eq!(next, s);
-    // }
 
     #[test]
     fn test_transition_action_ordering() {
@@ -678,241 +609,6 @@ mod tests {
         assert_eq!(trans1, trans2);
         assert_ne!(trans2, trans3);
     }
-
-    // #[test]
-    // fn test_asdf() {
-
-    //     let mut operations = vec!();
-    //     let competition_state = v!("competition_state");
-
-    //     // Locations of AGVs, can be: kitting, assembly_front, assembly_back, warehouse, UNKNOWN
-    //     let agv_1_location = v!("agv_1_location");
-    //     let agv_2_location = v!("agv_2_location");
-    //     let agv_3_location = v!("agv_3_location");
-    //     let agv_4_location = v!("agv_4_location");
-
-    //     let floor_robot_request_trigger = bv!("floor_robot_request_trigger");
-    //     let floor_robot_request_state = v!("floor_robot_request_state");
-    //     let floor_robot_fail_counter = iv!("floor_robot_fail_counter");
-    //     let floor_robot_health = bv!("floor_robot_health");
-    //     let floor_robot_command = v!("floor_robot_command");
-    //     let floor_robot_current_position_name = v!("floor_robot_current_position_name");
-
-    //     let floor_robot_part_gripper_enabled = bv!("floor_robot_part_gripper_enabled");
-    //     let floor_robot_part_gripper_attached = bv!("floor_robot_part_gripper_attached");
-    //     let floor_robot_tray_gripper_enabled = bv!("floor_robot_tray_gripper_enabled");
-    //     let floor_robot_tray_gripper_attached = bv!("floor_robot_tray_gripper_attached");
-
-    //     let floor_robot_gripper_request_trigger = bv!("floor_robot_gripper_request_trigger");
-    //     let floor_robot_gripper_request_state = v!("floor_robot_gripper_request_state");
-    //     let floor_robot_gripper_fail_counter = iv!("floor_robot_gripper_fail_counter");
-    //     let floor_robot_gripper_command = v!("floor_robot_gripper_command");
-
-    //     // -----------------------------------------------------------------------
-
-    //     let state = State::new();
-    //     let state = state.add(assign!(competition_state, SPValue::UNKNOWN));
-
-    //     let state = state.add(assign!(agv_1_location, SPValue::UNKNOWN));
-    //     let state = state.add(assign!(agv_2_location, SPValue::UNKNOWN));
-    //     let state = state.add(assign!(agv_3_location, SPValue::UNKNOWN));
-    //     let state = state.add(assign!(agv_4_location, SPValue::UNKNOWN));
-
-    //     let state = state.add(assign!(floor_robot_request_trigger, false.to_spvalue()));
-    //     let state = state.add(assign!(floor_robot_request_state, "initial".to_spvalue()));
-    //     let state = state.add(assign!(floor_robot_fail_counter, 0.to_spvalue()));
-    //     let state = state.add(assign!(floor_robot_health, false.to_spvalue()));
-    //     let state = state.add(assign!(floor_robot_command, SPValue::UNKNOWN));
-    //     let state = state.add(assign!(floor_robot_current_position_name, SPValue::UNKNOWN));
-
-    //     let state = state.add(assign!(floor_robot_part_gripper_enabled, false.to_spvalue()));
-    //     let state = state.add(assign!(floor_robot_part_gripper_attached, false.to_spvalue()));
-    //     let state = state.add(assign!(floor_robot_tray_gripper_enabled, false.to_spvalue()));
-    //     let state = state.add(assign!(floor_robot_tray_gripper_attached, false.to_spvalue()));
-
-    //     let state = state.add(assign!(floor_robot_gripper_request_trigger, false.to_spvalue()));
-    //     let state = state.add(assign!(floor_robot_gripper_request_state, "initial".to_spvalue()));
-    //     let state = state.add(assign!(floor_robot_gripper_fail_counter, 0.to_spvalue()));
-    //     let state = state.add(assign!(floor_robot_gripper_command, SPValue::UNKNOWN));
-
-    //     // --------------------------------------------------------------------------
-
-    //     let runner_goal = v!("floor_robot_runner_goal");
-    //     let runner_plan = av!("floor_robot_runner_plan");
-    //     let runner_plan_info = v!("floor_robot_runner_plan_info");
-    //     let runner_plan_state = v!("floor_robot_runner_plan_state");
-    //     let runner_plan_current_step = iv!("floor_robot_runner_plan_current_step");
-    //     let runner_replan = bv!("floor_robot_runner_replan");
-    //     let runner_replanned = bv!("floor_robot_runner_replanned");
-    //     let runner_replan_counter = iv!("floor_robot_runner_replan_counter");
-    //     let runner_replan_trigger = bv!("floor_robot_runner_replan_trigger");
-
-    //     let state = state.add(assign!(runner_goal, SPValue::UNKNOWN));
-    //     let state = state.add(assign!(runner_plan, SPValue::UNKNOWN));
-    //     let state = state.add(assign!(runner_plan_info, SPValue::UNKNOWN));
-    //     let state = state.add(assign!(runner_plan_state, "empty".to_spvalue()));
-    //     let state = state.add(assign!(runner_plan_current_step, SPValue::UNKNOWN));
-    //     let state = state.add(assign!(runner_replan, false.to_spvalue()));
-    //     let state = state.add(assign!(runner_replanned, false.to_spvalue()));
-    //     let state = state.add(assign!(runner_replan_counter, 0.to_spvalue()));
-    //     let state = state.add(assign!(runner_replan_trigger, false.to_spvalue()));
-
-    //     for pos in vec![
-    //         "kitting_station_1",
-    //         "kitting_station_2",
-    //         "conveyor_belt"
-    //     ] {
-    //         operations.push(Operation::new(
-    //             &format!("op_floor_robot_direct_joint_move_to_{}", pos),
-    //             // precondition
-    //             t!(
-    //                 // name
-    //                 &format!("start_floor_robot_direct_joint_move_to_{}", pos).as_str(),
-    //                 // planner guard
-    //                 "var:floor_robot_request_state == initial && var:floor_robot_request_trigger == false && var:floor_robot_health == true",
-    //                 // runner guard
-    //                 "true",
-    //                 // planner actions
-    //                 vec!(
-    //                     &format!("var:floor_robot_command <- direct_joint_move_to_{pos}").as_str(),
-    //                     "var:robot_request_trigger <- true"
-    //                 ),
-    //                 //runner actions
-    //                 Vec::<&str>::new(),
-    //                 &state
-    //             ),
-    //             // postcondition
-    //             t!(
-    //                 // name
-    //                 &format!("complete_floor_robot_direct_joint_move_to_{}", pos).as_str(),
-    //                 // planner guard
-    //                 "true",
-    //                 // runner guard
-    //                 &format!("var:floor_robot_request_state == succeeded")
-    //                     .as_str(),
-    //                 // "true",
-    //                 // planner actions
-    //                 vec!(
-    //                     "var:floor_robot_request_trigger <- false",
-    //                     "var:floor_robot_request_state <- initial",
-    //                     &format!("var:floor_robot_current_position_name <- {pos}")
-    //                 ),
-    //                 //runner actions
-    //                 Vec::<&str>::new(),
-    //                 &state
-    //             ),
-    //             Transition::empty()
-    //         ));
-    //     }
-    // }
-
-    // #[test]
-    // fn test_transition_get_vars_all() {
-    //     let s = State::from_vec(&john_doe());
-    //     let name = v!("name");
-    //     let surname = v!("surname");
-    //     let height = iv!("height");
-    //     let weight = fv!("weight");
-    //     let smart = bv!("smart");
-    //     let alive = bv!("alive");
-
-    //     let guard = pred_parser::pred("var:smart == TRUE -> (var:alive == FALSE || TRUE)", &s);
-
-    //     // Transitions should be equal even if they have a different name
-    //     let t1 = t_plan!("gains_weight_again", eq!(&weight.wrap(), 80.0.wrap()), vec!(a1.clone(), a2.clone(), a3.clone()));
-    //     let t2 = t_plan!("gains_weight_again", eq!(&weight.wrap(), 80.0.wrap()), vec!(a1.clone(), a2.clone(), a3.clone()));
-    //     let t3 = t_plan!("loses_weight_again", eq!(&weight.wrap(), 80.0.wrap()), vec!(a1.clone(), a2.clone(), a3.clone()));
-    //     let t4 = t_plan!("loses_weight_again", eq!(&weight.wrap(), 80.0.wrap()), vec!(a3.clone(), a2.clone()));
-    //     let trans1 = vec!(t1.clone(), t3.clone());
-    //     let trans2 = vec!(t2.clone(), t3.clone());
-    //     let trans3 = vec!(t2.clone(), t4.clone());
-    //     assert_eq!(trans1, trans2);
-    //     assert_ne!(trans2, trans3);
-    // }
-
-    // proptest! {
-    //     #![proptest_config(ProptestConfig::with_cases(10))]
-    //     #[test]
-    //     fn test_transition_mcdc(gripper_ref_val in prop_oneof!("opened", "closed")) {
-
-    //         // let gripper_act = v!("gripper_act", vec!("opened", "closed", "gripping"));
-    //         let gripper_ref = v_command!("gripper_ref", vec!("opened", "closed"));
-
-    //         let state = State::new();
-    //         // let state = state.add(assign!(gripper_act, "opened".to_spvalue()));
-    //         let state = state.add(assign!(gripper_ref, gripper_ref_val.to_spvalue()));
-
-    //         let start_gripper_close = t!(
-    //             // name
-    //             "start_gripper_close",
-    //             // planner guard
-    //             "var:gripper_ref != closed",
-    //             // runner guard
-    //             "true",
-    //             // planner actions
-    //             vec!("var:gripper_ref <- closed"),
-    //             //runner actions
-    //             Vec::<&str>::new(),
-    //             &state
-    //         );
-
-    //         // MC/DC
-
-    //         // 1. Every point of entry and exit in the program has been invoked at least once.
-    //         // => This probably doesn't mean much because the transition can be either taken or not taken, there is no alternatives.
-    //         if gripper_ref_val == "opened" {
-    //             prop_assert!(start_gripper_close.eval_planning(&state));
-    //         } else {
-    //             prop_assert!(!start_gripper_close.eval_planning(&state));
-    //         }
-
-    //         // 2.  Every condition in a decision in the program has taken all possible outcomes at least once.
-    //         // => During running, the guard "var:gripper_ref != closed" has to be true at least once.
-
-    //         // 3. Every decision in the program has taken all possible outcomes at least once.
-    //         // => Only one decision is present, so need to do extra things here.
-
-    //         // 4. Each condition in a decision has been shown to independently affect
-    //         // that decision’s outcome. A condition is shown to independently affect
-    //         // a decision’s outcome by varying just that condition while holding fixed
-    //         // all other conditions.
-    //         // => There is only one variable that can affect the outcome of the program.'
-
-    //     }
-    // }
-
-    // proptest! {
-    //     #![proptest_config(ProptestConfig::with_cases(10))]
-    //     #[test]
-    //     fn my_behavior_model_works(gantry_act_val in prop_oneof!("a", "b")) {
-
-    //         let m = rita_model();
-    //         // let model = Model::new(&m.0, m.1, m.2, m.3, m.4);
-    //         // let gantry_act = v!("gantry_act", vec!("a", "b", "atr"));
-    //         let new_state = m.1.update("gantry_act", gantry_act_val.to_spvalue());
-
-    //         let model = Model::new(
-    //             "asdf",
-    //             new_state.clone(),
-    //             m.2,
-    //             m.3,
-    //             vec!()
-    //         );
-
-    //         let plan = bfs_operation_planner(model.state.clone(), extract_goal_from_state(&model.state.clone()), model.operations.clone(), 50);
-    //         for p in plan.plan {
-    //             println!("{}", p);
-    //         }
-
-    //         // let mut runner = TestRunner::default();
-    //         // let config = ProptestConfig::with_cases(10); // Set the number of test cases to 10
-    //         // runner.set_config(config);
-
-    //         prop_assert!(plan.found);
-    //         // prop_assert!(!model.is_empty());
-    //         // prop_assert!(model.last_value().is_some());
-    //     }
-    // }
 }
 
 /// Model parsing and rendering.

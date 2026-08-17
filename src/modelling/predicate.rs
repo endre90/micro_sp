@@ -1,30 +1,79 @@
+//! [`Predicate`]s: the guards that decide whether a transition may be taken.
+//!
+//! A predicate is a boolean formula over state variables and values. It is
+//! evaluated against a [`State`], and is what both a [`Transition`]'s guard and
+//! a planning goal are made of. Build them by hand, with the `eq!`/`and!`/`or!`
+//! macros, or by parsing a string with [`pred_parser::pred`].
+
 use serde::{Deserialize, Serialize};
 
-// use crate::{SPVariable, SPWrapped, State};
 use crate::*;
 use std::fmt;
 
 /// A predicate is an equality logical formula that can evaluate to either true or false.
-/// An equality logic formula F is defined with the following grammar:
-///     F : F ∧ F | F ∨ F | ¬F | atom
-///     atom : term == term | true | false
-///     term : variable | value
+///
+/// The grammar of an equality logic formula `F`:
+///
+/// ```text
+/// F    : F ∧ F | F ∨ F | ¬F | atom
+/// atom : term == term | true | false
+/// term : variable | value
+/// ```
+///
+/// # Example
+///
+/// ```
+/// use micro_sp::*;
+///
+/// let pos = SPVariable::new("pos", SPValueType::String);
+/// let busy = SPVariable::new("busy", SPValueType::Bool);
+/// let state = State::from_vec(&vec![
+///     (pos.clone(), "a".to_spvalue()),
+///     (busy.clone(), false.to_spvalue()),
+/// ]);
+///
+/// let ready = Predicate::AND(vec![
+///     Predicate::EQ(pos.wrap(), "a".wrap()),
+///     Predicate::NOT(Box::new(Predicate::EQ(busy.wrap(), true.wrap()))),
+/// ]);
+///
+/// assert!(ready.eval(&state, "docs"));
+/// assert_eq!(ready.get_predicate_var_keys(), vec!["busy", "pos"]);
+/// ```
 #[derive(Debug, PartialEq, Clone, Eq, Hash, Serialize, Deserialize)]
 pub enum Predicate {
+    /// Always holds.
     TRUE,
+    /// Never holds.
     FALSE,
+    /// Holds when the inner predicate does not.
     NOT(Box<Predicate>),
+    /// Holds when every child holds. An empty `AND` holds.
     AND(Vec<Predicate>),
+    /// Holds when at least one child holds. An empty `OR` does not hold.
     OR(Vec<Predicate>),
+    /// Holds when the two terms evaluate equal.
     EQ(SPWrapped, SPWrapped),
+    /// Holds when the two terms evaluate unequal.
     NEQ(SPWrapped, SPWrapped),
+    /// Holds when the left term is less than or equal to the right one.
     LTEQ(SPWrapped, SPWrapped),
+    /// Holds when the left term is greater than or equal to the right one.
     GTEQ(SPWrapped, SPWrapped),
+    /// Holds when the left term is strictly less than the right one.
     LT(SPWrapped, SPWrapped),
+    /// Holds when the left term is strictly greater than the right one.
     GT(SPWrapped, SPWrapped),
 }
 
 impl Predicate {
+    /// Evaluate this predicate against `state`.
+    ///
+    /// `log_target` is the `log::` target the state lookups report under.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the predicate mentions a variable that is not in `state`.
     pub fn eval(&self, state: &State, log_target: &str) -> bool {
         match self {
             Predicate::TRUE => true,
@@ -42,7 +91,12 @@ impl Predicate {
         }
     }
 
-    // experimental
+    /// Project this predicate down to the variables named in `only`.
+    ///
+    /// Experimental. A comparison survives only if *every* variable it mentions
+    /// is kept; an `AND`/`OR` keeps its surviving children, unwrapping a lone
+    /// survivor. Returns `None` when nothing survives - deliberately not `TRUE`,
+    /// so the caller decides what "no constraint left" means.
     pub fn keep_only(&self, only: &Vec<String>) -> Option<Predicate> {
         match self {
             Predicate::TRUE => Some(Predicate::TRUE),
@@ -83,7 +137,12 @@ impl Predicate {
             }
         }
     }
-    // experimental
+
+    /// The complement of [`Predicate::keep_only`]: drop every comparison that
+    /// mentions a variable named in `remove`.
+    ///
+    /// Experimental. Collapsing and the `None` result follow the same rules as
+    /// `keep_only`.
     pub fn remove(&self, remove: &Vec<String>) -> Option<Predicate> {
         match self {
             Predicate::TRUE => Some(Predicate::TRUE),
@@ -125,6 +184,7 @@ impl Predicate {
         }
     }
 
+    /// Every variable this predicate mentions, sorted and deduplicated.
     pub fn get_predicate_vars(&self) -> Vec<SPVariable> {
         let mut vars = match self {
             Predicate::AND(preds) | Predicate::OR(preds) => {
@@ -149,158 +209,19 @@ impl Predicate {
         vars
     }
 
-    // }
-
-    // /// Keep only the variables in the predicate from the `only` list.
-    // pub fn keep_only(&self, only: &Vec<String>) -> Option<Predicate> {
-    //     match self {
-    //         Predicate::TRUE => Some(Predicate::TRUE),
-    //         Predicate::FALSE => Some(Predicate::FALSE),
-    //         Predicate::NOT(x) => match x.keep_only(only) {
-    //             Some(x) => Some(Predicate::NOT(Box::new(x))),
-    //             None => None,
-    //         },
-    //         Predicate::AND(x) => {
-    //             let mut new: Vec<_> = x.iter().flat_map(|p| p.clone().keep_only(only)).collect();
-    //             new.dedup();
-    //             if new.len() == 0 {
-    //                 None
-    //             } else if new.len() == 1 {
-    //                 Some(new[0].clone())
-    //             } else {
-    //                 Some(Predicate::AND(new))
-    //             }
-    //         }
-    //         Predicate::OR(x) => {
-    //             let mut new: Vec<_> = x.iter().flat_map(|p| p.clone().keep_only(only)).collect();
-    //             new.dedup();
-    //             if new.len() == 0 {
-    //                 None
-    //             } else if new.len() == 1 {
-    //                 Some(new[0].clone())
-    //             } else {
-    //                 Some(Predicate::OR(new))
-    //             }
-    //         }
-    //         Predicate::EQ(x, y)
-    //         | Predicate::NEQ(x, y)
-    //         | Predicate::LTEQ(x, y)
-    //         | Predicate::GTEQ(x, y)
-    //         | Predicate::LT(x, y)
-    //         | Predicate::GT(x, y) => {
-    //             let remove_x = match x {
-    //                 SPWrapped::SPValue(_) => false,
-    //                 SPWrapped::SPVariable(vx) => !only.contains(&vx.name),
-    //             };
-    //             let remove_y = match y {
-    //                 SPWrapped::SPValue(_) => false,
-    //                 SPWrapped::SPVariable(vy) => !only.contains(&vy.name),
-    //             };
-
-    //             if remove_x || remove_y {
-    //                 None
-    //             } else {
-    //                 Some(self.clone())
-    //             }
-    //         }
-    //     }
-    // }
-
-    // /// Remove the variables in the predicate from the `remove` list.
-    // pub fn remove(&self, remove: &Vec<String>) -> Option<Predicate> {
-    //     match self {
-    //         Predicate::TRUE => Some(Predicate::TRUE),
-    //         Predicate::FALSE => Some(Predicate::FALSE),
-    //         Predicate::NOT(x) => match x.remove(remove) {
-    //             Some(x) => Some(Predicate::NOT(Box::new(x))),
-    //             None => None,
-    //         },
-    //         Predicate::AND(x) => {
-    //             let mut new: Vec<_> = x.iter().flat_map(|p| p.clone().remove(remove)).collect();
-    //             new.dedup();
-    //             if new.len() == 0 {
-    //                 None
-    //             } else if new.len() == 1 {
-    //                 Some(new[0].clone())
-    //             } else {
-    //                 Some(Predicate::AND(new))
-    //             }
-    //         }
-    //         Predicate::OR(x) => {
-    //             let mut new: Vec<_> = x.iter().flat_map(|p| p.clone().remove(remove)).collect();
-    //             new.dedup();
-    //             if new.len() == 0 {
-    //                 None
-    //             } else if new.len() == 1 {
-    //                 Some(new[0].clone())
-    //             } else {
-    //                 Some(Predicate::OR(new))
-    //             }
-    //         }
-    //         Predicate::EQ(x, y)
-    //         | Predicate::NEQ(x, y)
-    //         | Predicate::LTEQ(x, y)
-    //         | Predicate::GTEQ(x, y)
-    //         | Predicate::LT(x, y)
-    //         | Predicate::GT(x, y) => {
-    //             let remove_x = match x {
-    //                 SPWrapped::SPValue(_) => false,
-    //                 SPWrapped::SPVariable(vx) => remove.contains(&vx.name),
-    //             };
-    //             let remove_y = match y {
-    //                 SPWrapped::SPValue(_) => false,
-    //                 SPWrapped::SPVariable(vy) => remove.contains(&vy.name),
-    //             };
-
-    //             if remove_x || remove_y {
-    //                 None
-    //             } else {
-    //                 Some(self.clone())
-    //             }
-    //         }
-    //     }
-    // }
-
-    // pub fn get_predicate_vars(&self) -> Vec<SPVariable> {
-    //     let mut vars = match self {
-    //         Predicate::AND(preds) | Predicate::OR(preds) => {
-    //             preds.iter().flat_map(|p| p.get_predicate_vars()).collect()
-    //         }
-    //         Predicate::NOT(p) => p.get_predicate_vars(),
-    //         Predicate::EQ(lhs, rhs)
-    //         | Predicate::NEQ(lhs, rhs)
-    //         | Predicate::LTEQ(lhs, rhs)
-    //         | Predicate::GTEQ(lhs, rhs)
-    //         | Predicate::LT(lhs, rhs)
-    //         | Predicate::GT(lhs, rhs) => {
-    //             let mut found = Vec::new();
-    //             if let SPWrapped::SPVariable(v) = lhs {
-    //                 found.push(v.clone());
-    //             }
-    //             if let SPWrapped::SPVariable(v) = rhs {
-    //                 found.push(v.clone());
-    //             }
-    //             found
-    //         }
-    //         Predicate::TRUE | Predicate::FALSE => vec![],
-    //     };
-
-    //     vars.sort();
-    //     vars.dedup();
-    //     vars
-    // }
-
+    /// The names of every variable this predicate mentions, sorted and
+    /// deduplicated. Runners use these to build their state read sets.
     pub fn get_predicate_var_keys(&self) -> Vec<String> {
         self.get_predicate_vars()
             .iter()
             .map(|var| var.name.to_owned())
             .collect()
     }
-
 }
-// }
 
 impl fmt::Display for Predicate {
+    /// Renders the formula infix, e.g. `(a = true && !(b = false))`. This is
+    /// what a "please satisfy this guard" message is built from.
     fn fmt(&self, fmtr: &mut fmt::Formatter<'_>) -> fmt::Result {
         let s: String = match &self {
             Predicate::AND(x) => {
