@@ -33,3 +33,6 @@ serde_json = "1.0.140"
 testcontainers = "0.23.3"
 testcontainers-modules = { version = "0.11.6", features = ["redis"] }
 serial_test = "3.2.0"
+# Used by the emulators under `examples/`. Examples build with dev-dependencies,
+# so this stays off consumers' dependency graph.
+rand = "0.8"

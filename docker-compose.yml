@@ -1,0 +1,12 @@
+# Redis for the runners and the examples.
+#
+#   docker compose up -d
+#   cargo run --example sop_sequence
+#
+services:
+  redis:
+    image: redis
+    container_name: micro_sp_redis
+    ports:
+      - "6379:6379"
+    command: redis-server --save 60 1 --loglevel warning
