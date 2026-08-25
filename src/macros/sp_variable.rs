@@ -1,6 +1,6 @@
 //! Shorthand constructors for [`SPVariable`](crate::SPVariable)s.
 //!
-//! Each macro is sugar for `SPVariable::new(name, SPValueType::X)`, one per
+//! Each macro is syntactic sugar for `SPVariable::new(name, SPValueType::X)`, one per
 //! value type, so a model declaration reads as a list of names rather than as a
 //! wall of repeated constructor calls.
 

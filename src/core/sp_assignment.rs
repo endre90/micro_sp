@@ -39,9 +39,10 @@ impl SPAssignment {
         match var.has_type() == val.has_type() {
             true => SPAssignment { var, val },
             false => panic!(
-                "Wrong value type '{}' can't be assigned to a variable with type '{}'.",
-                var.has_type(),
-                val.has_type()
+                "Wrong value of type '{}' can't be assigned to a variable '{}' with type '{}'.",
+                val.has_type(),
+                var.name,
+                var.has_type()
             ),
         }
     }

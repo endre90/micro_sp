@@ -2,8 +2,8 @@
 //!
 //! Everything the runtime reasons about lives in a [`State`] - guards are
 //! evaluated against it, actions produce a new one, and [`StateManager`] mirrors
-//! it to and from Redis. Every method takes a `log_target`, the `log` crate
-//! target that misuse is reported under (typically the runner's name).
+//! it to and from Redis. Every method takes a `log_target`, to specofy
+//! who is emitting the log.
 //!
 //! The typed `get_*` accessors share one contract: a value of the wrong type is
 //! logged and replaced by `UNKNOWN` or a default, but a variable that is *not in
@@ -19,7 +19,8 @@ use std::{collections::HashMap, fmt};
 ///
 /// Maps a variable name to its [`SPAssignment`] (the [`SPVariable`] and its
 /// current [`SPValue`]). Most methods come in an owned form returning a new
-/// `State` and a `_mut` form modifying in place.
+/// `State` and a `_mut` form modifying in place. The reason why we don't only
+/// map to [`SPVlue`] is to have the access to the type during lookup.
 ///
 /// ```
 /// use micro_sp::*;

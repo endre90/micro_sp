@@ -1,8 +1,8 @@
 //! The value type of the whole crate.
 //!
 //! [`SPValue`] is what a variable in a [`State`](crate::State) holds. Every type it can take
-//! is *also* allowed to be `UNKNOWN`, which is what a freshly started system
-//! reads before anything has measured it. [`ToSPValue`] converts ordinary Rust
+//! is *also* allowed to be `UNKNOWN`, which is what a freshly started system usually
+//! assigns before anything has measured it. [`ToSPValue`] converts ordinary Rust
 //! values into `SPValue`s, and [`SPValueType`] is the type tag an
 //! [`SPVariable`](crate::SPVariable) declares.
 
@@ -13,7 +13,7 @@ use std::{fmt, time::SystemTime};
 /// A value held by a variable in a [`State`](crate::State).
 ///
 /// Each variant wraps an `...OrUnknown` enum, so any value can also be
-/// `UNKNOWN` - "this exists, but nothing has told us what it is yet".
+/// `UNKNOWN` - meaninng: "this exists, but nothing has told us what it is yet".
 ///
 /// ```
 /// use micro_sp::*;
@@ -22,7 +22,7 @@ use std::{fmt, time::SystemTime};
 /// assert_eq!(v.has_type(), SPValueType::Int64);
 /// assert_eq!(v.to_string(), "42");
 ///
-/// // Every type has an UNKNOWN inhabitant, and it keeps its type.
+/// // Every type has an UNKNOWN variant, and it keeps its type.
 /// let unknown = SPValue::Int64(IntOrUnknown::UNKNOWN);
 /// assert!(unknown.is_type(SPValueType::Int64));
 /// assert_eq!(unknown.to_string(), "UNKNOWN");
@@ -101,7 +101,7 @@ pub enum TimeOrUnknown {
 /// A list of [`SPValue`]s, or `UNKNOWN`.
 #[derive(Debug, PartialEq, Clone, Hash, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum ArrayOrUnknown {
-    /// A known array. Elements need not share a type.
+    /// A known array. Elements need not share a type, however, that is usually the case.
     Array(Vec<SPValue>),
     /// The array is not known.
     UNKNOWN,
