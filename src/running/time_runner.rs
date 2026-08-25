@@ -25,14 +25,7 @@ pub async fn time_interface_runner(
 
     log::info!(target: &log_target,  "Online.");
 
-    let mut keys: Vec<String> = vec![];
-    for timer_id in 1..=number_of_timers {
-        keys.push(format!("{}_timer_{}_request_trigger", sp_id, timer_id));
-        keys.push(format!("{}_timer_{}_request_state", sp_id, timer_id));
-        keys.push(format!("{}_timer_{}_command", sp_id, timer_id));
-        keys.push(format!("{}_timer_{}_duration_ms", sp_id, timer_id));
-        keys.push(format!("{}_timer_{}_elapsed_ms", sp_id, timer_id));
-    }
+    let keys = time_runner_keys(sp_id, number_of_timers);
 
     let mut con = connection_manager.get_connection().await;
 
@@ -48,80 +41,7 @@ pub async fn time_interface_runner(
             None => continue,
         };
 
-        // One accumulator for every timer, diffed and written once below.
-        let mut new_state = state.clone();
-
-        for timer_id in 1..=number_of_timers {
-            let mut request_trigger = state.get_bool_or_default_to_false(
-                &format!("{}_timer_{}_request_trigger", sp_id, timer_id),
-                &log_target,
-            );
-
-            let mut request_state = state.get_string_or_default_to_unknown(
-                &format!("{}_timer_{}_request_state", sp_id, timer_id),
-                &log_target,
-            );
-
-            let command = state.get_string_or_default_to_unknown(
-                &format!("{}_timer_{}_command", sp_id, timer_id),
-                &log_target,
-            );
-
-            let duration_ms = state.get_int_or_default_to_zero(
-                &format!("{}_timer_{}_duration_ms", sp_id, timer_id),
-                &log_target,
-            );
-
-            let mut elapsed_ms = state.get_int_or_default_to_zero(
-                &format!("{}_timer_{}_elapsed_ms", sp_id, timer_id),
-                &log_target,
-            );
-
-            if request_trigger {
-                request_trigger = false;
-                if matches!(ActionRequestState::from_str(&request_state), ActionRequestState::Initial) {
-                    match command.as_str() {
-                        "sleep" => {
-                            if duration_ms > 0 {
-                                log::info!(target: &log_target, "Starting sleep timer {} for {} ms.", timer_id, duration_ms);
-                                request_state = ActionRequestState::Executing.to_string();
-                                elapsed_ms = 0;
-                            } else {
-                                log::error!(target: &log_target, "Invalid sleep duration: {}. Must be > 0.", duration_ms);
-                                request_state = ActionRequestState::Failed.to_string();
-                            }
-                        }
-                        _ => {
-                            log::error!(target: &log_target, "Timer interface command '{}' is invalid.", command);
-                            request_state = ActionRequestState::Failed.to_string();
-                        }
-                    }
-                }
-            }
-
-            if matches!(ActionRequestState::from_str(&request_state), ActionRequestState::Executing) {
-                elapsed_ms += tick_elapsed_ms;
-
-                if elapsed_ms >= duration_ms {
-                    elapsed_ms = duration_ms;
-                    request_state = ActionRequestState::Succeeded.to_string();
-                    log::info!(target: &log_target, "Sleep timer {} finished.", timer_id);
-                }
-            }
-
-            new_state.update_mut(
-                &format!("{}_timer_{}_request_trigger", sp_id, timer_id),
-                request_trigger.to_spvalue(),
-            );
-            new_state.update_mut(
-                &format!("{}_timer_{}_request_state", sp_id, timer_id),
-                request_state.to_spvalue(),
-            );
-            new_state.update_mut(
-                &format!("{}_timer_{}_elapsed_ms", sp_id, timer_id),
-                elapsed_ms.to_spvalue(),
-            );
-        }
+        let new_state = time_tick(sp_id, &state, number_of_timers, tick_elapsed_ms, &log_target);
 
         let modified_state = state.get_diff_partial_state(&new_state);
         if !modified_state.state.is_empty() {
@@ -129,6 +49,115 @@ pub async fn time_interface_runner(
             StateManager::set_state(&mut con, &modified_state).await;
         }
     }
+}
+
+/// The keys the timer interface reads and writes, for `number_of_timers` timers.
+///
+/// Static for the lifetime of the runner - timers are numbered `1..=n` up front
+/// rather than created on demand - so a caller sharing one snapshot across
+/// several runners can fold this into its union once.
+pub fn time_runner_keys(sp_id: &str, number_of_timers: u64) -> Vec<String> {
+    let mut keys: Vec<String> = vec![];
+    for timer_id in 1..=number_of_timers {
+        keys.push(format!("{}_timer_{}_request_trigger", sp_id, timer_id));
+        keys.push(format!("{}_timer_{}_request_state", sp_id, timer_id));
+        keys.push(format!("{}_timer_{}_command", sp_id, timer_id));
+        keys.push(format!("{}_timer_{}_duration_ms", sp_id, timer_id));
+        keys.push(format!("{}_timer_{}_elapsed_ms", sp_id, timer_id));
+    }
+    keys
+}
+
+/// One tick of every timer: start the ones just requested, advance the running
+/// ones by `tick_elapsed_ms` of wall clock, and finish the ones that are due.
+///
+/// Pure - no Redis and no clock of its own - so the caller owns the read, the
+/// elapsed measurement and the write. [`time_interface_runner`] calls it with a
+/// snapshot of its own keys; the sequential runner calls it with the shared
+/// snapshot and threads the result into the next body.
+pub fn time_tick(
+    sp_id: &str,
+    state: &State,
+    number_of_timers: u64,
+    tick_elapsed_ms: i64,
+    log_target: &str,
+) -> State {
+    // One accumulator for every timer, diffed and written once below.
+    let mut new_state = state.clone();
+
+    for timer_id in 1..=number_of_timers {
+        let mut request_trigger = state.get_bool_or_default_to_false(
+            &format!("{}_timer_{}_request_trigger", sp_id, timer_id),
+            &log_target,
+        );
+
+        let mut request_state = state.get_string_or_default_to_unknown(
+            &format!("{}_timer_{}_request_state", sp_id, timer_id),
+            &log_target,
+        );
+
+        let command = state.get_string_or_default_to_unknown(
+            &format!("{}_timer_{}_command", sp_id, timer_id),
+            &log_target,
+        );
+
+        let duration_ms = state.get_int_or_default_to_zero(
+            &format!("{}_timer_{}_duration_ms", sp_id, timer_id),
+            &log_target,
+        );
+
+        let mut elapsed_ms = state.get_int_or_default_to_zero(
+            &format!("{}_timer_{}_elapsed_ms", sp_id, timer_id),
+            &log_target,
+        );
+
+        if request_trigger {
+            request_trigger = false;
+            if matches!(ActionRequestState::from_str(&request_state), ActionRequestState::Initial) {
+                match command.as_str() {
+                    "sleep" => {
+                        if duration_ms > 0 {
+                            log::info!(target: &log_target, "Starting sleep timer {} for {} ms.", timer_id, duration_ms);
+                            request_state = ActionRequestState::Executing.to_string();
+                            elapsed_ms = 0;
+                        } else {
+                            log::error!(target: &log_target, "Invalid sleep duration: {}. Must be > 0.", duration_ms);
+                            request_state = ActionRequestState::Failed.to_string();
+                        }
+                    }
+                    _ => {
+                        log::error!(target: &log_target, "Timer interface command '{}' is invalid.", command);
+                        request_state = ActionRequestState::Failed.to_string();
+                    }
+                }
+            }
+        }
+
+        if matches!(ActionRequestState::from_str(&request_state), ActionRequestState::Executing) {
+            elapsed_ms += tick_elapsed_ms;
+
+            if elapsed_ms >= duration_ms {
+                elapsed_ms = duration_ms;
+                request_state = ActionRequestState::Succeeded.to_string();
+                log::info!(target: &log_target, "Sleep timer {} finished.", timer_id);
+            }
+        }
+
+        new_state.update_mut(
+            &format!("{}_timer_{}_request_trigger", sp_id, timer_id),
+            request_trigger.to_spvalue(),
+        );
+        new_state.update_mut(
+            &format!("{}_timer_{}_request_state", sp_id, timer_id),
+            request_state.to_spvalue(),
+        );
+        new_state.update_mut(
+            &format!("{}_timer_{}_elapsed_ms", sp_id, timer_id),
+            elapsed_ms.to_spvalue(),
+        );
+    }
+
+    new_state
 }
 
 /// The timer interface, driven end to end against a real Redis.

@@ -7,17 +7,28 @@
 //! Redis.
 
 
-use crate::{running::goal_runner::goal_runner, transforms::interface::tf_interface, *};
+use crate::{
+    running::{goal_runner::goal_runner, sequential::sequential_runner},
+    transforms::interface::tf_interface,
+    *,
+};
 use std::sync::Arc;
 
 /// Spawn the whole runner stack for `model` and return immediately.
 ///
-/// Initialises logging and the activity log, then spawns eight detached tokio
-/// tasks - planner ticker, SOP runner, plan runner, auto transition runner, auto
-/// operation runner, timer interface, goal runner and transform interface - each
-/// of which loops forever polling Redis. Every runner reads and writes
-/// `{sp_id}_*` keys plus the model's own variables; see the individual runners
-/// for their key sets.
+/// Initialises logging and the activity log, then spawns
+/// [`sequential_runner`]: one detached task that
+/// drives every runner - planner ticker, SOP runner, plan runner, auto
+/// transition runner, auto operation runner, timer interface, goal runner and
+/// transform interface - in that order, off one snapshot per tick. Every runner
+/// reads and writes `{sp_id}_*` keys plus the model's own variables; see the
+/// individual runners for their key sets.
+///
+/// With `MICRO_SP_SEQUENTIAL=0` the eight run as separate detached tasks
+/// instead, each polling Redis on its own. That is the arrangement in which two
+/// runners can decide from the same stale read and the later write wins, so it
+/// is an escape hatch rather than a supported mode - see
+/// [`sequential_runner_enabled`].
 ///
 /// * `sp_id` - the namespace every runner key is prefixed with.
 /// * `model` - the operations, automatic transitions and SOPs to execute. Moved
@@ -58,6 +69,11 @@ pub async fn main_runner(
     // One deep copy of the model for the whole process; every task below holds
     // an `Arc::clone` of it.
     let model = Arc::new(model);
+
+    if sequential_runner_enabled() {
+        spawn_sequential_runner(sp_id, &model, number_of_timers, connection_manager);
+        return;
+    }
 
     log::info!(target: &format!("{sp_id}_micro_sp"), "Spawning planner.");
     let model_clone = Arc::clone(&model);
@@ -142,6 +158,57 @@ pub async fn main_runner(
 /// entirely through shared keys written by different tasks on different timers.
 /// If a key name, a state string or a handshake order drifts on one side only,
 /// this is the test that notices.
+/// Whether [`main_runner`] drives everything from one sequential loop.
+///
+/// On by default. `MICRO_SP_SEQUENTIAL=0`/`false` goes back to the eight
+/// separate tasks, which is worth having while the two are being compared - but
+/// note that arrangement is what makes read-modify-write across runners
+/// non-atomic in the first place, so it is an escape hatch, not a supported
+/// mode. See [`crate::running::sequential`].
+pub fn sequential_runner_enabled() -> bool {
+    match std::env::var("MICRO_SP_SEQUENTIAL") {
+        Ok(value) => !matches!(value.trim().to_ascii_lowercase().as_str(), "0" | "false"),
+        Err(_) => true,
+    }
+}
+
+/// Spawn the sequential runner and take the process down if it ever stops.
+///
+/// The loop is not supposed to return at all, so both a panic and an `Err` mean
+/// the control system is gone. Exiting says so. The alternative is what the
+/// eight-task arrangement does: `.unwrap()` inside a detached task, so a runner
+/// that dies takes no one with it and nothing observes that it is missing - the
+/// system keeps running, minus a runner, for as long as nobody notices.
+fn spawn_sequential_runner(
+    sp_id: &String,
+    model: &Arc<Model>,
+    number_of_timers: u64,
+    connection_manager: &Arc<ConnectionManager>,
+) {
+    let log_target = format!("{sp_id}_micro_sp");
+    log::info!(target: &log_target, "Spawning sequential runner.");
+
+    let model_clone = Arc::clone(model);
+    let con_clone = connection_manager.clone();
+    let sp_id_clone = sp_id.clone();
+    let handle = tokio::task::spawn(async move {
+        sequential_runner(&sp_id_clone, &model_clone, &con_clone, number_of_timers)
+            .await
+            .map_err(|e| e.to_string())
+    });
+
+    tokio::task::spawn(async move {
+        let reason = match handle.await {
+            Ok(Ok(())) => "the sequential runner returned".to_string(),
+            Ok(Err(e)) => format!("the sequential runner failed: {e}"),
+            Err(e) => format!("the sequential runner panicked: {e}"),
+        };
+        log::error!(target: &log_target, "{reason}. Exiting.");
+        activity_log::flush();
+        std::process::exit(1);
+    });
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

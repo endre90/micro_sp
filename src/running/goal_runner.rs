@@ -276,7 +276,33 @@ pub async fn goal_runner(
     // For nicer logging
     let mut goal_info_old = String::new();
 
-    let keys: Vec<String> = vec![
+    let keys = goal_runner_keys(sp_id);
+
+    let mut con = connection_manager.get_connection().await;
+
+    loop {
+        interval.tick().await;
+        let state = match StateManager::get_state_for_keys(&mut con, &keys, &log_target).await {
+            Some(s) => s,
+            None => continue,
+        };
+
+        let new_state = goal_tick(sp_id, &mut con, &state, &mut goal_info_old, &log_target).await;
+
+        let modified_state = state.get_diff_partial_state(&new_state);
+        if !modified_state.state.is_empty() {
+            activity_log::log_state_diff(&log_target, &state, &modified_state);
+            StateManager::set_state(&mut con, &modified_state).await;
+        }
+    }
+}
+
+/// The keys the goal runner reads and writes.
+///
+/// Static for the lifetime of the runner, so a caller sharing one snapshot
+/// across several runners can fold this into its union once.
+pub fn goal_runner_keys(sp_id: &str) -> Vec<String> {
+    vec![
         format!("{}_current_goal_state", sp_id),
         format!("{}_current_goal_id", sp_id),
         format!("{}_current_goal_predicate", sp_id),
@@ -290,247 +316,273 @@ pub async fn goal_runner(
         format!("{}_replanned", sp_id),
         format!("{}_plan_current_step", sp_id),
         format!("{}_replan_for_same_goal", sp_id),
-    ];
+    ]
+}
 
-    let mut con = connection_manager.get_connection().await;
+/// One tick of goal admission: drain whatever was posted, keep the queue in
+/// priority order, promote one goal at a time, trigger the planner for it, and
+/// advance the current goal on what the plan runner reported.
+///
+/// `goal_info_old` is the last line this runner logged, carried across ticks so
+/// the same message is not repeated every 5 ms. `con` is needed for exactly one
+/// thing - the atomic drain of `{sp_id}_incoming_goals` - and the caller still
+/// owns the snapshot and the write. [`goal_runner`] calls it with a snapshot of
+/// its own keys; the sequential runner calls it with the shared snapshot and
+/// threads the result into the next body.
+pub async fn goal_tick(
+    sp_id: &str,
+    con: &mut SPConnection,
+    state: &State,
+    goal_info_old: &mut String,
+    log_target: &str,
+) -> State {
+    let current_goal_state = state.get_string_or_default_to_unknown(
+        &format!("{}_current_goal_state", sp_id),
+        &log_target,
+    );
 
-    loop {
-        interval.tick().await;
-        let state = match StateManager::get_state_for_keys(&mut con, &keys, &log_target).await {
-            Some(s) => s,
-            None => continue,
-        };
+    let mut goal_runner_information = state.get_string_or_default_to_unknown(
+        &format!("{}_goal_runner_information", sp_id),
+        &log_target,
+    );
 
-        let current_goal_state = state.get_string_or_default_to_unknown(
-            &format!("{}_current_goal_state", sp_id),
-            &log_target,
-        );
+    let current_goal_id = state
+        .get_string_or_default_to_unknown(&format!("{}_current_goal_id", sp_id), &log_target);
 
-        let mut goal_runner_information = state.get_string_or_default_to_unknown(
-            &format!("{}_goal_runner_information", sp_id),
-            &log_target,
-        );
+    let current_goal_predicate = state.get_string_or_default_to_unknown(
+        &format!("{}_current_goal_predicate", sp_id),
+        &log_target,
+    );
 
-        let current_goal_id = state
-            .get_string_or_default_to_unknown(&format!("{}_current_goal_id", sp_id), &log_target);
+    let replan_for_same_goal = state
+        .get_bool_or_default_to_false(&format!("{}_replan_for_same_goal", sp_id), &log_target);
 
-        let current_goal_predicate = state.get_string_or_default_to_unknown(
-            &format!("{}_current_goal_predicate", sp_id),
-            &log_target,
-        );
+    let plan_state =
+        state.get_string_or_default_to_unknown(&format!("{}_plan_state", sp_id), &log_target);
 
-        let replan_for_same_goal = state
-            .get_bool_or_default_to_false(&format!("{}_replan_for_same_goal", sp_id), &log_target);
+    let scheduled_goals_sp_val =
+        state.get_array_or_default_to_empty(&format!("{}_scheduled_goals", sp_id), &log_target);
 
-        let plan_state =
-            state.get_string_or_default_to_unknown(&format!("{}_plan_state", sp_id), &log_target);
-
-        let scheduled_goals_sp_val =
-            state.get_array_or_default_to_empty(&format!("{}_scheduled_goals", sp_id), &log_target);
-
-        let mut scheduled_goals = vec![];
-        for goal_sp_val in scheduled_goals_sp_val {
-            match sp_value_to_goal(&goal_sp_val) {
-                Ok(goal) => scheduled_goals.push(goal),
-                Err(_) => (),
-            }
-        }
-
-        let incoming_goals_sp_val =
-            state.get_array_or_default_to_empty(&format!("{}_incoming_goals", sp_id), &log_target);
-
-        let mut incoming_goals = vec![];
-        for goal_sp_val in incoming_goals_sp_val {
-            match sp_value_to_goal(&goal_sp_val) {
-                Ok(goal) => incoming_goals.push(goal),
-                Err(_) => (),
-            }
-        }
-
-        if goal_info_old != goal_runner_information {
-            if goal_runner_information != "UNKNOWN".to_string() {
-                log::info!(target: &format!("{}_goal_runner", sp_id), "{goal_runner_information}");
-            }
-
-            goal_info_old = goal_runner_information.clone()
-        }
-
-        let mut new_state = state.clone();
-
-        // Handle incoming goals first. A goal gets its unique id exactly once,
-        // here, as it is admitted to the queue - goals already scheduled keep
-        // theirs. Re-generating the whole queue's ids on every tick (which is
-        // what this used to do) made the serialised value differ every time, so
-        // an MSET went out 10x/s for as long as anything was queued, and a
-        // goal's id changed while it waited.
-        let scheduled_goals = admit_goals(scheduled_goals, incoming_goals);
-
-        let scheduled_goals_sp_values: Vec<SPValue> = scheduled_goals
-            .iter()
-            .map(|x| goal_to_sp_value(x))
-            .collect();
-        new_state.update_mut(
-            &format!("{}_scheduled_goals", sp_id),
-            scheduled_goals_sp_values.to_spvalue(),
-        );
-        new_state.update_mut(
-            &format!("{}_incoming_goals", sp_id),
-            Vec::<SPValue>::new().to_spvalue(),
-        );
-
-        match GoalState::from_str(&current_goal_state) {
-            GoalState::Initial => {
-                if replan_for_same_goal {  // This should be Option(number of replans) for every goal
-                    goal_runner_information = format!(
-                        "Replan for same goal {}: \n       {}",
-                        current_goal_id, current_goal_predicate
-                    );
-                    new_state.update_mut(
-                        &format!("{}_replan_for_same_goal", sp_id),
-                        false.to_spvalue(),
-                    );
-                    new_state.update_mut(&format!("{}_replan_trigger", sp_id), true.to_spvalue());
-                    new_state.update_mut(&format!("{}_replanned", sp_id), false.to_spvalue());
-                    new_state.update_mut(&format!("{}_plan_current_step", sp_id), 0.to_spvalue());
-                    new_state
-                        .update_mut(&format!("{}_plan", sp_id), Vec::<String>::new().to_spvalue());
-                    new_state.update_mut(&format!("{}_plan_state", sp_id), "initial".to_spvalue());
-                    new_state.update_mut(&format!("{}_planner_state", sp_id), "ready".to_spvalue());
-                } else {
-                    if !scheduled_goals.is_empty() {
-                        match scheduled_goals.split_first() {
-                            Some((current, rest)) => {
-                                let rest_of_the_goals: Vec<SPValue> =
-                                    rest.iter().map(|x| goal_to_sp_value(x)).collect();
-                                goal_runner_information = format!(
-                                    "Initializing new goal {}: \n       {}",
-                                    current.id, current.predicate
-                                );
-                                new_state.update_mut(
-                                    &format!("{}_scheduled_goals", sp_id),
-                                    rest_of_the_goals.to_spvalue(),
-                                );
-                                new_state.update_mut(
-                                    &format!("{}_current_goal_id", sp_id),
-                                    current.id.to_string().to_spvalue(),
-                                );
-                                new_state.update_mut(
-                                    &format!("{}_current_goal_state", sp_id),
-                                    GoalState::Executing.to_string().to_spvalue(),
-                                );
-                                new_state.update_mut(
-                                    &format!("{}_current_goal_predicate", sp_id),
-                                    current.predicate.to_string().to_spvalue(),
-                                );
-                                new_state
-                                    .update_mut(&format!("{}_replan_trigger", sp_id), true.to_spvalue());
-                                new_state
-                                    .update_mut(&format!("{}_replanned", sp_id), false.to_spvalue());
-                                new_state
-                                    .update_mut(&format!("{}_plan_current_step", sp_id), 0.to_spvalue());
-                                new_state.update_mut(
-                                    &format!("{}_plan", sp_id),
-                                    Vec::<String>::new().to_spvalue(),
-                                );
-                                new_state
-                                    .update_mut(&format!("{}_plan_state", sp_id), "initial".to_spvalue());
-                                new_state
-                                    .update_mut(&format!("{}_planner_state", sp_id), "ready".to_spvalue());
-                            }
-                            None => {
-                                log::error!(target: log_target, "This shouldn't happen, investigate.")
-                            }
-                        }
-                    } else {
-                        goal_runner_information =
-                            "No goals scheduled, goal list is empty.".to_string();
-                    }
-                }
-            }
-
-            GoalState::Executing => {
-                goal_runner_information = format!(
-                    "Executing goal {}: \n       {}",
-                    current_goal_id, current_goal_predicate
-                );
-                match PlanState::from_str(&plan_state) {
-                    PlanState::Initial => (),
-                    PlanState::Executing => (),
-                    PlanState::Failed => {
-                        new_state.update_mut(
-                            &format!("{}_current_goal_state", sp_id),
-                            GoalState::Failed.to_string().to_spvalue(),
-                        )
-                    }
-                    PlanState::Completed => {
-                        new_state.update_mut(
-                            &format!("{}_current_goal_state", sp_id),
-                            GoalState::Completed.to_string().to_spvalue(),
-                        )
-                    }
-                    PlanState::Cancelled => {
-                        new_state.update_mut(
-                            &format!("{}_current_goal_state", sp_id),
-                            GoalState::Cancelled.to_string().to_spvalue(),
-                        )
-                    }
-                    PlanState::UNKNOWN => {
-                        new_state.update_mut(
-                            &format!("{}_current_goal_state", sp_id),
-                            GoalState::UNKNOWN.to_string().to_spvalue(),
-                        )
-                    }
-                }
-            }
-
-            // Plan fails only if operation is unrecoverable, so it is ok to go to initial here.
-            GoalState::Failed => {
-                goal_runner_information = format!(
-                    "Goal {} failed: \n       {}",
-                    current_goal_id, current_goal_predicate
-                );
-                new_state.update_mut(
-                    &format!("{}_current_goal_state", sp_id),
-                    GoalState::Initial.to_string().to_spvalue(),
-                )
-            }
-            GoalState::Completed => {
-                goal_runner_information = format!(
-                    "Goal {} completed: \n       {}",
-                    current_goal_id, current_goal_predicate
-                );
-                new_state.update_mut(
-                    &format!("{}_current_goal_state", sp_id),
-                    GoalState::Initial.to_string().to_spvalue(),
-                )
-            }
-            GoalState::Cancelled => {
-                goal_runner_information = format!(
-                    "Goal {} cancelled: \n       {}",
-                    current_goal_id, current_goal_predicate
-                );
-                new_state.update_mut(
-                    &format!("{}_current_goal_state", sp_id),
-                    GoalState::Initial.to_string().to_spvalue(),
-                )
-            }
-            GoalState::UNKNOWN => {
-                new_state.update_mut(
-                    &format!("{}_current_goal_state", sp_id),
-                    GoalState::Initial.to_string().to_spvalue(),
-                )
-            }
-        }
-        new_state.update_mut(
-            &format!("{}_goal_runner_information", sp_id),
-            goal_runner_information.to_spvalue(),
-        );
-        let modified_state = state.get_diff_partial_state(&new_state);
-        if !modified_state.state.is_empty() {
-            activity_log::log_state_diff(&log_target, &state, &modified_state);
-            StateManager::set_state(&mut con, &modified_state).await;
+    let mut scheduled_goals = vec![];
+    for goal_sp_val in scheduled_goals_sp_val {
+        match sp_value_to_goal(&goal_sp_val) {
+            Ok(goal) => scheduled_goals.push(goal),
+            Err(_) => (),
         }
     }
+
+    // Drain the queue with an atomic take instead of reading it here and
+    // blind-writing an empty array back at the end of the tick.
+    // `_incoming_goals` is written by whatever is asking for work - a
+    // dashboard, a bridge, another process - so a goal posted between that
+    // read and that write would be erased, and because the poster's own
+    // write succeeded nothing would ever retry it.
+    //
+    // The snapshot decides only *whether* to drain. An empty one means
+    // there is nothing to take and the tick issues no write at all; a goal
+    // landing right afterwards stays in the key and the next tick sees it.
+    let incoming_goals_key = format!("{}_incoming_goals", sp_id);
+    let incoming_goals_sp_val = if state
+        .get_array_or_default_to_empty(&incoming_goals_key, &log_target)
+        .is_empty()
+    {
+        vec![]
+    } else {
+        match StateManager::take_sp_value(
+            con,
+            &incoming_goals_key,
+            &Vec::<SPValue>::new().to_spvalue(),
+        )
+        .await
+        {
+            Some(SPValue::Array(ArrayOrUnknown::Array(goals))) => goals,
+            _ => vec![],
+        }
+    };
+
+    let mut incoming_goals = vec![];
+    for goal_sp_val in incoming_goals_sp_val {
+        match sp_value_to_goal(&goal_sp_val) {
+            Ok(goal) => incoming_goals.push(goal),
+            Err(_) => (),
+        }
+    }
+
+    if *goal_info_old != goal_runner_information {
+        if goal_runner_information != "UNKNOWN".to_string() {
+            log::info!(target: &format!("{}_goal_runner", sp_id), "{goal_runner_information}");
+        }
+
+        *goal_info_old = goal_runner_information.clone()
+    }
+
+    let mut new_state = state.clone();
+
+    // Handle incoming goals first. A goal gets its unique id exactly once,
+    // here, as it is admitted to the queue - goals already scheduled keep
+    // theirs. Re-generating the whole queue's ids on every tick (which is
+    // what this used to do) made the serialised value differ every time, so
+    // an MSET went out 10x/s for as long as anything was queued, and a
+    // goal's id changed while it waited.
+    let scheduled_goals = admit_goals(scheduled_goals, incoming_goals);
+
+    let scheduled_goals_sp_values: Vec<SPValue> = scheduled_goals
+        .iter()
+        .map(|x| goal_to_sp_value(x))
+        .collect();
+    new_state.update_mut(
+        &format!("{}_scheduled_goals", sp_id),
+        scheduled_goals_sp_values.to_spvalue(),
+    );
+
+    match GoalState::from_str(&current_goal_state) {
+        GoalState::Initial => {
+            if replan_for_same_goal {  // This should be Option(number of replans) for every goal
+                goal_runner_information = format!(
+                    "Replan for same goal {}: \n       {}",
+                    current_goal_id, current_goal_predicate
+                );
+                new_state.update_mut(
+                    &format!("{}_replan_for_same_goal", sp_id),
+                    false.to_spvalue(),
+                );
+                new_state.update_mut(&format!("{}_replan_trigger", sp_id), true.to_spvalue());
+                new_state.update_mut(&format!("{}_replanned", sp_id), false.to_spvalue());
+                new_state.update_mut(&format!("{}_plan_current_step", sp_id), 0.to_spvalue());
+                new_state
+                    .update_mut(&format!("{}_plan", sp_id), Vec::<String>::new().to_spvalue());
+                new_state.update_mut(&format!("{}_plan_state", sp_id), "initial".to_spvalue());
+                new_state.update_mut(&format!("{}_planner_state", sp_id), "ready".to_spvalue());
+            } else {
+                if !scheduled_goals.is_empty() {
+                    match scheduled_goals.split_first() {
+                        Some((current, rest)) => {
+                            let rest_of_the_goals: Vec<SPValue> =
+                                rest.iter().map(|x| goal_to_sp_value(x)).collect();
+                            goal_runner_information = format!(
+                                "Initializing new goal {}: \n       {}",
+                                current.id, current.predicate
+                            );
+                            new_state.update_mut(
+                                &format!("{}_scheduled_goals", sp_id),
+                                rest_of_the_goals.to_spvalue(),
+                            );
+                            new_state.update_mut(
+                                &format!("{}_current_goal_id", sp_id),
+                                current.id.to_string().to_spvalue(),
+                            );
+                            new_state.update_mut(
+                                &format!("{}_current_goal_state", sp_id),
+                                GoalState::Executing.to_string().to_spvalue(),
+                            );
+                            new_state.update_mut(
+                                &format!("{}_current_goal_predicate", sp_id),
+                                current.predicate.to_string().to_spvalue(),
+                            );
+                            new_state
+                                .update_mut(&format!("{}_replan_trigger", sp_id), true.to_spvalue());
+                            new_state
+                                .update_mut(&format!("{}_replanned", sp_id), false.to_spvalue());
+                            new_state
+                                .update_mut(&format!("{}_plan_current_step", sp_id), 0.to_spvalue());
+                            new_state.update_mut(
+                                &format!("{}_plan", sp_id),
+                                Vec::<String>::new().to_spvalue(),
+                            );
+                            new_state
+                                .update_mut(&format!("{}_plan_state", sp_id), "initial".to_spvalue());
+                            new_state
+                                .update_mut(&format!("{}_planner_state", sp_id), "ready".to_spvalue());
+                        }
+                        None => {
+                            log::error!(target: log_target, "This shouldn't happen, investigate.")
+                        }
+                    }
+                } else {
+                    goal_runner_information =
+                        "No goals scheduled, goal list is empty.".to_string();
+                }
+            }
+        }
+
+        GoalState::Executing => {
+            goal_runner_information = format!(
+                "Executing goal {}: \n       {}",
+                current_goal_id, current_goal_predicate
+            );
+            match PlanState::from_str(&plan_state) {
+                PlanState::Initial => (),
+                PlanState::Executing => (),
+                PlanState::Failed => {
+                    new_state.update_mut(
+                        &format!("{}_current_goal_state", sp_id),
+                        GoalState::Failed.to_string().to_spvalue(),
+                    )
+                }
+                PlanState::Completed => {
+                    new_state.update_mut(
+                        &format!("{}_current_goal_state", sp_id),
+                        GoalState::Completed.to_string().to_spvalue(),
+                    )
+                }
+                PlanState::Cancelled => {
+                    new_state.update_mut(
+                        &format!("{}_current_goal_state", sp_id),
+                        GoalState::Cancelled.to_string().to_spvalue(),
+                    )
+                }
+                PlanState::UNKNOWN => {
+                    new_state.update_mut(
+                        &format!("{}_current_goal_state", sp_id),
+                        GoalState::UNKNOWN.to_string().to_spvalue(),
+                    )
+                }
+            }
+        }
+
+        // Plan fails only if operation is unrecoverable, so it is ok to go to initial here.
+        GoalState::Failed => {
+            goal_runner_information = format!(
+                "Goal {} failed: \n       {}",
+                current_goal_id, current_goal_predicate
+            );
+            new_state.update_mut(
+                &format!("{}_current_goal_state", sp_id),
+                GoalState::Initial.to_string().to_spvalue(),
+            )
+        }
+        GoalState::Completed => {
+            goal_runner_information = format!(
+                "Goal {} completed: \n       {}",
+                current_goal_id, current_goal_predicate
+            );
+            new_state.update_mut(
+                &format!("{}_current_goal_state", sp_id),
+                GoalState::Initial.to_string().to_spvalue(),
+            )
+        }
+        GoalState::Cancelled => {
+            goal_runner_information = format!(
+                "Goal {} cancelled: \n       {}",
+                current_goal_id, current_goal_predicate
+            );
+            new_state.update_mut(
+                &format!("{}_current_goal_state", sp_id),
+                GoalState::Initial.to_string().to_spvalue(),
+            )
+        }
+        GoalState::UNKNOWN => {
+            new_state.update_mut(
+                &format!("{}_current_goal_state", sp_id),
+                GoalState::Initial.to_string().to_spvalue(),
+            )
+        }
+    }
+    new_state.update_mut(
+        &format!("{}_goal_runner_information", sp_id),
+        goal_runner_information.to_spvalue(),
+    );
+    new_state
 }
 
 #[cfg(test)]

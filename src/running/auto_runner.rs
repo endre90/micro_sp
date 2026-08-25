@@ -46,13 +46,7 @@ pub async fn auto_transition_runner(
     activity_log::init_from_env();
     let mut interval = runner_interval();
     let log_target = format!("{}_auto_transition_runner", name);
-    let keys: Vec<String> = normalize_keys(
-        model
-            .auto_transitions
-            .iter()
-            .flat_map(|t| t.get_all_var_keys())
-            .collect(),
-    );
+    let keys = auto_transition_runner_keys(model);
 
     log::info!(target: &log_target, "Online.");
 
@@ -65,12 +59,7 @@ pub async fn auto_transition_runner(
             None => continue,
         };
 
-        // One `State` threaded through every transition, so each sees what the
-        // ones before it did, and one write for the whole tick.
-        let mut new_state = state.clone();
-        for t in &model.auto_transitions {
-            process_transition(t, &mut new_state, &log_target);
-        }
+        let new_state = auto_transition_tick(model, &state, &log_target);
 
         let modified_state = state.get_diff_partial_state(&new_state);
         if !modified_state.state.is_empty() {
@@ -78,6 +67,37 @@ pub async fn auto_transition_runner(
             StateManager::set_state(&mut con, &modified_state).await;
         }
     }
+}
+
+/// Every variable the model's automatic transitions mention.
+///
+/// Static for the lifetime of the runner, so a caller sharing one snapshot
+/// across several runners can fold this into its union once.
+pub fn auto_transition_runner_keys(model: &Model) -> Vec<String> {
+    normalize_keys(
+        model
+            .auto_transitions
+            .iter()
+            .flat_map(|t| t.get_all_var_keys())
+            .collect(),
+    )
+}
+
+/// One tick of the automatic transitions: every guard evaluated once against
+/// `state`, returning the state they leave behind.
+///
+/// Pure - no Redis, no clock, nothing carried between ticks - so the caller owns
+/// the read and the write. [`auto_transition_runner`] calls it with a snapshot
+/// of its own key set; the sequential runner calls it with the shared snapshot
+/// and threads the result into the next body.
+pub fn auto_transition_tick(model: &Model, state: &State, log_target: &str) -> State {
+    // One `State` threaded through every transition, so each sees what the ones
+    // before it did, and one write for the whole tick.
+    let mut new_state = state.clone();
+    for t in &model.auto_transitions {
+        process_transition(t, &mut new_state, log_target);
+    }
+    new_state
 }
 
 /// Runs the automatic operation executor until the process ends.
@@ -97,12 +117,7 @@ pub async fn auto_operation_runner(
     let mut interval = runner_interval();
     let log_target = format!("{}_operation_runner", sp_id);
 
-    let mut active_auto_ops: Vec<Operation> = vec![];
-    let mut active_mutexed_op: Option<Operation> = None;
-    let mut terminated_operations: Vec<String> = vec![];
-
-    let static_keys = auto_operation_runner_static_keys(sp_id, &model);
-    let mut keys = static_keys.clone();
+    let mut ctx = AutoOperationCtx::new(sp_id, model);
     let read_full_state = read_full_state_enabled();
     if read_full_state {
         log::warn!(target: &log_target, "MICRO_SP_READ_FULL_STATE is set: reading the whole keyspace every tick.");
@@ -119,142 +134,204 @@ pub async fn auto_operation_runner(
 
         let read = match read_full_state {
             true => StateManager::get_full_state(&mut con).await,
-            false => StateManager::get_state_for_keys(&mut con, &keys, &log_target).await,
+            false => StateManager::get_state_for_keys(&mut con, &ctx.keys, &log_target).await,
         };
         let state = match read {
             Some(s) => s,
             None => continue,
         };
 
-        let mut new_state = state.clone();
-        let mut new_op_ids = vec![];
-
-        for op in &model.auto_operations {
-            if op.eval(&state, &log_target) {
-                let prefix = format!("{}_", op.name);
-                if !active_auto_ops.iter().any(|a| a.name.starts_with(&prefix)) {
-                    let unique_id = nanoid::nanoid!(10, &NANOID_ALPHABET);
-                    let unique_op_id = format!("{}{}", prefix, unique_id);
-                    let mut op_mut = op.clone();
-                    op_mut.name = unique_op_id.clone();
-                    active_auto_ops.push(op_mut);
-                    new_op_ids.push(unique_op_id);
-                }
-            }
-        }
-
-        if active_mutexed_op.is_none() {
-            for op in &model.mutexed_auto_operations {
-                if op.eval(&state, &log_target) {
-                    let prefix = format!("{}_", op.name);
-                    let unique_id = nanoid::nanoid!(10, &NANOID_ALPHABET);
-                    let unique_op_id = format!("{}{}", prefix, unique_id);
-                    let mut op_mut = op.clone();
-                    op_mut.name = unique_op_id.clone();
-                    
-                    active_mutexed_op = Some(op_mut);
-                    new_op_ids.push(unique_op_id);
-                    
-                    break;
-                }
-            }
-        }
-
-        if !new_op_ids.is_empty() {
-            new_state =
-                add_operation_meta_tracking_variables(&new_op_ids, &new_state, false, &log_target);
-            new_state = add_operation_state_tracking_variable(&new_op_ids, &new_state, &log_target);
-        }
-
-        let mut next_active_auto_ops = vec![];
-        for current_active_op in active_auto_ops {
-            new_state = process_operation(
-                &sp_id,
-                new_state,
-                &current_active_op,
-                OperationProcessingType::Automatic,
-                None,
-                None,
-                tick_elapsed_ms,
-                &log_target,
-            )
-            .await;
-
-            let operation_state = new_state.get_string_or_default_to_unknown(
-                &format!("{}", current_active_op.name),
-                &log_target,
-            );
-
-            match OperationState::from_str(&operation_state) {
-                OperationState::Terminated(_) => {
-                    terminated_operations.push(current_active_op.name.clone());
-                }
-                _ => next_active_auto_ops.push(current_active_op),
-            };
-        }
-        active_auto_ops = next_active_auto_ops;
-
-        let mut next_active_mutexed_op = None;
-        if let Some(current_active_op) = active_mutexed_op {
-            new_state = process_operation(
-                &sp_id,
-                new_state,
-                &current_active_op,
-                OperationProcessingType::Automatic,
-                None,
-                None,
-                tick_elapsed_ms,
-                &log_target,
-            )
-            .await;
-
-            let operation_state = new_state.get_string_or_default_to_unknown(
-                &format!("{}", current_active_op.name),
-                &log_target,
-            );
-
-            match OperationState::from_str(&operation_state) {
-                OperationState::Terminated(_) => {
-                    terminated_operations.push(current_active_op.name.clone());
-                }
-                _ => {
-                    next_active_mutexed_op = Some(current_active_op);
-                }
-            };
-        }
-        active_mutexed_op = next_active_mutexed_op;
+        let (new_state, deletes) = auto_operation_tick(
+            sp_id,
+            model,
+            &state,
+            &mut ctx,
+            tick_elapsed_ms,
+            &log_target,
+        )
+        .await;
 
         let modified_state = state.get_diff_partial_state_and_add_missing(&new_state);
         activity_log::log_state_diff(&log_target, &state, &modified_state);
-        let active_set_changed = !new_op_ids.is_empty() || !terminated_operations.is_empty();
+        StateManager::apply(&mut con, &modified_state, &[&deletes]).await;
+    }
+}
 
-        let mut terminated_operations_meta = vec![];
-        for op in &terminated_operations {
-            terminated_operations_meta.push(format!("{}_information", op));
-            terminated_operations_meta.push(format!("{}_failure_retry_counter", op));
-            terminated_operations_meta.push(format!("{}_timeout_retry_counter", op));
-            terminated_operations_meta.push(format!("{}_elapsed_executing_ms", op));
-            terminated_operations_meta.push(format!("{}_elapsed_disabled_ms", op));
-        }
-        StateManager::apply(
-            &mut con,
-            &modified_state,
-            &[&terminated_operations, &terminated_operations_meta],
-        )
-        .await;
-        terminated_operations.clear();
+/// What the automatic operation runner carries from one tick to the next.
+///
+/// The active instances are named with a nanoid the moment a template's guard
+/// fires, so their bookkeeping variables do not exist until then - which is why
+/// [`AutoOperationCtx::keys`] is rebuilt as the active set changes rather than
+/// computed once. Reading a variable that is not in the state panics, so the key
+/// set has to follow the instances.
+pub struct AutoOperationCtx {
+    active_auto_ops: Vec<Operation>,
+    active_mutexed_op: Option<Operation>,
+    static_keys: Vec<String>,
+    /// The keys to read on the next tick.
+    pub keys: Vec<String>,
+    /// Set for one tick whenever [`AutoOperationCtx::keys`] was just rebuilt, so
+    /// a caller sharing one snapshot across several runners knows to recompute
+    /// its union.
+    pub keys_changed: bool,
+}
 
-        // Operations were activated and/or terminated this tick, so the set of
-        // bookkeeping variables to read from the next tick on has changed.
-        if active_set_changed {
-            let active: Vec<String> = active_auto_ops
-                .iter()
-                .chain(active_mutexed_op.iter())
-                .map(|op| op.name.clone())
-                .collect();
-            keys = keys_with_active_operations(&static_keys, &active);
+impl AutoOperationCtx {
+    /// Start with no active instances and only the static key set.
+    pub fn new(sp_id: &str, model: &Model) -> Self {
+        let static_keys = auto_operation_runner_static_keys(sp_id, model);
+        Self {
+            active_auto_ops: vec![],
+            active_mutexed_op: None,
+            keys: static_keys.clone(),
+            static_keys,
+            keys_changed: false,
         }
     }
+}
+
+/// One tick of the automatic operations: activate whatever template guards have
+/// become true, advance every active instance, and retire the ones that
+/// terminated.
+///
+/// Returns the state the tick leaves behind and the bookkeeping keys of the
+/// operations that terminated, which the caller deletes. Nothing here touches
+/// Redis, so [`auto_operation_runner`] and the sequential runner can both drive
+/// it - the latter threading the returned state straight into the next body.
+pub async fn auto_operation_tick(
+    sp_id: &str,
+    model: &Model,
+    state: &State,
+    ctx: &mut AutoOperationCtx,
+    tick_elapsed_ms: i64,
+    log_target: &str,
+) -> (State, Vec<String>) {
+    ctx.keys_changed = false;
+
+    let mut new_state = state.clone();
+    let mut new_op_ids = vec![];
+    let mut terminated_operations: Vec<String> = vec![];
+
+    for op in &model.auto_operations {
+        if op.eval(state, log_target) {
+            let prefix = format!("{}_", op.name);
+            if !ctx
+                .active_auto_ops
+                .iter()
+                .any(|a| a.name.starts_with(&prefix))
+            {
+                let unique_id = nanoid::nanoid!(10, &NANOID_ALPHABET);
+                let unique_op_id = format!("{}{}", prefix, unique_id);
+                let mut op_mut = op.clone();
+                op_mut.name = unique_op_id.clone();
+                ctx.active_auto_ops.push(op_mut);
+                new_op_ids.push(unique_op_id);
+            }
+        }
+    }
+
+    if ctx.active_mutexed_op.is_none() {
+        for op in &model.mutexed_auto_operations {
+            if op.eval(state, log_target) {
+                let prefix = format!("{}_", op.name);
+                let unique_id = nanoid::nanoid!(10, &NANOID_ALPHABET);
+                let unique_op_id = format!("{}{}", prefix, unique_id);
+                let mut op_mut = op.clone();
+                op_mut.name = unique_op_id.clone();
+
+                ctx.active_mutexed_op = Some(op_mut);
+                new_op_ids.push(unique_op_id);
+
+                break;
+            }
+        }
+    }
+
+    if !new_op_ids.is_empty() {
+        new_state =
+            add_operation_meta_tracking_variables(&new_op_ids, &new_state, false, log_target);
+        new_state = add_operation_state_tracking_variable(&new_op_ids, &new_state, log_target);
+    }
+
+    let mut next_active_auto_ops = vec![];
+    for current_active_op in std::mem::take(&mut ctx.active_auto_ops) {
+        new_state = process_operation(
+            &sp_id,
+            new_state,
+            &current_active_op,
+            OperationProcessingType::Automatic,
+            None,
+            None,
+            tick_elapsed_ms,
+            log_target,
+        )
+        .await;
+
+        let operation_state = new_state
+            .get_string_or_default_to_unknown(&format!("{}", current_active_op.name), log_target);
+
+        match OperationState::from_str(&operation_state) {
+            OperationState::Terminated(_) => {
+                terminated_operations.push(current_active_op.name.clone());
+            }
+            _ => next_active_auto_ops.push(current_active_op),
+        };
+    }
+    ctx.active_auto_ops = next_active_auto_ops;
+
+    let mut next_active_mutexed_op = None;
+    if let Some(current_active_op) = ctx.active_mutexed_op.take() {
+        new_state = process_operation(
+            &sp_id,
+            new_state,
+            &current_active_op,
+            OperationProcessingType::Automatic,
+            None,
+            None,
+            tick_elapsed_ms,
+            log_target,
+        )
+        .await;
+
+        let operation_state = new_state
+            .get_string_or_default_to_unknown(&format!("{}", current_active_op.name), log_target);
+
+        match OperationState::from_str(&operation_state) {
+            OperationState::Terminated(_) => {
+                terminated_operations.push(current_active_op.name.clone());
+            }
+            _ => {
+                next_active_mutexed_op = Some(current_active_op);
+            }
+        };
+    }
+    ctx.active_mutexed_op = next_active_mutexed_op;
+
+    let active_set_changed = !new_op_ids.is_empty() || !terminated_operations.is_empty();
+
+    // Operations were activated and/or terminated this tick, so the set of
+    // bookkeeping variables to read from the next tick on has changed.
+    if active_set_changed {
+        let active: Vec<String> = ctx
+            .active_auto_ops
+            .iter()
+            .chain(ctx.active_mutexed_op.iter())
+            .map(|op| op.name.clone())
+            .collect();
+        ctx.keys = keys_with_active_operations(&ctx.static_keys, &active);
+        ctx.keys_changed = true;
+    }
+
+    let mut deletes = terminated_operations.clone();
+    for op in &terminated_operations {
+        deletes.push(format!("{}_information", op));
+        deletes.push(format!("{}_failure_retry_counter", op));
+        deletes.push(format!("{}_timeout_retry_counter", op));
+        deletes.push(format!("{}_elapsed_executing_ms", op));
+        deletes.push(format!("{}_elapsed_disabled_ms", op));
+    }
+
+    (new_state, deletes)
 }
 /// The two automatic runners, driven end to end against a real Redis.
 ///

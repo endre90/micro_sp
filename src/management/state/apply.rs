@@ -10,8 +10,10 @@ use crate::{SPConnection, State};
 ///
 /// Deliberately *not* `.atomic()`. The three separate commands it replaces had
 /// no atomicity either, so adding MULTI/EXEC here would change behaviour under
-/// the cover of a performance fix - see the caveat on [`crate::StateManager`]
-/// for what actually needs doing there.
+/// the cover of a performance fix. It would also not buy anything: the race
+/// worth caring about is between a caller's read and its write, not among the
+/// writes of one publish, and inside the runtime that gap is closed by running
+/// every runner in one loop - see the caveat on [`crate::StateManager`].
 pub(super) async fn apply(con: &mut SPConnection, state: &State, deletes: &[&[String]]) {
     let items_to_set: Vec<(&str, String)> = state
         .state

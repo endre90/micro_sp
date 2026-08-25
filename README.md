@@ -12,8 +12,8 @@ full system state lives in Redis, so several processes — and any external tool
 or dashboard — observe and drive the same system.
 
 There is no configuration file, no DSL file to load and no server to deploy.
-The model is Rust, the state is Redis keys, and the runtime is eight tokio
-tasks inside your binary.
+The model is Rust, the state is Redis keys, and the runtime is one tokio task
+inside your binary.
 
 **Contents** — [Quick start](#quick-start) · [Core pieces](#core-pieces) ·
 [Guards and actions](#guards-and-actions) ·
@@ -278,22 +278,37 @@ procedure" and "the planner may use this".
 
 ## How micro_sp runs them
 
-`main_runner` spawns eight detached tokio tasks:
+`main_runner` spawns one task that drives eight runners, in data-flow order so a
+request crosses the whole system in a single tick:
 
 | Runner | Job |
 |---|---|
-| `planner_ticker` | Searches `model.operations` for a plan to the current goal. |
-| `planned_operation_runner` | Walks `{sp_id}_plan`, driving one operation at a time. |
-| `sop_runner` | Walks the enabled SOP tree, driving its operations. |
-| `auto_transition_runner` | Takes every automatic transition whose guard holds. |
-| `auto_operation_runner` | Drives automatic and mutexed automatic operations. |
-| `goal_runner` | Admits goals, orders them by priority, promotes one at a time. |
 | `time_interface_runner` | Drives the `{sp_id}_timer_N_*` timers. |
 | `tf_interface` | Serves 3D transform lookups and inserts. |
+| `auto_transition_runner` | Takes every automatic transition whose guard holds. |
+| `auto_operation_runner` | Drives automatic and mutexed automatic operations. |
+| `planned_operation_runner` | Walks `{sp_id}_plan`, driving one operation at a time. |
+| `sop_runner` | Walks the enabled SOP tree, driving its operations. |
+| `goal_runner` | Admits goals, orders them by priority, promotes one at a time. |
+| `planner_ticker` | Searches `model.operations` for a plan to the current goal. |
 
-**They never call each other.** Every handover is a key in Redis. Each runner
-loops: wait one tick, read only the key set it cares about, compute a new
-`State`, and write back the diff. An idle stack therefore writes nothing at all.
+**They never call each other.** Every handover is a key in Redis. The tick is:
+wait one period, read the union of the key sets they care about, thread that one
+`State` through each runner in turn, and write back the diff. An idle stack
+therefore writes nothing at all.
+
+Running them in one loop rather than eight concurrent tasks is what makes a
+tick's read-modify-write atomic. Eight tasks each read their own snapshot and
+write their own diff, and nothing in Redis ties a write to the read it came
+from - so two overlapping ticks both decide from the same stale values and the
+later write silently wins. One loop has no second reader to be stale and no
+second writer to lose to. `MICRO_SP_SEQUENTIAL=0` goes back to eight tasks, and
+brings that race back with it.
+
+The planner is the exception that proves the ordering: its search runs on a
+blocking thread with a five-second deadline, so the loop starts it, keeps the
+handle, and folds the plan in on whichever later tick it is ready - while the
+other seven keep ticking.
 
 That also means anything else that can reach Redis is a first-class participant.
 A dashboard reads the same keys; a separate process can host a driver, post

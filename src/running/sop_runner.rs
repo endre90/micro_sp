@@ -30,17 +30,7 @@ pub async fn sop_runner(
 
     log::info!(target: log_target, "Online.");
 
-    let mut active_unique_sop_id: Option<String> = None;
-    let mut active_unique_sop_state: SOPState = SOPState::Initial;
-    let mut active_sop_container: Option<SOP> = None;
-
-    // The variables read every tick no matter what is running, and the set
-    // actually requested from Redis. The latter grows with the bookkeeping
-    // variables of a SOP's operations while that SOP is active - their names
-    // only exist once `uniquify_sop_operations` has run, which is why the set
-    // is rebuilt there rather than computed once here.
-    let static_keys = sop_runner_static_keys(sp_id, model);
-    let mut keys = static_keys.clone();
+    let mut ctx = SopRunnerCtx::new(sp_id, model);
     let read_full_state = read_full_state_enabled();
     if read_full_state {
         log::warn!(target: log_target, "MICRO_SP_READ_FULL_STATE is set: reading the whole keyspace every tick.");
@@ -60,222 +50,14 @@ pub async fn sop_runner(
 
         let read = match read_full_state {
             true => StateManager::get_full_state(&mut con).await,
-            false => StateManager::get_state_for_keys(&mut con, &keys, &log_target).await,
+            false => StateManager::get_state_for_keys(&mut con, &ctx.keys, log_target).await,
         };
         let state = match read {
             Some(s) => s,
             None => continue,
         };
 
-        let mut new_state = state.clone();
-        let mut sop_state =
-            state.get_string_or_default_to_unknown(&format!("{}_sop_state", sp_id), &log_target);
-
-        let sop_enabled =
-            state.get_bool_or_default_to_false(&format!("{}_sop_enabled", sp_id), &log_target);
-
-        let sop_id =
-            state.get_string_or_default_to_unknown(&format!("{}_sop_id", sp_id), &log_target);
-
-        let Some(sop_template) = model.sops.iter().find(|s| s.id == sop_id) else {
-            log::debug!(target: &log_target, "SOP with id '{}' not found in model. Skipping evaluation.", sop_id);
-            continue;
-        };
-
-        let old_sop_information = new_state
-            .get_string_or_default_to_unknown(&format!("{}_sop_information", sop_id), &log_target);
-
-        let mut new_sop_info: String; // = old_sop_information.clone();
-        let mut sop_info_level: Level = log::Level::Info;
-
-
-        // Snapshotted for the file log: the arms below drive
-        // `active_unique_sop_state` forward, and comparing against this after
-        // the match is what turns "the runner is in state X" into "the SOP
-        // moved from X to Y", which is the thing worth a line.
-        let sop_state_before = active_unique_sop_state.clone();
-        let sop_id_before = active_unique_sop_id.clone();
-
-        // Check first if there is an active unique SOP already running
-        match active_unique_sop_id {
-            None => {
-                if sop_enabled {
-                    let unique_sop_id = nanoid::nanoid!(10, &NANOID_ALPHABET);
-                    active_unique_sop_id = Some(format!("{}_{}", sop_template.id, unique_sop_id));
-
-                    let unique_sop = uniquify_sop_operations(sop_template.sop.clone());
-                    active_sop_container = Some(unique_sop.clone());
-                    let ops_in_sop = get_all_operations_from_sop(&unique_sop);
-                    let op_names: Vec<String> =
-                        ops_in_sop.iter().map(|x| x.name.clone()).collect();
-
-                    // The bookkeeping variables of these operations are created
-                    // in `new_state` below and written out by the diff at the
-                    // end of this tick; from the next tick on they have to be
-                    // read back, so the key set grows with them here.
-                    keys = keys_with_active_operations(&static_keys, &op_names);
-
-                    new_state = add_operation_meta_tracking_variables(
-                        &op_names,
-                        &new_state,
-                        false,
-                        &log_target,
-                    );
-                    new_state =
-                        add_operation_state_tracking_variable(&op_names, &new_state, &log_target);
-                    new_sop_info = format!("SOP '{sop_id}' is enabled, starting execution.");
-                    sop_info_level = log::Level::Info;
-                    new_state =
-                        new_state.update(&format!("{}_sop_enabled", sp_id), false.to_spvalue());
-                } else {
-                    continue;
-                }
-            }
-            Some(ref active_sop) => match active_unique_sop_state {
-                SOPState::Initial => {
-                    active_unique_sop_state = SOPState::Executing;
-                    new_sop_info = format!(
-                        "Initializing a new SOP '{}':\n{}",
-                        active_sop,
-                        visualize_sop(active_sop_container.as_ref().unwrap())
-                    );
-                }
-                SOPState::Executing => {
-                    // Inform the operation that the sop is executing
-                    sop_state = SOPState::Executing.to_string();
-                    let con_clone = con.clone();
-                    new_sop_info = format!("Executing SOP '{active_sop}'.");
-                    sop_info_level = log::Level::Info;
-                    new_state = process_sop_node_tick(
-                        sp_id,
-                        new_state,
-                        active_sop_container.as_ref().unwrap(),
-                        con_clone,
-                        tick_elapsed_ms,
-                        &log_target,
-                    )
-                    .await;
-
-                    let calculated_root_state = active_sop_container
-                        .as_ref()
-                        .unwrap()
-                        .get_state(&new_state, &log_target);
-
-                    if calculated_root_state != SOPState::Executing {
-                        new_sop_info = format!("Completing SOP '{active_sop}'.");
-                        sop_info_level = log::Level::Info;
-
-                        active_unique_sop_state = calculated_root_state;
-                    }
-                }
-                SOPState::Fatal => {
-                    new_sop_info = format!("Fataled SOP '{active_sop}'.");
-                    sop_info_level = log::Level::Error;
-                    active_unique_sop_state = SOPState::Initial;
-                    // Inform the operation that the sop has failed:
-                    sop_state = SOPState::Fatal.to_string();
-
-                    if let Some(unique_sop) = active_sop_container {
-                        let con_clone = con.clone();
-                        remove_operations_from_state(active_sop, &unique_sop, con_clone).await;
-                    }
-
-                    active_sop_container = None;
-                    active_unique_sop_id = None;
-                    // Those operation variables have just been deleted from
-                    // Redis, so stop asking for them.
-                    keys = static_keys.clone();
-                }
-                SOPState::Completed => {
-                    new_sop_info = format!("Completed SOP '{active_sop}'.");
-                    sop_info_level = log::Level::Info;
-                    active_unique_sop_state = SOPState::Initial;
-                    // Inform the operation that the sop has completed:
-                    sop_state = SOPState::Completed.to_string();
-
-                    if let Some(unique_sop) = active_sop_container {
-                        let con_clone = con.clone();
-                        remove_operations_from_state(active_sop, &unique_sop, con_clone).await;
-                    }
-
-                    active_sop_container = None;
-                    active_unique_sop_id = None;
-                    // Those operation variables have just been deleted from
-                    // Redis, so stop asking for them.
-                    keys = static_keys.clone();
-                }
-                SOPState::Cancelled => {
-                    new_sop_info = format!("Cancelled SOP '{active_sop}'.");
-                    sop_info_level = log::Level::Warn;
-                    active_unique_sop_state = SOPState::Initial;
-                    // Inform the operation that the sop has ben cancelled:
-                    sop_state = SOPState::Cancelled.to_string();
-
-                    if let Some(unique_sop) = active_sop_container {
-                        let con_clone = con.clone();
-                        remove_operations_from_state(active_sop, &unique_sop, con_clone).await;
-                    }
-
-                    active_sop_container = None;
-                    active_unique_sop_id = None;
-                    // Those operation variables have just been deleted from
-                    // Redis, so stop asking for them.
-                    keys = static_keys.clone();
-                }
-                SOPState::UNKNOWN => {
-                    new_sop_info = format!("SOP '{active_sop}' state id UNKNOWN.");
-                    sop_info_level = log::Level::Info;
-                    active_unique_sop_state = SOPState::Initial;
-                    active_sop_container = None;
-                    active_unique_sop_id = None;
-                    keys = static_keys.clone();
-                }
-            },
-        }
-
-        if new_sop_info != old_sop_information {
-            match sop_info_level {
-                log::Level::Info => log::info!(target: &log_target, "{}", new_sop_info),
-                log::Level::Warn => log::warn!(target: &log_target, "{}", new_sop_info),
-                log::Level::Error => log::error!(target: &log_target, "{}", new_sop_info),
-                _ => (),
-            }
-        }
-
-        // A `SOP` line whenever the runner actually moved: either the tracked
-        // state changed, or a new unique SOP was activated / an old one torn
-        // down (both of which change `active_unique_sop_id` while the state can
-        // stay put). Guarding on a real change is what keeps this off the
-        // per-tick path - `Executing` re-enters its arm every 100 ms.
-        if sop_state_before != active_unique_sop_state || sop_id_before != active_unique_sop_id {
-            let subject = active_unique_sop_id
-                .as_deref()
-                .or(sop_id_before.as_deref())
-                .unwrap_or(&sop_id);
-            // Activation and teardown both leave the tracked state untouched
-            // (a SOP is activated *into* `Initial`, and released back *to* it),
-            // so without this note those two lines would read as a meaningless
-            // "initial -> initial" and "completed -> initial".
-            let note = match (sop_id_before.is_some(), active_unique_sop_id.is_some()) {
-                (false, true) => "activated",
-                (true, false) => "released",
-                _ => "",
-            };
-            activity_log::log_sop(
-                &log_target,
-                subject,
-                &sop_state_before.to_string(),
-                &active_unique_sop_state.to_string(),
-                note,
-            );
-        }
-
-        new_state = new_state
-            .update(
-                &format!("{}_sop_information", sop_id),
-                new_sop_info.to_spvalue(),
-            )
-            .update(&format!("{}_sop_state", sp_id), sop_state.to_spvalue());
+        let new_state = sop_tick(sp_id, &mut con, model, &state, &mut ctx, tick_elapsed_ms, log_target).await;
 
         let modified_state = state.get_diff_partial_state_and_add_missing(&new_state);
 
@@ -285,6 +67,292 @@ pub async fn sop_runner(
         }
 
     }
+}
+
+/// What the SOP runner carries from one tick to the next.
+///
+/// A SOP's operations are uniquified when it is activated, so their bookkeeping
+/// variables only exist from that moment. Reading a variable that is not in the
+/// state panics, which is why [`SopRunnerCtx::keys`] grows when a SOP starts and
+/// shrinks back to the static set when one is torn down.
+pub struct SopRunnerCtx {
+    active_unique_sop_id: Option<String>,
+    active_unique_sop_state: SOPState,
+    active_sop_container: Option<SOP>,
+    static_keys: Vec<String>,
+    /// The keys to read on the next tick.
+    pub keys: Vec<String>,
+    /// Set for one tick whenever [`SopRunnerCtx::keys`] was just rebuilt, so a
+    /// caller sharing one snapshot across several runners knows to recompute its
+    /// union.
+    pub keys_changed: bool,
+}
+
+impl SopRunnerCtx {
+    /// Start with no active SOP and only the static key set.
+    pub fn new(sp_id: &str, model: &Model) -> Self {
+        let static_keys = sop_runner_static_keys(sp_id, model);
+        Self {
+            active_unique_sop_id: None,
+            active_unique_sop_state: SOPState::Initial,
+            active_sop_container: None,
+            keys: static_keys.clone(),
+            static_keys,
+            keys_changed: false,
+        }
+    }
+}
+
+/// One tick of the SOP runner: activate an enabled SOP, advance the active one,
+/// and tear it down when its root node settles.
+///
+/// Returns the state the tick leaves behind - the caller's own state, unchanged,
+/// when there is nothing to do, so the diff comes out empty and no write is
+/// issued. [`sop_runner`] calls it with a snapshot of its own keys; the
+/// sequential runner calls it with the shared snapshot and threads the result
+/// into the next body.
+pub async fn sop_tick(
+    sp_id: &str,
+    con: &mut SPConnection,
+    model: &Model,
+    state: &State,
+    ctx: &mut SopRunnerCtx,
+    tick_elapsed_ms: i64,
+    log_target: &str,
+) -> State {
+    ctx.keys_changed = false;
+
+    // Taken out of the context so the match below can drive them without
+    // holding a borrow on it; put back at the single normal exit. The two early
+    // exits restore them untouched, because neither has changed anything yet.
+    let mut active_unique_sop_id = ctx.active_unique_sop_id.take();
+    let mut active_unique_sop_state = ctx.active_unique_sop_state.clone();
+    let mut active_sop_container = ctx.active_sop_container.take();
+
+    let mut new_state = state.clone();
+    let mut sop_state =
+        state.get_string_or_default_to_unknown(&format!("{}_sop_state", sp_id), log_target);
+
+    let sop_enabled =
+        state.get_bool_or_default_to_false(&format!("{}_sop_enabled", sp_id), log_target);
+
+    let sop_id =
+        state.get_string_or_default_to_unknown(&format!("{}_sop_id", sp_id), log_target);
+
+    let Some(sop_template) = model.sops.iter().find(|s| s.id == sop_id) else {
+        log::debug!(target: log_target, "SOP with id '{}' not found in model. Skipping evaluation.", sop_id);
+        ctx.active_unique_sop_id = active_unique_sop_id;
+        ctx.active_sop_container = active_sop_container;
+        return state.clone();
+    };
+
+    let old_sop_information = new_state
+        .get_string_or_default_to_unknown(&format!("{}_sop_information", sop_id), log_target);
+
+    let mut new_sop_info: String; // = old_sop_information.clone();
+    let mut sop_info_level: Level = log::Level::Info;
+
+
+    // Snapshotted for the file log: the arms below drive
+    // `active_unique_sop_state` forward, and comparing against this after
+    // the match is what turns "the runner is in state X" into "the SOP
+    // moved from X to Y", which is the thing worth a line.
+    let sop_state_before = active_unique_sop_state.clone();
+    let sop_id_before = active_unique_sop_id.clone();
+
+    // Check first if there is an active unique SOP already running
+    match active_unique_sop_id {
+        None => {
+            if sop_enabled {
+                let unique_sop_id = nanoid::nanoid!(10, &NANOID_ALPHABET);
+                active_unique_sop_id = Some(format!("{}_{}", sop_template.id, unique_sop_id));
+
+                let unique_sop = uniquify_sop_operations(sop_template.sop.clone());
+                active_sop_container = Some(unique_sop.clone());
+                let ops_in_sop = get_all_operations_from_sop(&unique_sop);
+                let op_names: Vec<String> =
+                    ops_in_sop.iter().map(|x| x.name.clone()).collect();
+
+                // The bookkeeping variables of these operations are created
+                // in `new_state` below and written out by the diff at the
+                // end of this tick; from the next tick on they have to be
+                // read back, so the key set grows with them here.
+                ctx.keys = keys_with_active_operations(&ctx.static_keys, &op_names);
+                    ctx.keys_changed = true;
+
+                new_state = add_operation_meta_tracking_variables(
+                    &op_names,
+                    &new_state,
+                    false,
+                    log_target,
+                );
+                new_state =
+                    add_operation_state_tracking_variable(&op_names, &new_state, log_target);
+                new_sop_info = format!("SOP '{sop_id}' is enabled, starting execution.");
+                sop_info_level = log::Level::Info;
+                new_state =
+                    new_state.update(&format!("{}_sop_enabled", sp_id), false.to_spvalue());
+            } else {
+        ctx.active_unique_sop_id = active_unique_sop_id;
+        ctx.active_sop_container = active_sop_container;
+        return state.clone();
+            }
+        }
+        Some(ref active_sop) => match active_unique_sop_state {
+            SOPState::Initial => {
+                active_unique_sop_state = SOPState::Executing;
+                new_sop_info = format!(
+                    "Initializing a new SOP '{}':\n{}",
+                    active_sop,
+                    visualize_sop(active_sop_container.as_ref().unwrap())
+                );
+            }
+            SOPState::Executing => {
+                // Inform the operation that the sop is executing
+                sop_state = SOPState::Executing.to_string();
+                let con_clone = con.clone();
+                new_sop_info = format!("Executing SOP '{active_sop}'.");
+                sop_info_level = log::Level::Info;
+                new_state = process_sop_node_tick(
+                    sp_id,
+                    new_state,
+                    active_sop_container.as_ref().unwrap(),
+                    con_clone,
+                    tick_elapsed_ms,
+                    log_target,
+                )
+                .await;
+
+                let calculated_root_state = active_sop_container
+                    .as_ref()
+                    .unwrap()
+                    .get_state(&new_state, log_target);
+
+                if calculated_root_state != SOPState::Executing {
+                    new_sop_info = format!("Completing SOP '{active_sop}'.");
+                    sop_info_level = log::Level::Info;
+
+                    active_unique_sop_state = calculated_root_state;
+                }
+            }
+            SOPState::Fatal => {
+                new_sop_info = format!("Fataled SOP '{active_sop}'.");
+                sop_info_level = log::Level::Error;
+                active_unique_sop_state = SOPState::Initial;
+                // Inform the operation that the sop has failed:
+                sop_state = SOPState::Fatal.to_string();
+
+                if let Some(unique_sop) = active_sop_container {
+                    let con_clone = con.clone();
+                    remove_operations_from_state(active_sop, &unique_sop, con_clone).await;
+                }
+
+                active_sop_container = None;
+                active_unique_sop_id = None;
+                // Those operation variables have just been deleted from
+                // Redis, so stop asking for them.
+                ctx.keys = ctx.static_keys.clone();
+                    ctx.keys_changed = true;
+            }
+            SOPState::Completed => {
+                new_sop_info = format!("Completed SOP '{active_sop}'.");
+                sop_info_level = log::Level::Info;
+                active_unique_sop_state = SOPState::Initial;
+                // Inform the operation that the sop has completed:
+                sop_state = SOPState::Completed.to_string();
+
+                if let Some(unique_sop) = active_sop_container {
+                    let con_clone = con.clone();
+                    remove_operations_from_state(active_sop, &unique_sop, con_clone).await;
+                }
+
+                active_sop_container = None;
+                active_unique_sop_id = None;
+                // Those operation variables have just been deleted from
+                // Redis, so stop asking for them.
+                ctx.keys = ctx.static_keys.clone();
+                    ctx.keys_changed = true;
+            }
+            SOPState::Cancelled => {
+                new_sop_info = format!("Cancelled SOP '{active_sop}'.");
+                sop_info_level = log::Level::Warn;
+                active_unique_sop_state = SOPState::Initial;
+                // Inform the operation that the sop has ben cancelled:
+                sop_state = SOPState::Cancelled.to_string();
+
+                if let Some(unique_sop) = active_sop_container {
+                    let con_clone = con.clone();
+                    remove_operations_from_state(active_sop, &unique_sop, con_clone).await;
+                }
+
+                active_sop_container = None;
+                active_unique_sop_id = None;
+                // Those operation variables have just been deleted from
+                // Redis, so stop asking for them.
+                ctx.keys = ctx.static_keys.clone();
+                    ctx.keys_changed = true;
+            }
+            SOPState::UNKNOWN => {
+                new_sop_info = format!("SOP '{active_sop}' state id UNKNOWN.");
+                sop_info_level = log::Level::Info;
+                active_unique_sop_state = SOPState::Initial;
+                active_sop_container = None;
+                active_unique_sop_id = None;
+                ctx.keys = ctx.static_keys.clone();
+                    ctx.keys_changed = true;
+            }
+        },
+    }
+
+    if new_sop_info != old_sop_information {
+        match sop_info_level {
+            log::Level::Info => log::info!(target: log_target, "{}", new_sop_info),
+            log::Level::Warn => log::warn!(target: log_target, "{}", new_sop_info),
+            log::Level::Error => log::error!(target: log_target, "{}", new_sop_info),
+            _ => (),
+        }
+    }
+
+    // A `SOP` line whenever the runner actually moved: either the tracked
+    // state changed, or a new unique SOP was activated / an old one torn
+    // down (both of which change `active_unique_sop_id` while the state can
+    // stay put). Guarding on a real change is what keeps this off the
+    // per-tick path - `Executing` re-enters its arm every 100 ms.
+    if sop_state_before != active_unique_sop_state || sop_id_before != active_unique_sop_id {
+        let subject = active_unique_sop_id
+            .as_deref()
+            .or(sop_id_before.as_deref())
+            .unwrap_or(&sop_id);
+        // Activation and teardown both leave the tracked state untouched
+        // (a SOP is activated *into* `Initial`, and released back *to* it),
+        // so without this note those two lines would read as a meaningless
+        // "initial -> initial" and "completed -> initial".
+        let note = match (sop_id_before.is_some(), active_unique_sop_id.is_some()) {
+            (false, true) => "activated",
+            (true, false) => "released",
+            _ => "",
+        };
+        activity_log::log_sop(
+            log_target,
+            subject,
+            &sop_state_before.to_string(),
+            &active_unique_sop_state.to_string(),
+            note,
+        );
+    }
+
+    new_state = new_state
+        .update(
+            &format!("{}_sop_information", sop_id),
+            new_sop_info.to_spvalue(),
+        )
+        .update(&format!("{}_sop_state", sp_id), sop_state.to_spvalue());
+
+    ctx.active_unique_sop_id = active_unique_sop_id;
+    ctx.active_unique_sop_state = active_unique_sop_state;
+    ctx.active_sop_container = active_sop_container;
+
+    new_state
 }
 
 async fn remove_operations_from_state(sop_id: &str, unique_sop: &SOP, mut con: SPConnection) {

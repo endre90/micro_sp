@@ -13,6 +13,7 @@ mod get_full_state;
 mod get_sp_value;
 mod get_state_for_keys;
 mod set_sp_value;
+mod take_sp_value;
 mod set_state;
 mod remove_sp_value;
 mod remove_sp_values;
@@ -27,18 +28,37 @@ mod flush_state;
 ///
 /// # Caveats
 ///
-/// Read-modify-write across runners is **not** atomic. Each runner reads a
-/// snapshot, computes a diff against it and writes that diff back, so two
-/// runners whose ticks overlap can both decide from the same stale read and the
-/// later write wins. It only bites on the handful of keys two runners genuinely
-/// share (the `_plan*`, `_planner_state` and `_replan*` families, written by
-/// `planner_ticker`, `plan_runner` and `goal_runner`), where it shows up as "the
-/// state change did not take" plus a tick of latency while it is redone. Fixing
-/// it properly means either giving each key a single owning runner or making the
-/// read-compute-write one WATCH/MULTI/EXEC transaction with a retry policy -
-/// both design changes rather than patches. Note that [`StateManager::apply`] is
-/// deliberately non-atomic for the same reason: the race is between the read and
-/// the write, not among the writes.
+/// Read-modify-write through this type is **not** atomic, and nothing here makes
+/// it so. A caller reads a snapshot, decides from it and writes back; nothing in
+/// Redis records that the write was computed from that read, so a write landing
+/// in between is simply overwritten - silently, and with the other writer's own
+/// write having succeeded, so nothing retries.
+///
+/// Inside the runtime this no longer bites, because
+/// [`sequential_runner`] drives every runner in one
+/// loop off one snapshot and publishes one diff. There is no second reader to be
+/// stale and no second writer to lose to. (`MICRO_SP_SEQUENTIAL=0` goes back to
+/// eight concurrent tasks and brings the race back with it - see
+/// [`sequential_runner_enabled`].)
+///
+/// What remains is every writer outside that loop: a device driver in its own
+/// process, a dashboard, another `micro_sp`, or any consumer of this API. Two
+/// rules cover it:
+///
+/// - A handoff that crosses the process boundary must be consumed atomically.
+///   [`StateManager::take_sp_value`] is one `GETSET`, and is how
+///   `{sp_id}_incoming_goals` is drained.
+/// - A `*_request_trigger` is not such a handoff, despite the shape. It is a
+///   request flag *and* a busy flag, cleared together with the `request_state`
+///   that answers it - see [`StateManager::take_sp_value`] for why taking one
+///   early re-opens the model's start guard mid-request.
+///
+/// A consumer doing its own read-modify-write on a key a runner also writes is
+/// on its own; there is no locking here to borrow.
+///
+/// Note that [`StateManager::apply`] is deliberately non-atomic, but for an
+/// unrelated reason: the race was always between the read and the write, never
+/// among the writes of one publish.
 ///
 /// ```no_run
 /// use micro_sp::*;
@@ -108,6 +128,45 @@ impl StateManager {
     /// logged and swallowed.
     pub async fn set_sp_value(con: &mut SPConnection, key: &str, value: &SPValue) {
         set_sp_value::set_sp_value(con, key, value).await
+    }
+
+    /// Read a variable and overwrite it in the same, atomic step, returning what
+    /// was there before.
+    ///
+    /// One `GETSET`. This is how a runner drains a queue another *process*
+    /// fills, such as `{sp_id}_incoming_goals`. Reading the key and later
+    /// writing the emptied value back is two commands with a gap between them,
+    /// and anything the producer writes inside that gap is erased: the
+    /// producer's own write succeeded, so nothing ever retries and the request
+    /// is simply lost. Taking the value *is* emptying it, so a write that lands
+    /// afterwards is still there on the next tick.
+    ///
+    /// Not for the `*_request_trigger` keys, despite the shape looking the
+    /// same. A trigger is a request flag *and* a busy flag: the models guard
+    /// their start transitions on `request_state == initial && request_trigger
+    /// == false`, so clearing it before the response is written declares the
+    /// resource free while the request is still in flight, and the operation
+    /// starts again. A trigger has to be cleared together with the
+    /// `request_state` that answers it, which is a write, not a take.
+    ///
+    /// `replacement` is the cleared value, not a deletion - a key that stops
+    /// existing would be missing from a later
+    /// [`StateManager::get_state_for_keys`], which callers treat as fatal - so a
+    /// key that was absent is created holding it and `None` comes back.
+    ///
+    /// `None` also covers "the command failed" and "the stored value did not
+    /// deserialise"; both are logged, and in the latter case the replacement has
+    /// still landed, so a poisoned key cannot wedge a runner permanently.
+    ///
+    /// Note this consumes the value at *read* time: a runner that dies
+    /// mid-tick has already taken the request, where the old read-then-clear
+    /// would have left it set.
+    pub async fn take_sp_value(
+        con: &mut SPConnection,
+        key: &str,
+        replacement: &SPValue,
+    ) -> Option<SPValue> {
+        take_sp_value::take_sp_value(con, key, replacement).await
     }
 
     /// Delete a single key. Idempotent - deleting a key that was never there is
