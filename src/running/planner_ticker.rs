@@ -27,7 +27,44 @@ pub async fn planner_ticker(
 
     // Get only the relevant keys from the state
     log::info!(target: &format!("{}_operation_runner", sp_id), "Online.");
-    let keys = planner_ticker_keys(sp_id, model);
+    let mut keys: Vec<String> = model
+        .operations
+        .iter()
+        .flat_map(|t| t.get_all_var_keys())
+        .collect();
+
+    // We also need some of the planner vars
+    keys.extend(vec![
+        format!("{}_planner_information", sp_id),
+        format!("{}_planner_state", sp_id),
+        format!("{}_plan_state", sp_id),
+        format!("{}_plan_current_step", sp_id),
+        format!("{}_plan", sp_id),
+        format!("{}_plan_id", sp_id),
+        format!("{}_replan_trigger", sp_id),
+        format!("{}_replanned", sp_id),
+        format!("{}_plan_counter", sp_id),
+        format!("{}_replan_counter", sp_id),
+        format!("{}_replan_counter_total", sp_id),
+        format!("{}_current_goal_state", sp_id),
+        format!("{}_current_goal_predicate", sp_id),
+    ]);
+
+    // And the operation names
+    // Maybe we don't even need this if we are not resetting all operations when planning
+    // Actually we do need it because the operation planner (bfs needs to access the steate, and the planning is done on the template level)
+    keys.extend(
+        model
+            .operations
+            .iter()
+            .map(|op| op.name.clone())
+            .collect::<Vec<String>>(),
+    );
+
+    // Operations share most of their variables, so without this the per-tick
+    // `MGET` sends the same key many times over.
+    keys.sort_unstable();
+    keys.dedup();
 
     // The two flags that decide whether this tick has anything to do at all.
     let trigger_key = format!("{}_replan_trigger", sp_id);
@@ -100,204 +137,37 @@ struct PlannerContext {
     planner_information: String,
 }
 
-/// The keys the planner reads and writes: every variable its operations mention,
-/// the operation names themselves, and its own bookkeeping.
-///
-/// Static for the lifetime of the runner, so a caller sharing one snapshot
-/// across several runners can fold this into its union once.
-pub fn planner_ticker_keys(sp_id: &str, model: &Model) -> Vec<String> {
-    let mut keys: Vec<String> = model
-        .operations
-        .iter()
-        .flat_map(|t| t.get_all_var_keys())
-        .collect();
-
-    keys.extend(vec![
-        format!("{}_planner_information", sp_id),
-        format!("{}_planner_state", sp_id),
-        format!("{}_plan_state", sp_id),
-        format!("{}_plan_current_step", sp_id),
-        format!("{}_plan", sp_id),
-        format!("{}_plan_id", sp_id),
-        format!("{}_replan_trigger", sp_id),
-        format!("{}_replanned", sp_id),
-        format!("{}_plan_counter", sp_id),
-        format!("{}_replan_counter", sp_id),
-        format!("{}_replan_counter_total", sp_id),
-        format!("{}_current_goal_state", sp_id),
-        format!("{}_current_goal_predicate", sp_id),
-    ]);
-
-    // `Operation::eval` reads `{op.name}` to decide whether an operation may
-    // start, and the search runs on the template level, so the names are read
-    // on every tick too.
-    keys.extend(
-        model
-            .operations
-            .iter()
-            .map(|op| op.name.clone())
-            .collect::<Vec<String>>(),
-    );
-
-    // Operations share most of their variables, so without this the per-tick
-    // `MGET` sends the same key many times over.
-    keys.sort_unstable();
-    keys.dedup();
-    keys
-}
-
-/// What the planner carries from one tick to the next when it is driven without
-/// blocking.
-///
-/// The pending search handle is the whole point: [`planner_ticker`] parks its own
-/// task inside the search, which is fine when it is the only thing that task
-/// does, but a runner that drives every body in one loop cannot stop for up to
-/// five seconds. Holding the handle instead lets the search run on a blocking
-/// thread while the rest of the tick carries on.
-pub struct PlannerCtx {
-    pending: Option<tokio::task::JoinHandle<PlanningResult>>,
-    planning_operations: Arc<Vec<Operation>>,
-    /// The keys the planner needs read into the snapshot.
-    pub keys: Vec<String>,
-}
-
-impl PlannerCtx {
-    /// Build the operation `Arc` once, so a replan hands the search a refcount
-    /// bump rather than a deep copy.
-    pub fn new(sp_id: &str, model: &Model) -> Self {
-        Self {
-            pending: None,
-            planning_operations: Arc::new(model.operations.clone()),
-            keys: planner_ticker_keys(sp_id, model),
-        }
-    }
-
-    /// Whether a search is currently running.
-    pub fn is_planning(&self) -> bool {
-        self.pending.is_some()
-    }
-}
-
-/// One tick of the planner that never blocks.
-///
-/// Returns the caller's state unchanged while a search is in flight, which is
-/// exactly what [`planner_ticker`] publishes over the same period - parked
-/// inside `bfs_operation_planner`, it writes nothing until the search returns.
-/// `{sp_id}_replan_trigger` therefore stays set for the duration either way, and
-/// the two-phase trigger/`replanned` handshake is untouched.
-///
-/// The sequential runner calls this; [`planner_ticker`] keeps the blocking form.
-pub async fn planner_tick(
-    sp_id: &str,
-    state: &State,
-    ctx: &mut PlannerCtx,
-    log_target: &str,
-) -> State {
-    let new_state = state.clone();
-
-    if let Some(handle) = ctx.pending.take() {
-        if !handle.is_finished() {
-            // Still searching. Publish nothing, so the request stays pending in
-            // the state exactly as it does while the blocking runner is parked.
-            ctx.pending = Some(handle);
-            return new_state;
-        }
-
-        let plan_result = join_planner(handle, log_target).await;
-        let mut pctx = PlannerContext::from_state(sp_id, state, log_target);
-        pctx.plan = vec![];
-        let mut new_state = new_state;
-        apply_plan_result(&mut pctx, &mut new_state, plan_result, log_target);
-        return pctx.finish(sp_id, new_state);
-    }
-
-    let mut pctx = PlannerContext::from_state(sp_id, state, log_target);
-
-    if !pctx.replan_trigger {
-        pctx.replanned = false;
-    } else if pctx.replanned {
-        pctx.replan_trigger = false;
-        pctx.replanned = false;
-    } else {
-        pctx.plan = vec![];
-        if PlannerState::from_str(&pctx.planner_state) == PlannerState::Ready {
-            ctx.pending = Some(spawn_planner(
-                sp_id,
-                &ctx.planning_operations,
-                state,
-                log_target,
-            ));
-            // The search owns this request now; nothing to publish yet.
-            return new_state;
-        }
-    }
-
-    pctx.finish(sp_id, new_state)
-}
-
-impl PlannerContext {
-    /// Read the planner's own variables out of `state`.
-    fn from_state(sp_id: &str, state: &State, log_target: &str) -> Self {
-            PlannerContext {
-            replan_trigger: state
-                .get_bool_or_default_to_false(&format!("{}_replan_trigger", sp_id), &log_target),
-            replanned: state.get_bool_or_default_to_false(&format!("{}_replanned", sp_id), &log_target),
-            plan_counter: state
-                .get_int_or_default_to_zero(&format!("{}_plan_counter", sp_id), &log_target),
-            // replan_counter: state
-            //     .get_int_or_default_to_zero(&format!("{}_replan_counter", sp_id), &log_target),
-            // replan_counter_total: state
-            //     .get_int_or_default_to_zero(&format!("{}_replan_counter_total", sp_id), &log_target),
-            planner_state: state
-                .get_string_or_default_to_unknown(&format!("{}_planner_state", sp_id), &log_target),
-            plan_id: state
-                .get_string_or_default_to_unknown(&format!("{}_plan_id", sp_id), &log_target),
-            plan: state
-                .get_array_or_default_to_empty(&format!("{}_plan", sp_id), &log_target)
-                .iter()
-                .filter(|val| val.is_string())
-                .map(|y| y.to_string())
-                .collect(),
-            planner_information: state.get_string_or_default_to_unknown(
-                &format!("{}_planner_information", sp_id),
-                &log_target,
-            ),
-        }
-    }
-
-    /// Write the planner's variables back into `new_state`.
-    fn finish(self, sp_id: &str, new_state: State) -> State {
-        new_state
-            .update(
-                &format!("{}_replan_trigger", sp_id),
-                self.replan_trigger.to_spvalue(),
-            )
-            .update(&format!("{}_replanned", sp_id), self.replanned.to_spvalue())
-            .update(
-                &format!("{}_plan_counter", sp_id),
-                self.plan_counter.to_spvalue(),
-            )
-            // The replan counters are owned by the goal runner, not written here.
-            .update(
-                &format!("{}_planner_state", sp_id),
-                self.planner_state.to_spvalue(),
-            )
-            .update(&format!("{}_plan_id", sp_id), self.plan_id.to_spvalue())
-            .update(&format!("{}_plan", sp_id), self.plan.to_spvalue())
-            .update(
-                &format!("{}_planner_information", sp_id),
-                self.planner_information.to_spvalue(),
-            )
-    }
-}
-
 async fn process_planner_tick(
     sp_id: &str,
     planning_operations: &Arc<Vec<Operation>>,
     state: &State,
     log_target: &str,
 ) -> State {
-    let mut ctx = PlannerContext::from_state(sp_id, state, log_target);
+    let mut ctx = PlannerContext {
+        replan_trigger: state
+            .get_bool_or_default_to_false(&format!("{}_replan_trigger", sp_id), &log_target),
+        replanned: state.get_bool_or_default_to_false(&format!("{}_replanned", sp_id), &log_target),
+        plan_counter: state
+            .get_int_or_default_to_zero(&format!("{}_plan_counter", sp_id), &log_target),
+        // replan_counter: state
+        //     .get_int_or_default_to_zero(&format!("{}_replan_counter", sp_id), &log_target),
+        // replan_counter_total: state
+        //     .get_int_or_default_to_zero(&format!("{}_replan_counter_total", sp_id), &log_target),
+        planner_state: state
+            .get_string_or_default_to_unknown(&format!("{}_planner_state", sp_id), &log_target),
+        plan_id: state
+            .get_string_or_default_to_unknown(&format!("{}_plan_id", sp_id), &log_target),
+        plan: state
+            .get_array_or_default_to_empty(&format!("{}_plan", sp_id), &log_target)
+            .iter()
+            .filter(|val| val.is_string())
+            .map(|y| y.to_string())
+            .collect(),
+        planner_information: state.get_string_or_default_to_unknown(
+            &format!("{}_planner_information", sp_id),
+            &log_target,
+        ),
+    };
 
     let mut new_state = state.clone();
 
@@ -318,7 +188,30 @@ async fn process_planner_tick(
         .await;
     }
 
-    ctx.finish(sp_id, new_state)
+    new_state
+        .update(
+            &format!("{}_replan_trigger", sp_id),
+            ctx.replan_trigger.to_spvalue(),
+        )
+        .update(&format!("{}_replanned", sp_id), ctx.replanned.to_spvalue())
+        .update(
+            &format!("{}_plan_counter", sp_id),
+            ctx.plan_counter.to_spvalue(),
+        )
+        // The replan counters are owned by the goal runner, not written here.
+        .update(
+            &format!("{}_planner_state", sp_id),
+            ctx.planner_state.to_spvalue(),
+        )
+        .update(
+            &format!("{}_plan_id", sp_id),
+            ctx.plan_id.to_spvalue(),
+        )
+        .update(&format!("{}_plan", sp_id), ctx.plan.to_spvalue())
+        .update(
+            &format!("{}_planner_information", sp_id),
+            ctx.planner_information.to_spvalue(),
+        )
 }
 
 // Returns a new state to add containing unique operations ad unique operation meta
@@ -339,37 +232,16 @@ async fn handle_replan_request(
     }
 
 
-    let plan_result = join_planner(
-        spawn_planner(sp_id, planning_operations, state, log_target),
-        log_target,
-    )
-    .await;
-
-    apply_plan_result(ctx, new_state, plan_result, log_target);
-}
-
-/// Start the search for a plan to `state`'s current goal on a blocking thread.
-///
-/// The search is pure CPU with its own deadline and reads nothing after it
-/// starts - it works from the `state` clone taken here - so the caller is free
-/// to keep ticking while it runs. [`planner_ticker`] awaits it
-/// immediately; the sequential runner holds the handle and collects it on a
-/// later tick.
-///
-/// `spawn_blocking` needs owned data: the operations are behind an `Arc` built
-/// once at startup, so this is a refcount bump, and the state is cloned once per
-/// replan - not once per expanded node, as the old by-value signature forced.
-pub fn spawn_planner(
-    sp_id: &str,
-    planning_operations: &Arc<Vec<Operation>>,
-    state: &State,
-    log_target: &str,
-) -> tokio::task::JoinHandle<PlanningResult> {
     let goal = state.extract_goal(&sp_id);
+
+    // `spawn_blocking` needs owned data: the operations are behind an `Arc`
+    // built once at startup, so this is a refcount bump, and the state is
+    // cloned once per replan - not once per expanded node, as the old
+    // by-value signature forced.
     let planning_state = state.clone();
     let operations = Arc::clone(planning_operations);
     let planner_log_target = log_target.to_string();
-    tokio::task::spawn_blocking(move || {
+    let plan_result = match tokio::task::spawn_blocking(move || {
         bfs_operation_planner(
             &planning_state,
             &goal,
@@ -379,15 +251,8 @@ pub fn spawn_planner(
             5000,
         )
     })
-}
-
-/// Collect a finished [`spawn_planner`] handle, turning a dead task into "no
-/// plan found" rather than propagating the panic.
-pub async fn join_planner(
-    handle: tokio::task::JoinHandle<PlanningResult>,
-    log_target: &str,
-) -> PlanningResult {
-    match handle.await {
+    .await
+    {
         Ok(result) => result,
         Err(e) => {
             log::error!(target: log_target, "Planner task failed to run: {e}");
@@ -396,17 +261,8 @@ pub async fn join_planner(
                 ..Default::default()
             }
         }
-    }
-}
+    };
 
-/// Fold a finished search into the planner's variables, naming the plan's steps
-/// and creating their bookkeeping variables when one was found.
-fn apply_plan_result(
-    ctx: &mut PlannerContext,
-    new_state: &mut State,
-    plan_result: PlanningResult,
-    log_target: &str,
-) {
     if !plan_result.found {
         ctx.plan_id = "".to_string();
         ctx.planner_information = format!(

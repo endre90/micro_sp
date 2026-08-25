@@ -29,7 +29,9 @@ pub async fn planned_operation_runner(
 
     let mut con = connection_manager.get_connection().await;
 
-    let mut ctx = PlanRunnerCtx::new(sp_id, model);
+    let static_keys = plan_runner_static_keys(sp_id, &model);
+    let mut keys = static_keys.clone();
+    let mut active_plan: Vec<String> = vec![];
     let read_full_state = read_full_state_enabled();
     if read_full_state {
         log::warn!(target: &log_target, "MICRO_SP_READ_FULL_STATE is set: reading the whole keyspace every tick.");
@@ -44,126 +46,46 @@ pub async fn planned_operation_runner(
 
         let read = match read_full_state {
             true => StateManager::get_full_state(&mut con).await,
-            false => StateManager::get_state_for_keys(&mut con, &ctx.keys, &log_target).await,
+            false => StateManager::get_state_for_keys(&mut con, &keys, &log_target).await,
         };
         let mut state = match read {
             Some(s) => s,
             None => continue,
         };
 
-        let new_state = plan_tick(
+        // The plan is produced by `planner_ticker`, so a new plan shows up here
+        // as a changed `{sp_id}_plan`. Its steps are uniquified operation names
+        // whose bookkeeping variables have to be in the key set before
+        // `process_plan_tick` reads them - reading a variable that is not in
+        // the state panics - so rebuild and re-read once when it changes.
+        if !read_full_state {
+            let plan = read_plan(&state, sp_id, &log_target);
+            if plan != active_plan {
+                keys = keys_with_active_operations(&static_keys, &plan);
+                active_plan = plan;
+                state = match StateManager::get_state_for_keys(&mut con, &keys, &log_target).await {
+                    Some(s) => s,
+                    None => continue,
+                };
+            }
+        }
+
+        let con_clone = con.clone();
+        let new_state = process_plan_tick(
             sp_id,
-            &mut con,
-            model,
-            &mut state,
-            &mut ctx,
-            read_full_state,
+            con_clone,
+            &model,
+            &state,
             tick_elapsed_ms,
             &log_target,
         )
         .await;
-
         let modified_state = state.get_diff_partial_state(&new_state);
         if !modified_state.state.is_empty() {
             activity_log::log_state_diff(&log_target, &state, &modified_state);
             StateManager::set_state(&mut con, &modified_state).await;
         }
     }
-}
-
-/// What the plan runner carries from one tick to the next.
-///
-/// A plan's steps are uniquified operation names, so their bookkeeping variables
-/// only exist once the planner has produced the plan. Reading a variable that is
-/// not in the state panics, which is why [`PlanRunnerCtx::keys`] follows the
-/// active plan rather than being computed once.
-pub struct PlanRunnerCtx {
-    static_keys: Vec<String>,
-    /// The keys to read on the next tick.
-    pub keys: Vec<String>,
-    active_plan: Vec<String>,
-    /// Set for one tick whenever [`PlanRunnerCtx::keys`] was just rebuilt, so a
-    /// caller sharing one snapshot across several runners knows to recompute its
-    /// union.
-    pub keys_changed: bool,
-}
-
-impl PlanRunnerCtx {
-    /// Start with no active plan and only the static key set.
-    pub fn new(sp_id: &str, model: &Model) -> Self {
-        let static_keys = plan_runner_static_keys(sp_id, model);
-        Self {
-            keys: static_keys.clone(),
-            static_keys,
-            active_plan: vec![],
-            keys_changed: false,
-        }
-    }
-}
-
-/// One tick of plan execution: advance the current step, react to what the
-/// planner and the goal runner left behind, and retire operations that finished.
-///
-/// `state` is topped up in place when a new plan appears: its steps bring
-/// bookkeeping variables that were not in the caller's snapshot, and reading a
-/// variable that is not in the state panics. Only the genuinely missing keys are
-/// fetched, so values the caller has already changed in `state` are never
-/// clobbered by the top-up. Pass `read_full_state` through from
-/// [`read_full_state_enabled`]; when it is set the snapshot is the whole
-/// keyspace already and no top-up is needed.
-///
-/// [`planned_operation_runner`] calls this with a snapshot of its own keys; the
-/// sequential runner calls it with the shared snapshot and threads the result
-/// into the next body.
-pub async fn plan_tick(
-    sp_id: &str,
-    con: &mut SPConnection,
-    model: &Model,
-    state: &mut State,
-    ctx: &mut PlanRunnerCtx,
-    read_full_state: bool,
-    tick_elapsed_ms: i64,
-    log_target: &str,
-) -> State {
-    ctx.keys_changed = false;
-
-    // The plan is produced by `planner_ticker`, so a new plan shows up here as a
-    // changed `{sp_id}_plan`. Its steps are uniquified operation names whose
-    // bookkeeping variables have to be in the state before `process_plan_tick`
-    // reads them, so rebuild the key set and fetch what is missing.
-    if !read_full_state {
-        let plan = read_plan(state, sp_id, log_target);
-        if plan != ctx.active_plan {
-            ctx.keys = keys_with_active_operations(&ctx.static_keys, &plan);
-            ctx.active_plan = plan;
-            ctx.keys_changed = true;
-
-            let missing: Vec<String> = ctx
-                .keys
-                .iter()
-                .filter(|key| !state.state.contains_key(*key))
-                .cloned()
-                .collect();
-            if !missing.is_empty() {
-                if let Some(extra) = StateManager::get_state_for_keys(con, &missing, log_target).await
-                {
-                    for (key, assignment) in extra.state {
-                        state.state.insert(key, assignment);
-                    }
-                }
-            }
-        }
-    }
-
-    process_plan_tick(
-        sp_id,
-        con.clone(),
-        model,
-        state,
-        tick_elapsed_ms,
-        log_target,
-    )
-    .await
 }
 
 /// Length of the `_{nanoid}` suffix that `handle_replan_request` appends to an
