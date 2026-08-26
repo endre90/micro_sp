@@ -5,25 +5,40 @@
 //! configured entirely by six fields on the operation itself:
 //!
 //! ```text
-//!                       preconditions hold
-//!    initial ─────────────────────────────────────> executing
-//!       ^                                          /    |    \
-//!       |                    postconditions hold  /     |     \  timeout_executing_ms
-//!       |                                        v      |      v      elapsed
-//!       |                                   completed   |   timedout
-//!       |                                        |      |      |
-//!       |            failure_transition holds ───┼──> failed    |
-//!       |                                        |      |      |
-//!       └── retries left (failure_retries /      |      v      v
-//!           timeout_retries) ────────────────────┘   can_be_bypassed?
-//!                                                       /       \
-//!                                                    yes         no
-//!                                                     v           v
-//!                                                 bypassed      fatal
-//!                                                     \          /
-//!                                                      v        v
-//!                                                     terminated
+//!                           executing
+//!                               │
+//!             ┌─────────────────┴─────────────────┐
+//!             │ a failure_transition              │ past
+//!             │ holds                             │ timeout_executing_ms
+//!             v                                   v
+//!          failed                             timedout
+//!             │                                   │
+//!             └─────────────────┬─────────────────┘
+//!                               │
+//!     ┌─────────────────────────┼─────────────────────────┐
+//!     │ a retry is left         │ out of retries,         │ out of retries,
+//!     │ (failure_retries /      │ can_be_bypassed         │ otherwise
+//!     │  timeout_retries)       │                         │
+//!     v                         v                         v
+//!  initial                  bypassed                    fatal
+//!                               ┆                         ┆
+//!                               v                         v
+//!                      terminated_bypassed        terminated_fatal
 //! ```
+//!
+//! The two dotted edges are the intent, not yet the behaviour:
+//! `Operation::terminate` only implements `TerminationReason::Completed`, so
+//! today a bypassed or fatal operation stays in `bypassed` / `fatal` instead of
+//! reaching `terminated_*`. The three scenarios below never notice - each one
+//! checks a flag its own bypass or timeout transition set, not the lifecycle
+//! variable. A bypassable operation inside a SOP does notice: `SOP::get_state`
+//! counts only `terminated_bypassed` as a finished step, so that branch would
+//! report `executing` forever.
+//!
+//! Two precedences decide which arrow is taken when more than one could be. A
+//! `stop` command beats everything, and a `failure_transition` beats a deadline
+//! that came due on the same tick - so a modelled failure is never silently
+//! turned into a timeout, and neither is ever silently completed.
 //!
 //! Three scenarios, run one after another against the same model. Each is an
 //! automatic operation gated on a `scenario` variable, so `main` can step
@@ -42,6 +57,13 @@
 //!    sleep but gives itself `timeout_executing_ms: Some(500)`. It cannot
 //!    possibly finish in time, so it times out, spends its one
 //!    `timeout_retries`, times out again and goes fatal.
+//!
+//!    Note *when* that second timeout lands. A retry puts the operation back to
+//!    `initial` but does not reset `{name}_elapsed_executing_ms`, and that
+//!    counter is already past 500 ms from the first attempt - so the retry
+//!    times out on the tick after it restarts, not 500 ms later. The observed
+//!    sequence is `executing -> timedout -> initial -> executing -> timedout ->
+//!    fatal`. `timeout_retries` buys extra attempts, not extra time.
 //!
 //! The sharp edge worth reading twice: **a retry only ever happens if there is
 //! a transition to fire.** `failure_retries` counts failures, and a failure is

@@ -12,8 +12,8 @@
 //!   before anything has measured it.
 //! - **Behaviour.** A [`Transition`] is a guard plus a set of assignments. An
 //!   [`Operation`] wraps transitions into a lifecycle (initial → executing →
-//!   completed, with timeouts, retries and cancellation). A [`SOPStruct`]
-//!   sequences operations into a procedure.
+//!   completed → terminated, with timeouts, retries, bypass and cancellation).
+//!   A [`SOPStruct`] sequences operations into a procedure.
 //! - **A [`Model`]** collects the operations, automatic transitions and SOPs a
 //!   system has.
 //! - **Runners.** [`main_runner`] spawns the tasks that actually execute a
