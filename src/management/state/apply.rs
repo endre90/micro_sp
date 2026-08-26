@@ -2,16 +2,6 @@ use crate::{SPConnection, State};
 
 /// Publish a tick's changes - a state delta plus any keys to delete - in one
 /// round trip.
-///
-/// The runners used to do this as `set_state(..).await` followed by one or two
-/// `remove_sp_values(..).await`, each waiting for the previous reply before it
-/// could even be sent. That is three sequential round trips per tick of the
-/// operation runners whenever an operation terminates.
-///
-/// Deliberately *not* `.atomic()`. The three separate commands it replaces had
-/// no atomicity either, so adding MULTI/EXEC here would change behaviour under
-/// the cover of a performance fix - see the caveat on [`crate::StateManager`]
-/// for what actually needs doing there.
 pub(super) async fn apply(con: &mut SPConnection, state: &State, deletes: &[&[String]]) {
     let items_to_set: Vec<(&str, String)> = state
         .state

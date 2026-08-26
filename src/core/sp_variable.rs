@@ -2,8 +2,10 @@
 //!
 //! An [`SPVariable`] is a name plus an [`SPValueType`]; pairing one with a
 //! value of that type gives an [`SPAssignment`], and a set of assignments is a
-//! [`State`]. [`SPVariableFormal`] adds an explicit domain, used where the
-//! planner needs to enumerate a variable's possible values.
+//! [`State`]. 
+ 
+// Removed for now: [`SPVariableFormal`] adds an explicit domain, used where the
+// planner needs to enumerate a variable's possible values.
 
 use serde::{Deserialize, Serialize};
 
@@ -32,16 +34,16 @@ pub struct SPVariable {
     pub value_type: SPValueType,
 }
 
-/// An [`SPVariable`] with an explicit domain of allowed values.
-#[derive(Debug, PartialEq, Clone, Hash, Eq, PartialOrd, Ord, Serialize, Deserialize)]
-pub struct SPVariableFormal {
-    /// The variable's unique name.
-    pub name: String,
-    /// The type of value the variable may hold.
-    pub value_type: SPValueType,
-    /// The values the variable is allowed to take.
-    pub domain: Vec<SPValue>,
-}
+// /// An [`SPVariable`] with an explicit domain of allowed values.
+// #[derive(Debug, PartialEq, Clone, Hash, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+// pub struct SPVariableFormal {
+//     /// The variable's unique name.
+//     pub name: String,
+//     /// The type of value the variable may hold.
+//     pub value_type: SPValueType,
+//     /// The values the variable is allowed to take.
+//     pub domain: Vec<SPValue>,
+// }
 
 impl SPVariable {
     /// Creates a variable with the given name and type.

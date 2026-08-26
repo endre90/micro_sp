@@ -26,7 +26,7 @@ use crate::{State, StateManager};
 /// Because reconnection is handled by the driver, nothing in this crate needs
 /// to pre-flight a `PING` before issuing a command. Grab a connection once when
 /// a runner starts and keep using it; a dead socket surfaces as an error on the
-/// command itself and is repaired underneath you.
+/// command itself and is repaired underneath.
 ///
 /// This is an alias rather than a concrete type on purpose: swapping the
 /// transport (for a cluster connection, a pooled connection, or a test double)
@@ -48,19 +48,10 @@ const RECONNECT_RETRIES: usize = 6;
 /// Delay between attempts of the initial, blocking startup connect loop.
 const INITIAL_CONNECT_RETRY_DELAY: Duration = Duration::from_secs(5);
 
-/// How often the optional background health monitor pings Redis. This is the
-/// replacement for the old per-tick, per-runner `PING`: one round trip every
-/// few seconds for the whole process instead of ~50 per second.
+/// How often the optional background health monitor pings Redis.
 pub const DEFAULT_HEALTH_CHECK_PERIOD: Duration = Duration::from_secs(5);
 
 /// Owns the process-wide Redis connection and hands out cheap clones of it.
-///
-/// Note there is deliberately no `RwLock` here any more. The previous design
-/// wrapped a `MultiplexedConnection` in `Arc<RwLock<..>>` so that a reconnect
-/// could swap it out, which meant every single access on the hot path took an
-/// async read guard, and a reconnect blocked every runner for the duration of
-/// the retry loop. `SPConnection` replaces its own inner connection on failure,
-/// so a plain field is both faster and more robust.
 pub struct ConnectionManager {
     connection: SPConnection,
     redis_addr: String,
@@ -116,10 +107,10 @@ impl ConnectionManager {
     async fn try_connect(redis_addr: &str) -> RedisResult<SPConnection> {
         let client = Client::open(redis_addr.to_string())?;
 
-        // Note: `response_timeout` is intentionally left unset. Capping how long
+        // Note: `response_timeout` is intentionally left unset, for now. Capping how long
         // a *command* may take would abort long-running calls such as `KEYS *`
         // or `FLUSHDB` on a large keyspace and surface them as connection
-        // errors. Set it here if you later bound the size of those operations.
+        // errors. Optional: set here to bound the size of those operations.
         let config = ConnectionManagerConfig::new()
             .set_exponent_base(RECONNECT_EXPONENT_BASE)
             .set_factor(RECONNECT_FACTOR_MS)
@@ -132,7 +123,7 @@ impl ConnectionManager {
 
     /// Get a handle to Redis.
     ///
-    /// This is now just a reference-count bump - no lock, no I/O - so it is
+    /// This is now just a reference-count bump, so it is
     /// safe to call anywhere. Even so, prefer calling it *once* before a
     /// runner's loop and reusing the handle: the returned connection stays
     /// valid across reconnects, so there is no reason to re-fetch per tick.
@@ -157,9 +148,7 @@ impl ConnectionManager {
     ///
     /// This is a diagnostic / startup probe, **not** something to call on a
     /// tick. It used to run before every iteration of every runner, which cost
-    /// a full round trip per runner per tick (~40-60 RTTs/second across the
-    /// process) and, because it was awaited before the real work, added that
-    /// latency directly to every state update. Recovery no longer depends on
+    /// a full round trip per runner per tick. Recovery no longer depends on
     /// it: `SPConnection` reconnects on its own. Use
     /// [`ConnectionManager::spawn_health_monitor`] if you want a liveness
     /// signal in the logs.
@@ -185,9 +174,7 @@ impl ConnectionManager {
     /// Block until Redis answers again.
     ///
     /// Reconnection itself is automatic, so this no longer *performs* a
-    /// reconnect - it waits for one to succeed, which is the only part callers
-    /// ever actually needed. Unlike the previous implementation it holds no
-    /// lock, so waiting here never stalls the other runners.
+    /// reconnect - it waits for one to succeed.
     pub async fn reconnect(&self, log_target: &str) {
         log::warn!(target: log_target, "Waiting for the Redis connection to recover...");
 
@@ -204,11 +191,6 @@ impl ConnectionManager {
     }
 
     /// Log a Redis error from a command.
-    ///
-    /// Callers no longer need to trigger anything: an I/O error means the
-    /// driver is already reconnecting in the background and the next command
-    /// will go over the new socket. Skipping the current tick is the correct
-    /// response.
     pub async fn handle_redis_error(&self, e: &redis::RedisError, log_target: &str) {
         if e.is_io_error() {
             log::error!(
@@ -222,10 +204,6 @@ impl ConnectionManager {
     }
 
     /// Spawn a single background task that pings Redis on an interval.
-    ///
-    /// This replaces the old per-runner, per-tick health check with one probe
-    /// for the whole process. It exists only for observability - nothing
-    /// depends on it to recover.
     pub fn spawn_health_monitor(
         self: &Arc<Self>,
         log_target: &str,
@@ -278,14 +256,6 @@ pub async fn restore_state_from_snapshot(
     }
 }
 
-/// The connection layer.
-///
-/// Most of this module is the *recovery* path - health checks, reconnect
-/// waiting, error classification, the background monitor - which is precisely
-/// the code that only ever runs when something has already gone wrong, and so
-/// was entirely uncovered. It is also the code that was rewritten when the
-/// per-tick PING was removed, so what its replacements actually do is worth
-/// having written down.
 #[cfg(test)]
 mod tests {
     use super::*;

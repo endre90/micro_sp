@@ -25,21 +25,6 @@ mod flush_state;
 /// failure, writes log and continue - nothing here panics or propagates a
 /// Redis error, because a runner must survive a blip rather than die on it.
 ///
-/// # Caveats
-///
-/// Read-modify-write across runners is **not** atomic. Each runner reads a
-/// snapshot, computes a diff against it and writes that diff back, so two
-/// runners whose ticks overlap can both decide from the same stale read and the
-/// later write wins. It only bites on the handful of keys two runners genuinely
-/// share (the `_plan*`, `_planner_state` and `_replan*` families, written by
-/// `planner_ticker`, `plan_runner` and `goal_runner`), where it shows up as "the
-/// state change did not take" plus a tick of latency while it is redone. Fixing
-/// it properly means either giving each key a single owning runner or making the
-/// read-compute-write one WATCH/MULTI/EXEC transaction with a retry policy -
-/// both design changes rather than patches. Note that [`StateManager::apply`] is
-/// deliberately non-atomic for the same reason: the race is between the read and
-/// the write, not among the writes.
-///
 /// ```no_run
 /// use micro_sp::*;
 ///
@@ -110,7 +95,7 @@ impl StateManager {
         set_sp_value::set_sp_value(con, key, value).await
     }
 
-    /// Delete a single key. Idempotent - deleting a key that was never there is
+    /// Delete a single key. Deleting a key that was never there is
     /// not an error - and a failed `DEL` is logged rather than returned.
     pub async fn remove_sp_value(con: &mut SPConnection, key: &str) {
         remove_sp_value::remove_sp_value(con, key).await
@@ -126,8 +111,8 @@ impl StateManager {
     ///
     /// The "publish this tick" call: pipelines the `MSET` and the `DEL`s
     /// together, and issues nothing at all when there is nothing to do.
-    /// Deliberately not `.atomic()` (no MULTI/EXEC) - see the caveat on
-    /// [`StateManager`]. Failures are logged rather than returned.
+    /// Deliberately not `.atomic()` (no MULTI/EXEC). 
+    /// Failures are logged rather than returned.
     pub async fn apply(con: &mut SPConnection, state: &State, deletes: &[&[String]]) {
         apply::apply(con, state, deletes).await
     }
@@ -149,13 +134,7 @@ impl StateManager {
         flush_state::flush_state(con).await
     }
 }
-/// The `StateManager` facade, end to end.
-///
-/// Each submodule tests its own function, but several of the facade methods and
-/// several of the *edge* cases - an empty keyspace, an empty key list, deleting
-/// nothing, a value that fails to deserialise - are only reachable from here.
-/// They matter because they are precisely the states a freshly started or
-/// freshly flushed system is in.
+
 #[cfg(test)]
 mod facade_tests {
     use crate::*;

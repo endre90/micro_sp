@@ -256,14 +256,7 @@ pub async fn auto_operation_runner(
         }
     }
 }
-/// The two automatic runners, driven end to end against a real Redis.
-///
-/// `auto_transition_runner` fires guard-less state rewrites; `auto_operation_runner`
-/// activates an operation instance whenever a template's guard becomes true,
-/// drives it, and deletes its bookkeeping variables once it terminates. Neither
-/// is reachable without Redis, and the activation/teardown bookkeeping - which
-/// is where the "operations accumulate in the keyspace" class of bug lives - had
-/// no coverage at all.
+
 #[cfg(test)]
 mod runner_tests {
     use super::*;

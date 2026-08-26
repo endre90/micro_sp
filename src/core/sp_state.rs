@@ -2,7 +2,7 @@
 //!
 //! Everything the runtime reasons about lives in a [`State`] - guards are
 //! evaluated against it, actions produce a new one, and [`StateManager`] mirrors
-//! it to and from Redis. Every method takes a `log_target`, to specofy
+//! it to and from Redis. Every method takes a `log_target`, to specify
 //! who is emitting the log.
 //!
 //! The typed `get_*` accessors share one contract: a value of the wrong type is
@@ -20,7 +20,7 @@ use std::{collections::HashMap, fmt};
 /// Maps a variable name to its [`SPAssignment`] (the [`SPVariable`] and its
 /// current [`SPValue`]). Most methods come in an owned form returning a new
 /// `State` and a `_mut` form modifying in place. The reason why we don't only
-/// map to [`SPVlue`] is to have the access to the type during lookup.
+/// map to [`SPValue`] is to have the access to the type during lookup.
 ///
 /// ```
 /// use micro_sp::*;
@@ -48,11 +48,11 @@ pub struct State {
 impl Hash for State {
     fn hash<H: Hasher>(&self, s: &mut H) {
         let mut keys: Vec<&String> = self.state.keys().collect();
-        keys.sort(); 
+        keys.sort();
 
         for key in keys {
             key.hash(s);
-            
+
             if let Some(assignment) = self.state.get(key) {
                 assignment.var.hash(s);
                 assignment.val.hash(s);
@@ -203,8 +203,7 @@ impl State {
                 "Variable {} already in state! Skipped add.", assignment.var.name);
             return;
         }
-        self.state
-            .insert(assignment.var.name.clone(), assignment);
+        self.state.insert(assignment.var.name.clone(), assignment);
     }
 
     /// Remove a variable. Logs and does nothing if it is not present, matching
@@ -605,13 +604,17 @@ impl State {
     ///
     /// A missing, mistyped or unparseable goal yields [`Predicate::TRUE`], i.e.
     /// "nothing to do" rather than an error.
-    pub fn extract_goal(&self, name: &str) -> Predicate {
+    pub fn extract_goal(&self, name: &str, log_target: &str) -> Predicate {
         match self.state.get(&format!("{}_current_goal_predicate", name)) {
             Some(g_spvalue) => match &g_spvalue.val {
                 SPValue::String(StringOrUnknown::String(g_value)) => {
                     match pred_parser::pred(&g_value, &self) {
                         Ok(goal_predicate) => goal_predicate,
-                        Err(_) => Predicate::TRUE,
+                        Err(_) => {
+                            log::error!(target: &log_target,
+                                "Failed to extract the goal predicate.");
+                            Predicate::TRUE
+                        }
                     }
                 }
                 _ => Predicate::TRUE,
@@ -1027,13 +1030,16 @@ mod tests {
     #[test]
     fn test_extract_goal() {
         let state_no_goal = get_initial_state();
-        assert_eq!(state_no_goal.extract_goal("g"), Predicate::TRUE);
+        assert_eq!(state_no_goal.extract_goal("g", "test"), Predicate::TRUE);
 
-        let state_with_bad_goal = state_no_goal.add(SPAssignment::new(
-            SPVariable::new("g_current_goal_predicate", SPValueType::Int64),
-            1.to_spvalue(),
-        ), "test");
-        assert_eq!(state_with_bad_goal.extract_goal("g"), Predicate::TRUE);
+        let state_with_bad_goal = state_no_goal.add(
+            SPAssignment::new(
+                SPVariable::new("g_current_goal_predicate", SPValueType::Int64),
+                1.to_spvalue(),
+            ),
+            "test",
+        );
+        assert_eq!(state_with_bad_goal.extract_goal("g", "test"), Predicate::TRUE);
     }
 }
 /// The typed accessors, exhaustively.
@@ -1073,7 +1079,10 @@ mod accessor_tests {
             (SPVariable::new("b", SPValueType::Bool), true.to_spvalue()),
             (SPVariable::new("i", SPValueType::Int64), 7.to_spvalue()),
             (SPVariable::new("f", SPValueType::Float64), 2.5.to_spvalue()),
-            (SPVariable::new("s", SPValueType::String), "text".to_spvalue()),
+            (
+                SPVariable::new("s", SPValueType::String),
+                "text".to_spvalue(),
+            ),
             (
                 SPVariable::new("arr", SPValueType::Array),
                 vec![1.to_spvalue()].to_spvalue(),
@@ -1176,8 +1185,16 @@ mod accessor_tests {
         assert!(!state.get_bool_or_default_to_false("wrong", TARGET));
         assert_eq!(state.get_int_or_default_to_zero("wrong", TARGET), 0);
         assert_eq!(state.get_float_or_default_to_zero("wrong", TARGET), 0.0);
-        assert!(state.get_array_or_default_to_empty("wrong", TARGET).is_empty());
-        assert!(state.get_map_or_default_to_empty("wrong", TARGET).is_empty());
+        assert!(
+            state
+                .get_array_or_default_to_empty("wrong", TARGET)
+                .is_empty()
+        );
+        assert!(
+            state
+                .get_map_or_default_to_empty("wrong", TARGET)
+                .is_empty()
+        );
         assert!(matches!(
             state.get_time_or_unknown("wrong", TARGET),
             TimeOrUnknown::UNKNOWN
@@ -1227,8 +1244,16 @@ mod accessor_tests {
             state.get_string_or_default_to_unknown("s_unknown", TARGET),
             "UNKNOWN"
         );
-        assert!(state.get_array_or_default_to_empty("arr_unknown", TARGET).is_empty());
-        assert!(state.get_map_or_default_to_empty("map_unknown", TARGET).is_empty());
+        assert!(
+            state
+                .get_array_or_default_to_empty("arr_unknown", TARGET)
+                .is_empty()
+        );
+        assert!(
+            state
+                .get_map_or_default_to_empty("map_unknown", TARGET)
+                .is_empty()
+        );
         assert_eq!(
             state
                 .get_transform_or_default_to_default("tf_unknown", TARGET)
@@ -1381,13 +1406,13 @@ mod accessor_tests {
             ),
             TARGET,
         );
-        assert_eq!(state.extract_goal("sp"), Predicate::TRUE);
+        assert_eq!(state.extract_goal("sp", "test"), Predicate::TRUE);
 
         // A goal of the wrong type, and a missing goal, do the same.
         let mut wrong_type = state.clone();
         wrong_type.update_mut("sp_current_goal_predicate", 7.to_spvalue());
-        assert_eq!(wrong_type.extract_goal("sp"), Predicate::TRUE);
-        assert_eq!(state.extract_goal("no_such_runner"), Predicate::TRUE);
+        assert_eq!(wrong_type.extract_goal("sp", "test"), Predicate::TRUE);
+        assert_eq!(state.extract_goal("no_such_runner", "test"), Predicate::TRUE);
     }
 
     #[test]
@@ -1401,9 +1426,12 @@ mod accessor_tests {
             TARGET,
         );
 
-        let goal = state.extract_goal("sp");
+        let goal = state.extract_goal("sp", "test");
         assert_ne!(goal, Predicate::TRUE);
-        assert!(goal.eval(&state, TARGET), "the goal already holds in this state");
+        assert!(
+            goal.eval(&state, TARGET),
+            "the goal already holds in this state"
+        );
 
         state.update_mut("i", 8.to_spvalue());
         assert!(!goal.eval(&state, TARGET));

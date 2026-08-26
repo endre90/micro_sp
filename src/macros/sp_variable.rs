@@ -92,14 +92,6 @@ macro_rules! tfv {
     };
 }
 
-/// Each `*v!` macro is just sugar for `SPVariable::new(name, SPValueType::X)`,
-/// but nothing in the crate actually calls `tv!` (the `Time`-typed one) - every
-/// other variant is exercised indirectly through model/state building code
-/// elsewhere, so `tv!` was the one macro invocation that never expanded during
-/// any test run. Instantiate every variant once and check both the name and
-/// the resulting `SPValueType`, since a copy-pasted macro (there are eight,
-/// differing only in the `SPValueType` variant) is exactly the kind of code
-/// where one of them silently gets the wrong type.
 #[cfg(test)]
 mod tests {
     use crate::*;

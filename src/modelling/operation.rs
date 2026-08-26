@@ -1,7 +1,9 @@
 //! [`Operation`]s: a [`Transition`] wrapped in a lifecycle.
 //!
-//! An operation is the unit the planner schedules and the runners execute. It
-//! goes from `initial` through `executing` to `completed`, with branches for
+//! An operation is the unit and the runners execute. It can be scheduled by the
+//! planner or taken automatically. 
+//! 
+//! It goes from `initial` through `executing` to `completed`, with branches for
 //! failure, timeout, bypass and cancellation, and each branch carries its own
 //! transitions. The current state lives in the [`State`] under the operation's
 //! own name, which is why every method here takes a state and returns a new one.
@@ -37,6 +39,8 @@ pub enum OperationState {
     Cancelled,
     /// Finished for good, with the reason it finished. This is the state a SOP
     /// or plan runner waits for before moving on.
+    // Paused on request, e.g. a `pause` dashboard command. Can be continued.
+    // Paused,
     Terminated(TerminationReason),
     /// Not yet initialized, or a value that does not parse as any of the above.
     UNKNOWN,
@@ -77,6 +81,7 @@ impl OperationState {
             "completed" => OperationState::Completed,
             "bypassed" => OperationState::Bypassed,
             "cancelled" => OperationState::Cancelled,
+            // "paused" => OperationState::Paused,
             "terminated_completed" => OperationState::Terminated(TerminationReason::Completed),
             "terminated_bypassed" => OperationState::Terminated(TerminationReason::Bypassed),
             "terminated_fatal" => OperationState::Terminated(TerminationReason::Fatal),
@@ -104,6 +109,7 @@ impl OperationState {
             OperationState::Completed => "completed",
             OperationState::Bypassed => "bypassed",
             OperationState::Cancelled => "cancelled",
+            // OperationState::Paused => "paused",
             OperationState::Terminated(TerminationReason::Completed) => "terminated_completed",
             OperationState::Terminated(TerminationReason::Bypassed) => "terminated_bypassed",
             OperationState::Terminated(TerminationReason::Fatal) => "terminated_fatal",
@@ -114,14 +120,6 @@ impl OperationState {
 }
 
 /// Allocation-free equivalent of `value == expected.to_spvalue()`.
-///
-/// The subtlety worth spelling out: `to_spvalue()` does *not* always produce
-/// `SPValue::String(StringOrUnknown::String(..))`. `ToSPValue for String`
-/// collapses "UNKNOWN"/"unknown"/"Unknown" to `StringOrUnknown::UNKNOWN`, so
-/// `OperationState::UNKNOWN.to_spvalue()` is the UNKNOWN *variant*, not the
-/// string "UNKNOWN". Both sides have to be compared in that same shape or this
-/// silently disagrees with the comparison it replaced - which is exactly what
-/// `value_is_matches_the_old_spvalue_comparison` pins down.
 fn value_is(value: &SPValue, expected: OperationState) -> bool {
     let expected_is_unknown = matches!(expected, OperationState::UNKNOWN);
     match value {
@@ -149,9 +147,9 @@ impl fmt::Display for OperationState {
 /// one with [`Operation::new`].
 #[derive(Debug, PartialEq, Clone, Eq, Hash, Serialize, Deserialize)]
 pub struct Operation {
-    /// Unique name; also the state variable holding this operation's state.
+    /// Unique name; also the state variable holding this operation's state in Redis.
     pub name: String,
-    /// Initial state stamped into the model. The authoritative state at runtime
+    /// Initial state stamped into the model. The state at runtime
     /// is the value stored under [`Operation::name`] in the [`State`].
     pub state: OperationState,
     /// Deadline in `executing`, in milliseconds. `None` disables the timeout.
@@ -163,7 +161,7 @@ pub struct Operation {
     /// How many times a timed-out operation may be retried before going fatal.
     pub timeout_retries: i64,
     /// Whether a failed or timed-out operation may be bypassed and the plan
-    /// carried on regardless.
+    /// (or SOP) carried on regardless.
     pub can_be_bypassed: bool,
     /// Guards that start the operation; the first one that holds is taken.
     pub preconditions: Vec<Transition>,
@@ -330,7 +328,7 @@ impl Operation {
     }
 
     /// Execute the planing actions of both the pre and post conditions.
-    /// Inex 0 taken as to indicate that the firstly defined transition should be taken when planning.
+    /// Index 0 taken as to indicate that the firstly defined transition should be taken when planning.
     pub fn take_planning(&self, state: &State, log_target: &str) -> State {
         let mut new_state = state.clone();
         self.preconditions[0].take_planning_mut(&mut new_state, &log_target);
@@ -760,7 +758,6 @@ impl Operation {
 
         all_keys
     }
-
 }
 #[cfg(test)]
 mod operation_state_tests {
@@ -906,8 +903,11 @@ mod can_be_cancelled_tests {
         for operation_state in ["initial", "executing", "disabled", "failed", "timedout"] {
             for command in ["none", "start", ""] {
                 assert!(
-                    !operation()
-                        .can_be_cancelled(SP_ID, &state_with(operation_state, command), TARGET),
+                    !operation().can_be_cancelled(
+                        SP_ID,
+                        &state_with(operation_state, command),
+                        TARGET
+                    ),
                     "'{operation_state}' with command '{command}' should not be cancellable"
                 );
             }
@@ -1003,13 +1003,22 @@ mod guard_tests {
         let operation = operation(&world);
 
         let first = in_state(&world.update("go", true.to_spvalue()), "initial");
-        assert_eq!(operation.evaluate_with_transition_index(&first, TARGET), (true, 0));
+        assert_eq!(
+            operation.evaluate_with_transition_index(&first, TARGET),
+            (true, 0)
+        );
 
         let second = in_state(&world.update("alt", true.to_spvalue()), "initial");
-        assert_eq!(operation.evaluate_with_transition_index(&second, TARGET), (true, 1));
+        assert_eq!(
+            operation.evaluate_with_transition_index(&second, TARGET),
+            (true, 1)
+        );
 
         let neither = in_state(&world, "initial");
-        assert_eq!(operation.evaluate_with_transition_index(&neither, TARGET), (false, 0));
+        assert_eq!(
+            operation.evaluate_with_transition_index(&neither, TARGET),
+            (false, 0)
+        );
     }
 
     /// Unlike `eval`, the indexed form only accepts `initial` - it does not
@@ -1103,20 +1112,45 @@ mod guard_tests {
         let cases: Vec<(&str, Method, &str, &str)> = vec![
             ("disable", Operation::disable, "initial", "disabled"),
             ("start", Operation::start, "initial", "executing"),
-            ("start from disabled", Operation::start, "disabled", "executing"),
+            (
+                "start from disabled",
+                Operation::start,
+                "disabled",
+                "executing",
+            ),
             ("complete", Operation::complete, "executing", "completed"),
             ("fail", Operation::fail, "executing", "failed"),
             ("timeout", Operation::timeout, "executing", "timedout"),
-            ("timeout from disabled", Operation::timeout, "disabled", "timedout"),
+            (
+                "timeout from disabled",
+                Operation::timeout,
+                "disabled",
+                "timedout",
+            ),
             ("fatal from failed", Operation::fatal, "failed", "fatal"),
             ("fatal from timedout", Operation::fatal, "timedout", "fatal"),
             ("retry from failed", Operation::retry, "failed", "initial"),
-            ("retry from timedout", Operation::retry, "timedout", "initial"),
+            (
+                "retry from timedout",
+                Operation::retry,
+                "timedout",
+                "initial",
+            ),
             // `bypass` is reached from a *failed* or *timedout* operation - it
             // is the "this step did not work, carry on anyway" path, not
             // something an executing operation does.
-            ("bypass from failed", Operation::bypass, "failed", "bypassed"),
-            ("bypass from timedout", Operation::bypass, "timedout", "bypassed"),
+            (
+                "bypass from failed",
+                Operation::bypass,
+                "failed",
+                "bypassed",
+            ),
+            (
+                "bypass from timedout",
+                Operation::bypass,
+                "timedout",
+                "bypassed",
+            ),
         ];
 
         for (label, method, from, expected) in cases {
@@ -1135,7 +1169,13 @@ mod guard_tests {
         let world = world();
         let operation = operation(&world);
 
-        for from in ["initial", "executing", "completed", "terminated_completed", "fatal"] {
+        for from in [
+            "initial",
+            "executing",
+            "completed",
+            "terminated_completed",
+            "fatal",
+        ] {
             let state = in_state(&world, from);
             assert_eq!(
                 op_state(&operation.cancel(&state, TARGET)),
@@ -1167,7 +1207,11 @@ mod guard_tests {
 
         for from in ["completed", "fatal"] {
             let state = in_state(&world, from);
-            assert_eq!(op_state(&operation.reinitialize(&state, TARGET)), "initial", "{from}");
+            assert_eq!(
+                op_state(&operation.reinitialize(&state, TARGET)),
+                "initial",
+                "{from}"
+            );
         }
         for from in ["executing", "initial", "failed"] {
             let state = in_state(&world, from);

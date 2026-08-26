@@ -201,8 +201,7 @@ impl Action {
     }
 
     /// Owned form of [`Action::assign_mut`]: clones the state once, applies the
-    /// action and returns the result. Kept so existing call sites are
-    /// unchanged; prefer `assign_mut` when you already own a `State`.
+    /// action and returns the result. Prefer `assign_mut` when you already own a `State`.
     pub fn assign(self, state: &State, log_target: &str) -> State {
         let mut new_state = state.clone();
         self.assign_mut(&mut new_state, log_target);

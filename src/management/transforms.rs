@@ -84,7 +84,7 @@ impl TransformsManager {
         get_all_transforms::get_all_transforms(con).await
     }
 
-    /// Replace the pose of frame `name`, keeping its parent.
+    /// Replace the pose of frame `name`, keeping its parent id.
     ///
     /// `Err` if the frame does not exist or does not hold a valid transform.
     pub async fn move_transform(
@@ -170,10 +170,6 @@ impl TransformsManager {
     }
 }
 
-/// The public façade. Each associated function above only forwards to its
-/// module, but the façade is what every caller outside this crate actually
-/// uses, so the round trip through it is worth pinning: what goes in through
-/// [`TransformsManager`] must come back out through it.
 #[cfg(test)]
 mod tests {
     use crate::*;

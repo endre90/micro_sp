@@ -232,7 +232,7 @@ async fn handle_replan_request(
     }
 
 
-    let goal = state.extract_goal(&sp_id);
+    let goal = state.extract_goal(&sp_id, &log_target);
 
     // `spawn_blocking` needs owned data: the operations are behind an `Arc`
     // built once at startup, so this is a refcount bump, and the state is
