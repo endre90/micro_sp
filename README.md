@@ -1,6 +1,6 @@
 # Micro SP (Sequence Planner)
 
-[![Documentation](https://img.shields.io/badge/docs-github--pages-blue)](https://endre90.github.io/micro_sp/)
+[![Documentation](https://img.shields.io/badge/docs-github--pages-blue)](https://endre90.github.io/micro_sp/) [![Coverage](https://img.shields.io/badge/coverage-97.98%25-brightgreen)](#tests)
 
 A Sequence Planner runtime for controlling automation systems, in the form of a
 library.
@@ -320,7 +320,7 @@ goals, or enable a SOP, without linking against your binary.
                                   |
                                   v
   {sp_id}_plan_current_step -->  planned_operation_runner drives step N:
-                                  initial -> executing -> completed -> terminated
+                                  initial -> executing -> completed -> terminated_completed
                                   |
                                   v
   {sp_id}_plan_state == completed
@@ -439,31 +439,113 @@ over, while `runner_actions` are applied only when actually running.
 
 ### The lifecycle
 
+[`process_operation`](src/running/process_operation.rs) is called once per tick
+for every active operation. It matches on the operation's current state and takes
+the **first** branch whose guard holds, so the order matters as much as the arrows
+do — see the precedence table below.
+
 ```text
-                        preconditions hold
-     initial ───────────────────────────────────────> executing
-        ^                                            /    |    \
-        |                      postconditions hold  /     |     \  deadline
-        |                                          v      |      v  elapsed
-        |                                     completed   |   timedout
-        |                                          |      |      |
-        |              failure_transition holds ───┼──> failed    |
-        |                                          |      |      |
-        └── retries left ──────────────────────────┘      v      v
-                                                     can_be_bypassed?
-                                                        /       \
-                                                     yes         no
-                                                      v           v
-                                                  bypassed      fatal
-                                                       \         /
-                                                        v       v
-                                                      terminated
+                           initial
+                              │
+      ┌───────────────────────┴─────────────────────────────────┐
+      │ a precondition holds                                    │ otherwise
+      │                                                         v
+      │                                                     disabled
+      │                                                     │         │
+      │                                a precondition holds │         │
+      ├─────────────────────────────────────────────────────┘         |
+      |                                                               |
+      v                                     past timeout_disabled_ms  │
+  executing                                                           │
+      │                                                               │
+      ├───────────────────────┬─────────────────────┐                 │
+      │                       │                     │                 │
+      │ a postcondition       │ a failure_          │ past timeout_   │
+      │ holds                 │ transition holds    │ executing_ms    │
+      │                       │                     │                 │
+      v                       v                     v                 │
+  completed                failed               timedout   <──────────┘
+      │                       │                     │
+      │                       └──────────┬──────────┘
+      │                                  │
+      │       ┌──────────────────────────┼────────────────────────┐
+      │       │ a retry is left          │ out of retries,        │ out of retries,
+      │       │ (counter += 1)           │ can_be_bypassed        │ otherwise
+      │       v                          v                        v
+      │    initial                   bypassed                   fatal
+      │                                  |                        |
+      |                                  |                        |
+      |                                  v                        |
+      └───────────────────────────>  terminated  <────────────────┘
 ```
 
-`disabled` is the state of an operation that has been scheduled but whose
-preconditions do not hold yet; `cancelled` is reachable from a stop command at
-any point. `Terminated(reason)` is the state a plan or SOP runner waits for
-before advancing to the next step.
+Two things the picture leaves out:
+
+* **`UNKNOWN` → `initial`.** A state value that does not parse as any of the
+  above — a variable that was never initialised, or a garbled one — is forced
+  back to `initial` rather than treated as an error.
+* **`cancelled`.** A `stop` dashboard command cancels the operation, but only
+  from `initial`, `disabled`, `executing`, `failed` or `timedout`. It is *not*
+  reachable from `completed`, `bypassed`, `fatal` or `terminated_*`.
+
+The `timedout` and `bypassed` edges also need their all-or-nothing
+`timeout_transitions` / `bypass_transitions` to permit them, per the field table
+above; declaring one whose guard never holds is how you forbid a timeout or a
+bypass outright.
+
+### What each state checks, in order
+
+| In state | Checked in this order |
+|---|---|
+| `initial` | cancel → a precondition holds → **`executing`**; otherwise → **`disabled`** |
+| `disabled` | cancel → past `timeout_disabled_ms` → **`timedout`**; a precondition holds → **`executing`**; otherwise wait |
+| `executing` | cancel → a `failure_transition` holds → **`failed`**; past `timeout_executing_ms` → **`timedout`**; a postcondition holds → **`completed`**; otherwise wait |
+| `failed` / `timedout` | cancel → a retry is left → **`initial`**; `can_be_bypassed` → **`bypassed`**; otherwise → **`fatal`** |
+
+The precedences are load-bearing. A failure beats a timeout that came due on the
+same tick, and both beat a postcondition that also holds, so a modelled failure
+is never quietly completed. In `disabled`, the deadline is checked before the
+precondition, so an operation whose guard first holds on the very tick its
+disabled deadline passes times out instead of starting.
+
+### Termination, and two sharp edges
+
+All three end states terminate, each carrying the reason it got there:
+`completed` → `terminated_completed`, `bypassed` → `terminated_bypassed`,
+`fatal` → `terminated_fatal`. A `terminated_*` operation is inert — further ticks
+leave it exactly where it is — and it is what a plan or SOP runner waits for
+before taking its next step. `SOP::get_state` reads the reason back:
+`Completed` and `Bypassed` both count as a finished step, `Fatal` fails the SOP.
+
+Each of the three also does its own bookkeeping on the way out. `completed`
+clears both retry counters and advances `plan_current_step` for a planned
+operation; `bypassed` advances the cursor too; `fatal` sets `plan_state` to
+`failed`.
+
+**The dotted edges in the diagram are not wired up yet.**
+[`Operation::terminate`](src/modelling/operation.rs) only implements
+`TerminationReason::Completed`; its `_ => state.clone()` arm makes the other
+three reasons silent no-ops. So today `bypassed`, `fatal` and `cancelled` stay
+put, and `terminated_bypassed`, `terminated_fatal` and `terminated_cancelled` are
+parseable but never actually written.
+
+It bites hardest inside a SOP. `SOP::get_state` maps `bypassed` to
+`SOPState::Executing` and only `terminated_bypassed` to `SOPState::Completed`, so
+a bypassed operation leaves its branch reporting `Executing` forever and the SOP
+never finishes. The plan runner escapes it: it advances the cursor on the way
+past, so the stuck operation is simply never looked at again. `fatal` and
+`cancelled` are read directly by `SOP::get_state` as well, so those two still
+propagate. `a_bypassed_operation_never_lets_its_sop_finish`,
+`a_bypassed_operation_advances_the_plan_but_never_terminates` and
+`a_fatal_operation_stays_fatal_and_settles` pin all of it, so the gap cannot be
+mistaken for working.
+
+A retry also puts the operation back to `initial` **without** resetting
+`{name}_elapsed_executing_ms` / `{name}_elapsed_disabled_ms`. Those counters are
+already past the deadline that caused the timeout, so a timeout retry times out
+again on the tick after it restarts — the pinned sequence is `executing →
+timedout → initial → executing → timedout → fatal`. `timeout_retries` therefore
+buys extra attempts, not extra time.
 
 ## Examples
 
