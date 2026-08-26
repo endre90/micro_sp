@@ -8,6 +8,12 @@
 //! value - so that afterwards you can answer "what was this cell doing at
 //! 10:32?" from a file rather than from a scrollback buffer that is long gone.
 //!
+//! The two are not fully separate any more: the logger `initialize_env_logger`
+//! installs also forwards every line it prints here through [`log_message`],
+//! tagged `ERR`/`WARN`/`INFO`/`DEBUG`/`TRACE` in the kind column. So the prose
+//! saying *why* something happened sits in the same file, in timestamp order,
+//! as the structured lines saying *what* happened, and one `grep` sees both.
+//!
 //! # Why a thread and not a tokio task
 //!
 //! Every emission site is on a runner's hot path: `process_operation` runs once
@@ -51,6 +57,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::mpsc::{Receiver, SyncSender, TrySendError, sync_channel};
 
 use chrono::{DateTime, Local};
+use log::Level;
 
 use crate::{SPValue, State};
 
@@ -82,6 +89,10 @@ pub const DEFAULT_MAX_VALUE_LEN: usize = 120;
 /// How many events may be in flight before emission starts dropping them.
 pub const DEFAULT_QUEUE_CAPACITY: usize = 8192;
 
+/// The `log` target this module reports its own troubles under, and the one
+/// target [`log_message`] refuses to record. See the guard there for why.
+pub const LOG_TARGET: &str = "activity_log";
+
 /// What kind of thing a line describes. This is the second column of the file,
 /// and the thing you grep for.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -94,6 +105,13 @@ pub enum ActivityKind {
     Sop,
     /// A state variable took a new value.
     Variable,
+    /// A console log line, mirrored here by the logger
+    /// [`initialize_env_logger`](crate::initialize_env_logger) installs.
+    ///
+    /// Carrying the `log::Level` rather than one variant per severity keeps
+    /// [`tag`](ActivityKind::tag) exhaustive over every level the `log` crate
+    /// has, so none of them can end up silently unlabelled.
+    Log(Level),
 }
 
 impl ActivityKind {
@@ -104,6 +122,13 @@ impl ActivityKind {
             ActivityKind::Transition => "TRANS",
             ActivityKind::Sop => "SOP",
             ActivityKind::Variable => "VAR",
+            // `ERR` rather than `ERROR` so every tag fits the five-character
+            // kind column that `format_record` pads to.
+            ActivityKind::Log(Level::Error) => "ERR",
+            ActivityKind::Log(Level::Warn) => "WARN",
+            ActivityKind::Log(Level::Info) => "INFO",
+            ActivityKind::Log(Level::Debug) => "DEBUG",
+            ActivityKind::Log(Level::Trace) => "TRACE",
         }
     }
 }
@@ -312,7 +337,8 @@ fn header(config: &ActivityLogConfig) -> String {
         "# micro_sp activity log - opened {}\n\
          # columns: timestamp | kind | source | subject | detail\n\
          # kinds:   OP = operation state change, TRANS = auto transition taken,\n\
-         #          SOP = sop lifecycle, VAR = variable value change\n\
+         #          SOP = sop lifecycle, VAR = variable value change,\n\
+         #          ERR/WARN/INFO/DEBUG/TRACE = a console log line\n\
          # rotates at {} MiB, keeping {}\n\
          #\n",
         Local::now().format("%Y-%m-%d %H:%M:%S%.3f %:z"),
@@ -426,7 +452,7 @@ impl ActivityWriter {
         // which will simply be over budget) rather than stopping silently.
         if let Err(e) = fs::rename(&from, &to) {
             log::warn!(
-                target: "activity_log",
+                target: LOG_TARGET,
                 "Could not rotate {} to {}: {e}. Continuing in the current file.",
                 from.display(),
                 to.display()
@@ -488,7 +514,7 @@ impl ActivityWriter {
         for path in rotated.into_iter().take(excess) {
             if let Err(e) = fs::remove_file(&path) {
                 log::warn!(
-                    target: "activity_log",
+                    target: LOG_TARGET,
                     "Could not remove old activity log {}: {e}", path.display()
                 );
             }
@@ -548,7 +574,7 @@ pub fn init(config: ActivityLogConfig) -> bool {
         Ok(w) => w,
         Err(e) => {
             log::error!(
-                target: "activity_log",
+                target: LOG_TARGET,
                 "Could not open the activity log: {e}. File logging is off for this process."
             );
             return false;
@@ -570,11 +596,11 @@ pub fn init(config: ActivityLogConfig) -> bool {
 
     match spawned {
         Ok(_) => {
-            log::info!(target: "activity_log", "Activity log writing to {}.", path.display());
+            log::info!(target: LOG_TARGET, "Activity log writing to {}.", path.display());
             true
         }
         Err(e) => {
-            log::error!(target: "activity_log", "Could not start the activity log thread: {e}.");
+            log::error!(target: LOG_TARGET, "Could not start the activity log thread: {e}.");
             false
         }
     }
@@ -641,7 +667,7 @@ fn writer_loop(mut writer: ActivityWriter, rx: Receiver<Msg>) {
             match msg {
                 Msg::Record(record) => {
                     if let Err(e) = writer.write_record(&record) {
-                        log::error!(target: "activity_log", "Activity log write failed: {e}.");
+                        log::error!(target: LOG_TARGET, "Activity log write failed: {e}.");
                     }
                 }
                 Msg::Flush(tx) => *ack = Some(tx),
@@ -657,20 +683,21 @@ fn writer_loop(mut writer: ActivityWriter, rx: Receiver<Msg>) {
         // as the events around it.
         let dropped = DROPPED.load(Ordering::Relaxed);
         if dropped > reported_drops {
-            let line = format!(
-                "{} | {:<5} | {:<26} | {:<34} | {} events dropped (queue full)\n",
-                Local::now().format("%Y-%m-%d %H:%M:%S%.3f"),
-                "WARN",
-                "activity_log",
+            // Formatted through `format_record` like everything else, but
+            // written with `write_line` rather than queued: this runs *on* the
+            // writer thread, so it cannot wait on the writer thread.
+            let line = format_record(&ActivityRecord::new(
+                ActivityKind::Log(Level::Warn),
+                LOG_TARGET,
                 "-",
-                dropped - reported_drops
-            );
+                format!("{} events dropped (queue full)", dropped - reported_drops),
+            ));
             let _ = writer.write_line(&line);
             reported_drops = dropped;
         }
 
         if let Err(e) = writer.flush() {
-            log::error!(target: "activity_log", "Activity log flush failed: {e}.");
+            log::error!(target: LOG_TARGET, "Activity log flush failed: {e}.");
         }
         if let Some(ack) = pending_ack {
             let _ = ack.send(());
@@ -683,6 +710,39 @@ fn writer_loop(mut writer: ActivityWriter, rx: Receiver<Msg>) {
 // ---------------------------------------------------------------------------
 // Emission helpers - what the runners call
 // ---------------------------------------------------------------------------
+
+/// One console log line, recorded to the file alongside the events.
+///
+/// The logger [`initialize_env_logger`](crate::initialize_env_logger) installs
+/// forwards everything it prints through here, so a single pass over the file
+/// shows the prose explaining *why* something happened interleaved with the
+/// `OP`/`TRANS`/`SOP`/`VAR` lines saying *what* happened - the two used to live
+/// in a file and a terminal scrollback respectively, and correlating them after
+/// the fact was hopeless.
+///
+/// `source` is the `log` target (the runners' `log_target`, so it lands in the
+/// same column as an event's source) and `location` is the `file:line` of the
+/// statement that emitted it.
+pub fn log_message(level: Level, source: &str, location: &str, message: String) {
+    if !is_enabled() {
+        return;
+    }
+    // The writer thread reports its own failures with
+    // `log::error!(target: LOG_TARGET, "Activity log write failed: ...")`. If
+    // those came back through here, one failed write would queue a record whose
+    // write fails, which logs, which queues... - an unbounded loop out of a
+    // single bad disk. The log never records its own lines, so it cannot feed
+    // itself.
+    if source == LOG_TARGET {
+        return;
+    }
+    emit(ActivityRecord::new(
+        ActivityKind::Log(level),
+        source,
+        location,
+        message,
+    ));
+}
 
 /// An operation changed state, e.g. `Initial -> Executing`.
 ///
@@ -912,14 +972,79 @@ mod tests {
             ActivityKind::Transition.tag(),
             ActivityKind::Sop.tag(),
             ActivityKind::Variable.tag(),
+            ActivityKind::Log(Level::Error).tag(),
+            ActivityKind::Log(Level::Warn).tag(),
+            ActivityKind::Log(Level::Info).tag(),
+            ActivityKind::Log(Level::Debug).tag(),
+            ActivityKind::Log(Level::Trace).tag(),
         ];
         let unique: std::collections::HashSet<_> = tags.iter().collect();
-        assert_eq!(unique.len(), 4);
+        assert_eq!(
+            unique.len(),
+            tags.len(),
+            "a tag is doing double duty: {tags:?}"
+        );
 
         let op = format_record(&record(ActivityKind::Operation, "x", "d"));
         let sop = format_record(&record(ActivityKind::Sop, "x", "d"));
         assert!(op.contains("| OP    |"));
         assert!(!sop.contains("| OP    |"), "SOP must not match an OP grep");
+    }
+
+    /// The mirrored console lines share the kind column with the event kinds,
+    /// so their tags have to be the levels a reader would grep for and they
+    /// have to fit the column - a sixth character would push every field on
+    /// those lines out of alignment with every other line in the file.
+    #[test]
+    fn log_levels_are_tagged_and_fit_the_kind_column() {
+        let expected = [
+            (Level::Error, "ERR"),
+            (Level::Warn, "WARN"),
+            (Level::Info, "INFO"),
+            (Level::Debug, "DEBUG"),
+            (Level::Trace, "TRACE"),
+        ];
+        for (level, tag) in expected {
+            assert_eq!(ActivityKind::Log(level).tag(), tag);
+            assert!(tag.len() <= 5, "{tag} does not fit the kind column");
+        }
+
+        // And the columns still line up with an event line written beside it.
+        let info = format_record(&record(
+            ActivityKind::Log(Level::Info),
+            "tick.rs:88",
+            "started",
+        ));
+        let var = format_record(&record(
+            ActivityKind::Variable,
+            "robot_pose",
+            "home -> at_b",
+        ));
+        let column_of = |line: &str| line.find(" | ").map(|i| i + 3);
+        assert_eq!(column_of(&info), column_of(&var));
+        assert!(info.contains("| INFO  |"));
+    }
+
+    /// A mirrored `log::error!` argument is arbitrary prose, and plenty of the
+    /// crate's own messages are multi-line - `process_operation`'s "disabled"
+    /// arm renders a whole predicate tree. One log call must still be one line
+    /// with the same five fields as everything else.
+    #[test]
+    fn a_mirrored_log_line_keeps_the_five_columns() {
+        let line = format_record(&ActivityRecord::new(
+            ActivityKind::Log(Level::Error),
+            "sp_operation_runner",
+            "running/process_operation.rs:214",
+            "Operation disabled, please satisfy:\n\tvar == 1\n".to_string(),
+        ));
+
+        assert_eq!(line.matches('\n').count(), 1, "one line: {line:?}");
+        let fields: Vec<&str> = line.trim_end().split(" | ").collect();
+        assert_eq!(fields.len(), 5, "timestamp|kind|source|subject|detail");
+        assert_eq!(fields[1].trim(), "ERR");
+        assert_eq!(fields[2].trim(), "sp_operation_runner");
+        assert_eq!(fields[3].trim(), "running/process_operation.rs:214");
+        assert!(fields[4].contains("\\n"), "embedded newlines are escaped");
     }
 
     /// Values are truncated so one transform cannot take a whole line, and the

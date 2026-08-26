@@ -547,14 +547,23 @@ tail -f /tmp/micro_sp/micro_sp.log
 
 Setting `MICRO_SP_ACTIVITY_LOG_DIR` records everything the system does to a
 rotating file — operations, automatic transitions, SOP lifecycle and variable
-changes, each with a timestamp:
+changes, plus every console log line, each with a timestamp:
 
 ```
 2026-08-17 10:42:00.577 | SOP   | sp_sop_runner | test_sop_MhcX6L      | initial -> executing
 2026-08-17 10:40:44.878 | OP    | sp_op_runner  | op_a_to_b_zLmvT0QlAU | initial -> executing  (Starting)
 2026-08-17 10:40:44.863 | TRANS | sp_auto_..    | beat                 | taken as 'beat_siBI079q95'
 2026-08-17 10:40:44.869 | VAR   | sp_planner    | sp_plan              | [] -> [op_a_to_b, op_b_to_c]
+2026-08-17 10:40:44.871 | INFO  | sp_planner    | running/plan_..rs:71 | Planning to reach: var == 1.
+2026-08-17 10:40:44.884 | ERR   | sp_op_runner  | running/proce..rs:214| Operation timed out.
 ```
+
+The last two are the same lines `RUST_LOG` prints to the console, mirrored here so
+the prose saying *why* something happened sits next to the records saying *what*
+happened. Their kind column is the level (`ERR`, `WARN`, `INFO`, `DEBUG`,
+`TRACE`), their source column is the log target and their subject column is the
+`file:line` that emitted them. `RUST_LOG` governs both views identically — a line
+the console suppresses never reaches the file.
 
 The active file is always `micro_sp.log`, so `tail -f` has a stable target; it
 rotates at 5 MiB. Each kind sits in its own column, so it greps cleanly:
@@ -562,6 +571,7 @@ rotates at 5 MiB. Each kind sits in its own column, so it greps cleanly:
 ```bash
 grep '| OP '  micro_sp.log            # operation state changes
 grep '| VAR ' micro_sp.log | grep pos # one variable's history
+grep '| ERR ' micro_sp.log            # just the errors
 ```
 
 ## Documentation
