@@ -15,6 +15,24 @@
 //! `request_trigger` handshake: only one can hold it at a time. That is the
 //! difference from `sop_parallel`, where each branch had a resource to itself.
 //!
+//! # Which runner drives this
+//!
+//! [`main_runner`] spawns [`sop_multi_runner`], so the wrapper operation below
+//! talks to that runner's per-SOP channel:
+//!
+//! ```text
+//! var:sop_move_robot_sop_enabled <- true      // start it
+//! var:sop_move_robot_sop_state   == completed // wait for it
+//! ```
+//!
+//! The old single-SOP [`sop_runner`] channel is kept alongside it, commented
+//! out, so the difference is visible in one place. It went through three keys
+//! shared by every procedure in the model - `{sp_id}_sop_id` named the SOP to
+//! run, `{sp_id}_sop_enabled` started it, `{sp_id}_sop_state` reported back -
+//! which is exactly why only one could be in flight at a time. The multi runner
+//! drops the `{sp_id}_sop_id` indirection and namespaces the other two by the
+//! SOP's own id instead; see `sop_multi` for two procedures at once.
+//!
 //! Run with:
 //!
 //! ```text
@@ -27,14 +45,16 @@ mod common;
 use common::{DONT_EMULATE_FAILURE, SP_ID, TARGET};
 use micro_sp::*;
 
+const SOP_ID: &str = "sop_move_robot";
+
 fn model(sp_id: &str, state: &State) -> (Model, State) {
-    let state = state.clone();
+    let mut state = state.clone();
 
     let done = bv!("done");
-    let state = state.add(assign!(done, false.to_spvalue()), TARGET);
+    state.add_mut(assign!(done, false.to_spvalue()), TARGET);
 
     let sops = vec![SOPStruct {
-        id: "sop_move_robot".to_string(),
+        id: SOP_ID.to_string(),
         sop: SOP::Alternative(vec![
             // Blocked: can never start, so the node has to fall through to the
             // branches below it.
@@ -44,7 +64,18 @@ fn model(sp_id: &str, state: &State) -> (Model, State) {
         ]),
     }];
 
-    let auto_operations = vec![enable_sop(sp_id, &state)];
+    // `{sop_id}_sop_enabled` and `{sop_id}_sop_state` are not part of
+    // `generate_runner_state_variables`, and they have to exist in the state the
+    // wrapper operation is parsed against - `Transition::parse` resolves `var:`
+    // names at parse time and panics on one it cannot find. So this goes between
+    // building the SOPs and building the operations.
+    //
+    // The single-SOP runner needed none of this: its three keys are per `sp_id`
+    // and `generate_runner_state_variables` already creates them.
+    state.extend_mut(generate_multi_sop_state_variables(&sops, TARGET), true);
+
+    let auto_operations = vec![enable_sop(&state)];
+    // let auto_operations = vec![enable_sop_single(sp_id, &state)];
 
     let model = Model::new(sp_id, vec![], auto_operations, vec![], sops, vec![]);
 
@@ -52,34 +83,39 @@ fn model(sp_id: &str, state: &State) -> (Model, State) {
 }
 
 /// Enables the SOP and completes when the tree reports `completed`.
-fn enable_sop(sp_id: &str, state: &State) -> Operation {
+///
+/// The operation's "hardware" is the SOP runner: the start action raises this
+/// SOP's own enable flag, the postcondition waits on this SOP's own status key.
+/// Nothing here is keyed by `sp_id`, which is what would let a second wrapper
+/// for a second procedure run beside this one.
+fn enable_sop(state: &State) -> Operation {
     Operation::new(
-        "sop_move_robot",
+        SOP_ID,
         None,
         None,
         None,
         None,
         false,
         vec![Transition::parse(
-            "start_sop_move_robot",
+            &format!("start_{SOP_ID}"),
             "var:done == false",
             "true",
             vec![
-                &format!("var:{sp_id}_sop_id <- sop_move_robot"),
-                &format!("var:{sp_id}_sop_state <- initial"),
-                &format!("var:{sp_id}_sop_enabled <- true"),
+                &format!("var:{SOP_ID}_sop_state <- initial"),
+                &format!("var:{SOP_ID}_sop_enabled <- true"),
             ],
             Vec::<&str>::new(),
             state,
         )],
         vec![Transition::parse(
-            "complete_sop_move_robot",
+            &format!("complete_{SOP_ID}"),
             "true",
-            &format!("var:{sp_id}_sop_state == completed"),
+            &format!("var:{SOP_ID}_sop_state == completed"),
             vec![
                 "var:done <- true",
-                &format!("var:{sp_id}_sop_state <- initial"),
-                &format!("var:{sp_id}_sop_enabled <- false"),
+                &format!("var:{SOP_ID}_sop_state <- initial"),
+                // No `_sop_enabled <- false` here: the multi runner consumes the
+                // request flag itself when it activates the SOP.
             ],
             Vec::<&str>::new(),
             state,
@@ -90,6 +126,56 @@ fn enable_sop(sp_id: &str, state: &State) -> Operation {
         vec![],
     )
 }
+
+// The same wrapper written against the single-SOP `sop_runner`, for comparison.
+// To run the example this way, uncomment this function and the
+// `enable_sop_single` line in `model`, and re-spawn `sop_runner` (it is
+// commented out in `main_runner`, which now spawns `sop_multi_runner`).
+//
+// Note what the extra key buys and costs: `{sp_id}_sop_id` has to be written on
+// start and holds the runner for the whole run, so a second procedure could only
+// be started by overwriting it - and `{sp_id}_sop_enabled` has to be lowered by
+// hand on completion, because it is a standing flag rather than a consumed
+// request.
+//
+// fn enable_sop_single(sp_id: &str, state: &State) -> Operation {
+//     Operation::new(
+//         SOP_ID,
+//         None,
+//         None,
+//         None,
+//         None,
+//         false,
+//         vec![Transition::parse(
+//             &format!("start_{SOP_ID}"),
+//             "var:done == false",
+//             "true",
+//             vec![
+//                 &format!("var:{sp_id}_sop_id <- {SOP_ID}"),
+//                 &format!("var:{sp_id}_sop_state <- initial"),
+//                 &format!("var:{sp_id}_sop_enabled <- true"),
+//             ],
+//             Vec::<&str>::new(),
+//             state,
+//         )],
+//         vec![Transition::parse(
+//             &format!("complete_{SOP_ID}"),
+//             "true",
+//             &format!("var:{sp_id}_sop_state == completed"),
+//             vec![
+//                 "var:done <- true",
+//                 &format!("var:{sp_id}_sop_state <- initial"),
+//                 &format!("var:{sp_id}_sop_enabled <- false"),
+//             ],
+//             Vec::<&str>::new(),
+//             state,
+//         )],
+//         vec![],
+//         vec![],
+//         vec![],
+//         vec![],
+//     )
+// }
 
 /// One branch. With `available` false the guard is prefixed with `FALSE`, which
 /// the DSL parses as a literal that never holds - the branch stays `disabled`
@@ -150,6 +236,8 @@ async fn main() {
     common::configure_emulator(&connection_manager, "robot", Some(300), DONT_EMULATE_FAILURE).await;
 
     println!("Three alternative routes; the first is blocked, so another has to close the node.");
+
+    // Spawns `sop_multi_runner`; nothing extra to start here.
     main_runner(&SP_ID.to_string(), model, 1, &connection_manager).await;
 
     let done = common::wait_until(&connection_manager, &["done"], 40_000, |state| {
@@ -165,7 +253,11 @@ async fn main() {
         &[
             "done",
             "robot_position_estimated",
-            &format!("{SP_ID}_sop_state"),
+            &format!("{SOP_ID}_sop_state"),
+            &format!("{SP_ID}_sop_runner_information"),
+            // The single-SOP runner's status key, for comparison: untouched,
+            // because nothing ever named a SOP in `{sp_id}_sop_id`.
+            // &format!("{SP_ID}_sop_state"),
         ],
     )
     .await;

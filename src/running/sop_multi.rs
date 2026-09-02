@@ -38,8 +38,13 @@
 //! is for every other runner - `{sp_id}_dashboard_command == "stop"` is what
 //! [`Operation::can_be_cancelled`] reads, so it cancels every active SOP at once.
 //!
-//! This runner is *not* spawned by [`main_runner`](crate::main_runner); spawn it
-//! yourself. It touches none of `{sp_id}_sop_id`, `{sp_id}_sop_enabled`,
+//! [`main_runner`](crate::main_runner) spawns this runner; the single-SOP
+//! [`sop_runner`](crate::sop_runner) is the one commented out there. Do not spawn
+//! a second copy by hand - each copy keeps its own list of active SOPs, so two of
+//! them would each start their own instance of the same [`SOPStruct`] and drive
+//! the same hardware twice.
+//!
+//! It touches none of `{sp_id}_sop_id`, `{sp_id}_sop_enabled`,
 //! `{sp_id}_sop_state`, `{sp_id}_sop_current_step` or `{sp_id}_sop_stack`, so it
 //! can run alongside the single-SOP runner - as long as the two are not pointed
 //! at the same SOP, since they would then fight over its operations' variables.
@@ -84,6 +89,15 @@ struct ActiveSop {
     /// The uniquified operation names, kept for the read key set and for
     /// teardown - recomputing them from the tree on every tick would be waste.
     op_names: Vec<String>,
+    /// The last line logged for this instance, so `Executing` - which re-enters
+    /// its arm every tick - is printed only when it actually changes.
+    ///
+    /// Kept here rather than read back from `{template_id}_sop_information`:
+    /// that key is per template while the message is per instance, so anything
+    /// else writing it - a second copy of this runner, a dashboard - would make
+    /// every tick look like a change and log at the tick rate. Same shape as
+    /// `goal_info_old` in `goal_runner`.
+    last_logged_info: String,
 }
 
 /// The per-SOP request and status variables [`sop_multi_runner`] reads and
@@ -311,6 +325,7 @@ pub async fn sop_multi_runner(
                 tracked_state: SOPState::Initial,
                 sop,
                 op_names,
+                last_logged_info: String::new(),
             });
         }
 
@@ -400,25 +415,26 @@ pub async fn sop_multi_runner(
                 }
             }
 
-            let information_key = format!("{}_sop_information", instance.template_id);
             // Logged only when it actually changes - `Executing` re-enters its
-            // arm every tick. Guarded on presence rather than read straight:
-            // reading a variable that is not in the state panics, and this one
-            // is the caller's to seed.
-            let previous_info = match new_state.contains(&information_key) {
-                true => {
-                    new_state.get_string_or_value(&information_key, String::new(), &log_target)
-                }
-                false => String::new(),
-            };
-            if previous_info != info {
+            // arm every tick. Compared against this instance's own last line
+            // rather than against the state, so a foreign writer of the shared
+            // `{template_id}_sop_information` key cannot turn this into a log
+            // line per tick. The key itself is still published below: that is
+            // the model-facing channel and its contract is unchanged.
+            if instance.last_logged_info != info {
                 match level {
                     Level::Warn => log::warn!(target: log_target, "{}", info),
                     Level::Error => log::error!(target: log_target, "{}", info),
                     _ => log::info!(target: log_target, "{}", info),
                 }
+                instance.last_logged_info = info.clone();
             }
-            publish(&mut new_state, &information_key, info.to_spvalue(), &log_target);
+            publish(
+                &mut new_state,
+                &format!("{}_sop_information", instance.template_id),
+                info.to_spvalue(),
+                &log_target,
+            );
 
             if let Some(sop_state) = published {
                 publish(

@@ -25,17 +25,17 @@
 //! still `executing` - which is what the emulators' different execution times
 //! (400 ms against 800 ms) make visible in the log.
 //!
-//! Two things this example has to do that the single-SOP examples do not:
+//! Like every other SOP example, this one has to seed the per-SOP variables:
+//! `{sop_id}_sop_enabled` and `{sop_id}_sop_state` are not part of
+//! `generate_runner_state_variables`, so [`generate_multi_sop_state_variables`]
+//! creates them, and it has to be called *before* the wrapper operations are
+//! built, because `Transition::parse` resolves `var:` names at parse time and
+//! panics on one it cannot find.
 //!
-//! **Seed the per-SOP variables.** `{sop_id}_sop_enabled` and
-//! `{sop_id}_sop_state` are not part of `generate_runner_state_variables`.
-//! [`generate_multi_sop_state_variables`] creates them, and it has to be called
-//! *before* the wrapper operations are built, because `Transition::parse`
-//! resolves `var:` names at parse time and panics on one it cannot find.
-//!
-//! **Spawn the runner.** `main_runner` still spawns the single-SOP runner, not
-//! this one. The two coexist here without interfering: nothing ever writes
-//! `{sp_id}_sop_id`, so the old runner stays idle.
+//! What is unique here is the shape of the model rather than any extra setup:
+//! *two* [`SOPStruct`]s and two independent wrapper operations, sharing no key.
+//! `main_runner` spawns [`sop_multi_runner`] and drives both of them - there is
+//! nothing extra to start.
 //!
 //! Run with:
 //!
@@ -233,13 +233,10 @@ async fn main() {
 
     println!("Two SOPs at once: the robot walks a -> b while the gantry walks b -> a.");
 
-    // `main_runner` spawns the single-SOP runner, which sits idle here because
-    // nothing writes `{sp_id}_sop_id`. The multi-SOP runner is opt-in.
-    let multi_model = model.clone();
+    // Spawns `sop_multi_runner`; nothing extra to start here. Spawning a second
+    // copy by hand would give each one its own instance of both SOPs, and the
+    // robot and gantry would be driven twice.
     main_runner(&SP_ID.to_string(), model, 1, &connection_manager).await;
-
-    let con = connection_manager.clone();
-    tokio::task::spawn(async move { sop_multi_runner(SP_ID, &multi_model, &con).await.unwrap() });
 
     let done = common::wait_until(
         &connection_manager,
