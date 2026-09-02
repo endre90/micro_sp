@@ -69,12 +69,22 @@ pub async fn main_runner(
             .unwrap()
     });
 
+    // log::info!(target:  &format!("{sp_id}_micro_sp"), "Spawning SOP runner.");
+    // let model_clone = Arc::clone(&model);
+    // let con_clone = connection_manager.clone();
+    // let sp_id_clone = sp_id.clone();
+    // tokio::task::spawn(async move {
+    //     sop_runner(&sp_id_clone, &model_clone, &con_clone)
+    //         .await
+    //         .unwrap()
+    // });
+
     log::info!(target:  &format!("{sp_id}_micro_sp"), "Spawning SOP runner.");
     let model_clone = Arc::clone(&model);
     let con_clone = connection_manager.clone();
     let sp_id_clone = sp_id.clone();
     tokio::task::spawn(async move {
-        sop_runner(&sp_id_clone, &model_clone, &con_clone)
+        sop_multi_runner(&sp_id_clone, &model_clone, &con_clone)
             .await
             .unwrap()
     });

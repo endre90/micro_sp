@@ -1897,6 +1897,7 @@ mod tests {
     /// the writer thread actually put on disk.
     #[test]
     #[serial_test::serial(micro_sp_activity_log_global)]
+    // #[serial_test::serial()]
     fn the_installed_log_renders_every_emission_helper_onto_disk() {
         let dir = temp_dir("inprocess");
         let config = ActivityLogConfig {

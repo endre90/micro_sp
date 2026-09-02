@@ -139,6 +139,7 @@ pub use crate::running::runner_keys::*;
 pub use crate::running::tick::*;
 pub use crate::running::runner_states::*;
 pub use crate::running::sop_runner::*;
+pub use crate::running::sop_multi::*;
 pub use crate::running::state_init::*;
 pub use crate::running::time_runner::*;
 

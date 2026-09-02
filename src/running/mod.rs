@@ -15,6 +15,8 @@ pub mod planner_ticker;
 pub mod goal_runner;
 /// Executing SOPs.
 pub mod sop_runner;
+/// Executing several SOPs at the same time.
+pub mod sop_multi;
 /// Spawning and supervising all of the above.
 pub mod main_runner;
 /// Generating the initial state a model needs.

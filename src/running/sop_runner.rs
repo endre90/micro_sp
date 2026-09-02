@@ -308,7 +308,7 @@ async fn remove_operations_from_state(sop_id: &str, unique_sop: &SOP, mut con: S
     StateManager::apply(&mut con, &State::new(), &[&op_ids, &op_ids_meta]).await;
 }
 
-async fn process_sop_node_tick(
+pub(crate) async fn process_sop_node_tick(
     sp_id: &str,
     mut state: State,
     sop: &SOP,
