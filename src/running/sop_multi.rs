@@ -8,9 +8,9 @@
 //!
 //! This runner drops the `{sp_id}_sop_id` indirection - which is the thing that
 //! makes it single-valued - and namespaces everything by the SOP's *own* id
-//! instead. Every [`SOPStruct`] in the model gets its own request and status
-//! variables, so a model can start and wait on each procedure independently and
-//! any number of them can run at once:
+//! instead. Every [`SOPStruct`](crate::SOPStruct) in the model gets its own
+//! request and status variables, so a model can start and wait on each procedure
+//! independently and any number of them can run at once:
 //!
 //! | Key | Type | Direction | Meaning |
 //! |---|---|---|---|
@@ -28,21 +28,25 @@
 //! ```
 //!
 //! `{sop.id}_sop_information` already exists for every SOP in the model -
-//! [`generate_operation_state_variables`] creates it. The other two do not: seed
-//! them with [`generate_multi_sop_state_variables`], and seed them *before*
-//! building the model, because `Transition::parse` resolves `var:` names at parse
-//! time and panics on a name that is not in the state it is given.
+//! [`generate_operation_state_variables`](crate::generate_operation_state_variables)
+//! creates it. The other two do not: seed them with
+//! [`generate_multi_sop_state_variables`](crate::generate_multi_sop_state_variables),
+//! and seed them *before* building the model, because `Transition::parse`
+//! resolves `var:` names at parse time and panics on a name that is not in the
+//! state it is given.
 //!
-//! One live instance per [`SOPStruct`]: enabling a SOP that is already running is
-//! ignored (with a debug line) rather than queued. Cancellation is global, as it
-//! is for every other runner - `{sp_id}_dashboard_command == "stop"` is what
-//! [`Operation::can_be_cancelled`] reads, so it cancels every active SOP at once.
+//! One live instance per [`SOPStruct`](crate::SOPStruct): enabling a SOP that is
+//! already running is ignored (with a debug line) rather than queued.
+//! Cancellation is global, as it is for every other runner -
+//! `{sp_id}_dashboard_command == "stop"` is what
+//! [`Operation::can_be_cancelled`](crate::Operation::can_be_cancelled) reads, so
+//! it cancels every active SOP at once.
 //!
 //! [`main_runner`](crate::main_runner) spawns this runner; the single-SOP
 //! [`sop_runner`](crate::sop_runner) is the one commented out there. Do not spawn
 //! a second copy by hand - each copy keeps its own list of active SOPs, so two of
-//! them would each start their own instance of the same [`SOPStruct`] and drive
-//! the same hardware twice.
+//! them would each start their own instance of the same
+//! [`SOPStruct`](crate::SOPStruct) and drive the same hardware twice.
 //!
 //! It touches none of `{sp_id}_sop_id`, `{sp_id}_sop_enabled`,
 //! `{sp_id}_sop_state`, `{sp_id}_sop_current_step` or `{sp_id}_sop_stack`, so it
@@ -56,15 +60,16 @@
 //!
 //! * `Operation::terminate` only implements `TerminationReason::Completed`, so a
 //!   **bypassed** operation never reaches `terminated_bypassed`.
-//!   [`SOP::get_state`] maps plain `Bypassed` to `Executing`, so a SOP containing
-//!   a bypassed operation never finishes.
+//!   [`SOP::get_state`](crate::SOP::get_state) maps plain `Bypassed` to
+//!   `Executing`, so a SOP containing a bypassed operation never finishes.
 //! * A retry does not reset `{op}_elapsed_executing_ms` / `_elapsed_disabled_ms`,
 //!   so a timeout retry times out again on the next tick. `timeout_retries` buys
 //!   extra attempts, not extra time.
-//! * [`SOPState::Cancelled`] renders as `"cancelled"` but `SOPState::from_str`
-//!   has no arm for it. This runner tracks each instance's state in memory and
-//!   never parses that key back, so it is unaffected - and a model guard written
-//!   as `var:{sop_id}_sop_state == cancelled` still works, being a plain string
+//! * [`SOPState::Cancelled`](crate::SOPState::Cancelled) renders as `"cancelled"`
+//!   but `SOPState::from_str` has no arm for it. This runner tracks each
+//!   instance's state in memory and never parses that key back, so it is
+//!   unaffected - and a model guard written as
+//!   `var:{sop_id}_sop_state == cancelled` still works, being a plain string
 //!   comparison.
 
 use crate::running::sop_runner::process_sop_node_tick;
